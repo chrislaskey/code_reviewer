@@ -39,14 +39,18 @@ The function table has vim-style navigation, implemented client side in
 | `gg` / `G`, `3G` | first / last row, row 3 |
 | `0` `^` / `$` | first / last column |
 | `Ctrl-d` / `Ctrl-u` | half page down / up |
-| `Enter` | on a module row: expand or collapse its functions; on a module row's `+/−` cell: show or hide a whole-module diff; on a function row: show or hide that function's diff |
-| `za` / `zo` / `zc` | toggle / open / close the module under the cursor |
+| `{` / `}` | previous / next table row, skipping diff lines |
+| `[c` / `]c` | previous / next change (a run of `+`/`−` lines) in a diff |
+| `Enter` | on a module row: expand or collapse its functions; on a module row's `+/−` cell: show or hide a whole-module diff; on a function row: show or hide that function's diff; on a diff line: report the line to the server (`activate`) |
+| `za` / `zo` / `zc` | toggle / open / close the fold under the cursor: the diff on a function row or diff line, the module on a module row. `zc` on a function whose diff is closed closes its module, as in vim |
 | `zR` / `zM` | open / close every module |
-| `Escape` | clear pending keys |
+| `Escape` | clear pending keys; on a diff line, jump back to the row that owns the diff |
 
 The table is a module view by default: one row per module with its functions
 folded underneath. Folds, like movement, are client side. Diffs are lazy: the
 first `Enter` on a function fetches both versions of its file from git,
 builds a whole-function line diff (`CodeReviewer.FunctionDiff`), and streams
-one row in under the function; the cursor skips diff rows and folding the
-module hides them.
+one row in under the function. An open diff behaves like an open fold: its
+lines are cursor stops, so `j` from the function walks into the code and out
+the other side, and the status line switches from `col` to `line` with the
+line number under the cursor. Folding the module hides its functions' diffs.

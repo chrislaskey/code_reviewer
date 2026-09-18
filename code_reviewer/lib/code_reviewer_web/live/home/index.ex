@@ -12,7 +12,9 @@ defmodule CodeReviewerWeb.HomeLive.Index do
   (`"toggle_diff"`); the diff is built on demand from the two file versions
   in git and streamed in as a row right under the function. `Enter` on a
   module row folds it, except on its `+/-` cell, which opens the same kind
-  of diff for the whole module.
+  of diff for the whole module. Once a diff is open its lines are cursor
+  stops too, so the same keys walk through the code; `Enter` on a line
+  reports it (`"activate"` with `kind: "line"`), a hook for what comes next.
   """
 
   use CodeReviewerWeb, :live_view
@@ -146,12 +148,25 @@ defmodule CodeReviewerWeb.HomeLive.Index do
     end
   end
 
-  # `Enter` on any other cell. Behaviour to be decided; for now the server
-  # records what was chosen so the round trip is visible.
+  # `Enter` on any other cell, or on a diff line. Behaviour to be decided;
+  # for now the server records what was chosen so the round trip is visible.
   def handle_event("activate", %{"id" => id, "column" => column} = params, socket) do
-    selected = %{id: id, column: column, module: params["module"], function: params["function"]}
+    selected = %{
+      id: id,
+      column: column,
+      module: params["module"],
+      function: params["function"],
+      line: selected_line_params(params["line"])
+    }
+
     {:noreply, assign(socket, :selected, selected)}
   end
+
+  defp selected_line_params(%{"kind" => kind} = line) when kind in ~w(add del context) do
+    %{kind: String.to_existing_atom(kind), old: line["old"], new: line["new"]}
+  end
+
+  defp selected_line_params(_), do: nil
 
   # -- data --------------------------------------------------------------------
 
@@ -337,6 +352,12 @@ defmodule CodeReviewerWeb.HomeLive.Index do
   @doc false
   def selected_label(%{module: module, function: nil}), do: module || "—"
   def selected_label(%{module: module, function: function}), do: "#{module}.#{function}"
+
+  # `+42` for an added line, `−17` for a removed one, `42` for context.
+  @doc false
+  def selected_line(%{kind: :add, new: new}), do: "+#{new}"
+  def selected_line(%{kind: :del, old: old}), do: "−#{old}"
+  def selected_line(%{new: new, old: old}), do: to_string(new || old || "—")
 
   @doc false
   def short_repo(path) do

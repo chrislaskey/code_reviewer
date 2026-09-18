@@ -139,8 +139,14 @@
                       <div :if={row.lines == []} class="px-4 py-3 text-base-content/50">
                         No lines to show for this function.
                       </div>
+                      <%!-- each line is a cursor stop for the VimGrid hook --%>
                       <div
-                        :for={line <- row.lines}
+                        :for={{line, i} <- Enum.with_index(row.lines)}
+                        data-id={"#{row.id}:L#{i}"}
+                        data-line={i}
+                        data-kind={line.kind}
+                        data-old={line.old}
+                        data-new={line.new}
                         class={[
                           "grid grid-cols-[3.5rem_3.5rem_1.25rem_1fr]",
                           line_class(line.kind)
@@ -273,18 +279,26 @@
         class="flex items-center gap-4 rounded-md bg-base-200/60 px-3 py-1.5 font-mono text-xs text-base-content/70"
       >
         <span class="rounded bg-primary/15 px-1.5 py-0.5 font-semibold text-primary">NORMAL</span>
-        <span>row <span data-vim-row>–</span>/<span data-vim-total>{@module_count}</span></span>
-        <span>col <span data-vim-col>–</span></span>
+        <span class="whitespace-nowrap">
+          row <span data-vim-row>–</span>/<span data-vim-total>{@module_count}</span>
+        </span>
+        <span class="whitespace-nowrap">
+          <span data-vim-col-label>col</span> <span data-vim-col>–</span>
+        </span>
         <span class="min-w-6 text-primary" data-vim-pending></span>
-        <span class="ml-auto hidden text-base-content/50 sm:inline">
-          hjkl move · gg/G · 0/$ · ^d/^u · 5j counts · Enter: fold module / show diff (+/− on a module: module diff) · za zR zM
+        <span class="ml-auto hidden text-right text-base-content/50 sm:inline">
+          hjkl · gg/G · 0/$ · ^d/^u · 5j · &#123;/&#125; rows · [c/]c changes · Enter: fold / diff (+/− on a module: module diff) · za zo zc zR zM · Esc leaves a diff
         </span>
       </div>
 
       <p :if={@selected} id="selected-cell" class="text-xs text-base-content/70">
         Enter on
         <span class="font-mono font-medium text-base-content">{selected_label(@selected)}</span>
-        column <span class="font-mono">{@selected.column}</span>
+        <%= if @selected.line do %>
+          line <span class="font-mono">{selected_line(@selected.line)}</span>
+        <% else %>
+          column <span class="font-mono">{@selected.column}</span>
+        <% end %>
         — what opens here is the next step.
       </p>
     </div>

@@ -120,6 +120,26 @@ defmodule CodeReviewerWeb.HomeLiveTest do
     })
 
     assert has_element?(view, "#selected-cell", "Shop.add/2")
+    assert has_element?(view, "#selected-cell", "column function")
+  end
+
+  test "enter on a diff line reports the line", %{conn: conn, repo: repo} do
+    {:ok, view, _html} = live(conn, ~p"/?#{%{repo: repo, rev: "HEAD"}}")
+    render_async(view, 5_000)
+
+    view
+    |> element("#function-index")
+    |> render_hook("activate", %{
+      "id" => "x",
+      "kind" => "line",
+      "column" => "diff",
+      "module" => "Shop",
+      "function" => "total/1",
+      "line" => %{"kind" => "add", "old" => nil, "new" => "2"}
+    })
+
+    assert has_element?(view, "#selected-cell", "Shop.total/1")
+    assert has_element?(view, "#selected-cell", "line +2")
   end
 
   test "enter on a function's module name streams its diff row in and out", %{
@@ -148,6 +168,24 @@ defmodule CodeReviewerWeb.HomeLiveTest do
              view,
              "#function-rows tr[data-kind='diff'] [data-column='diff']",
              "def total(cart), do: cart"
+           )
+
+    # every line is a cursor stop with a stable id and its line numbers
+    assert has_element?(
+             view,
+             "#function-rows tr[data-kind='diff'] [data-line='0'][data-id='d-#{id}:L0']"
+           )
+
+    assert has_element?(
+             view,
+             "#function-rows tr[data-kind='diff'] [data-line][data-kind='del'][data-old='2']",
+             "def total(cart), do: cart"
+           )
+
+    assert has_element?(
+             view,
+             "#function-rows tr[data-kind='diff'] [data-line][data-kind='add'][data-new='2']",
+             "def total(cart), do: Enum.sum(cart)"
            )
 
     view |> element("#function-index") |> render_hook("toggle_diff", %{"id" => id})

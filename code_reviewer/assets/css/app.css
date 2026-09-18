@@ -132,3 +132,14 @@
   background: color-mix(in oklab, var(--color-primary) 14%, transparent);
   transition: background-color 80ms ease-out;
 }
+
+/* Diff lines are cursor stops too. The outline marks the line; a translucent
+   gradient tints it on top of the +/− colouring instead of replacing it. */
+.vim-grid tbody [data-line].is-cursor {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  background-image: linear-gradient(
+    color-mix(in oklab, var(--color-primary) 10%, transparent),
+    color-mix(in oklab, var(--color-primary) 10%, transparent)
+  );
+}
