@@ -12,9 +12,9 @@
 //   gg / G             first / last row (3G = row 3)
 //   0 ^ / $            first / last column
 //   Ctrl-d / Ctrl-u    half page down / up
-//   Enter              on a module name: toggle its functions
-//                      on a function's module name: toggle its diff row
-//                      elsewhere: activate
+//   Enter              on a module row: toggle its functions
+//                      on a module row's +/- cell: toggle the whole-module diff
+//                      on a function row: toggle its diff row
 //   za / zo / zc       toggle / open / close the module under the cursor
 //   zR / zM            open / close every module
 //   Escape             clear pending keys
@@ -44,8 +44,8 @@ const VimGrid = {
       if (!tr.dataset.id || tr.dataset.kind === "diff") return
       this.rowId = tr.dataset.id
       this.col = td.cellIndex
-      if (tr.dataset.kind === "module" && td.dataset.column === "module") this.toggle(tr.dataset.id)
-      if (tr.dataset.kind === "function" && td.dataset.column === "module") this.pushEvent("toggle_diff", {id: tr.dataset.id})
+      // a click is Enter on that cell
+      this.activate(tr)
       this.render()
     })
 
@@ -223,12 +223,17 @@ const VimGrid = {
     const td = tr.children[this.col]
     const column = td ? td.dataset.column : null
 
-    if (tr.dataset.kind === "module" && column === "module") {
+    if (tr.dataset.kind === "module" && column === "stats") {
+      this.pushEvent("toggle_diff", {id: tr.dataset.id})
+      return
+    }
+
+    if (tr.dataset.kind === "module") {
       this.toggle(tr.dataset.id)
       return
     }
 
-    if (tr.dataset.kind === "function" && column === "module") {
+    if (tr.dataset.kind === "function") {
       this.pushEvent("toggle_diff", {id: tr.dataset.id})
       return
     }

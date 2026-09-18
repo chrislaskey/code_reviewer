@@ -39,7 +39,7 @@ The function table has vim-style navigation, implemented client side in
 | `gg` / `G`, `3G` | first / last row, row 3 |
 | `0` `^` / `$` | first / last column |
 | `Ctrl-d` / `Ctrl-u` | half page down / up |
-| `Enter` | on a module name: expand or collapse its functions; on a function's module name: show or hide that function's diff; elsewhere: send `"activate"` to the LiveView |
+| `Enter` | on a module row: expand or collapse its functions; on a module row's `+/−` cell: show or hide a whole-module diff; on a function row: show or hide that function's diff |
 | `za` / `zo` / `zc` | toggle / open / close the module under the cursor |
 | `zR` / `zM` | open / close every module |
 | `Escape` | clear pending keys |

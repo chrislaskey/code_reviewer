@@ -74,6 +74,7 @@ defmodule CodeReviewer.FunctionIndex do
         old_name: module.old_name,
         file: file.path,
         line: range && range.first,
+        ranges: module.range,
         stats: module.stats,
         functions: functions
       }

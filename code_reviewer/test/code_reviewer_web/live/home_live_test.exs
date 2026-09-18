@@ -93,13 +93,13 @@ defmodule CodeReviewerWeb.HomeLiveTest do
 
     assert has_element?(
              view,
-             "#function-rows tr[data-function='log/1'] [data-column='function']",
+             "#function-rows tr[data-function='log/1'] [data-column='module']",
              "defp log/1"
            )
 
     assert has_element?(
              view,
-             "#function-rows tr[data-function='add/2'] [data-column='function']",
+             "#function-rows tr[data-function='add/2'] [data-column='module']",
              "def add/2"
            )
 
@@ -152,6 +152,30 @@ defmodule CodeReviewerWeb.HomeLiveTest do
 
     view |> element("#function-index") |> render_hook("toggle_diff", %{"id" => id})
     refute has_element?(view, "#function-rows tr[data-kind='diff']")
+  end
+
+  test "toggle_diff on a module row shows the whole module", %{conn: conn, repo: repo} do
+    {:ok, view, _html} = live(conn, ~p"/?#{%{repo: repo, rev: "HEAD"}}")
+    render_async(view, 5_000)
+
+    {:ok, review} = CodeReviewer.review_git(repo, from: "HEAD~1", to: "HEAD")
+    [%{id: module_id}] = CodeReviewer.FunctionIndex.by_module(review)
+
+    view |> element("#function-index") |> render_hook("toggle_diff", %{"id" => "m-" <> module_id})
+
+    assert has_element?(view, "#function-rows tr[data-kind='diff'][data-parent='m-#{module_id}']")
+
+    assert has_element?(
+             view,
+             "#function-rows tr[data-kind='diff'] [data-column='diff']",
+             "defmodule Shop do"
+           )
+
+    assert has_element?(
+             view,
+             "#function-rows tr[data-kind='diff'] [data-column='diff']",
+             "defp log(msg), do: msg"
+           )
   end
 
   test "submitting the source form patches the url and reloads", %{conn: conn, repo: repo} do

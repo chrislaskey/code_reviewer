@@ -8,10 +8,11 @@ defmodule CodeReviewerWeb.HomeLive.Index do
 
   The review is computed off the LiveView process with `start_async/3`.
   Cursor movement and expand/collapse are client side in the `VimGrid` hook.
-  `Enter` on a function's module name asks the server for that function's
-  diff (`"toggle_diff"`); the diff is built on demand from the two file
-  versions in git and streamed in as a row right under the function.
-  `Enter` elsewhere is `"activate"`.
+  `Enter` on a function row asks the server for that function's diff
+  (`"toggle_diff"`); the diff is built on demand from the two file versions
+  in git and streamed in as a row right under the function. `Enter` on a
+  module row folds it, except on its `+/-` cell, which opens the same kind
+  of diff for the whole module.
   """
 
   use CodeReviewerWeb, :live_view
@@ -22,11 +23,10 @@ defmodule CodeReviewerWeb.HomeLive.Index do
   # the rest. Long text truncates instead of wrapping so rows stay one line
   # high, which keeps j/k movement predictable.
   @columns [
-    %{key: "module", label: "Module", width: "w-[26rem]", align: nil},
-    %{key: "verb", label: "Verb", width: "w-24", align: nil},
+    %{key: "verb", label: "Verb", width: "w-16", align: nil},
+    %{key: "module", label: "Module / Function", width: nil, align: nil},
     %{key: "stats", label: "+ / −", width: "w-28", align: "text-center"},
-    %{key: "function", label: "Function", width: nil, align: nil},
-    %{key: "clauses", label: "Clauses", width: "w-24", align: nil},
+    %{key: "notes", label: "Notes", width: "w-44", align: nil},
     %{key: "lines", label: "Lines", width: "w-28", align: nil},
     %{key: "location", label: "File:Line", width: "w-[18rem]", align: nil}
   ]
@@ -81,10 +81,7 @@ defmodule CodeReviewerWeb.HomeLive.Index do
       |> assign(:module_count, length(result.modules))
       |> assign(:row_count, result.summary.total)
       |> assign(:review, result.review)
-      |> assign(
-        :rows_by_id,
-        rows |> Enum.filter(&(&1.kind == :function)) |> Map.new(&{&1.id, &1})
-      )
+      |> assign(:rows_by_id, Map.new(rows, &{&1.id, &1}))
       |> assign(:display_order, Enum.map(rows, & &1.id))
       |> assign(:open_diffs, MapSet.new())
       |> stream(:rows, rows, reset: true)
@@ -113,7 +110,8 @@ defmodule CodeReviewerWeb.HomeLive.Index do
     {:noreply, push_patch(socket, to: ~p"/?#{%{repo: String.trim(repo), rev: String.trim(rev)}}")}
   end
 
-  # `Enter` on a function's module name: show or hide its diff row.
+  # `Enter` on a function row, or on a module row's `+/-`: show or hide the
+  # diff row for that function or module.
   def handle_event("toggle_diff", %{"id" => id}, socket) do
     diff_id = "d-" <> id
 
@@ -217,6 +215,7 @@ defmodule CodeReviewerWeb.HomeLive.Index do
         verb: m.verb,
         file: m.file,
         line: m.line,
+        ranges: m.ranges,
         stats: m.stats,
         function_count: length(m.functions)
       }
@@ -232,7 +231,9 @@ defmodule CodeReviewerWeb.HomeLive.Index do
     end)
   end
 
-  # Whole-function diff, built from the two file versions fetched from git.
+  # Whole-function (or whole-module) diff, built from the two file versions
+  # fetched from git. Module diffs sit under the module row and stay visible
+  # when it is folded; function diffs fold with their module.
   defp diff_row(%{review: review, source: source}, row, diff_id) do
     file = Enum.find(review.files, &(&1.path == row.file))
     %{from: from, to: to} = revisions(source)
@@ -257,7 +258,7 @@ defmodule CodeReviewerWeb.HomeLive.Index do
       parent_id: row.id,
       fold_id: row.parent_id,
       module: row.module,
-      function: row.function,
+      function: row[:function],
       lines: lines
     }
   end
@@ -278,11 +279,11 @@ defmodule CodeReviewerWeb.HomeLive.Index do
   def line_class(:del), do: "bg-rose-500/10 text-rose-900 dark:text-rose-100"
   def line_class(:context), do: "text-base-content/80"
 
-  # Dark ink for a real count, light gray when there is nothing to report.
+  # Plain ink for a real count, light gray when there is nothing to report.
   @doc false
   def count_class(0, _kind), do: "text-base-content/35"
-  def count_class(_n, :add), do: "text-emerald-900 dark:text-emerald-300"
-  def count_class(_n, :del), do: "text-rose-900 dark:text-rose-300"
+  def count_class(_n, :add), do: "text-emerald-500/60 dark:text-emerald-400/60"
+  def count_class(_n, :del), do: "text-rose-500/60 dark:text-rose-400/60"
 
   @doc false
   def verb_letter(verb), do: verb |> Atom.to_string() |> String.first() |> String.upcase()
@@ -299,11 +300,25 @@ defmodule CodeReviewerWeb.HomeLive.Index do
   def verb_class(:renamed), do: "bg-violet-500/10 text-violet-700 dark:text-violet-300"
   def verb_class(_), do: "bg-base-300 text-base-content/70"
 
-  # Current clause count; when it changed, the old count too.
+  # What changed about an updated function besides its body, as short notes.
   @doc false
-  def clauses(%{clauses: %{before: b, after: a}, verb: :deleted}) when a == 0, do: "#{b}"
-  def clauses(%{clauses: %{before: b, after: a}}) when b == 0 or b == a, do: "#{a}"
-  def clauses(%{clauses: %{before: b, after: a}}), do: "#{b} → #{a}"
+  def notes(%{verb: :updated, details: details, clauses: clauses}) do
+    details
+    |> Enum.flat_map(fn
+      :clauses -> ["#{clauses.before} → #{clauses.after} clauses"]
+      :visibility -> ["visibility changed"]
+      :head -> ["head changed"]
+      :spec -> ["spec changed"]
+      :doc -> ["doc changed"]
+      :impl -> ["impl changed"]
+      _ -> []
+    end)
+    |> Enum.join(", ")
+  end
+
+  def notes(%{clauses: %{after: a}}) when a > 1, do: "#{a} clauses"
+  def notes(%{clauses: %{before: b, after: 0}}) when b > 1, do: "#{b} clauses"
+  def notes(_row), do: ""
 
   # `def rows/2`, `defp module_id/1`, `test "name"`
   @doc false
