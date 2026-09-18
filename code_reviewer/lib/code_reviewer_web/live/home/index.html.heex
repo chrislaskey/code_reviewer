@@ -1,0 +1,264 @@
+<Layouts.app flash={@flash}>
+  <div class="flex flex-col gap-4">
+    <%!-- Source picker --%>
+    <.form
+      for={@form}
+      id="source-form"
+      phx-submit="source"
+      class="flex flex-wrap items-end gap-3 rounded-lg border border-base-300 bg-base-200/40 px-4 py-3"
+    >
+      <label class="flex flex-col gap-1 text-xs text-base-content/60">
+        Repository
+        <input
+          type="text"
+          name="repo"
+          id="source-repo"
+          value={@form[:repo].value}
+          spellcheck="false"
+          class="w-[28rem] max-w-full rounded-md border border-base-300 bg-base-100 px-2.5 py-1.5 font-mono text-sm text-base-content focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </label>
+      <label class="flex flex-col gap-1 text-xs text-base-content/60">
+        Revision
+        <input
+          type="text"
+          name="rev"
+          id="source-rev"
+          value={@form[:rev].value}
+          spellcheck="false"
+          class="w-40 rounded-md border border-base-300 bg-base-100 px-2.5 py-1.5 font-mono text-sm text-base-content focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </label>
+      <button
+        type="submit"
+        id="source-load"
+        class="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-content transition hover:brightness-110 active:scale-[0.98]"
+      >
+        Load
+      </button>
+      <p class="ml-auto self-center text-xs text-base-content/50">
+        Compares <span class="font-mono">{@source.rev}~1</span>
+        to <span class="font-mono">{@source.rev}</span>
+      </p>
+    </.form>
+
+    <%!-- Summary --%>
+    <header
+      :if={@status == :ready and @summary}
+      id="index-summary"
+      class="flex flex-wrap items-baseline gap-x-6 gap-y-1"
+    >
+      <h1 class="text-base font-semibold tracking-tight">
+        {@title || "Functions"}
+      </h1>
+      <p class="text-sm text-base-content/70">
+        <span class="font-medium text-base-content">{@module_count}</span>
+        modules, <span class="font-medium text-base-content">{@summary.total}</span>
+        functions changed <span class="mx-2 text-base-content/30">·</span>
+        <span class="text-emerald-600 dark:text-emerald-400">{@summary.by_verb.created} created</span>
+        <span class="mx-1.5 text-base-content/30">·</span>
+        <span class="text-blue-600 dark:text-blue-400">{@summary.by_verb.updated} updated</span>
+        <span class="mx-1.5 text-base-content/30">·</span>
+        <span class="text-rose-600 dark:text-rose-400">{@summary.by_verb.deleted} deleted</span>
+        <span class="mx-2 text-base-content/30">·</span>
+        {@summary.by_visibility.public} public, {@summary.by_visibility.private} private
+        <span class="mx-2 text-base-content/30">·</span>
+        <span class="font-mono text-emerald-600 dark:text-emerald-400">+{@summary.added}</span>
+        <span class="font-mono text-rose-600 dark:text-rose-400">-{@summary.removed}</span>
+      </p>
+    </header>
+
+    <%!-- States --%>
+    <div
+      :if={@status == :loading}
+      id="index-loading"
+      class="flex items-center gap-3 py-10 text-sm text-base-content/60"
+    >
+      <span class="inline-block size-4 animate-spin rounded-full border-2 border-base-content/20 border-t-primary"></span>
+      Reading <span class="font-mono">{short_repo(@source.repo)}</span>
+      at <span class="font-mono">{@source.rev}</span>…
+    </div>
+
+    <div
+      :if={@status == :failed}
+      id="index-error"
+      class="rounded-lg border border-rose-500/30 bg-rose-500/5 px-4 py-3 text-sm"
+    >
+      <p class="font-medium text-rose-700 dark:text-rose-300">Could not build the review</p>
+      <pre class="mt-1 whitespace-pre-wrap font-mono text-xs text-base-content/70">{@error}</pre>
+    </div>
+
+    <%!-- Grid --%>
+    <div
+      :if={@status == :ready}
+      id="function-index"
+      phx-hook="VimGrid"
+      class="vim-grid flex flex-col gap-2"
+    >
+      <div class="overflow-x-auto rounded-lg border border-base-300">
+        <table class="w-full table-fixed border-collapse text-sm">
+          <thead class="bg-base-200/60 text-left text-xs uppercase tracking-wide text-base-content/60">
+            <tr>
+              <th
+                :for={col <- @columns}
+                class={["px-3 py-2 font-medium whitespace-nowrap", col.width]}
+                data-column={col.key}
+              >
+                {col.label}
+              </th>
+            </tr>
+          </thead>
+          <tbody id="function-rows" phx-update="stream" class="divide-y divide-base-300/70">
+            <tr id="function-rows-empty" class="hidden only:table-row">
+              <td colspan={length(@columns)} class="px-3 py-8 text-center text-base-content/50">
+                No functions changed in this revision.
+              </td>
+            </tr>
+            <tr
+              :for={{dom_id, row} <- @streams.rows}
+              id={dom_id}
+              data-id={row.id}
+              data-kind={row.kind}
+              data-parent={row.parent_id}
+              data-module={row.module}
+              data-function={row[:function]}
+              class={[
+                "transition-colors",
+                if(row.kind == :module,
+                  do: "bg-base-200/30 font-medium hover:bg-base-200/60",
+                  else: "hover:bg-base-200/40"
+                )
+              ]}
+            >
+              <%= if row.kind == :module do %>
+                <td class="px-3 py-1.5 font-mono text-xs" data-column="module" title={row.module}>
+                  <div class="flex items-center gap-1.5">
+                    <span class="flex w-4 shrink-0 items-center justify-center text-base-content/50">
+                      <%= if row.function_count > 0 do %>
+                        <span data-chevron="open"><.icon
+                          name="hero-chevron-down-mini"
+                          class="size-3.5"
+                        /></span>
+                        <span data-chevron="closed"><.icon
+                          name="hero-chevron-right-mini"
+                          class="size-3.5"
+                        /></span>
+                      <% end %>
+                    </span>
+                    <span class="min-w-0 truncate">{row.module || "—"}</span>
+                    <span
+                      :if={row.function_count > 0}
+                      class="ml-auto shrink-0 pl-3 tabular-nums text-base-content/50"
+                      data-function-count
+                    >
+                      {row.function_count}
+                    </span>
+                  </div>
+                </td>
+                <td class="px-3 py-1.5 whitespace-nowrap" data-column="verb">
+                  <span class={[
+                    "inline-block rounded px-1.5 py-0.5 text-xs font-medium",
+                    verb_class(row.verb)
+                  ]}>
+                    {row.verb |> Atom.to_string() |> String.capitalize()}
+                  </span>
+                </td>
+                <td data-column="visibility"></td>
+                <td data-column="function"></td>
+                <td data-column="clauses"></td>
+                <td data-column="lines"></td>
+                <td class="px-3 py-1.5 whitespace-nowrap font-mono text-xs" data-column="stats">
+                  <span class="text-emerald-600 dark:text-emerald-400">+{row.stats.added}</span>
+                  <span class="ml-1 text-rose-600 dark:text-rose-400">-{row.stats.removed}</span>
+                </td>
+                <td
+                  class="truncate px-3 py-1.5 font-mono text-xs text-base-content/60"
+                  data-column="location"
+                  title={location(row)}
+                >
+                  {location(row)}
+                </td>
+              <% else %>
+                <td
+                  class="px-3 py-1.5 font-mono text-xs text-base-content/60"
+                  data-column="module"
+                  title={row.module}
+                >
+                  <div class="flex items-center gap-1.5">
+                    <span class="w-4 shrink-0"></span>
+                    <span class="min-w-0 truncate">{row.module || "—"}</span>
+                  </div>
+                </td>
+                <td class="px-3 py-1.5 whitespace-nowrap" data-column="verb">
+                  <span class={[
+                    "inline-block rounded px-1.5 py-0.5 text-xs font-medium",
+                    verb_class(row.verb)
+                  ]}>
+                    {row.verb |> Atom.to_string() |> String.capitalize()}
+                  </span>
+                </td>
+                <td
+                  class="px-3 py-1.5 whitespace-nowrap text-base-content/70"
+                  data-column="visibility"
+                >
+                  {row.visibility}
+                </td>
+                <td
+                  class="truncate px-3 py-1.5 font-mono text-xs font-medium"
+                  data-column="function"
+                  title={row.function}
+                >
+                  {row.function}
+                </td>
+                <td
+                  class="px-3 py-1.5 whitespace-nowrap font-mono text-xs text-base-content/70"
+                  data-column="clauses"
+                >
+                  {clauses(row)}
+                </td>
+                <td
+                  class="px-3 py-1.5 whitespace-nowrap font-mono text-xs text-base-content/70"
+                  data-column="lines"
+                >
+                  {lines(row)}
+                </td>
+                <td class="px-3 py-1.5 whitespace-nowrap font-mono text-xs" data-column="stats">
+                  <span class="text-emerald-600 dark:text-emerald-400">+{row.stats.added}</span>
+                  <span class="ml-1 text-rose-600 dark:text-rose-400">-{row.stats.removed}</span>
+                </td>
+                <td
+                  class="truncate px-3 py-1.5 font-mono text-xs text-base-content/60"
+                  data-column="location"
+                  title={location(row)}
+                >
+                  {location(row)}
+                </td>
+              <% end %>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <%!-- Vim-style status line; the hook fills the data-vim-* spans --%>
+      <div
+        id="vim-statusline"
+        class="flex items-center gap-4 rounded-md bg-base-200/60 px-3 py-1.5 font-mono text-xs text-base-content/70"
+      >
+        <span class="rounded bg-primary/15 px-1.5 py-0.5 font-semibold text-primary">NORMAL</span>
+        <span>row <span data-vim-row>–</span>/<span data-vim-total>{@module_count}</span></span>
+        <span>col <span data-vim-col>–</span></span>
+        <span class="min-w-6 text-primary" data-vim-pending></span>
+        <span class="ml-auto hidden text-base-content/50 sm:inline">
+          hjkl move · gg/G · 0/$ · ^d/^u · 5j counts · Enter toggle module / open · za zR zM folds
+        </span>
+      </div>
+
+      <p :if={@selected} id="selected-cell" class="text-xs text-base-content/70">
+        Enter on
+        <span class="font-mono font-medium text-base-content">{selected_label(@selected)}</span>
+        column <span class="font-mono">{@selected.column}</span>
+        — what opens here is the next step.
+      </p>
+    </div>
+  </div>
+</Layouts.app>

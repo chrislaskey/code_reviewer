@@ -29,6 +29,15 @@ defmodule CodeReviewer.Git do
     end
   end
 
+  @doc "Root of the working tree containing `path`, or nil when it is not inside a git repository."
+  @spec toplevel(Path.t()) :: Path.t() | nil
+  def toplevel(path) do
+    case run(path, ["rev-parse", "--show-toplevel"]) do
+      {:ok, out} -> out |> String.trim() |> blank_to_nil()
+      _ -> nil
+    end
+  end
+
   defp run(repo, args) do
     case System.cmd("git", args, cd: Path.expand(repo), stderr_to_stdout: true) do
       {out, 0} -> {:ok, out}

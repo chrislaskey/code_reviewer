@@ -17,7 +17,7 @@ defmodule CodeReviewerWeb.Router do
   scope "/", CodeReviewerWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live "/", HomeLive.Index, :index
   end
 
   # Other scopes may use custom stacks.

@@ -32,8 +32,13 @@ defmodule CodeReviewer.MixProject do
   end
 
   # Specifies which paths to compile per environment.
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
-  defp elixirc_paths(_), do: ["lib"]
+  # The core library lives at the repository root (../lib) and shares the
+  # CodeReviewer namespace; this web app is its UI. Mix requires external
+  # source directories to be absolute.
+  @core_lib Path.expand("../lib", __DIR__)
+
+  defp elixirc_paths(:test), do: ["lib", @core_lib, "test/support"]
+  defp elixirc_paths(_), do: ["lib", @core_lib]
 
   # Specifies your project dependencies.
   #

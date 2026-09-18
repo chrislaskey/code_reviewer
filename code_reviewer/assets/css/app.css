@@ -1,6 +1,7 @@
 /* See the Tailwind configuration guide for advanced usage
    https://tailwindcss.com/docs/configuration */
 
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap");
 @import "tailwindcss" source(none);
 @import "phoenix-colocated/code_reviewer/colocated.css";
 @source "../css";
@@ -91,6 +92,10 @@
   --noise: 0;
 }
 
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
 /* Add variants based on LiveView classes */
 @custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);
 @custom-variant phx-submit-loading (.phx-submit-loading&, .phx-submit-loading &);
@@ -103,3 +108,27 @@
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
 /* This file is for your main application CSS */
+
+/* VimGrid cursor. The hook toggles these classes; keep them out of Tailwind
+   so a server re-render cannot strip them before `updated()` re-applies. */
+.vim-grid tbody tr.is-cursor-row > td {
+  background: color-mix(in oklab, var(--color-base-content) 5%, transparent);
+}
+
+/* Fold chevrons: two icons per module row, the fold state picks one. */
+.vim-grid tbody tr[data-kind="module"] [data-chevron="closed"],
+.vim-grid tbody tr[data-kind="module"].is-collapsed [data-chevron="open"] {
+  display: none;
+}
+
+.vim-grid tbody tr[data-kind="module"].is-collapsed [data-chevron="closed"] {
+  display: inline-flex;
+}
+
+.vim-grid tbody td.is-cursor {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--color-primary) 14%, transparent);
+  transition: background-color 80ms ease-out;
+}
