@@ -52,8 +52,8 @@ defmodule CodeReviewerWeb.HomeLiveTest do
     # one module row, with its function rows pointing back at it
     assert has_element?(
              view,
-             "#function-rows tr[data-kind='module'][data-module='Shop'] [data-column='verb']",
-             "Updated"
+             "#function-rows tr[data-kind='module'][data-module='Shop'] [data-column='verb'] [title='Updated']",
+             "U"
            )
 
     assert has_element?(
@@ -81,20 +81,26 @@ defmodule CodeReviewerWeb.HomeLiveTest do
 
     assert has_element?(
              view,
-             "#function-rows tr[data-function='total/1'] [data-column='verb']",
-             "Updated"
+             "#function-rows tr[data-function='total/1'] [data-column='verb'] [title='Updated']",
+             "U"
            )
 
     assert has_element?(
              view,
-             "#function-rows tr[data-function='add/2'] [data-column='verb']",
-             "Created"
+             "#function-rows tr[data-function='add/2'] [data-column='verb'] [title='Created']",
+             "C"
            )
 
     assert has_element?(
              view,
-             "#function-rows tr[data-function='log/1'] [data-column='visibility']",
-             "private"
+             "#function-rows tr[data-function='log/1'] [data-column='function']",
+             "defp log/1"
+           )
+
+    assert has_element?(
+             view,
+             "#function-rows tr[data-function='add/2'] [data-column='function']",
+             "def add/2"
            )
 
     assert has_element?(view, "#vim-statusline")
@@ -114,6 +120,38 @@ defmodule CodeReviewerWeb.HomeLiveTest do
     })
 
     assert has_element?(view, "#selected-cell", "Shop.add/2")
+  end
+
+  test "enter on a function's module name streams its diff row in and out", %{
+    conn: conn,
+    repo: repo
+  } do
+    {:ok, view, _html} = live(conn, ~p"/?#{%{repo: repo, rev: "HEAD"}}")
+    render_async(view, 5_000)
+
+    {:ok, review} = CodeReviewer.review_git(repo, from: "HEAD~1", to: "HEAD")
+
+    %{id: id} =
+      review |> CodeReviewer.FunctionIndex.rows() |> Enum.find(&(&1.function == "total/1"))
+
+    view |> element("#function-index") |> render_hook("toggle_diff", %{"id" => id})
+
+    assert has_element?(view, "#function-rows tr[data-kind='diff'][data-parent='#{id}']")
+
+    assert has_element?(
+             view,
+             "#function-rows tr[data-kind='diff'] [data-column='diff']",
+             "def total(cart), do: Enum.sum(cart)"
+           )
+
+    assert has_element?(
+             view,
+             "#function-rows tr[data-kind='diff'] [data-column='diff']",
+             "def total(cart), do: cart"
+           )
+
+    view |> element("#function-index") |> render_hook("toggle_diff", %{"id" => id})
+    refute has_element?(view, "#function-rows tr[data-kind='diff']")
   end
 
   test "submitting the source form patches the url and reloads", %{conn: conn, repo: repo} do

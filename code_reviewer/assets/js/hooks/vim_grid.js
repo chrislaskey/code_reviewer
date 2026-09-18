@@ -12,7 +12,9 @@
 //   gg / G             first / last row (3G = row 3)
 //   0 ^ / $            first / last column
 //   Ctrl-d / Ctrl-u    half page down / up
-//   Enter              on a module name: toggle its functions; elsewhere: activate
+//   Enter              on a module name: toggle its functions
+//                      on a function's module name: toggle its diff row
+//                      elsewhere: activate
 //   za / zo / zc       toggle / open / close the module under the cursor
 //   zR / zM            open / close every module
 //   Escape             clear pending keys
@@ -27,8 +29,10 @@ const VimGrid = {
     this.col = 0
     this.count = ""
     this.pending = "" // "g" or "z" awaiting a second key
-    // Module view by default: every module starts collapsed.
-    this.collapsed = new Set(this.moduleRows().map((tr) => tr.dataset.id))
+    // Module view by default: every module starts collapsed. `seen` lets
+    // updated() collapse only modules that arrive later.
+    this.seen = new Set(this.moduleRows().map((tr) => tr.dataset.id))
+    this.collapsed = new Set(this.seen)
 
     this.onKeydown = (e) => this.handleKey(e)
     window.addEventListener("keydown", this.onKeydown)
@@ -37,10 +41,11 @@ const VimGrid = {
       const td = e.target.closest("tbody td")
       if (!td || !this.el.contains(td)) return
       const tr = td.parentElement
-      if (!tr.dataset.id) return
+      if (!tr.dataset.id || tr.dataset.kind === "diff") return
       this.rowId = tr.dataset.id
       this.col = td.cellIndex
       if (tr.dataset.kind === "module" && td.dataset.column === "module") this.toggle(tr.dataset.id)
+      if (tr.dataset.kind === "function" && td.dataset.column === "module") this.pushEvent("toggle_diff", {id: tr.dataset.id})
       this.render()
     })
 
@@ -50,7 +55,7 @@ const VimGrid = {
   updated() {
     // New data may bring new modules; they start collapsed too.
     const known = new Set(this.moduleRows().map((tr) => tr.dataset.id))
-    for (const id of known) if (!this.seen || !this.seen.has(id)) this.collapsed.add(id)
+    for (const id of known) if (!this.seen.has(id)) this.collapsed.add(id)
     this.seen = known
     this.render()
   },
@@ -67,9 +72,12 @@ const VimGrid = {
     return this.allRows().filter((tr) => tr.dataset.kind === "module")
   },
 
-  // Visible rows only: function rows of a collapsed module do not count.
+  // Navigable rows: not diffs, and not functions of a collapsed module.
+  // Diff rows are scenery: hidden with their module's fold, never a cursor stop.
   rows() {
-    return this.allRows().filter((tr) => !(tr.dataset.parent && this.collapsed.has(tr.dataset.parent)))
+    return this.allRows().filter(
+      (tr) => tr.dataset.kind !== "diff" && !(tr.dataset.parent && this.collapsed.has(tr.dataset.parent))
+    )
   },
 
   columnCount() {
@@ -220,6 +228,11 @@ const VimGrid = {
       return
     }
 
+    if (tr.dataset.kind === "function" && column === "module") {
+      this.pushEvent("toggle_diff", {id: tr.dataset.id})
+      return
+    }
+
     this.pushEvent("activate", {
       id: tr.dataset.id,
       kind: tr.dataset.kind,
@@ -236,6 +249,8 @@ const VimGrid = {
     for (const tr of this.allRows()) {
       if (tr.dataset.kind === "module") {
         tr.classList.toggle(COLLAPSED, this.collapsed.has(tr.dataset.id))
+      } else if (tr.dataset.kind === "diff") {
+        tr.classList.toggle("hidden", this.collapsed.has(tr.dataset.fold))
       } else if (tr.dataset.parent) {
         tr.classList.toggle("hidden", this.collapsed.has(tr.dataset.parent))
       }

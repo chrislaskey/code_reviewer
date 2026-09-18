@@ -39,11 +39,14 @@ The function table has vim-style navigation, implemented client side in
 | `gg` / `G`, `3G` | first / last row, row 3 |
 | `0` `^` / `$` | first / last column |
 | `Ctrl-d` / `Ctrl-u` | half page down / up |
-| `Enter` | on a module name: expand or collapse its functions; elsewhere: send `"activate"` to the LiveView |
+| `Enter` | on a module name: expand or collapse its functions; on a function's module name: show or hide that function's diff; elsewhere: send `"activate"` to the LiveView |
 | `za` / `zo` / `zc` | toggle / open / close the module under the cursor |
 | `zR` / `zM` | open / close every module |
 | `Escape` | clear pending keys |
 
 The table is a module view by default: one row per module with its functions
-folded underneath. Folds, like movement, are client side; only `Enter` on a
-non-module cell reaches the server.
+folded underneath. Folds, like movement, are client side. Diffs are lazy: the
+first `Enter` on a function fetches both versions of its file from git,
+builds a whole-function line diff (`CodeReviewer.FunctionDiff`), and streams
+one row in under the function; the cursor skips diff rows and folding the
+module hides them.

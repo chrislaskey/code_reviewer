@@ -7,26 +7,28 @@ defmodule CodeReviewerWeb.HomeLive.Index do
   function rows pointing at their module through `parent_id`.
 
   The review is computed off the LiveView process with `start_async/3`.
-  Cursor movement and expand/collapse are client side in the `VimGrid` hook;
-  only `Enter` on a non-module cell reaches the server, as `"activate"`.
+  Cursor movement and expand/collapse are client side in the `VimGrid` hook.
+  `Enter` on a function's module name asks the server for that function's
+  diff (`"toggle_diff"`); the diff is built on demand from the two file
+  versions in git and streamed in as a row right under the function.
+  `Enter` elsewhere is `"activate"`.
   """
 
   use CodeReviewerWeb, :live_view
 
-  alias CodeReviewer.{FunctionIndex, Git}
+  alias CodeReviewer.{FunctionDiff, FunctionIndex, Git}
 
   # Fixed table layout: every column but Function has a width, Function takes
   # the rest. Long text truncates instead of wrapping so rows stay one line
   # high, which keeps j/k movement predictable.
   @columns [
-    %{key: "module", label: "Module", width: "w-[26rem]"},
-    %{key: "verb", label: "Verb", width: "w-24"},
-    %{key: "visibility", label: "Vis", width: "w-20"},
-    %{key: "function", label: "Function", width: nil},
-    %{key: "clauses", label: "Clauses", width: "w-20"},
-    %{key: "lines", label: "Lines", width: "w-28"},
-    %{key: "stats", label: "+/-", width: "w-24"},
-    %{key: "location", label: "File:Line", width: "w-[18rem]"}
+    %{key: "module", label: "Module", width: "w-[26rem]", align: nil},
+    %{key: "verb", label: "Verb", width: "w-24", align: nil},
+    %{key: "stats", label: "+ / −", width: "w-28", align: "text-center"},
+    %{key: "function", label: "Function", width: nil, align: nil},
+    %{key: "clauses", label: "Clauses", width: "w-24", align: nil},
+    %{key: "lines", label: "Lines", width: "w-28", align: nil},
+    %{key: "location", label: "File:Line", width: "w-[18rem]", align: nil}
   ]
 
   @impl true
@@ -42,6 +44,10 @@ defmodule CodeReviewerWeb.HomeLive.Index do
       |> assign(:row_count, 0)
       |> assign(:module_count, 0)
       |> assign(:selected, nil)
+      |> assign(:review, nil)
+      |> assign(:rows_by_id, %{})
+      |> assign(:display_order, [])
+      |> assign(:open_diffs, MapSet.new())
       |> stream(:rows, [])
 
     {:ok, socket}
@@ -65,6 +71,8 @@ defmodule CodeReviewerWeb.HomeLive.Index do
 
   @impl true
   def handle_async(:load, {:ok, {:ok, result}}, socket) do
+    rows = flatten(result.modules)
+
     socket =
       socket
       |> assign(:status, :ready)
@@ -72,7 +80,14 @@ defmodule CodeReviewerWeb.HomeLive.Index do
       |> assign(:title, result.title)
       |> assign(:module_count, length(result.modules))
       |> assign(:row_count, result.summary.total)
-      |> stream(:rows, flatten(result.modules), reset: true)
+      |> assign(:review, result.review)
+      |> assign(
+        :rows_by_id,
+        rows |> Enum.filter(&(&1.kind == :function)) |> Map.new(&{&1.id, &1})
+      )
+      |> assign(:display_order, Enum.map(rows, & &1.id))
+      |> assign(:open_diffs, MapSet.new())
+      |> stream(:rows, rows, reset: true)
 
     {:noreply, socket}
   end
@@ -98,8 +113,43 @@ defmodule CodeReviewerWeb.HomeLive.Index do
     {:noreply, push_patch(socket, to: ~p"/?#{%{repo: String.trim(repo), rev: String.trim(rev)}}")}
   end
 
-  # `Enter` on a cell. Behaviour to be decided; for now the server records
-  # what was chosen so the round trip is visible.
+  # `Enter` on a function's module name: show or hide its diff row.
+  def handle_event("toggle_diff", %{"id" => id}, socket) do
+    diff_id = "d-" <> id
+
+    cond do
+      MapSet.member?(socket.assigns.open_diffs, id) ->
+        socket =
+          socket
+          |> assign(:open_diffs, MapSet.delete(socket.assigns.open_diffs, id))
+          |> assign(:display_order, List.delete(socket.assigns.display_order, diff_id))
+          |> stream_delete(:rows, %{id: diff_id})
+
+        {:noreply, socket}
+
+      row = socket.assigns.rows_by_id[id] ->
+        diff_row = diff_row(socket.assigns, row, diff_id)
+        position = Enum.find_index(socket.assigns.display_order, &(&1 == id)) + 1
+
+        socket =
+          socket
+          |> assign(:open_diffs, MapSet.put(socket.assigns.open_diffs, id))
+          |> assign(
+            :display_order,
+            List.insert_at(socket.assigns.display_order, position, diff_id)
+          )
+          # the stream container's first child is the empty-state row
+          |> stream_insert(:rows, diff_row, at: position + 1)
+
+        {:noreply, socket}
+
+      true ->
+        {:noreply, socket}
+    end
+  end
+
+  # `Enter` on any other cell. Behaviour to be decided; for now the server
+  # records what was chosen so the round trip is visible.
   def handle_event("activate", %{"id" => id, "column" => column} = params, socket) do
     selected = %{id: id, column: column, module: params["module"], function: params["function"]}
     {:noreply, assign(socket, :selected, selected)}
@@ -144,6 +194,7 @@ defmodule CodeReviewerWeb.HomeLive.Index do
 
             {:ok,
              %{
+               review: review,
                modules: modules,
                summary: FunctionIndex.summary(rows),
                title: review.source[:title]
@@ -172,12 +223,74 @@ defmodule CodeReviewerWeb.HomeLive.Index do
 
       [
         module_row
-        | Enum.map(m.functions, &Map.merge(&1, %{kind: :function, parent_id: module_row.id}))
+        | Enum.map(
+            m.functions,
+            # the row kind drives rendering; the definer (def/defp/test) is kept aside
+            &Map.merge(&1, %{kind: :function, definer: &1.kind, parent_id: module_row.id})
+          )
       ]
     end)
   end
 
+  # Whole-function diff, built from the two file versions fetched from git.
+  defp diff_row(%{review: review, source: source}, row, diff_id) do
+    file = Enum.find(review.files, &(&1.path == row.file))
+    %{from: from, to: to} = revisions(source)
+    before_src = file && fetch(source.repo, from, file.old_path || file.path)
+    after_src = file && fetch(source.repo, to, file.path)
+
+    lines =
+      if file,
+        do:
+          FunctionDiff.for_ranges(
+            file,
+            row.ranges.before,
+            row.ranges.after,
+            before_src,
+            after_src
+          ),
+        else: []
+
+    %{
+      id: diff_id,
+      kind: :diff,
+      parent_id: row.id,
+      fold_id: row.parent_id,
+      module: row.module,
+      function: row.function,
+      lines: lines
+    }
+  end
+
+  defp revisions(%{rev: rev}), do: %{from: "#{rev}~1", to: rev}
+
+  defp fetch(repo, rev, path) do
+    case Git.show(repo, rev, path) do
+      {:ok, text} -> text
+      {:error, _} -> nil
+    end
+  end
+
   # -- view helpers -----------------------------------------------------------------
+
+  @doc false
+  def line_class(:add), do: "bg-emerald-500/10 text-emerald-900 dark:text-emerald-100"
+  def line_class(:del), do: "bg-rose-500/10 text-rose-900 dark:text-rose-100"
+  def line_class(:context), do: "text-base-content/80"
+
+  # Dark ink for a real count, light gray when there is nothing to report.
+  @doc false
+  def count_class(0, _kind), do: "text-base-content/35"
+  def count_class(_n, :add), do: "text-emerald-900 dark:text-emerald-300"
+  def count_class(_n, :del), do: "text-rose-900 dark:text-rose-300"
+
+  @doc false
+  def verb_letter(verb), do: verb |> Atom.to_string() |> String.first() |> String.upcase()
+
+  @doc false
+  def marker(:add), do: "+"
+  def marker(:del), do: "-"
+  def marker(:context), do: ""
 
   @doc false
   def verb_class(:created), do: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
@@ -186,10 +299,16 @@ defmodule CodeReviewerWeb.HomeLive.Index do
   def verb_class(:renamed), do: "bg-violet-500/10 text-violet-700 dark:text-violet-300"
   def verb_class(_), do: "bg-base-300 text-base-content/70"
 
+  # Current clause count; when it changed, the old count too.
   @doc false
-  def clauses(%{clauses: %{before: b, after: a}, verb: :created}) when b == 0, do: "#{a}/-"
-  def clauses(%{clauses: %{before: b, after: a}, verb: :deleted}) when a == 0, do: "-/#{b}"
-  def clauses(%{clauses: %{before: b, after: a}}), do: "#{a}/#{b}"
+  def clauses(%{clauses: %{before: b, after: a}, verb: :deleted}) when a == 0, do: "#{b}"
+  def clauses(%{clauses: %{before: b, after: a}}) when b == 0 or b == a, do: "#{a}"
+  def clauses(%{clauses: %{before: b, after: a}}), do: "#{b} → #{a}"
+
+  # `def rows/2`, `defp module_id/1`, `test "name"`
+  @doc false
+  def function_label(%{definer: :test, function: function}), do: function
+  def function_label(%{definer: definer, function: function}), do: "#{definer} #{function}"
 
   @doc false
   def lines(%{range: nil}), do: ""

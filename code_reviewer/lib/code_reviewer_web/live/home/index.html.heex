@@ -101,7 +101,7 @@
             <tr>
               <th
                 :for={col <- @columns}
-                class={["px-3 py-2 font-medium whitespace-nowrap", col.width]}
+                class={["px-3 py-2 font-medium whitespace-nowrap", col.width, col.align]}
                 data-column={col.key}
               >
                 {col.label}
@@ -120,119 +120,154 @@
               data-id={row.id}
               data-kind={row.kind}
               data-parent={row.parent_id}
+              data-fold={row[:fold_id]}
               data-module={row.module}
               data-function={row[:function]}
               class={[
                 "transition-colors",
-                if(row.kind == :module,
-                  do: "bg-base-200/30 font-medium hover:bg-base-200/60",
-                  else: "hover:bg-base-200/40"
-                )
+                case row.kind do
+                  :module -> "bg-base-200/30 font-medium hover:bg-base-200/60"
+                  :function -> "hover:bg-base-200/40"
+                  :diff -> ""
+                end
               ]}
             >
-              <%= if row.kind == :module do %>
-                <td class="px-3 py-1.5 font-mono text-xs" data-column="module" title={row.module}>
-                  <div class="flex items-center gap-1.5">
-                    <span class="flex w-4 shrink-0 items-center justify-center text-base-content/50">
-                      <%= if row.function_count > 0 do %>
-                        <span data-chevron="open"><.icon
-                          name="hero-chevron-down-mini"
-                          class="size-3.5"
-                        /></span>
-                        <span data-chevron="closed"><.icon
-                          name="hero-chevron-right-mini"
-                          class="size-3.5"
-                        /></span>
-                      <% end %>
-                    </span>
-                    <span class="min-w-0 truncate">{row.module || "—"}</span>
+              <%= cond do %>
+                <% row.kind == :diff -> %>
+                  <td colspan={length(@columns)} class="p-0" data-column="diff">
+                    <div class="overflow-x-auto border-y border-base-300/70 bg-base-100 font-mono text-xs leading-5">
+                      <div :if={row.lines == []} class="px-4 py-3 text-base-content/50">
+                        No lines to show for this function.
+                      </div>
+                      <div
+                        :for={line <- row.lines}
+                        class={[
+                          "grid grid-cols-[3.5rem_3.5rem_1.25rem_1fr]",
+                          line_class(line.kind)
+                        ]}
+                      >
+                        <span class="select-none pr-2 text-right text-base-content/40">{line.old}</span>
+                        <span class="select-none pr-2 text-right text-base-content/40">{line.new}</span>
+                        <span class="select-none text-center text-base-content/60">{marker(
+                          line.kind
+                        )}</span>
+                        <span class="whitespace-pre pr-4">{line.text}</span>
+                      </div>
+                    </div>
+                  </td>
+                <% row.kind == :module -> %>
+                  <td
+                    class="px-3 py-1.5 font-mono text-xs"
+                    data-column="module"
+                    title={row.module}
+                  >
+                    <div class="flex items-center gap-1.5">
+                      <span class="flex w-4 shrink-0 items-center justify-center text-base-content/50">
+                        <%= if row.function_count > 0 do %>
+                          <span data-chevron="open"><.icon
+                            name="hero-chevron-down-mini"
+                            class="size-3.5"
+                          /></span>
+                          <span data-chevron="closed"><.icon
+                            name="hero-chevron-right-mini"
+                            class="size-3.5"
+                          /></span>
+                        <% end %>
+                      </span>
+                      <span class="min-w-0 truncate">{row.module || "—"}</span>
+                      <span
+                        :if={row.function_count > 0}
+                        class="ml-auto shrink-0 pl-3 tabular-nums text-base-content/50"
+                        data-function-count
+                      >
+                        {row.function_count}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="px-3 py-1.5 whitespace-nowrap" data-column="verb">
                     <span
-                      :if={row.function_count > 0}
-                      class="ml-auto shrink-0 pl-3 tabular-nums text-base-content/50"
-                      data-function-count
+                      class={[
+                        "inline-block w-5 rounded py-0.5 text-center text-xs font-semibold",
+                        verb_class(row.verb)
+                      ]}
+                      title={row.verb |> Atom.to_string() |> String.capitalize()}
                     >
-                      {row.function_count}
+                      {verb_letter(row.verb)}
                     </span>
-                  </div>
-                </td>
-                <td class="px-3 py-1.5 whitespace-nowrap" data-column="verb">
-                  <span class={[
-                    "inline-block rounded px-1.5 py-0.5 text-xs font-medium",
-                    verb_class(row.verb)
-                  ]}>
-                    {row.verb |> Atom.to_string() |> String.capitalize()}
-                  </span>
-                </td>
-                <td data-column="visibility"></td>
-                <td data-column="function"></td>
-                <td data-column="clauses"></td>
-                <td data-column="lines"></td>
-                <td class="px-3 py-1.5 whitespace-nowrap font-mono text-xs" data-column="stats">
-                  <span class="text-emerald-600 dark:text-emerald-400">+{row.stats.added}</span>
-                  <span class="ml-1 text-rose-600 dark:text-rose-400">-{row.stats.removed}</span>
-                </td>
-                <td
-                  class="truncate px-3 py-1.5 font-mono text-xs text-base-content/60"
-                  data-column="location"
-                  title={location(row)}
-                >
-                  {location(row)}
-                </td>
-              <% else %>
-                <td
-                  class="px-3 py-1.5 font-mono text-xs text-base-content/60"
-                  data-column="module"
-                  title={row.module}
-                >
-                  <div class="flex items-center gap-1.5">
-                    <span class="w-4 shrink-0"></span>
-                    <span class="min-w-0 truncate">{row.module || "—"}</span>
-                  </div>
-                </td>
-                <td class="px-3 py-1.5 whitespace-nowrap" data-column="verb">
-                  <span class={[
-                    "inline-block rounded px-1.5 py-0.5 text-xs font-medium",
-                    verb_class(row.verb)
-                  ]}>
-                    {row.verb |> Atom.to_string() |> String.capitalize()}
-                  </span>
-                </td>
-                <td
-                  class="px-3 py-1.5 whitespace-nowrap text-base-content/70"
-                  data-column="visibility"
-                >
-                  {row.visibility}
-                </td>
-                <td
-                  class="truncate px-3 py-1.5 font-mono text-xs font-medium"
-                  data-column="function"
-                  title={row.function}
-                >
-                  {row.function}
-                </td>
-                <td
-                  class="px-3 py-1.5 whitespace-nowrap font-mono text-xs text-base-content/70"
-                  data-column="clauses"
-                >
-                  {clauses(row)}
-                </td>
-                <td
-                  class="px-3 py-1.5 whitespace-nowrap font-mono text-xs text-base-content/70"
-                  data-column="lines"
-                >
-                  {lines(row)}
-                </td>
-                <td class="px-3 py-1.5 whitespace-nowrap font-mono text-xs" data-column="stats">
-                  <span class="text-emerald-600 dark:text-emerald-400">+{row.stats.added}</span>
-                  <span class="ml-1 text-rose-600 dark:text-rose-400">-{row.stats.removed}</span>
-                </td>
-                <td
-                  class="truncate px-3 py-1.5 font-mono text-xs text-base-content/60"
-                  data-column="location"
-                  title={location(row)}
-                >
-                  {location(row)}
-                </td>
+                  </td>
+                  <td class="px-3 py-1.5 font-mono text-xs tabular-nums" data-column="stats">
+                    <%!-- three-part grid keeps the slash at the same x on every row --%>
+                    <div class="grid grid-cols-[1fr_auto_1fr] items-baseline">
+                      <span class={["text-right", count_class(row.stats.added, :add)]}>+{row.stats.added}</span>
+                      <span class="px-1.5 text-base-content/30">/</span>
+                      <span class={["text-left", count_class(row.stats.removed, :del)]}>−{row.stats.removed}</span>
+                    </div>
+                  </td>
+                  <td data-column="function"></td>
+                  <td data-column="clauses"></td>
+                  <td data-column="lines"></td>
+                  <td
+                    class="truncate px-3 py-1.5 font-mono text-xs text-base-content/60"
+                    data-column="location"
+                    title={location(row)}
+                  >
+                    {location(row)}
+                  </td>
+                <% true -> %>
+                  <td
+                    class="px-3 py-1.5 font-mono text-xs text-base-content/60"
+                    data-column="module"
+                    title={row.module}
+                  >
+                    <div class="flex items-center gap-1.5">
+                      <span class="w-4 shrink-0"></span>
+                      <span class="min-w-0 truncate">{row.module || "—"}</span>
+                    </div>
+                  </td>
+                  <td class="px-3 py-1.5 whitespace-nowrap" data-column="verb">
+                    <span
+                      class={[
+                        "inline-block w-5 rounded py-0.5 text-center text-xs font-semibold",
+                        verb_class(row.verb)
+                      ]}
+                      title={row.verb |> Atom.to_string() |> String.capitalize()}
+                    >
+                      {verb_letter(row.verb)}
+                    </span>
+                  </td>
+                  <td class="px-3 py-1.5 font-mono text-xs tabular-nums" data-column="stats">
+                    <%!-- three-part grid keeps the slash at the same x on every row --%>
+                    <div class="grid grid-cols-[1fr_auto_1fr] items-baseline">
+                      <span class={["text-right", count_class(row.stats.added, :add)]}>+{row.stats.added}</span>
+                      <span class="px-1.5 text-base-content/30">/</span>
+                      <span class={["text-left", count_class(row.stats.removed, :del)]}>−{row.stats.removed}</span>
+                    </div>
+                  </td>
+                  <td
+                    class="truncate px-3 py-1.5 font-mono text-xs"
+                    data-column="function"
+                    title={function_label(row)}
+                    phx-no-format
+                  ><span :if={row.definer != :test} class="text-base-content/50">{"#{row.definer} "}</span>{row.function}</td>
+                  <td
+                    class="px-3 py-1.5 whitespace-nowrap font-mono text-xs text-base-content/70"
+                    data-column="clauses"
+                  >
+                    {clauses(row)}
+                  </td>
+                  <td
+                    class="px-3 py-1.5 whitespace-nowrap font-mono text-xs text-base-content/70"
+                    data-column="lines"
+                  >
+                    {lines(row)}
+                  </td>
+                  <td
+                    class="truncate px-3 py-1.5 font-mono text-xs text-base-content/60"
+                    data-column="location"
+                    title={location(row)}
+                  >
+                    {location(row)}
+                  </td>
               <% end %>
             </tr>
           </tbody>
@@ -249,7 +284,7 @@
         <span>col <span data-vim-col>–</span></span>
         <span class="min-w-6 text-primary" data-vim-pending></span>
         <span class="ml-auto hidden text-base-content/50 sm:inline">
-          hjkl move · gg/G · 0/$ · ^d/^u · 5j counts · Enter toggle module / open · za zR zM folds
+          hjkl move · gg/G · 0/$ · ^d/^u · 5j counts · Enter on a name: fold module / show diff · za zR zM
         </span>
       </div>
 
