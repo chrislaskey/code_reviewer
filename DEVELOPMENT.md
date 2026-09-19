@@ -29,6 +29,34 @@ mix precommit        # compile --warnings-as-errors, format, test
 Open `http://localhost:4000/?repo=~/code/form_flow&rev=b67155b` to load a
 specific commit. With no params the page reviews `HEAD` of this repository.
 
+There are two views of the same review, linked from the header, and both
+read `repo` and `rev` from the query string (`CodeReviewerWeb.ReviewSource`):
+
+- `/` is the function table described below.
+- `/files` is the file view, laid out like a GitHub pull request's "Files
+  changed" tab: a collapsible file tree on the left, one card per file on
+  the right with its hunks as a unified diff. Cards fold from the chevron in
+  their header; the "Viewed" checkbox folds a card and counts toward the
+  progress bar in the summary. Everything here is server side and
+  per-file (the cards are a LiveView stream), so folding one file
+  re-renders only that file.
+
+The file view has its own vim-style navigation (`assets/js/hooks/vim_files.js`)
+with two panes: the tree on the left and the diff on the right.
+
+| Keys | Action |
+|---|---|
+| `j` `k`, arrows | in the tree: previous / next file; in the diff: previous / next line, flowing from one file into the next |
+| `Enter` | in the tree: scroll the diff to the highlighted file; on a diff line: report the line to the server (`activate`) |
+| `l` / `→` | move into the diff of the highlighted file (expanding it if it is folded) |
+| `h` / `←` / `Escape` | back to the tree, on the file the cursor was in |
+| `n` / `N` | next / previous change (a run of `+`/`−` lines) in the diff |
+| `{` / `}` | first line of the previous / next file in the diff |
+| `gg` / `G`, `5j` | first / last, counts as a prefix |
+| `Ctrl-d` / `Ctrl-u` | half page down / up |
+| `za` / `zo` / `zc` | toggle / open / close the highlighted file's diff |
+| `zR` / `zM` | expand / collapse every file |
+
 The function table has vim-style navigation, implemented client side in
 `assets/js/hooks/vim_grid.js`:
 
@@ -40,7 +68,7 @@ The function table has vim-style navigation, implemented client side in
 | `0` `^` / `$` | first / last column |
 | `Ctrl-d` / `Ctrl-u` | half page down / up |
 | `{` / `}` | previous / next table row, skipping diff lines |
-| `[c` / `]c` | previous / next change (a run of `+`/`−` lines) in a diff |
+| `n` / `N` | next / previous change (a run of `+`/`−` lines) in a diff |
 | `Enter` | on a module row: expand or collapse its functions; on a module row's `+/−` cell: show or hide a whole-module diff; on a function row: show or hide that function's diff; on a diff line: report the line to the server (`activate`) |
 | `za` / `zo` / `zc` | toggle / open / close the fold under the cursor: the diff on a function row or diff line, the module on a module row. `zc` on a function whose diff is closed closes its module, as in vim |
 | `zR` / `zM` | open / close every module |

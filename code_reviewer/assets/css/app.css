@@ -143,3 +143,45 @@
     color-mix(in oklab, var(--color-primary) 10%, transparent)
   );
 }
+
+/* File tree: directories are native <details>; the chevron follows the state. */
+.file-tree details:not([open]) > summary .tree-chevron {
+  transform: rotate(-90deg);
+}
+
+.file-tree summary::-webkit-details-marker {
+  display: none;
+}
+
+.file-tree summary {
+  list-style: none;
+}
+
+/* VimFiles cursor. Two panes: the tree link and the diff line under the
+   cursor; the card of the highlighted file carries an accent bar so the two
+   sides can be matched at a glance. */
+.vim-files #file-tree a[data-file].is-cursor {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--color-primary) 14%, transparent);
+}
+
+/* while the diff pane has the cursor the tree only remembers the file */
+.vim-files.pane-diff #file-tree a[data-file].is-cursor {
+  outline-color: transparent;
+  background: color-mix(in oklab, var(--color-base-content) 6%, transparent);
+}
+
+.vim-files article.is-active-file > header {
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.vim-files [data-line].is-cursor {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  background-image: linear-gradient(
+    color-mix(in oklab, var(--color-primary) 10%, transparent),
+    color-mix(in oklab, var(--color-primary) 10%, transparent)
+  );
+}

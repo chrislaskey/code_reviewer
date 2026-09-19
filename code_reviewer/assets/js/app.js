@@ -25,12 +25,13 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/code_reviewer"
 import topbar from "../vendor/topbar"
 import VimGrid from "./hooks/vim_grid"
+import VimFiles from "./hooks/vim_files"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, VimGrid},
+  hooks: {...colocatedHooks, VimGrid, VimFiles},
 })
 
 // Show progress bar on live navigation and form submits

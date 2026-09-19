@@ -31,6 +31,12 @@ defmodule CodeReviewerWeb.Layouts do
     default: nil,
     doc: "the current [scope](https://phoenix.hexdocs.pm/scopes.html)"
 
+  attr :section, :atom,
+    default: nil,
+    doc: "which view is showing, `:functions` or `:files`, to mark it in the nav"
+
+  attr :query, :map, default: %{}, doc: "query params to keep when switching views"
+
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -39,7 +45,14 @@ defmodule CodeReviewerWeb.Layouts do
       <header class="flex h-11 items-center gap-3 border-b border-base-300 px-4 text-sm sm:px-6">
         <a href="/" class="font-semibold tracking-tight">CodeReviewer</a>
         <span class="text-base-content/40">/</span>
-        <span class="text-base-content/70">functions</span>
+        <nav id="view-nav" class="flex items-center gap-1 text-xs">
+          <.nav_link section={:functions} current={@section} navigate={~p"/?#{@query}"}>
+            functions
+          </.nav_link>
+          <.nav_link section={:files} current={@section} navigate={~p"/files?#{@query}"}>
+            files
+          </.nav_link>
+        </nav>
         <div class="ml-auto flex items-center">
           <.theme_toggle />
         </div>
@@ -51,6 +64,30 @@ defmodule CodeReviewerWeb.Layouts do
     </div>
 
     <.flash_group flash={@flash} />
+    """
+  end
+
+  attr :section, :atom, required: true
+  attr :current, :atom, required: true
+  attr :navigate, :string, required: true
+  slot :inner_block, required: true
+
+  defp nav_link(assigns) do
+    ~H"""
+    <.link
+      navigate={@navigate}
+      data-section={@section}
+      aria-current={if @section == @current, do: "page"}
+      class={[
+        "rounded-md px-2 py-1 transition-colors",
+        if(@section == @current,
+          do: "bg-base-200 font-medium text-base-content",
+          else: "text-base-content/60 hover:bg-base-200/60 hover:text-base-content"
+        )
+      ]}
+    >
+      {render_slot(@inner_block)}
+    </.link>
     """
   end
 

@@ -17,7 +17,7 @@
 //   0 ^ / $            first / last column
 //   Ctrl-d / Ctrl-u    half page down / up
 //   { / }              previous / next table row, skipping diff lines
-//   [c / ]c            previous / next change (a run of +/− lines)
+//   n / N              next / previous change (a run of +/− lines)
 //   Enter              on a module row: toggle its functions
 //                      on a module row's +/− cell: toggle the whole-module diff
 //                      on a function row: toggle its diff
@@ -39,7 +39,7 @@ const VimGrid = {
     this.lastIdx = 0
     this.col = 0
     this.count = ""
-    this.pending = "" // "g", "z", "[" or "]" awaiting a second key
+    this.pending = "" // "g" or "z" awaiting a second key
     // Module view by default: every module starts collapsed. `seen` lets
     // updated() collapse only modules that arrive later.
     this.seen = new Set(this.moduleRows().map((tr) => tr.dataset.id))
@@ -170,7 +170,7 @@ const VimGrid = {
     return this.nth(stops, idx, n, (el) => !this.isLine(el))
   },
 
-  // [c and ]c: the first line of each run of +/− lines
+  // n and N: the first line of each run of +/− lines
   nthChange(stops, idx, n) {
     return this.nth(stops, idx, n, (el, i) => this.isChange(el) && !this.isChange(stops[i - 1]))
   },
@@ -289,9 +289,6 @@ const VimGrid = {
           case "M": this.moduleRows().forEach((tr) => this.collapse(tr.dataset.id)); break
           default: handled = false
         }
-      } else if ((prefix === "]" || prefix === "[") && e.key === "c") {
-        idx = this.nthChange(stops, idx, prefix === "]" ? n : -n)
-        moved = true
       } else {
         handled = false
       }
@@ -327,7 +324,9 @@ const VimGrid = {
       case "$": case "End":        this.col = cols - 1; break
       case "{": idx = this.nthRow(stops, idx, -n); break
       case "}": idx = this.nthRow(stops, idx, n); break
-      case "g": case "z": case "[": case "]":
+      case "n": idx = this.nthChange(stops, idx, n); break
+      case "N": idx = this.nthChange(stops, idx, -n); break
+      case "g": case "z":
         this.pending = e.key
         e.preventDefault()
         this.renderStatus()

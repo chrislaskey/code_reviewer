@@ -1,46 +1,6 @@
-<Layouts.app flash={@flash}>
+<Layouts.app flash={@flash} section={:functions} query={%{repo: @source.repo, rev: @source.rev}}>
   <div class="flex flex-col gap-4">
-    <%!-- Source picker --%>
-    <.form
-      for={@form}
-      id="source-form"
-      phx-submit="source"
-      class="flex flex-wrap items-end gap-3 rounded-lg border border-base-300 bg-base-200/40 px-4 py-3"
-    >
-      <label class="flex flex-col gap-1 text-xs text-base-content/60">
-        Repository
-        <input
-          type="text"
-          name="repo"
-          id="source-repo"
-          value={@form[:repo].value}
-          spellcheck="false"
-          class="w-[28rem] max-w-full rounded-md border border-base-300 bg-base-100 px-2.5 py-1.5 font-mono text-sm text-base-content focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-        />
-      </label>
-      <label class="flex flex-col gap-1 text-xs text-base-content/60">
-        Revision
-        <input
-          type="text"
-          name="rev"
-          id="source-rev"
-          value={@form[:rev].value}
-          spellcheck="false"
-          class="w-40 rounded-md border border-base-300 bg-base-100 px-2.5 py-1.5 font-mono text-sm text-base-content focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-        />
-      </label>
-      <button
-        type="submit"
-        id="source-load"
-        class="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-content transition hover:brightness-110 active:scale-[0.98]"
-      >
-        Load
-      </button>
-      <p class="ml-auto self-center text-xs text-base-content/50">
-        Compares <span class="font-mono">{@source.rev}~1</span>
-        to <span class="font-mono">{@source.rev}</span>
-      </p>
-    </.form>
+    <.source_picker form={@form} source={@source} />
 
     <%!-- Summary --%>
     <header
@@ -163,15 +123,7 @@
                   </td>
                 <% row.kind == :module -> %>
                   <td class="px-3 py-1.5 whitespace-nowrap" data-column="verb">
-                    <span
-                      class={[
-                        "inline-block w-5 rounded py-0.5 text-center text-xs font-semibold",
-                        verb_class(row.verb)
-                      ]}
-                      title={row.verb |> Atom.to_string() |> String.capitalize()}
-                    >
-                      {verb_letter(row.verb)}
-                    </span>
+                    <.verb_badge verb={row.verb} />
                   </td>
                   <td
                     class="px-3 py-1.5 font-mono text-xs"
@@ -220,15 +172,7 @@
                   </td>
                 <% true -> %>
                   <td class="px-3 py-1.5 whitespace-nowrap" data-column="verb">
-                    <span
-                      class={[
-                        "inline-block w-5 rounded py-0.5 text-center text-xs font-semibold",
-                        verb_class(row.verb)
-                      ]}
-                      title={row.verb |> Atom.to_string() |> String.capitalize()}
-                    >
-                      {verb_letter(row.verb)}
-                    </span>
+                    <.verb_badge verb={row.verb} />
                   </td>
                   <td
                     class="px-3 py-1.5 font-mono text-xs"
@@ -287,7 +231,7 @@
         </span>
         <span class="min-w-6 text-primary" data-vim-pending></span>
         <span class="ml-auto hidden text-right text-base-content/50 sm:inline">
-          hjkl · gg/G · 0/$ · ^d/^u · 5j · &#123;/&#125; rows · [c/]c changes · Enter: fold / diff (+/− on a module: module diff) · za zo zc zR zM · Esc leaves a diff
+          hjkl · gg/G · 0/$ · ^d/^u · 5j · &#123;/&#125; rows · n/N changes · Enter: fold / diff (+/− on a module: module diff) · za zo zc zR zM · Esc leaves a diff
         </span>
       </div>
 

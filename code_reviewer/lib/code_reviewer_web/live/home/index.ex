@@ -19,7 +19,10 @@ defmodule CodeReviewerWeb.HomeLive.Index do
 
   use CodeReviewerWeb, :live_view
 
-  alias CodeReviewer.{FunctionDiff, FunctionIndex, Git}
+  import CodeReviewerWeb.ReviewComponents
+
+  alias CodeReviewer.{FunctionDiff, FunctionIndex}
+  alias CodeReviewerWeb.ReviewSource
 
   # Fixed table layout: every column but Function has a width, Function takes
   # the rest. Long text truncates instead of wrapping so rows stay one line
@@ -57,7 +60,7 @@ defmodule CodeReviewerWeb.HomeLive.Index do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    source = source(params)
+    source = ReviewSource.from_params(params)
 
     socket =
       socket
@@ -170,52 +173,18 @@ defmodule CodeReviewerWeb.HomeLive.Index do
 
   # -- data --------------------------------------------------------------------
 
-  defp source(params) do
-    repo =
-      case params["repo"] do
-        blank when blank in [nil, ""] -> default_repo()
-        repo -> Path.expand(repo)
-      end
+  defp load(source) do
+    with {:ok, review} <- ReviewSource.review(source) do
+      modules = FunctionIndex.by_module(review)
+      rows = Enum.flat_map(modules, & &1.functions)
 
-    rev =
-      case params["rev"] do
-        blank when blank in [nil, ""] -> "HEAD"
-        rev -> rev
-      end
-
-    %{repo: repo, rev: rev}
-  end
-
-  # The repository this app lives in, so the page shows something on first load.
-  defp default_repo do
-    Git.toplevel(File.cwd!()) || File.cwd!()
-  end
-
-  defp load(%{repo: repo, rev: rev}) do
-    cond do
-      not File.dir?(repo) ->
-        {:error, "#{repo} is not a directory"}
-
-      Git.toplevel(repo) == nil ->
-        {:error, "#{repo} is not inside a git repository"}
-
-      true ->
-        case CodeReviewer.review_git(repo, from: "#{rev}~1", to: rev) do
-          {:ok, review} ->
-            modules = FunctionIndex.by_module(review)
-            rows = Enum.flat_map(modules, & &1.functions)
-
-            {:ok,
-             %{
-               review: review,
-               modules: modules,
-               summary: FunctionIndex.summary(rows),
-               title: review.source[:title]
-             }}
-
-          {:error, reason} ->
-            {:error, reason}
-        end
+      {:ok,
+       %{
+         review: review,
+         modules: modules,
+         summary: FunctionIndex.summary(rows),
+         title: review.source[:title]
+       }}
     end
   end
 
@@ -251,9 +220,9 @@ defmodule CodeReviewerWeb.HomeLive.Index do
   # when it is folded; function diffs fold with their module.
   defp diff_row(%{review: review, source: source}, row, diff_id) do
     file = Enum.find(review.files, &(&1.path == row.file))
-    %{from: from, to: to} = revisions(source)
-    before_src = file && fetch(source.repo, from, file.old_path || file.path)
-    after_src = file && fetch(source.repo, to, file.path)
+    %{from: from, to: to} = ReviewSource.revisions(source)
+    before_src = file && ReviewSource.fetch(source.repo, from, file.old_path || file.path)
+    after_src = file && ReviewSource.fetch(source.repo, to, file.path)
 
     lines =
       if file,
@@ -278,15 +247,6 @@ defmodule CodeReviewerWeb.HomeLive.Index do
     }
   end
 
-  defp revisions(%{rev: rev}), do: %{from: "#{rev}~1", to: rev}
-
-  defp fetch(repo, rev, path) do
-    case Git.show(repo, rev, path) do
-      {:ok, text} -> text
-      {:error, _} -> nil
-    end
-  end
-
   # -- view helpers -----------------------------------------------------------------
 
   @doc false
@@ -301,19 +261,9 @@ defmodule CodeReviewerWeb.HomeLive.Index do
   def count_class(_n, :del), do: "text-rose-500/60 dark:text-rose-400/60"
 
   @doc false
-  def verb_letter(verb), do: verb |> Atom.to_string() |> String.first() |> String.upcase()
-
-  @doc false
   def marker(:add), do: "+"
   def marker(:del), do: "-"
   def marker(:context), do: ""
-
-  @doc false
-  def verb_class(:created), do: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-  def verb_class(:deleted), do: "bg-rose-500/10 text-rose-700 dark:text-rose-300"
-  def verb_class(:updated), do: "bg-blue-500/10 text-blue-700 dark:text-blue-300"
-  def verb_class(:renamed), do: "bg-violet-500/10 text-violet-700 dark:text-violet-300"
-  def verb_class(_), do: "bg-base-300 text-base-content/70"
 
   # What changed about an updated function besides its body, as short notes.
   @doc false
@@ -358,13 +308,4 @@ defmodule CodeReviewerWeb.HomeLive.Index do
   def selected_line(%{kind: :add, new: new}), do: "+#{new}"
   def selected_line(%{kind: :del, old: old}), do: "−#{old}"
   def selected_line(%{new: new, old: old}), do: to_string(new || old || "—")
-
-  @doc false
-  def short_repo(path) do
-    home = System.user_home!()
-
-    if String.starts_with?(path, home),
-      do: "~" <> String.replace_prefix(path, home, ""),
-      else: path
-  end
 end

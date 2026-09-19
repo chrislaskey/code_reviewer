@@ -1,0 +1,261 @@
+<Layouts.app flash={@flash} section={:files} query={%{repo: @source.repo, rev: @source.rev}}>
+  <div class="flex flex-col gap-4">
+    <.source_picker form={@form} source={@source} />
+
+    <%!-- Summary --%>
+    <header
+      :if={@status == :ready and @summary}
+      id="files-summary"
+      class="flex flex-wrap items-center gap-x-6 gap-y-2"
+    >
+      <h1 class="text-base font-semibold tracking-tight">
+        {@title || "Files"}
+      </h1>
+      <p class="text-sm text-base-content/70">
+        <span class="font-medium text-base-content">{@summary.total}</span>
+        {if @summary.total == 1, do: "file", else: "files"} changed
+        <span class="mx-2 text-base-content/30">·</span>
+        <span class="text-emerald-600 dark:text-emerald-400">{@summary.by_verb.created} added</span>
+        <span class="mx-1.5 text-base-content/30">·</span>
+        <span class="text-blue-600 dark:text-blue-400">{@summary.by_verb.updated} modified</span>
+        <span class="mx-1.5 text-base-content/30">·</span>
+        <span class="text-rose-600 dark:text-rose-400">{@summary.by_verb.deleted} removed</span>
+        <span :if={@summary.by_verb.renamed > 0} class="mx-1.5 text-base-content/30">·</span>
+        <span :if={@summary.by_verb.renamed > 0} class="text-violet-600 dark:text-violet-400">
+          {@summary.by_verb.renamed} renamed
+        </span>
+        <span class="mx-2 text-base-content/30">·</span>
+        <span class="font-mono text-emerald-600 dark:text-emerald-400">+{@summary.added}</span>
+        <span class="font-mono text-rose-600 dark:text-rose-400">−{@summary.removed}</span>
+      </p>
+      <div
+        :if={@summary.total > 0}
+        id="viewed-progress"
+        class="ml-auto flex items-center gap-2 text-xs text-base-content/60"
+      >
+        <span class="tabular-nums">
+          <span data-viewed-count>{@viewed_count}</span> / {@summary.total} viewed
+        </span>
+        <span class="h-1.5 w-28 overflow-hidden rounded-full bg-base-300">
+          <span
+            class="block h-full rounded-full bg-emerald-500 transition-[width] duration-300"
+            style={"width: #{round(@viewed_count / @summary.total * 100)}%"}
+          />
+        </span>
+      </div>
+    </header>
+
+    <%!-- States --%>
+    <div
+      :if={@status == :loading}
+      id="files-loading"
+      class="flex items-center gap-3 py-10 text-sm text-base-content/60"
+    >
+      <span class="inline-block size-4 animate-spin rounded-full border-2 border-base-content/20 border-t-primary"></span>
+      Reading <span class="font-mono">{short_repo(@source.repo)}</span>
+      at <span class="font-mono">{@source.rev}</span>…
+    </div>
+
+    <div
+      :if={@status == :failed}
+      id="files-error"
+      class="rounded-lg border border-rose-500/30 bg-rose-500/5 px-4 py-3 text-sm"
+    >
+      <p class="font-medium text-rose-700 dark:text-rose-300">Could not build the review</p>
+      <pre class="mt-1 whitespace-pre-wrap font-mono text-xs text-base-content/70">{@error}</pre>
+    </div>
+
+    <%!-- Tree + cards, with the VimFiles cursor over both --%>
+    <div
+      :if={@status == :ready}
+      id="files-view"
+      phx-hook="VimFiles"
+      class="vim-files flex flex-col gap-2"
+    >
+      <div class="flex items-start gap-4">
+        <aside
+          id="file-tree"
+          class="sticky top-4 hidden max-h-[calc(100vh-2rem)] w-64 shrink-0 flex-col overflow-hidden rounded-lg border border-base-300 bg-base-100 md:flex"
+        >
+          <div class="flex items-center gap-2 border-b border-base-300 bg-base-200/60 px-3 py-2 text-xs uppercase tracking-wide text-base-content/60">
+            <span class="font-medium">Files</span>
+            <span class="tabular-nums text-base-content/40">{@summary.total}</span>
+            <span class="ml-auto flex items-center gap-1 normal-case tracking-normal">
+              <button
+                type="button"
+                phx-click="expand_all"
+                class="rounded px-1.5 py-0.5 transition-colors hover:bg-base-300 hover:text-base-content"
+                title="Expand all files"
+              >
+                expand
+              </button>
+              <span class="text-base-content/30">·</span>
+              <button
+                type="button"
+                phx-click="collapse_all"
+                class="rounded px-1.5 py-0.5 transition-colors hover:bg-base-300 hover:text-base-content"
+                title="Collapse all files"
+              >
+                collapse
+              </button>
+            </span>
+          </div>
+          <ul class="file-tree overflow-y-auto py-1">
+            <li :if={@tree == []} class="px-3 py-6 text-center text-xs text-base-content/50">
+              No files changed.
+            </li>
+            <.tree_node :for={node <- @tree} node={node} depth={0} />
+          </ul>
+        </aside>
+
+        <div id="file-cards" phx-update="stream" class="flex min-w-0 flex-1 flex-col gap-4">
+          <div
+            id="file-cards-empty"
+            class="hidden rounded-lg border border-base-300 px-4 py-12 text-center text-sm text-base-content/50 only:block"
+          >
+            No files changed in this revision.
+          </div>
+          <article
+            :for={{dom_id, file} <- @streams.files}
+            id={dom_id}
+            data-path={file.path}
+            data-verb={file.verb}
+            data-collapsed={file.collapsed}
+            data-viewed={file.viewed}
+            class={[
+              "file-card scroll-mt-4 rounded-lg border bg-base-100 transition-colors",
+              if(file.viewed, do: "border-base-300/70", else: "border-base-300")
+            ]}
+          >
+            <header class={[
+              "sticky top-0 z-10 flex items-center gap-2 rounded-t-lg border-b bg-base-200/90 px-3 py-2 text-sm backdrop-blur",
+              if(file.collapsed, do: "rounded-b-lg border-transparent", else: "border-base-300")
+            ]}>
+              <button
+                type="button"
+                phx-click="toggle_collapsed"
+                phx-value-id={file.id}
+                aria-expanded={to_string(not file.collapsed)}
+                class="flex size-6 shrink-0 items-center justify-center rounded text-base-content/60 transition-colors hover:bg-base-300 hover:text-base-content"
+                title={if file.collapsed, do: "Expand", else: "Collapse"}
+              >
+                <.icon
+                  name="hero-chevron-down-mini"
+                  class={[
+                    "size-4 transition-transform duration-150",
+                    file.collapsed && "-rotate-90"
+                  ]}
+                />
+              </button>
+
+              <span class="shrink-0 font-mono text-xs tabular-nums">
+                <span class={
+                  if file.stats.added > 0,
+                    do: "text-emerald-600 dark:text-emerald-400",
+                    else: "text-base-content/35"
+                }>
+                  +{file.stats.added}
+                </span>
+                <span class={
+                  if file.stats.removed > 0,
+                    do: "text-rose-600 dark:text-rose-400",
+                    else: "text-base-content/35"
+                }>
+                  −{file.stats.removed}
+                </span>
+              </span>
+
+              <a
+                href={"#" <> file.id}
+                class="min-w-0 truncate font-mono text-xs text-base-content hover:underline"
+                title={file.path}
+                data-file-path
+              >
+                <span :if={file.old_path} class="text-base-content/50">
+                  {file.old_path} <span class="mx-1">→</span>
+                </span>
+                <span class="text-base-content/60">{if file.dir != ".", do: file.dir <> "/"}</span><span class="font-medium">{file.name}</span>
+              </a>
+
+              <span class={[
+                "shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium",
+                verb_class(file.verb)
+              ]}>
+                {verb_word(file.verb)}
+              </span>
+
+              <label class="ml-auto flex shrink-0 cursor-pointer select-none items-center gap-1.5 text-xs text-base-content/70 hover:text-base-content">
+                <input
+                  type="checkbox"
+                  checked={file.viewed}
+                  phx-click="toggle_viewed"
+                  phx-value-id={file.id}
+                  class="size-3.5 cursor-pointer rounded border-base-300 accent-emerald-600"
+                /> Viewed
+              </label>
+            </header>
+
+            <div
+              :if={not file.collapsed}
+              class="overflow-x-auto rounded-b-lg font-mono text-xs leading-5"
+              data-diff
+            >
+              <div :if={file.hunks == []} class="px-4 py-8 text-center text-base-content/50">
+                No diff lines to show for this file.
+              </div>
+              <div :for={{hunk, hi} <- Enum.with_index(file.hunks)} data-hunk>
+                <%!-- the @@ separator, tinted like GitHub's --%>
+                <div class="grid grid-cols-[3.5rem_3.5rem_1.25rem_1fr] bg-sky-500/10 text-sky-800/80 dark:text-sky-200/80">
+                  <span class="col-span-3 select-none bg-sky-500/10"></span>
+                  <span class="whitespace-nowrap px-2 py-0.5" data-hunk-header>
+                    {hunk_label(hunk)}
+                    <span class="text-sky-800/50 dark:text-sky-200/50">{hunk.header}</span>
+                  </span>
+                </div>
+                <%!-- each line is a cursor stop for the VimFiles hook --%>
+                <div
+                  :for={{{kind, old, new, text}, li} <- Enum.with_index(hunk.lines)}
+                  data-id={"#{file.id}:#{hi}:#{li}"}
+                  data-line={li}
+                  data-kind={kind}
+                  data-old={old}
+                  data-new={new}
+                  class={["grid grid-cols-[3.5rem_3.5rem_1.25rem_1fr]", line_class(kind)]}
+                >
+                  <span class={["select-none pr-2 text-right", gutter_class(kind)]}>{old}</span>
+                  <span class={["select-none pr-2 text-right", gutter_class(kind)]}>{new}</span>
+                  <span class="select-none text-center text-base-content/60">{marker(kind)}</span>
+                  <span class="whitespace-pre pr-4">{text}</span>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <%!-- Vim-style status line; the hook fills the data-vim-* spans --%>
+      <div
+        id="files-statusline"
+        class="flex items-center gap-4 rounded-md bg-base-200/60 px-3 py-1.5 font-mono text-xs text-base-content/70"
+      >
+        <span class="rounded bg-primary/15 px-1.5 py-0.5 font-semibold text-primary">NORMAL</span>
+        <span class="whitespace-nowrap" data-vim-pane>files</span>
+        <span class="whitespace-nowrap">
+          <span data-vim-pos-label>file</span>
+          <span data-vim-pos>–</span>/<span data-vim-total>{@summary.total}</span>
+          <span class="text-base-content/50" data-vim-detail></span>
+        </span>
+        <span class="min-w-6 text-primary" data-vim-pending></span>
+        <span class="ml-auto hidden text-right text-base-content/50 sm:inline">
+          j/k · Enter: scroll to file · l: into the diff · h/Esc: back to files · n/N changes · &#123;/&#125; files · gg/G · ^d/^u · za zo zc zR zM
+        </span>
+      </div>
+
+      <p :if={@selected} id="selected-line" class="text-xs text-base-content/70">
+        Enter on <span class="font-mono font-medium text-base-content">{@selected.path}</span>
+        line <span class="font-mono">{selected_line(@selected.line)}</span>
+        — what opens here is the next step.
+      </p>
+    </div>
+  </div>
+</Layouts.app>
