@@ -21,7 +21,7 @@ if System.get_env("PHX_SERVER") do
 end
 
 config :code_reviewer, CodeReviewerWeb.Endpoint,
-  http: [port: String.to_integer(System.get_env("PORT", "4040"))]
+  http: [port: String.to_integer(System.get_env("PORT", "4030"))]
 
 if config_env() == :dev do
   # Reload browser tabs when matching files change.
