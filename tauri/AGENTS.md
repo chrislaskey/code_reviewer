@@ -1,5 +1,23 @@
 # Agent Instructions: Rust Production Application Architecture
 
+## 0. Using This Document with LLM Agents
+
+### Tool Calling Requirements
+This project uses the `pi` agent harness which requires specific tool calling conventions:
+
+* **Always use bash for file operations**: When reading, writing, or modifying files, use `bash` commands (e.g., `cat > file`, `echo >> file`, `mkdir -p dir`). Do not rely on file write tools that may fail silently.
+* **Verify tool execution**: If a tool call shows no output or appears to hang, it may have failed. Try a different approach using bash commands.
+* **Check for silent failures**: Tools like `write` or `read` may appear to succeed but not actually create/modify files. Always verify with `cat` or `ls` if unsure.
+* **Debugging failed operations**: If a tool call fails, retry using explicit bash alternatives:
+  * For writing files: `cat > path/to/file << 'EOF' ... content ... EOF`
+  * For reading files: `cat path/to/file` or `grep pattern path/to/file`
+  * For directory operations: `mkdir -p path/to/dir` then `cd path/to/dir`
+
+### Agent Output Minimization
+* Keep tool output to a minimum in responses
+* Summarize at the end what was done and key decision points
+* Only show full output when debugging or when explicitly requested
+
 ## 1. Project Context
 * **Language:** Rust (Stable)
 * **Application Type:** [e.g., Modular Workspace, Axum HTTP API, Ratatui CLI/TUI]
