@@ -14,6 +14,8 @@ AI Agents MUST run these commands to test, lint, and verify code before declarin
 * **Security Audit:** `cargo audit`
 
 ## 3. Strict Architectural Rules
+* **Naming** Always use concrete naming instead of jargon. Better to have an explicit name that tells what happens when it is called instead of a shorter name with jargon and ambiguity. Prefer concrete terms like list/get/create/update/upsert/delete on Backend and index/show/new/edit/delete for UI/UX.
+* **Rust vs JavaScript** Keep the JavaScript frontend a very thin presentation layer. Prefer writing application logic in Rust whenever possible, minimal logic in JS just related to presentation layer.
 * **Module Layout:** Follow standard Rust layouts. Keep `main.rs` or `lib.rs` thin. House core domain logic in decoupled modules (e.g., `src/domain/`, `src/api/`, `src/storage/`).
 * **Workspaces:** If adding features spanning multiple domains, separate them into dedicated crates within a Cargo workspace.
 * **State Management:** Web/API handlers must pass shared state via thread-safe atomic wrappers (`std::sync::Arc`) or Layered Extractors. Avoid global mutable state (`lazy_static`/`once_cell` for mutable variables).
