@@ -15,6 +15,7 @@ AI Agents MUST run these commands to test, lint, and verify code before declarin
 
 ## 3. Strict Architectural Rules
 * **Naming** Always use concrete naming instead of jargon. Better to have an explicit name that tells what happens when it is called instead of a shorter name with jargon and ambiguity. Prefer concrete terms like list/get/create/update/upsert/delete on Backend and index/show/new/edit/delete for UI/UX.
+* **Scope** Better to build through many small, well-defined iterative steps than try to build everything at once. Do not add product features or functionality that hasn't been discussed and planned first - instead write suggestions for additional functionality in `docs/suggestions/*.md` files.
 * **Rust vs JavaScript** Keep the JavaScript frontend a very thin presentation layer. Prefer writing application logic in Rust whenever possible, minimal logic in JS just related to presentation layer.
 * **Module Layout:** Follow standard Rust layouts. Keep `main.rs` or `lib.rs` thin. House core domain logic in decoupled modules (e.g., `src/domain/`, `src/api/`, `src/storage/`).
 * **Workspaces:** If adding features spanning multiple domains, separate them into dedicated crates within a Cargo workspace.
@@ -23,7 +24,9 @@ AI Agents MUST run these commands to test, lint, and verify code before declarin
 ## 4. Code Style & Idioms
 * **Naming:** Variables/Functions/Modules = `snake_case`; Structs/Traits/Enums = `PascalCase`; Statics/Constants = `SCREAMING_SNAKE_CASE`.
 * **Clarity over Cleverness:** Prefer explicit, readable imperative or clear functional styles (`Iterator` chains). Avoid over-engineering hyper-complex lifetime definitions unless performance profiles demand it.
+* **Clarity over Performance:** Prefer clear well structured code over optimizing for raw execution speed.
 * **Clippy Alignment:** Strictly conform to standard clippy settings. Fix all suggestions.
+* **Code Comments** prefer self documenting using good naming conventions for modules, functions, and variables. Only use comments to explain when absolutely critical. Always keep comments very short and concise.
 
 ## 5. Explicit Type & Error Handling
 * **No Swallowing Errors:** Production code MUST NOT use `.unwrap()`, `.expect()`, or `panic!` unless writing test suites or mathematically proven unreachability.
