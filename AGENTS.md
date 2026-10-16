@@ -1,5 +1,9 @@
 # Agent Instructions: Rust Production Application Architecture
 
+## Architecture Overview
+
+This is a Cargo + pnpm workspace with three Rust crates: `core/` (shared business logic library), `axum/` (HTTP server wrapping core), and `tauri/src-tauri/` (desktop app wrapping core). A shared React frontend lives in `frontend/` and uses a `BackendAdapter` interface so components never call `invoke()` or `fetch()` directly — each app provides its own adapter via React context. To add a feature: add the function to `core/`, expose it as an Axum route and Tauri command, add the method to `BackendAdapter`, then use it in shared UI pages.
+
 ## 0. Using This Document with LLM Agents
 
 ### Tool Calling Requirements

@@ -1,0 +1,19 @@
+# Build outputs
+/target
+node_modules
+dist
+dist-ssr
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+
+# Editor
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
