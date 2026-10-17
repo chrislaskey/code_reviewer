@@ -1,3 +1,4 @@
+pub mod analysis;
 pub mod git;
 
 use serde::{Deserialize, Serialize};

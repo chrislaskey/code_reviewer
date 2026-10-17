@@ -4,5 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+rayon = "1.12.0"
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
+tree-sitter = "0.27.1"
+tree-sitter-elixir = "0.3.5"
+
+[dev-dependencies]
+tempfile = "3.27.0"
