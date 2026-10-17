@@ -100,6 +100,62 @@ export interface AnalyzeChangesResponse {
   skipped_files: SkippedFile[];
 }
 
+export type FileChangeStatus = "added" | "modified" | "removed";
+
+/** Mirrors core::analysis::file_changes::FileFunctionChange. */
+export interface FileFunctionChange {
+  kind: FunctionChangeKind;
+  function: FunctionId;
+  /** The name in the base. Only set when renamed. */
+  previous_function: FunctionId | null;
+  /** Unknown for removed and renamed functions. */
+  added_line_count: number | null;
+  /** Only known for removed functions. */
+  removed_line_count: number | null;
+}
+
+/** Mirrors core::analysis::file_changes::FileCaller. */
+export interface FileCaller {
+  function: FunctionId;
+  file_path: string;
+  line: number;
+  /** The changed function in this file that is called. */
+  calls: FunctionId;
+  /** Still calls a function that was removed or renamed. */
+  is_stale: boolean;
+  is_also_changed: boolean;
+}
+
+/** Mirrors core::analysis::file_changes::FileCallee. */
+export interface FileCallee {
+  function: FunctionId;
+  /** False for the standard library and dependencies. */
+  defined_in_project: boolean;
+  /** The changed function in this file that makes the call. */
+  from: FunctionId;
+  call_count: number;
+  is_also_changed: boolean;
+}
+
+/** Mirrors core::analysis::file_changes::FileChange. */
+export interface FileChange {
+  file_path: string;
+  module: string;
+  status: FileChangeStatus;
+  functions: FileFunctionChange[];
+  callers: FileCaller[];
+  callees: FileCallee[];
+}
+
+/** Mirrors core::analysis::service::AnalyzeFileChangesResponse. */
+export interface AnalyzeFileChangesResponse {
+  base_commit: string;
+  head_commit: string | null;
+  /** Sorted by path. */
+  files: FileChange[];
+  skipped_files: SkippedFile[];
+}
+
 /** Mirrors core::analysis::service::GetFunctionSourceRequest. */
 export interface GetFunctionSourceRequest {
   repo_path: string;

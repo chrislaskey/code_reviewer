@@ -13,8 +13,8 @@ use code_reviewer_core::{
         error::AnalysisError,
         function_source::FunctionSource,
         service::{
-            AnalysisService, AnalyzeChangesRequest, AnalyzeChangesResponse, GetCallTraceRequest,
-            GetFunctionSourceRequest,
+            AnalysisService, AnalyzeChangesRequest, AnalyzeChangesResponse,
+            AnalyzeFileChangesResponse, GetCallTraceRequest, GetFunctionSourceRequest,
         },
     },
     git::{GitError, ListChangedFilesRequest, ListChangedFilesResponse},
@@ -65,6 +65,16 @@ async fn analyze_changes(
     run_analysis(service, move |service| service.analyze_changes(request)).await
 }
 
+async fn analyze_file_changes(
+    State(service): State<Arc<AnalysisService>>,
+    Json(request): Json<AnalyzeChangesRequest>,
+) -> Result<Json<AnalyzeFileChangesResponse>, ApiError> {
+    run_analysis(service, move |service| {
+        service.analyze_file_changes(request)
+    })
+    .await
+}
+
 async fn get_function_source(
     State(service): State<Arc<AnalysisService>>,
     Json(request): Json<GetFunctionSourceRequest>,
@@ -92,6 +102,7 @@ fn api_routes() -> Router {
         .route("/api/greet", post(greet))
         .route("/api/list_changed_files", post(list_changed_files))
         .route("/api/analyze_changes", post(analyze_changes))
+        .route("/api/analyze_file_changes", post(analyze_file_changes))
         .route("/api/get_function_source", post(get_function_source))
         .route("/api/get_call_trace", post(get_call_trace))
         .with_state(analysis_service)

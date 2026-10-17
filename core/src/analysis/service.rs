@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::call_trace::{get_call_trace, CallTraceOptions, GetCallTraceResponse};
 use super::error::AnalysisError;
+use super::file_changes::{group_changes_by_file, FileChange};
 use super::function_changes::{list_function_changes, FunctionChange};
 use super::function_source::{get_function_source, FunctionSource};
 use super::model::FunctionId;
@@ -32,6 +33,18 @@ pub struct AnalyzeChangesResponse {
     /// `None` when the head is the working tree.
     pub head_commit: Option<String>,
     pub changes: Vec<FunctionChange>,
+    /// Files in the head that could not be indexed.
+    pub skipped_files: Vec<SkippedFile>,
+}
+
+/// The changes of one review, grouped by file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalyzeFileChangesResponse {
+    pub base_commit: String,
+    /// `None` when the head is the working tree.
+    pub head_commit: Option<String>,
+    /// One entry per changed file, sorted by path.
+    pub files: Vec<FileChange>,
     /// Files in the head that could not be indexed.
     pub skipped_files: Vec<SkippedFile>,
 }
@@ -109,6 +122,22 @@ impl AnalysisService {
             head_commit,
             changes,
             skipped_files: head_index.skipped_files().to_vec(),
+        })
+    }
+
+    /// Group the changed functions by file, with the callers and calls of each file.
+    ///
+    /// Takes the same request as `analyze_changes`.
+    pub fn analyze_file_changes(
+        &self,
+        request: AnalyzeChangesRequest,
+    ) -> Result<AnalyzeFileChangesResponse, AnalysisError> {
+        let response = self.analyze_changes(request)?;
+        Ok(AnalyzeFileChangesResponse {
+            base_commit: response.base_commit,
+            head_commit: response.head_commit,
+            files: group_changes_by_file(&response.changes),
+            skipped_files: response.skipped_files,
         })
     }
 

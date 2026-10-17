@@ -9,6 +9,7 @@ pub mod changed_functions;
 mod elixir;
 pub mod error;
 pub mod external_calls;
+pub mod file_changes;
 pub mod function_changes;
 pub mod function_source;
 pub mod language;

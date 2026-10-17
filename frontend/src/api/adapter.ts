@@ -1,6 +1,7 @@
 import type {
   AnalyzeChangesRequest,
   AnalyzeChangesResponse,
+  AnalyzeFileChangesResponse,
   GetFunctionSourceRequest,
   FunctionSource,
   GetCallTraceRequest,
@@ -28,6 +29,11 @@ export interface BackendAdapter {
   analyzeChanges(
     request: AnalyzeChangesRequest,
   ): Promise<AnalyzeChangesResponse>;
+
+  /** Group the same changes by file, with the callers and calls of each file. */
+  analyzeFileChanges(
+    request: AnalyzeChangesRequest,
+  ): Promise<AnalyzeFileChangesResponse>;
 
   /** Get the whole function, not only the changed lines. */
   getFunctionSource(

@@ -1,0 +1,52 @@
+/*
+ * Shared theme for every app that renders the shared frontend.
+ * Imported by each app's styles.css, after `@import "tailwindcss"`.
+ *
+ * The `base-*` names match the visualized-elixir cards, so card markup can be
+ * copied between the two projects unchanged.
+ *
+ * The theme is chosen by `data-theme="light" | "dark"` on <html>. See
+ * `theme/ThemeProvider.tsx`, which resolves the "system" choice to one of them.
+ */
+@import "@xyflow/react/dist/style.css";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  --color-base-100: oklch(98% 0 0);
+  --color-base-200: oklch(96% 0.001 286.375);
+  --color-base-300: oklch(92% 0.004 286.32);
+  --color-base-content: oklch(21% 0.006 285.885);
+  --color-primary: rgb(0, 150, 220);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-base-100: oklch(30.33% 0.016 252.42);
+  --color-base-200: oklch(25.26% 0.014 253.1);
+  --color-base-300: oklch(20.15% 0.012 254.09);
+  --color-base-content: oklch(97.807% 0.029 256.847);
+  --color-primary: rgb(0, 183, 255);
+}
+
+body {
+  background-color: var(--color-base-100);
+  color: var(--color-base-content);
+}
+
+/* ReactFlow: let the page's own colours show through the canvas. */
+.react-flow {
+  --xy-background-color: transparent;
+  --xy-edge-stroke-default: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  --xy-handle-background-color-default: color-mix(in oklab, var(--color-base-content) 40%, transparent);
+  --xy-handle-border-color-default: var(--color-base-100);
+}
+
+/*
+ * ReactFlow turns pointer events off on nodes when the canvas has nothing
+ * selectable or draggable, which makes hover and click on our own node
+ * contents do nothing. Our nodes handle their own clicks.
+ */
+.react-flow .react-flow__node {
+  pointer-events: all !important;
+}

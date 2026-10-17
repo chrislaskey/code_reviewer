@@ -7,8 +7,8 @@ use code_reviewer_core::{
         error::AnalysisError,
         function_source::FunctionSource,
         service::{
-            AnalysisService, AnalyzeChangesRequest, AnalyzeChangesResponse, GetCallTraceRequest,
-            GetFunctionSourceRequest,
+            AnalysisService, AnalyzeChangesRequest, AnalyzeChangesResponse,
+            AnalyzeFileChangesResponse, GetCallTraceRequest, GetFunctionSourceRequest,
         },
     },
     git::{ChangedFile, ListChangedFilesRequest},
@@ -54,6 +54,17 @@ async fn analyze_changes(
 }
 
 #[tauri::command]
+async fn analyze_file_changes(
+    service: State<'_, Arc<AnalysisService>>,
+    request: AnalyzeChangesRequest,
+) -> Result<AnalyzeFileChangesResponse, String> {
+    run_analysis(&service, move |service| {
+        service.analyze_file_changes(request)
+    })
+    .await
+}
+
+#[tauri::command]
 async fn get_function_source(
     service: State<'_, Arc<AnalysisService>>,
     request: GetFunctionSourceRequest,
@@ -81,6 +92,7 @@ pub fn run() {
             greet,
             list_changed_files,
             analyze_changes,
+            analyze_file_changes,
             get_function_source,
             get_call_trace
         ])

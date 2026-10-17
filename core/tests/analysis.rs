@@ -408,6 +408,56 @@ mod revisions {
     }
 
     #[test]
+    fn test_file_changes_group_the_commit_by_file_with_status_and_stale_callers() {
+        use code_reviewer_core::analysis::file_changes::FileChangeStatus;
+
+        let dir = repo_with_two_commits();
+        let response = AnalysisService::new()
+            .analyze_file_changes(AnalyzeChangesRequest {
+                repo_path: dir.path().to_string_lossy().to_string(),
+                base_ref: None,
+                head_ref: Some("HEAD".to_string()),
+            })
+            .unwrap();
+
+        let paths: Vec<_> = response
+            .files
+            .iter()
+            .map(|f| f.file_path.as_str())
+            .collect();
+        assert_eq!(
+            paths,
+            vec![
+                "lib/shop/audit.ex",
+                "lib/shop/billing.ex",
+                "lib/shop/orders.ex"
+            ]
+        );
+
+        let audit = &response.files[0];
+        assert_eq!(audit.status, FileChangeStatus::Modified);
+        assert_eq!(audit.callers.iter().filter(|c| c.is_stale).count(), 2);
+        // Billing.charge is also changed in this review.
+        let billing_caller = audit
+            .callers
+            .iter()
+            .find(|c| c.function.module == "Shop.Billing")
+            .unwrap();
+        assert!(billing_caller.is_also_changed);
+
+        let billing = &response.files[1];
+        assert_eq!(billing.module, "Shop.Billing");
+        assert!(billing
+            .callees
+            .iter()
+            .any(|c| c.function.module == "Stripe.Charge" && !c.defined_in_project));
+
+        let orders = &response.files[2];
+        assert_eq!(orders.status, FileChangeStatus::Removed);
+        assert_eq!(orders.functions.len(), 2);
+    }
+
+    #[test]
     fn test_revision_range_matches_the_single_commit_and_sources_read_from_the_old_side() {
         let dir = repo_with_two_commits();
         let service = AnalysisService::new();

@@ -1,6 +1,7 @@
 import type {
   AnalyzeChangesRequest,
   AnalyzeChangesResponse,
+  AnalyzeFileChangesResponse,
   BackendAdapter,
   FunctionSource,
   GetCallTraceRequest,
@@ -64,6 +65,12 @@ export const httpAdapter: BackendAdapter = {
     request: AnalyzeChangesRequest,
   ): Promise<AnalyzeChangesResponse> {
     return postJson("analyze_changes", request, "Analyze changes");
+  },
+
+  analyzeFileChanges(
+    request: AnalyzeChangesRequest,
+  ): Promise<AnalyzeFileChangesResponse> {
+    return postJson("analyze_file_changes", request, "Analyze file changes");
   },
 
   getFunctionSource(

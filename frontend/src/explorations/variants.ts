@@ -1,0 +1,374 @@
+import type { Edge, Node } from "@xyflow/react";
+import type { ChipTone } from "./style";
+import { blockHeight, type BlockData, type BlockRow } from "./block";
+import {
+  calleeLabel,
+  callerLabel,
+  findFileForCallee,
+  findFileForCaller,
+  isOutsideProject,
+  shortPath,
+  splitCallees,
+  type ExampleCallee,
+  type ExampleCaller,
+  type ExampleFile,
+  type OutsideMode,
+} from "./data";
+import { fade, sortFiles, splitFocusKey, withFade, type LedgerSort } from "./depth";
+import { ledgerHeight, type LedgerData, type LedgerStyle } from "./ledger";
+import { SIZES, chipItem, layoutRows, listHeight, makeEdge, type ColumnItem, type Graph } from "./layout";
+import {
+  calleeMarkers,
+  calleeTone,
+  callerMarkers,
+  callerTone,
+  cardHeight,
+  type CardLook,
+  type CardStats,
+  type ChipData,
+  type FileCardData,
+  type ListData,
+  type Marker,
+} from "./nodes";
+
+/*
+ * Round three. Every node view here connects each side to the card at one
+ * point, and shows what belongs to a function by hover instead of by drawing
+ * one line per function.
+ */
+
+/* -- Ledger: E3 with options -------------------------------------------------- */
+
+export function buildLedgerVariant(
+  files: ExampleFile[],
+  options: {
+    style: LedgerStyle;
+    outside: OutsideMode;
+    sort: LedgerSort;
+    collapsed: Set<string>;
+    selected: string | null;
+  },
+): Graph {
+  let y = 0;
+  const nodes: Node[] = sortFiles(files, options.sort).map((file) => {
+    const id = `${file.id}:ledger`;
+    const data: LedgerData = {
+      file,
+      outside: options.outside,
+      style: options.style,
+      collapsed: options.collapsed.has(id),
+      selectedLabel: options.selected,
+    };
+    const node: Node = { id, type: "ledger", position: { x: 0, y }, data };
+    y += ledgerHeight(data) + SIZES.rowGap / 2;
+    return node;
+  });
+  return { nodes, edges: [], height: Math.max(y - SIZES.rowGap / 2, 0) };
+}
+
+/* -- Shared by the node views ------------------------------------------------- */
+
+/** Presentation choices for the chip view that the first round did not have. */
+export interface ViewLook extends CardLook {
+  /** Every connector solid. Dependencies are still thinner and lighter. */
+  solidEdges: boolean;
+  /** Changed calls are plain boxes with a marker icon, not tinted. */
+  subtleTones: boolean;
+  /** Every connector has the same colour, width and style, and stays put on hover. */
+  uniformEdges?: boolean;
+  /** Chip subtitles are the file path alone. */
+  pathSubtitles: boolean;
+}
+
+export interface NodeViewOptions {
+  outside: OutsideMode;
+  /** The function being hovered or pinned, as `fileId:name/arity`. */
+  focusKey: string | null;
+  stats: CardStats;
+  look?: ViewLook;
+}
+
+function focusContext(files: ExampleFile[], file: ExampleFile, focusKey: string | null) {
+  const focus = splitFocusKey(focusKey);
+  const inFocusFile = focus?.fileId === file.id;
+  return {
+    inFocusFile,
+    /** Is something in this file hovered, and is it not this function? */
+    isRelated: (fn: string) => focus === null || (inFocusFile && fn === focus.fn),
+    cardDimmed: focus !== null && !inFocusFile,
+    focused: focus !== null,
+    files,
+  };
+}
+
+function cardItem(file: ExampleFile, options: NodeViewOptions, dimmed: boolean): ColumnItem {
+  const { look } = options;
+  const stats = look?.pathHeader ? "none" : options.stats;
+  const data: FileCardData = { file, ports: false, focusKey: options.focusKey, stats, look };
+  return {
+    node: withFade({ id: `${file.id}:card`, type: "file_card", data }, dimmed),
+    height: cardHeight(file, false, stats, look?.functionsLabel ?? true),
+  };
+}
+
+function edgeWidthFor(related: boolean, focused: boolean, uniform = false): number {
+  return related && focused && !uniform ? 2.75 : 1.5;
+}
+
+/** One folded list for dependencies and the standard library, as in E1. */
+function foldedOutsideList(
+  file: ExampleFile,
+  outside: ExampleCallee[],
+  related: (fn: string) => boolean,
+  focused: boolean,
+  dashed = true,
+  uniform = false,
+): { item: ColumnItem; edge: Edge } {
+  const id = `${file.id}:outside`;
+  const data: ListData = {
+    side: "output",
+    title: `Dependencies & standard library · ${outside.length}`,
+    compact: true,
+    items: outside.map((callee) => ({
+      title: calleeLabel(callee),
+      subtitle: callee.call_count > 1 ? `×${callee.call_count}` : undefined,
+    })),
+  };
+  const dimmed = !outside.some((callee) => related(callee.from));
+  return {
+    item: {
+      node: withFade({ id, type: "list", data }, dimmed),
+      height: listHeight(outside.length, true),
+    },
+    edge: fade(
+      makeEdge(`card->${id}`, `${file.id}:card`, id, {
+        dashed,
+        width: edgeWidthFor(!dimmed, focused, uniform),
+      }),
+      dimmed,
+    ),
+  };
+}
+
+/* -- Chips, one connection point ---------------------------------------------- */
+
+const GROUP_GAP = 20;
+
+export function buildChipsOnePoint(
+  files: ExampleFile[],
+  options: NodeViewOptions & { compact: boolean },
+): Graph {
+  const chipHeight = options.compact ? SIZES.compactChipHeight : SIZES.chipHeight;
+  const itemGap = options.compact ? 6 : SIZES.chipGap;
+  const look = options.look;
+  const solid = look?.solidEdges ?? false;
+  const subtle = look?.subtleTones ?? false;
+  const uniform = look?.uniformEdges ?? false;
+  /** With subtle tones only stale callers keep a coloured connector, unless all are uniform. */
+  const edgeTone = (tone: ChipTone): ChipTone =>
+    uniform || (subtle && tone !== "stale") ? "neutral" : tone;
+
+  const rows = files.map((file) => {
+    const context = focusContext(files, file, options.focusKey);
+    const cardId = `${file.id}:card`;
+    const edges: Edge[] = [];
+
+    let previous: string | null = null;
+    const left: ColumnItem[] = file.callers.map((caller: ExampleCaller, index) => {
+      const id = `${file.id}:in:${index}`;
+      const alsoIn = caller.also_changed ? findFileForCaller(files, caller) : undefined;
+      const data: ChipData = {
+        side: "input",
+        title: callerLabel(caller),
+        subtitle: look?.pathSubtitles
+          ? `${caller.file_path}:${caller.line}`
+          : `${shortPath(caller.file_path)}:${caller.line} → ${caller.calls}`,
+        tone: callerTone(caller),
+        markers: callerMarkers(caller),
+        jumpToFileId: alsoIn?.id,
+        focusKey: `${file.id}:${caller.calls}`,
+        compact: options.compact,
+        subtle,
+        subtitleIsPath: look?.pathSubtitles,
+      };
+      const dimmed = !context.isRelated(caller.calls);
+      edges.push(
+        fade(
+          makeEdge(`${id}->card`, id, cardId, {
+            tone: edgeTone(callerTone(caller)),
+            dashed: !solid && caller.kind === "test",
+            width: edgeWidthFor(!dimmed, context.focused, uniform),
+          }),
+          dimmed,
+        ),
+      );
+      const startsGroup = previous !== null && previous !== caller.calls;
+      previous = caller.calls;
+      return {
+        ...chipItem(withFade({ id, type: "chip", data }, dimmed), chipHeight),
+        gapBefore: startsGroup ? GROUP_GAP : itemGap,
+      };
+    });
+
+    const { shown, folded } = splitCallees(file.callees, options.outside);
+    previous = null;
+    const right: ColumnItem[] = shown.map((callee, index) => {
+      const id = `${file.id}:out:${index}`;
+      const alsoIn = findFileForCallee(files, callee);
+      const markers: Marker[] = [...calleeMarkers(callee)];
+      if (alsoIn) markers.push("also_changed");
+      const outside = isOutsideProject(callee);
+      const data: ChipData = {
+        side: "output",
+        title: calleeLabel(callee),
+        subtitle: look?.pathSubtitles
+          ? callee.path
+          : `from ${callee.from}${callee.call_count > 1 ? ` ×${callee.call_count}` : ""}`,
+        tone: calleeTone(callee),
+        markers,
+        jumpToFileId: alsoIn?.id,
+        focusKey: `${file.id}:${callee.from}`,
+        dimOrigin: outside,
+        compact: options.compact,
+        subtle,
+        subtitleIsPath: look?.pathSubtitles,
+      };
+      const dimmed = !context.isRelated(callee.from);
+      const edge = makeEdge(`card->${id}`, cardId, id, {
+        tone: edgeTone(calleeTone(callee)),
+        dashed: !solid && (callee.diff === "removed" || outside),
+        width: outside && !uniform ? 1 : edgeWidthFor(!dimmed, context.focused, uniform),
+      });
+      // Solid lines still show dependencies as lighter.
+      const quiet =
+        solid && outside && !uniform
+          ? { ...edge, style: { ...edge.style, opacity: 0.45 } }
+          : edge;
+      edges.push(fade(quiet, dimmed));
+      const startsGroup = previous !== null && previous !== callee.from;
+      previous = callee.from;
+      return {
+        ...chipItem(withFade({ id, type: "chip", data }, dimmed), chipHeight),
+        gapBefore: startsGroup ? GROUP_GAP : itemGap,
+      };
+    });
+
+    if (folded.length > 0) {
+      const list = foldedOutsideList(
+        file,
+        folded,
+        context.isRelated,
+        context.focused,
+        !solid,
+        uniform,
+      );
+      right.push({ ...list.item, gapBefore: GROUP_GAP });
+      edges.push(list.edge);
+    }
+
+    return {
+      row: { left, card: cardItem(file, options, context.cardDimmed), right },
+      edges,
+    };
+  });
+
+  const layout = layoutRows(rows.map((item) => item.row));
+  return { nodes: layout.nodes, height: layout.height, edges: rows.flatMap((item) => item.edges) };
+}
+
+/* -- Blocks, one connection point --------------------------------------------- */
+
+export function buildBlocksOnePoint(
+  files: ExampleFile[],
+  options: NodeViewOptions & { groupedByFunction: boolean },
+): Graph {
+  const rows = files.map((file) => {
+    const context = focusContext(files, file, options.focusKey);
+    const cardId = `${file.id}:card`;
+    const edges: Edge[] = [];
+    const left: ColumnItem[] = [];
+    const right: ColumnItem[] = [];
+
+    const inputRows: BlockRow[] = [];
+    let previous: string | null = null;
+    for (const caller of file.callers) {
+      if (options.groupedByFunction && previous !== caller.calls) {
+        inputRows.push({ kind: "heading", label: caller.calls, focusKey: `${file.id}:${caller.calls}` });
+      }
+      previous = caller.calls;
+      const alsoIn = caller.also_changed ? findFileForCaller(files, caller) : undefined;
+      inputRows.push({
+        kind: "item",
+        title: callerLabel(caller),
+        detail: options.groupedByFunction ? undefined : caller.calls,
+        tone: callerTone(caller),
+        markers: callerMarkers(caller),
+        dim: caller.kind === "test",
+        focusKey: `${file.id}:${caller.calls}`,
+        jumpToFileId: alsoIn?.id,
+      });
+    }
+
+    const { shown, folded } = splitCallees(file.callees, options.outside);
+    const outputRows: BlockRow[] = [];
+    previous = null;
+    for (const callee of shown) {
+      if (options.groupedByFunction && previous !== callee.from) {
+        outputRows.push({ kind: "heading", label: callee.from, focusKey: `${file.id}:${callee.from}` });
+      }
+      previous = callee.from;
+      const alsoIn = findFileForCallee(files, callee);
+      const markers: Marker[] = [...calleeMarkers(callee)];
+      if (alsoIn) markers.push("also_changed");
+      outputRows.push({
+        kind: "item",
+        title: calleeLabel(callee),
+        detail: options.groupedByFunction
+          ? callee.call_count > 1 ? `×${callee.call_count}` : undefined
+          : callee.call_count > 1 ? `×${callee.call_count}` : callee.from,
+        tone: calleeTone(callee),
+        markers,
+        dim: isOutsideProject(callee),
+        focusKey: `${file.id}:${callee.from}`,
+        jumpToFileId: alsoIn?.id,
+      });
+    }
+    if (folded.length > 0) {
+      outputRows.push({ kind: "note", label: `+${folded.length} in dependencies and stdlib` });
+    }
+
+    const countItems = (blockRows: BlockRow[]) => blockRows.filter((row) => row.kind === "item").length;
+    const dimmed = context.cardDimmed;
+
+    if (inputRows.length > 0) {
+      const id = `${file.id}:inputs`;
+      const data: BlockData = {
+        side: "input",
+        title: `Inputs · ${countItems(inputRows)}`,
+        rows: inputRows,
+        focus: options.focusKey,
+      };
+      left.push({ node: { id, type: "block", data }, height: blockHeight(inputRows) });
+      edges.push(fade(makeEdge(`${id}->card`, id, cardId), dimmed));
+    }
+    if (outputRows.length > 0) {
+      const id = `${file.id}:outputs`;
+      const data: BlockData = {
+        side: "output",
+        title: `Outputs · ${countItems(outputRows)}`,
+        rows: outputRows,
+        focus: options.focusKey,
+      };
+      right.push({ node: { id, type: "block", data }, height: blockHeight(outputRows) });
+      edges.push(fade(makeEdge(`card->${id}`, cardId, id), dimmed));
+    }
+
+    return { row: { left, card: cardItem(file, options, context.cardDimmed), right }, edges };
+  });
+
+  const layout = layoutRows(
+    rows.map((item) => item.row),
+    SIZES.blockWidth,
+  );
+  return { nodes: layout.nodes, height: layout.height, edges: rows.flatMap((item) => item.edges) };
+}
