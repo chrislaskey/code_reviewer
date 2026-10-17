@@ -42,7 +42,7 @@ pub fn extract_function_source(definition: &FunctionDefinition, file_text: &str)
     }
 }
 
-/// Read the full source of `function` from the project on disk.
+/// Read the full source of `function` from the snapshot the index was built from.
 pub fn get_function_source(
     index: &ProjectIndex,
     function: &FunctionId,
@@ -51,11 +51,6 @@ pub fn get_function_source(
         .get_function(function)
         .ok_or_else(|| AnalysisError::FunctionNotFound(function.to_string()))?;
 
-    let full_path = index.repo_path().join(&definition.file_path);
-    let file_text =
-        std::fs::read_to_string(&full_path).map_err(|error| AnalysisError::ReadFileFailed {
-            path: definition.file_path.clone(),
-            message: error.to_string(),
-        })?;
+    let file_text = index.read_file_text(&definition.file_path)?;
     Ok(extract_function_source(definition, &file_text))
 }

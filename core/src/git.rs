@@ -31,6 +31,12 @@ pub enum GitError {
 
     #[error("git exited with status {code}: {stderr}")]
     NonZeroExit { code: i32, stderr: String },
+
+    #[error("invalid revision: {0}")]
+    InvalidRevision(String),
+
+    #[error("unexpected git output: {0}")]
+    UnexpectedOutput(String),
 }
 
 /// List files changed in the git working tree (staged + unstaged + untracked).
@@ -104,6 +110,9 @@ pub struct ListChangedLineRangesRequest {
     pub repo_path: String,
     /// Defaults to `HEAD`, which means all uncommitted changes.
     pub base_ref: Option<String>,
+    /// Compare against this revision instead of the working tree.
+    #[serde(default)]
+    pub head_ref: Option<String>,
 }
 
 /// The changed lines of one file, as line ranges in the current file.
@@ -161,37 +170,60 @@ pub fn list_project_file_paths(
     Ok(ListProjectFilePathsResponse { file_paths })
 }
 
-/// List the changed line ranges of every file since `base_ref`. Untracked
-/// files count as fully changed. Deleted files are left out because they
-/// have no lines in the current tree.
+/// List the changed line ranges of every file between `base_ref` and
+/// `head_ref`, or the working tree when there is no `head_ref`. Renames are
+/// followed, so a moved file only lists the lines that changed. Untracked
+/// files count as fully changed (working tree only). Deleted files are left
+/// out because they have no lines in the new tree.
 pub fn list_changed_line_ranges(
     request: ListChangedLineRangesRequest,
 ) -> Result<ListChangedLineRangesResponse, GitError> {
-    let base_ref = request.base_ref.as_deref().unwrap_or(DEFAULT_BASE_REF);
-    let diff = run_git(
+    let base_commit = get_commit_sha(
         &request.repo_path,
-        &[
-            "-c",
-            "core.quotePath=false",
-            "diff",
-            "-U0",
-            "--no-renames",
-            "--no-ext-diff",
-            "--no-color",
-            "--relative",
-            "--src-prefix=a/",
-            "--dst-prefix=b/",
-            base_ref,
-        ],
+        request.base_ref.as_deref().unwrap_or(DEFAULT_BASE_REF),
     )?;
-    let mut files = parse_unified_diff_zero_context(&diff);
+    let head_commit = request
+        .head_ref
+        .as_deref()
+        .map(|head_ref| get_commit_sha(&request.repo_path, head_ref))
+        .transpose()?;
 
+    // Both are full SHAs from `get_commit_sha`, so they cannot be read as options.
+    let mut arguments = vec![
+        "-c",
+        "core.quotePath=false",
+        "diff",
+        "-U0",
+        "-M",
+        "--no-ext-diff",
+        "--no-color",
+        "--relative",
+        "--src-prefix=a/",
+        "--dst-prefix=b/",
+        base_commit.as_str(),
+    ];
+    if let Some(head_commit) = &head_commit {
+        arguments.push(head_commit.as_str());
+    }
+    let mut files = parse_unified_diff_zero_context(&run_git(&request.repo_path, &arguments)?);
+
+    if head_commit.is_none() {
+        files.extend(list_untracked_files_as_changed(&request.repo_path)?);
+    }
+
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(ListChangedLineRangesResponse { files })
+}
+
+fn list_untracked_files_as_changed(repo_path: &str) -> Result<Vec<ChangedFileLines>, GitError> {
     let untracked = run_git(
-        &request.repo_path,
+        repo_path,
         &["ls-files", "-z", "--others", "--exclude-standard"],
     )?;
+
+    let mut files = Vec::new();
     for path in untracked.split('\0').filter(|path| !path.is_empty()) {
-        let full_path = std::path::Path::new(&request.repo_path).join(path);
+        let full_path = std::path::Path::new(repo_path).join(path);
         if let Ok(text) = std::fs::read_to_string(full_path) {
             let line_count = text.lines().count();
             if line_count > 0 {
@@ -205,9 +237,140 @@ pub fn list_changed_line_ranges(
             }
         }
     }
+    Ok(files)
+}
 
-    files.sort_by(|a, b| a.path.cmp(&b.path));
-    Ok(ListChangedLineRangesResponse { files })
+/// Resolve a branch, tag, SHA or expression like `HEAD~2` to a full commit SHA.
+pub fn get_commit_sha(repo_path: &str, revision: &str) -> Result<String, GitError> {
+    if revision.is_empty() || revision.starts_with('-') || revision.contains('\0') {
+        return Err(GitError::InvalidRevision(revision.to_string()));
+    }
+
+    let object = format!("{revision}^{{commit}}");
+    let stdout = run_git(repo_path, &["rev-parse", "--verify", "--quiet", &object])
+        .map_err(|_| GitError::InvalidRevision(revision.to_string()))?;
+    Ok(stdout.trim().to_string())
+}
+
+/// The first parent of a commit, as a full SHA.
+pub fn get_parent_commit_sha(repo_path: &str, commit_sha: &str) -> Result<String, GitError> {
+    get_commit_sha(repo_path, &format!("{commit_sha}^"))
+}
+
+/// List every file path in the tree of a commit.
+pub fn list_file_paths_at_commit(
+    repo_path: &str,
+    commit_sha: &str,
+) -> Result<Vec<String>, GitError> {
+    let stdout = run_git(
+        repo_path,
+        &["ls-tree", "-r", "-z", "--name-only", commit_sha],
+    )?;
+    Ok(stdout
+        .split('\0')
+        .filter(|path| !path.is_empty())
+        .map(str::to_string)
+        .collect())
+}
+
+/// Read one file as it was in a commit.
+pub fn get_file_text_at_commit(
+    repo_path: &str,
+    commit_sha: &str,
+    file_path: &str,
+) -> Result<String, GitError> {
+    run_git(repo_path, &["show", &format!("{commit_sha}:{file_path}")])
+}
+
+/// Read many files as they were in a commit with a single git process.
+/// Files that are missing or are not UTF-8 text are left out.
+pub fn list_file_texts_at_commit(
+    repo_path: &str,
+    commit_sha: &str,
+    file_paths: &[String],
+) -> Result<Vec<(String, String)>, GitError> {
+    use std::io::{BufRead, BufReader, Read, Write};
+    use std::process::Stdio;
+
+    let readable_paths: Vec<&String> = file_paths
+        .iter()
+        .filter(|path| !path.contains('\n'))
+        .collect();
+
+    let mut child = Command::new("git")
+        .args(["cat-file", "--batch"])
+        .current_dir(repo_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| GitError::CommandFailed("no stdin for git cat-file".to_string()))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| GitError::CommandFailed("no stdout for git cat-file".to_string()))?;
+
+    // Write requests on another thread so a full pipe cannot block the reader.
+    let requests: Vec<String> = readable_paths
+        .iter()
+        .map(|path| format!("{commit_sha}:{path}\n"))
+        .collect();
+    let writer = std::thread::spawn(move || {
+        for request in requests {
+            if stdin.write_all(request.as_bytes()).is_err() {
+                break;
+            }
+        }
+    });
+
+    let mut reader = BufReader::new(stdout);
+    let mut texts = Vec::new();
+    let mut read_result: Result<(), GitError> = Ok(());
+    for path in &readable_paths {
+        let mut header = String::new();
+        match reader.read_line(&mut header) {
+            Ok(0) => {
+                read_result = Err(GitError::UnexpectedOutput(
+                    "git cat-file ended early".to_string(),
+                ));
+                break;
+            }
+            Ok(_) => {}
+            Err(e) => {
+                read_result = Err(GitError::CommandFailed(e.to_string()));
+                break;
+            }
+        }
+
+        // "<oid> <type> <size>" for a found object, "<spec> missing" otherwise.
+        let size = match header
+            .trim_end()
+            .rsplit(' ')
+            .next()
+            .map(str::parse::<usize>)
+        {
+            Some(Ok(size)) if !header.trim_end().ends_with("missing") => size,
+            _ => continue,
+        };
+        let mut content = vec![0u8; size + 1];
+        if let Err(e) = reader.read_exact(&mut content) {
+            read_result = Err(GitError::CommandFailed(e.to_string()));
+            break;
+        }
+        content.truncate(size);
+        if let Ok(text) = String::from_utf8(content) {
+            texts.push(((*path).clone(), text));
+        }
+    }
+
+    drop(reader);
+    let _ = writer.join();
+    let _ = child.wait();
+    read_result.map(|()| texts)
 }
 
 /// Parse `git diff -U0` output into new-side line ranges per file.

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -9,13 +9,28 @@ use serde::{Deserialize, Serialize};
 use super::error::AnalysisError;
 use super::language::find_analyzer_for_path;
 use super::model::{FileSymbols, FunctionDefinition, FunctionId, RawCallTarget};
-use crate::git::{list_project_file_paths, ListProjectFilePathsRequest};
+use crate::git::{
+    get_file_text_at_commit, list_file_paths_at_commit, list_file_texts_at_commit,
+    list_project_file_paths, ListProjectFilePathsRequest,
+};
 
 /// A source file held in memory, used to index without touching disk.
 #[derive(Debug, Clone)]
 pub struct SourceFile {
     pub path: String,
     pub text: String,
+}
+
+/// Where the files of an index came from, and so where to read their text later.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum SourceOrigin {
+    /// Files on disk under the repository path.
+    WorkingTree,
+    /// Files as committed, identified by full commit SHA.
+    Commit(String),
+    /// Built from text passed in. File text cannot be read again.
+    #[default]
+    InMemory,
 }
 
 /// A file that could not be indexed, with the reason.
@@ -78,6 +93,7 @@ struct IndexedFile {
 #[derive(Debug, Default)]
 pub struct ProjectIndex {
     repo_path: PathBuf,
+    origin: SourceOrigin,
     files: BTreeMap<String, IndexedFile>,
     functions: BTreeMap<FunctionId, FunctionDefinition>,
     functions_by_module_and_name: HashMap<(String, String), Vec<FunctionId>>,
@@ -89,6 +105,29 @@ pub struct ProjectIndex {
 impl ProjectIndex {
     pub fn repo_path(&self) -> &Path {
         &self.repo_path
+    }
+
+    pub fn origin(&self) -> &SourceOrigin {
+        &self.origin
+    }
+
+    /// Read the text of an indexed file from the snapshot this index was built from.
+    pub fn read_file_text(&self, file_path: &str) -> Result<String, AnalysisError> {
+        let failed = |message: String| AnalysisError::ReadFileFailed {
+            path: file_path.to_string(),
+            message,
+        };
+        match &self.origin {
+            SourceOrigin::WorkingTree => std::fs::read_to_string(self.repo_path.join(file_path))
+                .map_err(|error| failed(error.to_string())),
+            SourceOrigin::Commit(commit_sha) => {
+                get_file_text_at_commit(&self.repo_path.to_string_lossy(), commit_sha, file_path)
+                    .map_err(|error| failed(error.to_string()))
+            }
+            SourceOrigin::InMemory => {
+                Err(failed("index was built from in-memory text".to_string()))
+            }
+        }
     }
 
     pub fn skipped_files(&self) -> &[SkippedFile] {
@@ -105,6 +144,11 @@ impl ProjectIndex {
 
     pub fn get_function(&self, id: &FunctionId) -> Option<&FunctionDefinition> {
         self.functions.get(id)
+    }
+
+    /// Every function in the project, ordered by module, name and arity.
+    pub fn list_functions(&self) -> impl Iterator<Item = &FunctionDefinition> {
+        self.functions.values()
     }
 
     /// Functions defined in `file_path`, in source order.
@@ -135,11 +179,13 @@ impl ProjectIndex {
 
     fn from_indexed_files(
         repo_path: PathBuf,
+        origin: SourceOrigin,
         files: BTreeMap<String, IndexedFile>,
         skipped_files: Vec<SkippedFile>,
     ) -> Self {
         let mut index = ProjectIndex {
             repo_path,
+            origin,
             files,
             skipped_files,
             ..Default::default()
@@ -281,6 +327,14 @@ fn parse_source(file: &SourceFile) -> Result<Arc<FileSymbols>, SkippedFile> {
 
 /// Builds an index from in-memory sources. Files with unknown extensions are skipped.
 pub fn build_project_index_from_sources(sources: Vec<SourceFile>) -> ProjectIndex {
+    index_sources(PathBuf::new(), SourceOrigin::InMemory, sources)
+}
+
+fn index_sources(
+    repo_path: PathBuf,
+    origin: SourceOrigin,
+    sources: Vec<SourceFile>,
+) -> ProjectIndex {
     let results: Vec<_> = sources
         .par_iter()
         .map(|file| (file, parse_source(file)))
@@ -302,7 +356,29 @@ pub fn build_project_index_from_sources(sources: Vec<SourceFile>) -> ProjectInde
             Err(skipped) => skipped_files.push(skipped),
         }
     }
-    ProjectIndex::from_indexed_files(PathBuf::new(), files, skipped_files)
+    ProjectIndex::from_indexed_files(repo_path, origin, files, skipped_files)
+}
+
+/// Builds an index of every analyzable file as it was in `commit_sha`.
+pub fn build_project_index_at_commit(
+    repo_path: &Path,
+    commit_sha: &str,
+) -> Result<ProjectIndex, AnalysisError> {
+    let repo = repo_path.to_string_lossy();
+    let analyzable_paths: Vec<String> = list_file_paths_at_commit(&repo, commit_sha)?
+        .into_iter()
+        .filter(|path| find_analyzer_for_path(path).is_some())
+        .collect();
+
+    let sources = list_file_texts_at_commit(&repo, commit_sha, &analyzable_paths)?
+        .into_iter()
+        .map(|(path, text)| SourceFile { path, text })
+        .collect();
+    Ok(index_sources(
+        repo_path.to_path_buf(),
+        SourceOrigin::Commit(commit_sha.to_string()),
+        sources,
+    ))
 }
 
 /// Builds an index of the project at `repo_path`.
@@ -353,6 +429,7 @@ pub fn build_project_index(
     }
     Ok(Arc::new(ProjectIndex::from_indexed_files(
         repo_path.to_path_buf(),
+        SourceOrigin::WorkingTree,
         files,
         skipped_files,
     )))
@@ -399,13 +476,24 @@ fn index_file_from_disk(
     (result, false)
 }
 
-/// Keeps one index per repository so later requests skip re-parsing.
+/// How many commit indexes the cache keeps before dropping the oldest.
+const MAX_COMMIT_INDEXES: usize = 8;
+
+#[derive(Debug, Default)]
+struct CachedIndexes {
+    working_trees: HashMap<PathBuf, Arc<ProjectIndex>>,
+    commits: HashMap<(PathBuf, String), Arc<ProjectIndex>>,
+    commit_insertion_order: VecDeque<(PathBuf, String)>,
+}
+
+/// Keeps indexes so later requests skip re-parsing.
 ///
-/// Each lookup re-checks file modified times and size, then re-parses only
-/// the files that changed.
+/// A working tree index is re-checked on each lookup: file modified times
+/// and sizes are compared and only the changed files are re-parsed. A commit
+/// never changes, so its index is kept as is (the newest few are kept).
 #[derive(Debug, Default)]
 pub struct ProjectIndexCache {
-    indexes: std::sync::Mutex<HashMap<PathBuf, Arc<ProjectIndex>>>,
+    indexes: std::sync::Mutex<CachedIndexes>,
 }
 
 impl ProjectIndexCache {
@@ -418,20 +506,54 @@ impl ProjectIndexCache {
         &self,
         repo_path: &Path,
     ) -> Result<Arc<ProjectIndex>, AnalysisError> {
-        let previous = self.lock_indexes().get(repo_path).cloned();
+        let previous = self.lock_indexes().working_trees.get(repo_path).cloned();
         let index = build_project_index(repo_path, previous.as_ref())?;
         self.lock_indexes()
+            .working_trees
             .insert(repo_path.to_path_buf(), Arc::clone(&index));
         Ok(index)
     }
 
-    /// Drops the cached index so the next lookup parses everything again.
-    pub fn delete_project_index(&self, repo_path: &Path) {
-        self.lock_indexes().remove(repo_path);
+    /// Returns the index of a commit, given its full SHA.
+    pub fn get_commit_project_index(
+        &self,
+        repo_path: &Path,
+        commit_sha: &str,
+    ) -> Result<Arc<ProjectIndex>, AnalysisError> {
+        let key = (repo_path.to_path_buf(), commit_sha.to_string());
+        if let Some(index) = self.lock_indexes().commits.get(&key) {
+            return Ok(Arc::clone(index));
+        }
+
+        let index = Arc::new(build_project_index_at_commit(repo_path, commit_sha)?);
+        let mut indexes = self.lock_indexes();
+        if indexes
+            .commits
+            .insert(key.clone(), Arc::clone(&index))
+            .is_none()
+        {
+            indexes.commit_insertion_order.push_back(key);
+        }
+        while indexes.commit_insertion_order.len() > MAX_COMMIT_INDEXES {
+            if let Some(oldest) = indexes.commit_insertion_order.pop_front() {
+                indexes.commits.remove(&oldest);
+            }
+        }
+        Ok(index)
     }
 
-    fn lock_indexes(&self) -> std::sync::MutexGuard<'_, HashMap<PathBuf, Arc<ProjectIndex>>> {
-        // The map stays valid even if a holder panicked, so recover the guard.
+    /// Drops every cached index of a repository so the next lookup parses everything again.
+    pub fn delete_project_indexes(&self, repo_path: &Path) {
+        let mut indexes = self.lock_indexes();
+        indexes.working_trees.remove(repo_path);
+        indexes.commits.retain(|(path, _), _| path != repo_path);
+        indexes
+            .commit_insertion_order
+            .retain(|(path, _)| path != repo_path);
+    }
+
+    fn lock_indexes(&self) -> std::sync::MutexGuard<'_, CachedIndexes> {
+        // The maps stay valid even if a holder panicked, so recover the guard.
         self.indexes
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())

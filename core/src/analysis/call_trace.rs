@@ -8,10 +8,9 @@ use super::project_index::{CallDirection, ProjectIndex};
 
 const DEFAULT_MAX_NODE_COUNT: usize = 5_000;
 
-/// Request for the full call tree above or below one function.
+/// How to trace: which way to follow calls and where to stop.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetCallTraceRequest {
-    pub function: FunctionId,
+pub struct CallTraceOptions {
     pub direction: CallDirection,
     /// Levels below the root to follow. `None` follows until cycles or dead ends.
     pub max_depth: Option<usize>,
@@ -62,25 +61,24 @@ struct Tracer<'a> {
 /// Follow every call above or below a function, local and external, through the whole project.
 pub fn get_call_trace(
     index: &ProjectIndex,
-    request: GetCallTraceRequest,
+    function: &FunctionId,
+    options: CallTraceOptions,
 ) -> Result<GetCallTraceResponse, AnalysisError> {
-    if index.get_function(&request.function).is_none() {
-        return Err(AnalysisError::FunctionNotFound(
-            request.function.to_string(),
-        ));
+    if index.get_function(function).is_none() {
+        return Err(AnalysisError::FunctionNotFound(function.to_string()));
     }
 
     let mut tracer = Tracer {
         index,
-        direction: request.direction,
-        max_depth: request.max_depth,
-        max_node_count: request.max_node_count.unwrap_or(DEFAULT_MAX_NODE_COUNT),
+        direction: options.direction,
+        max_depth: options.max_depth,
+        max_node_count: options.max_node_count.unwrap_or(DEFAULT_MAX_NODE_COUNT),
         node_count: 1,
         truncated: false,
         path: HashSet::new(),
     };
     let mut root = CallTraceNode {
-        function: request.function,
+        function: function.clone(),
         defined_in_project: true,
         call_file_path: None,
         call_lines: Vec::new(),
