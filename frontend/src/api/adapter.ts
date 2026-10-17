@@ -1,7 +1,10 @@
 import type {
   AnalyzeChangesRequest,
   AnalyzeChangesResponse,
+  AnalyzeFileChangesRequest,
   AnalyzeFileChangesResponse,
+  ListBranchesAndRecentCommitsRequest,
+  ListBranchesAndRecentCommitsResponse,
   GetFunctionSourceRequest,
   FunctionSource,
   GetCallTraceRequest,
@@ -25,6 +28,11 @@ export interface BackendAdapter {
     request: ListChangedFilesRequest,
   ): Promise<ListChangedFilesResponse>;
 
+  /** List the branches and latest commits, to choose what to review. */
+  listBranchesAndRecentCommits(
+    request: ListBranchesAndRecentCommitsRequest,
+  ): Promise<ListBranchesAndRecentCommitsResponse>;
+
   /** List added, modified, removed and renamed functions with their one-level external calls. */
   analyzeChanges(
     request: AnalyzeChangesRequest,
@@ -32,7 +40,7 @@ export interface BackendAdapter {
 
   /** Group the same changes by file, with the callers and calls of each file. */
   analyzeFileChanges(
-    request: AnalyzeChangesRequest,
+    request: AnalyzeFileChangesRequest,
   ): Promise<AnalyzeFileChangesResponse>;
 
   /** Get the whole function, not only the changed lines. */

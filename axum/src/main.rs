@@ -14,10 +14,14 @@ use code_reviewer_core::{
         function_source::FunctionSource,
         service::{
             AnalysisService, AnalyzeChangesRequest, AnalyzeChangesResponse,
-            AnalyzeFileChangesResponse, GetCallTraceRequest, GetFunctionSourceRequest,
+            AnalyzeFileChangesRequest, AnalyzeFileChangesResponse, GetCallTraceRequest,
+            GetFunctionSourceRequest,
         },
     },
-    git::{GitError, ListChangedFilesRequest, ListChangedFilesResponse},
+    git::{
+        GitError, ListBranchesAndRecentCommitsRequest, ListBranchesAndRecentCommitsResponse,
+        ListChangedFilesRequest, ListChangedFilesResponse,
+    },
     GreetRequest, GreetResponse,
 };
 use tower_http::{cors::CorsLayer, services::ServeDir};
@@ -30,6 +34,16 @@ async fn list_changed_files(
     Json(request): Json<ListChangedFilesRequest>,
 ) -> Result<Json<ListChangedFilesResponse>, (StatusCode, String)> {
     core::git::list_changed_files(request)
+        .map(Json)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+async fn list_branches_and_recent_commits(
+    Json(request): Json<ListBranchesAndRecentCommitsRequest>,
+) -> Result<Json<ListBranchesAndRecentCommitsResponse>, (StatusCode, String)> {
+    tokio::task::spawn_blocking(move || core::git::list_branches_and_recent_commits(request))
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .map(Json)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
@@ -67,7 +81,7 @@ async fn analyze_changes(
 
 async fn analyze_file_changes(
     State(service): State<Arc<AnalysisService>>,
-    Json(request): Json<AnalyzeChangesRequest>,
+    Json(request): Json<AnalyzeFileChangesRequest>,
 ) -> Result<Json<AnalyzeFileChangesResponse>, ApiError> {
     run_analysis(service, move |service| {
         service.analyze_file_changes(request)
@@ -101,6 +115,10 @@ fn api_routes() -> Router {
         .route("/api/health", get(health))
         .route("/api/greet", post(greet))
         .route("/api/list_changed_files", post(list_changed_files))
+        .route(
+            "/api/list_branches_and_recent_commits",
+            post(list_branches_and_recent_commits),
+        )
         .route("/api/analyze_changes", post(analyze_changes))
         .route("/api/analyze_file_changes", post(analyze_file_changes))
         .route("/api/get_function_source", post(get_function_source))

@@ -9,9 +9,11 @@ use super::file_changes::{group_changes_by_file, FileChange};
 use super::function_changes::{list_function_changes, FunctionChange};
 use super::function_source::{get_function_source, FunctionSource};
 use super::model::FunctionId;
+use super::module_rules::ModuleRules;
 use super::project_index::{CallDirection, ProjectIndex, ProjectIndexCache, SkippedFile};
 use crate::git::{
-    get_commit_sha, get_parent_commit_sha, list_changed_line_ranges, ListChangedLineRangesRequest,
+    get_commit_sha, get_merge_base_commit_sha, get_parent_commit_sha, list_changed_line_ranges,
+    ListChangedLineRangesRequest,
 };
 
 /// Request to analyze what changed, function by function.
@@ -20,11 +22,25 @@ use crate::git::{
 /// - `base_ref` only: the working tree against `base_ref`.
 /// - `head_ref` only: that commit against its parent (one commit).
 /// - Both: `head_ref` against `base_ref` (a revision range).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AnalyzeChangesRequest {
     pub repo_path: String,
     pub base_ref: Option<String>,
     pub head_ref: Option<String>,
+    /// With both refs, compare from where `head_ref` branched off `base_ref`,
+    /// like a pull request, instead of against the tip of `base_ref`.
+    #[serde(default)]
+    pub compare_from_merge_base: bool,
+}
+
+/// Request for the changes of one review, grouped by file.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AnalyzeFileChangesRequest {
+    #[serde(flatten)]
+    pub changes: AnalyzeChangesRequest,
+    /// Which callers and calls to highlight or leave out.
+    #[serde(default)]
+    pub module_rules: ModuleRules,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -95,6 +111,9 @@ impl AnalysisService {
             .map(|head_ref| get_commit_sha(repo, head_ref))
             .transpose()?;
         let base_commit = match (&request.base_ref, &head_commit) {
+            (Some(base_ref), Some(head_commit)) if request.compare_from_merge_base => {
+                get_merge_base_commit_sha(repo, base_ref, head_commit)?
+            }
             (Some(base_ref), _) => get_commit_sha(repo, base_ref)?,
             (None, Some(head_commit)) => get_parent_commit_sha(repo, head_commit)?,
             (None, None) => get_commit_sha(repo, "HEAD")?,
@@ -127,16 +146,15 @@ impl AnalysisService {
 
     /// Group the changed functions by file, with the callers and calls of each file.
     ///
-    /// Takes the same request as `analyze_changes`.
     pub fn analyze_file_changes(
         &self,
-        request: AnalyzeChangesRequest,
+        request: AnalyzeFileChangesRequest,
     ) -> Result<AnalyzeFileChangesResponse, AnalysisError> {
-        let response = self.analyze_changes(request)?;
+        let response = self.analyze_changes(request.changes)?;
         Ok(AnalyzeFileChangesResponse {
             base_commit: response.base_commit,
             head_commit: response.head_commit,
-            files: group_changes_by_file(&response.changes),
+            files: group_changes_by_file(&response.changes, &request.module_rules),
             skipped_files: response.skipped_files,
         })
     }

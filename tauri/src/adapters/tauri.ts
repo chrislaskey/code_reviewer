@@ -2,7 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   AnalyzeChangesRequest,
   AnalyzeChangesResponse,
+  AnalyzeFileChangesRequest,
   AnalyzeFileChangesResponse,
+  ListBranchesAndRecentCommitsRequest,
+  ListBranchesAndRecentCommitsResponse,
   BackendAdapter,
   FunctionSource,
   GetCallTraceRequest,
@@ -37,8 +40,17 @@ export const tauriAdapter: BackendAdapter = {
     return invoke<AnalyzeChangesResponse>("analyze_changes", { request });
   },
 
+  listBranchesAndRecentCommits(
+    request: ListBranchesAndRecentCommitsRequest,
+  ): Promise<ListBranchesAndRecentCommitsResponse> {
+    return invoke<ListBranchesAndRecentCommitsResponse>(
+      "list_branches_and_recent_commits",
+      { request },
+    );
+  },
+
   analyzeFileChanges(
-    request: AnalyzeChangesRequest,
+    request: AnalyzeFileChangesRequest,
   ): Promise<AnalyzeFileChangesResponse> {
     return invoke<AnalyzeFileChangesResponse>("analyze_file_changes", {
       request,

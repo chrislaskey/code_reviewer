@@ -41,7 +41,7 @@ export function toViewFiles(files: FileChange[]): ExampleFile[] {
       module: callee.function.module,
       name: callee.function.name,
       arity: callee.function.arity,
-      origin: callee.defined_in_project ? "project" : "dependency",
+      origin: callee.is_highlighted ? "project" : "dependency",
       from: functionKey(callee.from),
       call_count: callee.call_count,
       diff: "same",

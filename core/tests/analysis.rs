@@ -295,7 +295,8 @@ mod revisions {
     use super::*;
     use code_reviewer_core::analysis::function_changes::{FunctionChange, FunctionChangeKind};
     use code_reviewer_core::analysis::service::{
-        AnalysisService, AnalyzeChangesRequest, GetCallTraceRequest, GetFunctionSourceRequest,
+        AnalysisService, AnalyzeChangesRequest, AnalyzeFileChangesRequest, GetCallTraceRequest,
+        GetFunctionSourceRequest,
     };
 
     fn commit(repo: &Path, message: &str) {
@@ -344,6 +345,7 @@ mod revisions {
                 repo_path: repo.to_string_lossy().to_string(),
                 base_ref: base_ref.map(str::to_string),
                 head_ref: head_ref.map(str::to_string),
+                ..Default::default()
             })
             .unwrap()
             .changes
@@ -413,10 +415,14 @@ mod revisions {
 
         let dir = repo_with_two_commits();
         let response = AnalysisService::new()
-            .analyze_file_changes(AnalyzeChangesRequest {
-                repo_path: dir.path().to_string_lossy().to_string(),
-                base_ref: None,
-                head_ref: Some("HEAD".to_string()),
+            .analyze_file_changes(AnalyzeFileChangesRequest {
+                changes: AnalyzeChangesRequest {
+                    repo_path: dir.path().to_string_lossy().to_string(),
+                    base_ref: None,
+                    head_ref: Some("HEAD".to_string()),
+                    ..Default::default()
+                },
+                ..Default::default()
             })
             .unwrap();
 
@@ -455,6 +461,138 @@ mod revisions {
         let orders = &response.files[2];
         assert_eq!(orders.status, FileChangeStatus::Removed);
         assert_eq!(orders.functions.len(), 2);
+    }
+
+    /// `main` has `first` then `main work` (edits Audit). `feature` branched
+    /// after `first` and edits Billing. Checked out: `main`.
+    fn repo_with_diverged_branches() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path();
+        run_git(repo, &["init", "-q", "-b", "main"]);
+        write(repo, "lib/shop/orders.ex", ORDERS);
+        write(repo, "lib/shop/billing.ex", BILLING);
+        write(repo, "lib/shop/audit.ex", AUDIT);
+        commit(repo, "first");
+
+        run_git(repo, &["checkout", "-q", "-b", "feature"]);
+        write(
+            repo,
+            "lib/shop/billing.ex",
+            &BILLING.replace(
+                "Stripe.Charge.create(order)",
+                "Stripe.Charge.create(order, 1)",
+            ),
+        );
+        commit(repo, "feature work");
+
+        run_git(repo, &["checkout", "-q", "main"]);
+        write(
+            repo,
+            "lib/shop/audit.ex",
+            &AUDIT.replace("entry", "entry_value"),
+        );
+        commit(repo, "main work");
+        dir
+    }
+
+    fn changed_files_between(repo: &Path, from_merge_base: bool) -> Vec<String> {
+        let response = AnalysisService::new()
+            .analyze_file_changes(AnalyzeFileChangesRequest {
+                changes: AnalyzeChangesRequest {
+                    repo_path: repo.to_string_lossy().to_string(),
+                    base_ref: Some("main".to_string()),
+                    head_ref: Some("feature".to_string()),
+                    compare_from_merge_base: from_merge_base,
+                },
+                ..Default::default()
+            })
+            .unwrap();
+        response
+            .files
+            .into_iter()
+            .map(|file| file.file_path)
+            .collect()
+    }
+
+    #[test]
+    fn test_merge_base_comparison_leaves_out_what_the_base_branch_changed() {
+        let dir = repo_with_diverged_branches();
+
+        assert_eq!(
+            changed_files_between(dir.path(), false),
+            vec!["lib/shop/audit.ex", "lib/shop/billing.ex"]
+        );
+        assert_eq!(
+            changed_files_between(dir.path(), true),
+            vec!["lib/shop/billing.ex"]
+        );
+    }
+
+    #[test]
+    fn test_branches_and_recent_commits_are_listed_for_choosing_a_comparison() {
+        use code_reviewer_core::git::{
+            list_branches_and_recent_commits, ListBranchesAndRecentCommitsRequest,
+        };
+
+        let dir = repo_with_diverged_branches();
+        let response = list_branches_and_recent_commits(ListBranchesAndRecentCommitsRequest {
+            repo_path: dir.path().to_string_lossy().to_string(),
+            recent_commit_count: Some(2),
+        })
+        .unwrap();
+
+        assert_eq!(response.branches, vec!["feature", "main"]);
+        assert_eq!(response.current_branch.as_deref(), Some("main"));
+        assert_eq!(response.default_branch.as_deref(), Some("main"));
+        let subjects: Vec<_> = response
+            .recent_commits
+            .iter()
+            .map(|c| c.subject.as_str())
+            .collect();
+        assert_eq!(subjects, vec!["main work", "first"]);
+        assert_eq!(response.recent_commits[0].sha.len(), 40);
+    }
+
+    #[test]
+    fn test_module_rules_reach_the_file_changes() {
+        use code_reviewer_core::analysis::module_rules::ModuleRules;
+
+        let dir = repo_with_two_commits();
+        let response = AnalysisService::new()
+            .analyze_file_changes(AnalyzeFileChangesRequest {
+                changes: AnalyzeChangesRequest {
+                    repo_path: dir.path().to_string_lossy().to_string(),
+                    head_ref: Some("HEAD".to_string()),
+                    ..Default::default()
+                },
+                module_rules: ModuleRules {
+                    include: vec!["Stripe".to_string()],
+                    ignore: vec!["Shop.Billing".to_string()],
+                },
+            })
+            .unwrap();
+
+        let audit = response
+            .files
+            .iter()
+            .find(|f| f.module == "Shop.Audit")
+            .unwrap();
+        assert!(audit
+            .callers
+            .iter()
+            .all(|c| c.function.module != "Shop.Billing"));
+        let billing = response
+            .files
+            .iter()
+            .find(|f| f.module == "Shop.Billing")
+            .unwrap();
+        let stripe = billing
+            .callees
+            .iter()
+            .find(|c| c.function.module == "Stripe.Charge")
+            .unwrap();
+        assert!(!stripe.defined_in_project);
+        assert!(stripe.is_highlighted);
     }
 
     #[test]
@@ -556,6 +694,7 @@ mod revisions {
                 repo_path: dir.path().to_string_lossy().to_string(),
                 base_ref: Some(bad.to_string()),
                 head_ref: None,
+                ..Default::default()
             });
             assert!(result.is_err(), "{bad:?} should be rejected");
         }

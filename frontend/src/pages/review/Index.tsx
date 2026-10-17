@@ -1,7 +1,10 @@
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useBackend } from "../../api/context";
-import type { AnalyzeFileChangesResponse } from "../../api/types";
-import { OUTSIDE_MODE_OPTIONS, type OutsideMode } from "../../explorations/data";
+import type {
+  AnalyzeFileChangesResponse,
+  ListBranchesAndRecentCommitsResponse,
+} from "../../api/types";
+import { type OutsideMode } from "../../explorations/data";
 import { MarkerIcon } from "../../explorations/nodes";
 import { SegmentedControl, Toolbar } from "../../explorations/controls";
 import { Legend } from "../../explorations/scaffold";
@@ -10,60 +13,20 @@ import {
   ReviewCanvas,
   type ReviewView,
 } from "../../review/ReviewCanvas";
+import { CompareFormView } from "../../review/CompareFormView";
+import {
+  buildRequest,
+  loadForm,
+  saveForm,
+  withValidChoices,
+  type CompareForm,
+} from "../../review/compare_form";
 import { toViewFiles } from "../../review/view_model";
 
-const STORAGE_KEY = "code_reviewer.review_form";
-
-interface ReviewForm {
-  repoPath: string;
-  baseRef: string;
-  headRef: string;
-}
-
-function loadForm(): ReviewForm {
-  const empty = { repoPath: "", baseRef: "", headRef: "" };
-  try {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    return saved ? { ...empty, ...JSON.parse(saved) } : empty;
-  } catch {
-    return empty;
-  }
-}
-
-function saveForm(form: ReviewForm) {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
-  } catch {
-    // Remembering the form is a convenience only.
-  }
-}
-
-function TextField({
-  label,
-  value,
-  placeholder,
-  className,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  placeholder: string;
-  className?: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className={`flex flex-col gap-1 text-[11px] text-base-content/60 ${className ?? ""}`}>
-      {label}
-      <input
-        value={value}
-        placeholder={placeholder}
-        onChange={(event) => onChange(event.target.value)}
-        spellCheck={false}
-        className="rounded-lg border border-base-300 bg-base-100 px-2.5 py-1.5 font-mono text-xs text-base-content placeholder:text-base-content/30"
-      />
-    </label>
-  );
-}
+const OUTSIDE_OPTIONS: { value: OutsideMode; label: string }[] = [
+  { value: "dimmed", label: "Dimmed" },
+  { value: "hidden", label: "Hidden" },
+];
 
 function shortCommit(commit: string): string {
   return commit.slice(0, 8);
@@ -101,33 +64,61 @@ function ResultSummary({ result }: { result: AnalyzeFileChangesResponse }) {
 /** Changed functions of a real repository, drawn as inputs → file → outputs. */
 export default function ReviewIndex() {
   const backend = useBackend();
-  const [form, setForm] = useState<ReviewForm>(loadForm);
+  const [form, setForm] = useState<CompareForm>(loadForm);
+  const [refs, setRefs] = useState<ListBranchesAndRecentCommitsResponse | null>(null);
+  const [refsError, setRefsError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalyzeFileChangesResponse | null>(null);
   const [resultNumber, setResultNumber] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<ReviewView>("chips");
-  const [outside, setOutside] = useState<OutsideMode>("dimmed");
+  const [outside, setOutside] = useState<OutsideMode>("hidden");
   const latestRequest = useRef(0);
 
   const viewFiles = useMemo(() => (result ? toViewFiles(result.files) : []), [result]);
 
-  function updateForm(changes: Partial<ReviewForm>) {
+  // Read the branches and commits once the path stops changing.
+  useEffect(() => {
+    const repoPath = form.repoPath.trim();
+    if (repoPath === "") {
+      setRefs(null);
+      setRefsError(null);
+      return;
+    }
+    let outdated = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await backend.listBranchesAndRecentCommits({ repo_path: repoPath });
+        if (outdated) return;
+        setRefs(response);
+        setRefsError(null);
+        setForm((current) => withValidChoices(current, response));
+      } catch (e) {
+        if (outdated) return;
+        setRefs(null);
+        setRefsError(e instanceof Error ? e.message : String(e));
+      }
+    }, 400);
+    return () => {
+      outdated = true;
+      window.clearTimeout(timer);
+    };
+  }, [backend, form.repoPath]);
+
+  function updateForm(changes: Partial<CompareForm>) {
     setForm((current) => ({ ...current, ...changes }));
   }
 
   async function analyze(event: FormEvent) {
     event.preventDefault();
+    const analyzeRequest = buildRequest(form);
+    if (analyzeRequest === null) return;
     const request = ++latestRequest.current;
     saveForm(form);
     setLoading(true);
     setError(null);
     try {
-      const response = await backend.analyzeFileChanges({
-        repo_path: form.repoPath.trim(),
-        base_ref: form.baseRef.trim() || null,
-        head_ref: form.headRef.trim() || null,
-      });
+      const response = await backend.analyzeFileChanges(analyzeRequest);
       if (request !== latestRequest.current) return;
       setResult(response);
       setResultNumber(request);
@@ -142,43 +133,14 @@ export default function ReviewIndex() {
 
   return (
     <div>
-      <form
+      <CompareFormView
+        form={form}
+        refs={refs}
+        refsError={refsError}
+        loading={loading}
+        onChange={updateForm}
         onSubmit={analyze}
-        className="flex flex-wrap items-end gap-3 border-b border-base-300 bg-base-100 px-4 py-3"
-      >
-        <TextField
-          label="Repository path"
-          value={form.repoPath}
-          placeholder="/path/to/elixir/project"
-          className="min-w-72 flex-1"
-          onChange={(repoPath) => updateForm({ repoPath })}
-        />
-        <TextField
-          label="Base"
-          value={form.baseRef}
-          placeholder="e.g. main"
-          className="w-40"
-          onChange={(baseRef) => updateForm({ baseRef })}
-        />
-        <TextField
-          label="Head"
-          value={form.headRef}
-          placeholder="e.g. HEAD"
-          className="w-40"
-          onChange={(headRef) => updateForm({ headRef })}
-        />
-        <button
-          type="submit"
-          disabled={loading || form.repoPath.trim() === ""}
-          className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? "Analyzing…" : "Analyze changes"}
-        </button>
-        <p className="basis-full text-[11px] text-base-content/50">
-          Both refs empty: uncommitted changes against HEAD. Head only: that commit against its
-          parent. Base only: the working tree against the base.
-        </p>
-      </form>
+      />
 
       {error && (
         <p className="border-b border-base-300 bg-rose-500/10 px-4 py-3 font-mono text-xs text-rose-700 dark:text-rose-300">
@@ -212,7 +174,7 @@ export default function ReviewIndex() {
                   label="Dependencies and standard library"
                   value={outside}
                   onChange={setOutside}
-                  options={OUTSIDE_MODE_OPTIONS}
+                  options={OUTSIDE_OPTIONS}
                 />
               </Toolbar>
               <ReviewCanvas

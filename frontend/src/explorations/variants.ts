@@ -88,25 +88,43 @@ export interface NodeViewOptions {
   look?: ViewLook;
 }
 
-function focusContext(files: ExampleFile[], file: ExampleFile, focusKey: string | null) {
+/** Focus only reaches the file it is in. Every other file looks the same as without focus. */
+function focusKeyInFile(file: ExampleFile, focusKey: string | null): string | null {
+  return splitFocusKey(focusKey)?.fileId === file.id ? focusKey : null;
+}
+
+/** The focus here is always null or inside `file`. */
+function focusContext(files: ExampleFile[], focusKey: string | null) {
   const focus = splitFocusKey(focusKey);
-  const inFocusFile = focus?.fileId === file.id;
   return {
-    inFocusFile,
     /** Is something in this file hovered, and is it not this function? */
-    isRelated: (fn: string) => focus === null || (inFocusFile && fn === focus.fn),
-    cardDimmed: focus !== null && !inFocusFile,
+    isRelated: (fn: string) => focus === null || fn === focus.fn,
+    cardDimmed: false,
     focused: focus !== null,
     files,
   };
 }
 
-function cardItem(file: ExampleFile, options: NodeViewOptions, dimmed: boolean): ColumnItem {
+/*
+ * Rows are cached per analysis. Hovering rebuilds only the row hovered, and the
+ * rest keep the very same node and edge objects, so ReactFlow skips them.
+ */
+const ROW_CACHE = new WeakMap<ExampleFile[], Map<string, unknown>>();
+
+function cachedRow<T>(files: ExampleFile[], key: unknown[], build: () => T): T {
+  const cache = ROW_CACHE.get(files) ?? new Map<string, unknown>();
+  ROW_CACHE.set(files, cache);
+  const id = JSON.stringify(key);
+  if (!cache.has(id)) cache.set(id, build());
+  return cache.get(id) as T;
+}
+
+function cardItem(file: ExampleFile, options: NodeViewOptions, focusKey: string | null): ColumnItem {
   const { look } = options;
   const stats = look?.pathHeader ? "none" : options.stats;
-  const data: FileCardData = { file, ports: false, focusKey: options.focusKey, stats, look };
+  const data: FileCardData = { file, ports: false, focusKey, stats, look };
   return {
-    node: withFade({ id: `${file.id}:card`, type: "file_card", data }, dimmed),
+    node: withFade({ id: `${file.id}:card`, type: "file_card", data }, false),
     height: cardHeight(file, false, stats, look?.functionsLabel ?? true),
   };
 }
@@ -168,8 +186,8 @@ export function buildChipsOnePoint(
   const edgeTone = (tone: ChipTone): ChipTone =>
     uniform || (subtle && tone !== "stale") ? "neutral" : tone;
 
-  const rows = files.map((file) => {
-    const context = focusContext(files, file, options.focusKey);
+  const buildChipsRow = (file: ExampleFile, fileFocus: string | null) => {
+    const context = focusContext(files, fileFocus);
     const cardId = `${file.id}:card`;
     const edges: Edge[] = [];
 
@@ -267,9 +285,15 @@ export function buildChipsOnePoint(
     }
 
     return {
-      row: { left, card: cardItem(file, options, context.cardDimmed), right },
+      row: { left, card: cardItem(file, options, fileFocus), right },
       edges,
     };
+  };
+
+  const rows = files.map((file) => {
+    const fileFocus = focusKeyInFile(file, options.focusKey);
+    const key = ["chips", file.id, options.outside, options.stats, options.compact, look, fileFocus];
+    return cachedRow(files, key, () => buildChipsRow(file, fileFocus));
   });
 
   const layout = layoutRows(rows.map((item) => item.row));
@@ -282,8 +306,8 @@ export function buildBlocksOnePoint(
   files: ExampleFile[],
   options: NodeViewOptions & { groupedByFunction: boolean },
 ): Graph {
-  const rows = files.map((file) => {
-    const context = focusContext(files, file, options.focusKey);
+  const buildBlocksRow = (file: ExampleFile, fileFocus: string | null) => {
+    const context = focusContext(files, fileFocus);
     const cardId = `${file.id}:card`;
     const edges: Edge[] = [];
     const left: ColumnItem[] = [];
@@ -346,7 +370,7 @@ export function buildBlocksOnePoint(
         side: "input",
         title: `Inputs · ${countItems(inputRows)}`,
         rows: inputRows,
-        focus: options.focusKey,
+        focus: fileFocus,
       };
       left.push({ node: { id, type: "block", data }, height: blockHeight(inputRows) });
       edges.push(fade(makeEdge(`${id}->card`, id, cardId), dimmed));
@@ -357,13 +381,19 @@ export function buildBlocksOnePoint(
         side: "output",
         title: `Outputs · ${countItems(outputRows)}`,
         rows: outputRows,
-        focus: options.focusKey,
+        focus: fileFocus,
       };
       right.push({ node: { id, type: "block", data }, height: blockHeight(outputRows) });
       edges.push(fade(makeEdge(`card->${id}`, cardId, id), dimmed));
     }
 
-    return { row: { left, card: cardItem(file, options, context.cardDimmed), right }, edges };
+    return { row: { left, card: cardItem(file, options, fileFocus), right }, edges };
+  };
+
+  const rows = files.map((file) => {
+    const fileFocus = focusKeyInFile(file, options.focusKey);
+    const key = ["blocks", file.id, options.outside, options.stats, options.groupedByFunction, fileFocus];
+    return cachedRow(files, key, () => buildBlocksRow(file, fileFocus));
   });
 
   const layout = layoutRows(

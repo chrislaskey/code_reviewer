@@ -252,6 +252,162 @@ pub fn get_commit_sha(repo_path: &str, revision: &str) -> Result<String, GitErro
     Ok(stdout.trim().to_string())
 }
 
+/// The best common ancestor of two revisions, as a full SHA. Reviewing from
+/// here shows only what one side changed, as a pull request does.
+pub fn get_merge_base_commit_sha(
+    repo_path: &str,
+    first_revision: &str,
+    second_revision: &str,
+) -> Result<String, GitError> {
+    let first = get_commit_sha(repo_path, first_revision)?;
+    let second = get_commit_sha(repo_path, second_revision)?;
+    let stdout = run_git(repo_path, &["merge-base", &first, &second])?;
+    Ok(stdout.trim().to_string())
+}
+
+/// Request for the branches and latest commits to choose a comparison from.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListBranchesAndRecentCommitsRequest {
+    pub repo_path: String,
+    /// Defaults to 30.
+    #[serde(default)]
+    pub recent_commit_count: Option<usize>,
+}
+
+/// One commit, as shown in a list.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CommitSummary {
+    pub sha: String,
+    pub short_sha: String,
+    pub subject: String,
+    /// `YYYY-MM-DD`.
+    pub committed_on: String,
+}
+
+/// Branches and recent commits of a repository.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ListBranchesAndRecentCommitsResponse {
+    /// `None` when `HEAD` is detached.
+    pub current_branch: Option<String>,
+    /// The branch pull requests usually target: `origin/HEAD`, else `main` or `master`.
+    pub default_branch: Option<String>,
+    /// Local branches first, then remote branches that have no local copy.
+    pub branches: Vec<String>,
+    /// Newest first, reachable from `HEAD`. Empty in a repository without commits.
+    pub recent_commits: Vec<CommitSummary>,
+}
+
+const DEFAULT_RECENT_COMMIT_COUNT: usize = 30;
+
+/// List the branches and the latest commits, for choosing what to review.
+pub fn list_branches_and_recent_commits(
+    request: ListBranchesAndRecentCommitsRequest,
+) -> Result<ListBranchesAndRecentCommitsResponse, GitError> {
+    let repo = request.repo_path.as_str();
+    let local_branches = list_ref_names(repo, "refs/heads/")?;
+    let remote_branches: Vec<String> = list_ref_names(repo, "refs/remotes/")?
+        .into_iter()
+        .filter(|name| !name.ends_with("/HEAD"))
+        .filter(|name| {
+            let without_remote = name.split_once('/').map_or(name.as_str(), |(_, rest)| rest);
+            !local_branches.iter().any(|local| local == without_remote)
+        })
+        .collect();
+
+    let current_branch = Some(
+        run_git(repo, &["branch", "--show-current"])?
+            .trim()
+            .to_string(),
+    )
+    .filter(|name| !name.is_empty());
+    let default_branch = find_default_branch(repo, &local_branches, &remote_branches);
+
+    let count = request
+        .recent_commit_count
+        .unwrap_or(DEFAULT_RECENT_COMMIT_COUNT)
+        .to_string();
+    let recent_commits = run_git(
+        repo,
+        &[
+            "log",
+            "-n",
+            &count,
+            "--date=short",
+            "--format=%H%x1f%h%x1f%cd%x1f%s",
+        ],
+    )
+    .map(|stdout| stdout.lines().filter_map(parse_commit_summary).collect())
+    .unwrap_or_default();
+
+    let mut branches = local_branches;
+    branches.extend(remote_branches);
+    Ok(ListBranchesAndRecentCommitsResponse {
+        current_branch,
+        default_branch,
+        branches,
+        recent_commits,
+    })
+}
+
+fn list_ref_names(repo_path: &str, prefix: &str) -> Result<Vec<String>, GitError> {
+    let stdout = run_git(
+        repo_path,
+        &[
+            "for-each-ref",
+            "--format=%(refname)",
+            "--sort=refname",
+            prefix,
+        ],
+    )?;
+    Ok(stdout
+        .lines()
+        .filter_map(|name| {
+            name.strip_prefix("refs/heads/")
+                .or_else(|| name.strip_prefix("refs/remotes/"))
+        })
+        .map(str::to_string)
+        .collect())
+}
+
+fn find_default_branch(
+    repo_path: &str,
+    local_branches: &[String],
+    remote_branches: &[String],
+) -> Option<String> {
+    let remote_default = run_git(
+        repo_path,
+        &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+    )
+    .ok()
+    .map(|stdout| stdout.trim().to_string());
+
+    if let Some(remote_default) = remote_default {
+        let local_name = remote_default
+            .split_once('/')
+            .map_or(remote_default.as_str(), |(_, rest)| rest);
+        if local_branches.iter().any(|local| local == local_name) {
+            return Some(local_name.to_string());
+        }
+        if remote_branches.contains(&remote_default) {
+            return Some(remote_default);
+        }
+    }
+    ["main", "master"]
+        .into_iter()
+        .find(|name| local_branches.iter().any(|local| local == name))
+        .map(str::to_string)
+}
+
+fn parse_commit_summary(line: &str) -> Option<CommitSummary> {
+    let mut parts = line.splitn(4, '\x1f');
+    Some(CommitSummary {
+        sha: parts.next()?.to_string(),
+        short_sha: parts.next()?.to_string(),
+        committed_on: parts.next()?.to_string(),
+        subject: parts.next()?.to_string(),
+    })
+}
+
 /// The first parent of a commit, as a full SHA.
 pub fn get_parent_commit_sha(repo_path: &str, commit_sha: &str) -> Result<String, GitError> {
     get_commit_sha(repo_path, &format!("{commit_sha}^"))

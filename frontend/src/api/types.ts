@@ -8,6 +8,33 @@ export interface GreetResponse {
   message: string;
 }
 
+/** Mirrors core::git::ListBranchesAndRecentCommitsRequest. */
+export interface ListBranchesAndRecentCommitsRequest {
+  repo_path: string;
+  /** Defaults to 30. */
+  recent_commit_count?: number | null;
+}
+
+/** Mirrors core::git::CommitSummary. */
+export interface CommitSummary {
+  sha: string;
+  short_sha: string;
+  subject: string;
+  /** YYYY-MM-DD. */
+  committed_on: string;
+}
+
+/** Mirrors core::git::ListBranchesAndRecentCommitsResponse. */
+export interface ListBranchesAndRecentCommitsResponse {
+  /** Null when HEAD is detached. */
+  current_branch: string | null;
+  default_branch: string | null;
+  /** Local branches first, then remote branches without a local copy. */
+  branches: string[];
+  /** Newest first. */
+  recent_commits: CommitSummary[];
+}
+
 /** A single file changed in the git working tree. Mirrors core::git::ChangedFile. */
 export interface ChangedFile {
   status: string;
@@ -84,6 +111,25 @@ export interface AnalyzeChangesRequest {
   repo_path: string;
   base_ref?: string | null;
   head_ref?: string | null;
+  /** With both refs: compare from where head branched off base, like a pull request. */
+  compare_from_merge_base?: boolean;
+}
+
+/**
+ * Patterns name a module (`Shop`), a function (`Enum.reduce`, `Enum.reduce/3`)
+ * or a raw prefix (`Shop*`). Ignoring wins over including.
+ * Mirrors core::analysis::module_rules::ModuleRules.
+ */
+export interface ModuleRules {
+  /** Highlight matching calls like project calls. */
+  include?: string[];
+  /** Leave matching callers and calls out. */
+  ignore?: string[];
+}
+
+/** Mirrors core::analysis::service::AnalyzeFileChangesRequest. */
+export interface AnalyzeFileChangesRequest extends AnalyzeChangesRequest {
+  module_rules?: ModuleRules;
 }
 
 export interface SkippedFile {
@@ -131,6 +177,8 @@ export interface FileCallee {
   function: FunctionId;
   /** False for the standard library and dependencies. */
   defined_in_project: boolean;
+  /** Defined in the project, or matched by an include rule. */
+  is_highlighted: boolean;
   /** The changed function in this file that makes the call. */
   from: FunctionId;
   call_count: number;

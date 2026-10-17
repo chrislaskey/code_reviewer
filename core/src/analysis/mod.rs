@@ -14,5 +14,6 @@ pub mod function_changes;
 pub mod function_source;
 pub mod language;
 pub mod model;
+pub mod module_rules;
 pub mod project_index;
 pub mod service;

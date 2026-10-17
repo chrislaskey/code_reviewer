@@ -314,7 +314,7 @@ export default function ModuleFlowVariations() {
         <Option
           code="H1"
           title="Chips, one point, coverage in the card"
-          note="The card's counts row is replaced by test coverage. Everything unrelated to the hovered function fades and its lines thicken. Dependencies show as muted chips with dashed lines."
+          note="The card's counts row is replaced by test coverage. Everything in the same row that is unrelated to the hovered function fades and its lines thicken. Dependencies show as muted chips with dashed lines."
         >
           <NodeVariant files={EXAMPLE_FILES} build={CHIPS_COVERAGE} />
         </Option>

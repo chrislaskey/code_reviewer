@@ -1,7 +1,10 @@
 import type {
   AnalyzeChangesRequest,
   AnalyzeChangesResponse,
+  AnalyzeFileChangesRequest,
   AnalyzeFileChangesResponse,
+  ListBranchesAndRecentCommitsRequest,
+  ListBranchesAndRecentCommitsResponse,
   BackendAdapter,
   FunctionSource,
   GetCallTraceRequest,
@@ -67,8 +70,18 @@ export const httpAdapter: BackendAdapter = {
     return postJson("analyze_changes", request, "Analyze changes");
   },
 
+  listBranchesAndRecentCommits(
+    request: ListBranchesAndRecentCommitsRequest,
+  ): Promise<ListBranchesAndRecentCommitsResponse> {
+    return postJson(
+      "list_branches_and_recent_commits",
+      request,
+      "List branches and recent commits",
+    );
+  },
+
   analyzeFileChanges(
-    request: AnalyzeChangesRequest,
+    request: AnalyzeFileChangesRequest,
   ): Promise<AnalyzeFileChangesResponse> {
     return postJson("analyze_file_changes", request, "Analyze file changes");
   },

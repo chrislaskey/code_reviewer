@@ -66,11 +66,25 @@ function stackHeight(items: ColumnItem[]): number {
   );
 }
 
+/** The same node at the same position stays the same object, so ReactFlow skips it. */
+const POSITIONED = new WeakMap<NodeWithoutPosition, Map<string, Node>>();
+
+function positioned(source: NodeWithoutPosition, x: number, y: number): Node {
+  const byPosition = POSITIONED.get(source) ?? new Map<string, Node>();
+  POSITIONED.set(source, byPosition);
+  const key = `${x},${y}`;
+  const existing = byPosition.get(key);
+  if (existing) return existing;
+  const node = { ...source, position: { x, y } };
+  byPosition.set(key, node);
+  return node;
+}
+
 function stackColumn(items: ColumnItem[], x: number, top: number): Node[] {
   let y = top;
   return items.map((item, index) => {
     if (index > 0) y += gapBefore(item);
-    const node = { ...item.node, position: { x, y } };
+    const node = positioned(item.node, x, y);
     y += item.height;
     return node;
   });
@@ -96,7 +110,7 @@ export function layoutRows(
       stackHeight(row.right),
     );
     nodes.push(...stackColumn(row.left, 0, top));
-    nodes.push({ ...row.card.node, position: { x: cardX, y: top } });
+    nodes.push(positioned(row.card.node, cardX, top));
     nodes.push(...stackColumn(row.right, rightX, top));
     top += height + SIZES.rowGap;
   }

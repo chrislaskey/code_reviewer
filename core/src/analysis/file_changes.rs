@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::function_changes::{FunctionChange, FunctionChangeKind};
 use super::model::FunctionId;
+use super::module_rules::ModuleRules;
 use super::project_index::CallLink;
 
 /// What happened to a file, judged from its changed functions.
@@ -52,6 +53,8 @@ pub struct FileCallee {
     pub function: FunctionId,
     /// False for the standard library and dependencies.
     pub defined_in_project: bool,
+    /// Defined in the project, or matched by an include rule.
+    pub is_highlighted: bool,
     /// The changed function in this file that makes the call.
     pub from: FunctionId,
     pub call_count: usize,
@@ -76,7 +79,10 @@ pub struct FileChange {
 }
 
 /// Group function changes by file, sorted by file path.
-pub fn group_changes_by_file(changes: &[FunctionChange]) -> Vec<FileChange> {
+///
+/// Callers and calls that match `rules.ignore` are left out, and calls that
+/// match `rules.include` are highlighted like project calls.
+pub fn group_changes_by_file(changes: &[FunctionChange], rules: &ModuleRules) -> Vec<FileChange> {
     let changed_ids: HashSet<&FunctionId> = changes.iter().map(|change| &change.function).collect();
 
     let mut changes_by_file: BTreeMap<&str, Vec<&FunctionChange>> = BTreeMap::new();
@@ -89,7 +95,9 @@ pub fn group_changes_by_file(changes: &[FunctionChange]) -> Vec<FileChange> {
 
     changes_by_file
         .into_iter()
-        .map(|(file_path, file_changes)| build_file_change(file_path, &file_changes, &changed_ids))
+        .map(|(file_path, file_changes)| {
+            build_file_change(file_path, &file_changes, &changed_ids, rules)
+        })
         .collect()
 }
 
@@ -97,6 +105,7 @@ fn build_file_change(
     file_path: &str,
     changes: &[&FunctionChange],
     changed_ids: &HashSet<&FunctionId>,
+    rules: &ModuleRules,
 ) -> FileChange {
     FileChange {
         file_path: file_path.to_string(),
@@ -111,11 +120,11 @@ fn build_file_change(
             .collect(),
         callers: changes
             .iter()
-            .flat_map(|change| list_callers(change, changed_ids))
+            .flat_map(|change| list_callers(change, changed_ids, rules))
             .collect(),
         callees: changes
             .iter()
-            .flat_map(|change| list_callees(change, changed_ids))
+            .flat_map(|change| list_callees(change, changed_ids, rules))
             .collect(),
     }
 }
@@ -172,7 +181,11 @@ fn build_caller(
 /// A removed function lists its callers in the base, marking those that still
 /// call it in the head. A renamed function lists the callers of its new name,
 /// then the callers that still use the old name.
-fn list_callers(change: &FunctionChange, changed_ids: &HashSet<&FunctionId>) -> Vec<FileCaller> {
+fn list_callers(
+    change: &FunctionChange,
+    changed_ids: &HashSet<&FunctionId>,
+    rules: &ModuleRules,
+) -> Vec<FileCaller> {
     let stale_ids: HashSet<&FunctionId> = change
         .stale_callers
         .iter()
@@ -204,27 +217,32 @@ fn list_callers(change: &FunctionChange, changed_ids: &HashSet<&FunctionId>) -> 
         }
     }
 
+    callers.retain(|caller| !rules.is_ignored(&caller.function));
     callers.sort_by(|a, b| (!a.is_stale, &a.function).cmp(&(!b.is_stale, &b.function)));
     callers
 }
 
 /// Calls out of one changed function, calls into the project first.
-fn list_callees(change: &FunctionChange, changed_ids: &HashSet<&FunctionId>) -> Vec<FileCallee> {
+fn list_callees(
+    change: &FunctionChange,
+    changed_ids: &HashSet<&FunctionId>,
+    rules: &ModuleRules,
+) -> Vec<FileCallee> {
     let mut callees: Vec<FileCallee> = change
         .external_calls
         .calls_out
         .iter()
+        .filter(|link| !rules.is_ignored(&link.function))
         .map(|link| FileCallee {
             function: link.function.clone(),
             defined_in_project: link.defined_in_project,
+            is_highlighted: link.defined_in_project || rules.is_included(&link.function),
             from: change.function.clone(),
             call_count: link.call_lines.len().max(1),
             is_also_changed: changed_ids.contains(&link.function),
         })
         .collect();
-    callees.sort_by(|a, b| {
-        (!a.defined_in_project, &a.function).cmp(&(!b.defined_in_project, &b.function))
-    });
+    callees.sort_by(|a, b| (!a.is_highlighted, &a.function).cmp(&(!b.is_highlighted, &b.function)));
     callees
 }
 
@@ -232,6 +250,10 @@ fn list_callees(change: &FunctionChange, changed_ids: &HashSet<&FunctionId>) -> 
 mod tests {
     use super::*;
     use crate::analysis::external_calls::ExternalCalls;
+
+    fn group(changes: &[FunctionChange]) -> Vec<FileChange> {
+        group_changes_by_file(changes, &ModuleRules::default())
+    }
 
     fn id(module: &str, name: &str, arity: usize) -> FunctionId {
         FunctionId::new(module, name, arity)
@@ -274,7 +296,7 @@ mod tests {
             change(FunctionChangeKind::Modified, id("A", "one", 0), "lib/a.ex"),
             change(FunctionChangeKind::Modified, id("B", "two", 1), "lib/b.ex"),
         ];
-        let files = group_changes_by_file(&changes);
+        let files = group(&changes);
 
         let paths: Vec<_> = files.iter().map(|file| file.file_path.as_str()).collect();
         assert_eq!(paths, vec!["lib/a.ex", "lib/b.ex"]);
@@ -290,7 +312,7 @@ mod tests {
                 .enumerate()
                 .map(|(index, kind)| change(*kind, id("A", "f", index), "lib/a.ex"))
                 .collect();
-            group_changes_by_file(&changes)[0].status
+            group(&changes)[0].status
         };
         use FunctionChangeKind::*;
 
@@ -305,7 +327,7 @@ mod tests {
     #[test]
     fn test_line_counts_are_only_reported_where_known() {
         let counts = |kind| {
-            let files = group_changes_by_file(&[change(kind, id("A", "f", 0), "lib/a.ex")]);
+            let files = group(&[change(kind, id("A", "f", 0), "lib/a.ex")]);
             (
                 files[0].functions[0].added_line_count,
                 files[0].functions[0].removed_line_count,
@@ -337,7 +359,7 @@ mod tests {
         second.external_calls.calls_in = vec![link(id("C", "third", 0), true, &[7])];
         let other_file = change(FunctionChangeKind::Added, id("B", "other", 1), "lib/b.ex");
 
-        let files = group_changes_by_file(&[first, second, other_file]);
+        let files = group(&[first, second, other_file]);
         let callers = &files[0].callers;
 
         let order: Vec<_> = callers
@@ -360,7 +382,7 @@ mod tests {
         ];
         removed.stale_callers = vec![link(id("C", "broken", 0), true, &[2])];
 
-        let files = group_changes_by_file(&[removed]);
+        let files = group(&[removed]);
         let callers = &files[0].callers;
 
         assert_eq!(callers.len(), 2);
@@ -376,7 +398,7 @@ mod tests {
         renamed.external_calls.calls_in = vec![link(id("B", "updated", 0), true, &[1])];
         renamed.stale_callers = vec![link(id("C", "behind", 0), true, &[2])];
 
-        let files = group_changes_by_file(&[renamed]);
+        let files = group(&[renamed]);
         let callers = &files[0].callers;
 
         assert_eq!(callers.len(), 2);
@@ -394,7 +416,7 @@ mod tests {
             link(id("B", "work", 1), true, &[6]),
         ];
 
-        let files = group_changes_by_file(&[modified]);
+        let files = group(&[modified]);
         let callees = &files[0].callees;
 
         assert_eq!(callees[0].function, id("B", "work", 1));
@@ -402,5 +424,66 @@ mod tests {
         assert_eq!(callees[1].function, id("Enum", "map", 2));
         assert_eq!(callees[1].call_count, 2);
         assert_eq!(callees[1].from, id("A", "run", 0));
+    }
+
+    #[test]
+    fn test_ignore_rules_drop_callers_and_calls() {
+        let mut modified = change(FunctionChangeKind::Modified, id("A", "run", 0), "lib/a.ex");
+        modified.external_calls.calls_in = vec![
+            link(id("ATest", "checks", 0), true, &[1]),
+            link(id("B", "caller", 0), true, &[2]),
+        ];
+        modified.external_calls.calls_out = vec![
+            link(id("Enum", "reduce", 3), false, &[3]),
+            link(id("Enum", "map", 2), false, &[4]),
+        ];
+        let rules = ModuleRules {
+            include: Vec::new(),
+            ignore: vec!["ATest".to_string(), "Enum.reduce".to_string()],
+        };
+
+        let files = group_changes_by_file(&[modified], &rules);
+
+        assert_eq!(files[0].callers.len(), 1);
+        assert_eq!(files[0].callers[0].function, id("B", "caller", 0));
+        assert_eq!(files[0].callees.len(), 1);
+        assert_eq!(files[0].callees[0].function, id("Enum", "map", 2));
+    }
+
+    #[test]
+    fn test_include_rules_highlight_calls_the_project_does_not_define() {
+        let mut modified = change(FunctionChangeKind::Modified, id("A", "run", 0), "lib/a.ex");
+        modified.external_calls.calls_out = vec![
+            link(id("Enum", "map", 2), false, &[1]),
+            link(id("Ecto.Repo", "insert", 1), false, &[2]),
+            link(id("B", "work", 0), true, &[3]),
+        ];
+        let rules = ModuleRules {
+            include: vec!["Ecto.Repo".to_string()],
+            ignore: vec!["Ecto.Repo".to_string(), "Enum*".to_string()],
+        };
+        let only_include = ModuleRules {
+            include: rules.include.clone(),
+            ignore: Vec::new(),
+        };
+
+        let callees = &group_changes_by_file(&[modified.clone()], &only_include)[0].callees;
+        let highlighted: Vec<_> = callees
+            .iter()
+            .map(|callee| (callee.function.to_string(), callee.is_highlighted))
+            .collect();
+        assert_eq!(
+            highlighted,
+            vec![
+                ("B.work/0".to_string(), true),
+                ("Ecto.Repo.insert/1".to_string(), true),
+                ("Enum.map/2".to_string(), false),
+            ]
+        );
+
+        // Ignoring wins over including.
+        let callees = &group_changes_by_file(&[modified], &rules)[0].callees;
+        assert_eq!(callees.len(), 1);
+        assert_eq!(callees[0].function, id("B", "work", 0));
     }
 }

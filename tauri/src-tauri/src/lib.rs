@@ -8,10 +8,14 @@ use code_reviewer_core::{
         function_source::FunctionSource,
         service::{
             AnalysisService, AnalyzeChangesRequest, AnalyzeChangesResponse,
-            AnalyzeFileChangesResponse, GetCallTraceRequest, GetFunctionSourceRequest,
+            AnalyzeFileChangesRequest, AnalyzeFileChangesResponse, GetCallTraceRequest,
+            GetFunctionSourceRequest,
         },
     },
-    git::{ChangedFile, ListChangedFilesRequest},
+    git::{
+        ChangedFile, ListBranchesAndRecentCommitsRequest, ListBranchesAndRecentCommitsResponse,
+        ListChangedFilesRequest,
+    },
 };
 use tauri::State;
 
@@ -29,6 +33,18 @@ fn list_changed_files(repo_path: &str) -> Result<Vec<ChangedFile>, String> {
         repo_path: repo_path.to_string(),
     })
     .map(|r| r.files)
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn list_branches_and_recent_commits(
+    request: ListBranchesAndRecentCommitsRequest,
+) -> Result<ListBranchesAndRecentCommitsResponse, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        core::git::list_branches_and_recent_commits(request)
+    })
+    .await
+    .map_err(|e| e.to_string())?
     .map_err(|e| e.to_string())
 }
 
@@ -56,7 +72,7 @@ async fn analyze_changes(
 #[tauri::command]
 async fn analyze_file_changes(
     service: State<'_, Arc<AnalysisService>>,
-    request: AnalyzeChangesRequest,
+    request: AnalyzeFileChangesRequest,
 ) -> Result<AnalyzeFileChangesResponse, String> {
     run_analysis(&service, move |service| {
         service.analyze_file_changes(request)
@@ -91,6 +107,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             list_changed_files,
+            list_branches_and_recent_commits,
             analyze_changes,
             analyze_file_changes,
             get_function_source,
