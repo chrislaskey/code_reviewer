@@ -25,6 +25,12 @@ pub enum GroupConfigError {
     #[error("group {0} has no include patterns and no subgroups")]
     EmptyGroup(String),
 
+    #[error("group {0} has subgroups, so it cannot have include or exclude patterns of its own")]
+    ParentGroupHasPatterns(String),
+
+    #[error("{0:?} is reserved for files that are in no group")]
+    ReservedGroupName(String),
+
     #[error("invalid group flag {flag:?}: {reason}")]
     InvalidFlag { flag: String, reason: String },
 }

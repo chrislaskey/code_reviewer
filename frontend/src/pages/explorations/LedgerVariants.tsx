@@ -125,7 +125,6 @@ function Line({
         "flex items-center gap-2 font-mono text-[11px]",
         stacked ? "py-1 leading-4" : "leading-6",
         dim ? "text-base-content/55" : "",
-        tone === "stale" ? "text-rose-700 dark:text-rose-300" : "",
         tone === "removed" ? "line-through decoration-rose-500/60" : "",
       ].join(" ")}
     >

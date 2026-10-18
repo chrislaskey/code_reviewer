@@ -25,9 +25,11 @@ pub struct GroupConfig {
 
 /// One group, and the subgroups nested inside it.
 ///
-/// A group holds the files that match one of its own `include` patterns and
-/// none of its own `exclude` patterns, plus every file held by a subgroup.
-/// Excluding a file from a group never removes it from a subgroup.
+/// Either a leaf or a parent:
+/// - A leaf holds the files that match one of its `include` patterns and none
+///   of its `exclude` patterns.
+/// - A parent has `subgroups` and holds exactly the files its subgroups hold.
+///   It cannot have `include` or `exclude`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GroupDefinition {

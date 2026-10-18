@@ -57,7 +57,7 @@ function Arrowhead({ className }: { className: string }) {
 }
 
 /** The line between a column and the file card. */
-function Connector({ arrow, visible }: { arrow: boolean; visible: boolean }) {
+export function Connector({ arrow, visible }: { arrow: boolean; visible: boolean }) {
   return (
     <div
       className={`relative shrink-0 ${visible ? "" : "invisible"}`}
@@ -70,7 +70,7 @@ function Connector({ arrow, visible }: { arrow: boolean; visible: boolean }) {
 }
 
 /** Chips with a vertical line down the side facing the card and a short line to each chip. */
-function ChipColumn({
+export function ChipColumn({
   side,
   chips,
   focus,

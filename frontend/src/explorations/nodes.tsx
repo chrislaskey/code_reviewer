@@ -618,7 +618,6 @@ export function LedgerLine({
         selected ? "ring-1 ring-base-content/30" : "",
         faded ? "opacity-25" : "",
         dim ? "text-base-content/60" : "",
-        tone === "stale" ? "text-rose-700 dark:text-rose-300" : "",
         tone === "removed" ? "line-through decoration-rose-500/60" : "",
       ].join(" ")}
     >
@@ -639,7 +638,6 @@ export function RowNode({ id, data }: NodeProps<Node<RowData, "row">>) {
   const [hovered, setHovered] = useState<string | null>(null);
   const status = CHANGE_STYLES[fileStatus(file)];
   const Chevron = collapsed ? ChevronRightIcon : ChevronDownIcon;
-  const staleCount = file.callers.filter((caller) => caller.stale).length;
 
   const lineState = (key: string) => ({
     faded: hovered !== null && hovered !== key,
@@ -662,15 +660,7 @@ export function RowNode({ id, data }: NodeProps<Node<RowData, "row">>) {
         <h3 className="text-sm font-semibold">{file.module}</h3>
         <span className="font-mono text-[11px] text-base-content/50">{file.path}</span>
         <span className="ml-auto flex gap-4 font-mono text-[11px] text-base-content/60">
-          <span>{plural(file.functions.length, "changed function")}</span>
-          <span>{plural(file.callees.length, "call")} out</span>
-          <span>{plural(file.callers.length, "caller")}</span>
-          {refined && staleCount > 0 && (
-            <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400">
-              <ExclamationTriangleIcon className="size-3.5" />
-              {staleCount} stale
-            </span>
-          )}
+          <span>{plural(file.functions.length, "function")}</span>
         </span>
       </header>
       {!collapsed && (

@@ -56,14 +56,17 @@ export function Option({
   title,
   note,
   children,
+  clip = true,
 }: {
   code: string;
   title: string;
   note: ReactNode;
   children: ReactNode;
+  /** Off lets a sticky element inside stick to the page scroll. Rounded corners no longer clip. */
+  clip?: boolean;
 }) {
   return (
-    <article className="overflow-hidden rounded-xl border border-base-300">
+    <article className={`rounded-xl border border-base-300 ${clip ? "overflow-hidden" : ""}`}>
       <header className="flex items-baseline gap-3 border-b border-base-300 bg-base-100 px-4 py-2.5">
         <span className="font-mono text-xs text-primary">{code}</span>
         <h3 className="text-sm font-semibold">{title}</h3>

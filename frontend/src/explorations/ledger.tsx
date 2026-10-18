@@ -3,7 +3,6 @@ import type { Node, NodeProps } from "@xyflow/react";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
-  ExclamationTriangleIcon,
 } from "@heroicons/react/16/solid";
 import { useFlowActions } from "./actions";
 import {
@@ -358,7 +357,6 @@ export function LedgerView({ id, data }: { id: string; data: LedgerData }) {
   const [hovered, setHovered] = useState<string | null>(null);
   const status = CHANGE_STYLES[fileStatus(file)];
   const Chevron = collapsed ? ChevronRightIcon : ChevronDownIcon;
-  const staleCount = file.callers.filter((caller) => caller.stale).length;
   const findings = style.attention ? findingsFor(file) : [];
   const outputs = outputEntries(file, outside, style.order);
   const inputs = inputEntries(file, style.order);
@@ -435,19 +433,7 @@ export function LedgerView({ id, data }: { id: string; data: LedgerData }) {
         <h3 className="text-sm font-semibold">{file.module}</h3>
         <span className="font-mono text-[11px] text-base-content/50">{file.path}</span>
         <span className="ml-auto flex items-center gap-4 font-mono text-[11px] text-base-content/60">
-          {style.counts && (
-            <>
-              <span>{plural(file.functions.length, "changed function")}</span>
-              <span>{plural(file.callees.length, "call")} out</span>
-              <span>{plural(file.callers.length, "caller")}</span>
-            </>
-          )}
-          {!style.attention && staleCount > 0 && (
-            <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400">
-              <ExclamationTriangleIcon className="size-3.5" />
-              {staleCount} stale
-            </span>
-          )}
+          {style.counts && <span>{plural(file.functions.length, "function")}</span>}
           {style.coverage && file.coverage_percent !== undefined && (
             <CoverageBadge percent={file.coverage_percent} />
           )}

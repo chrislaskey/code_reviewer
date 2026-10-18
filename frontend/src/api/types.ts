@@ -263,8 +263,9 @@ export interface GetCallTraceResponse {
 
 /**
  * One group and its nested subgroups. Names are slugs (letters, digits, `_`, `-`).
- * A group holds the files matching one of its own `include` patterns and none of
- * its own `exclude` patterns, plus every file held by a subgroup.
+ * A leaf holds the files matching one of its `include` patterns and none of its
+ * `exclude` patterns. A group with `subgroups` is a parent: it holds what its
+ * subgroups hold and cannot have `include` or `exclude`.
  * Patterns are globs matched against repo-relative paths, or `regex:<expression>`.
  * Mirrors core::groups::GroupDefinition.
  */
@@ -290,10 +291,16 @@ export interface GroupFlags {
   exclude?: string[];
 }
 
-/** One group of the flat, ordered list. Mirrors core::groups::GroupSummary. */
+/**
+ * One group of the flat, ordered list. Empty when no groups are defined (groups are
+ * opt in); otherwise ends with the implicit `ungrouped` group.
+ * Mirrors core::groups::GroupSummary.
+ */
 export interface GroupSummary {
-  /** Names joined by `/`, like `core/data`. */
+  /** Names joined by `/`, like `core/data`. `ungrouped` is the implicit group for the rest. */
   id: string;
   parent_id: string | null;
   label: string;
+  /** Rolls up its subgroups and has no patterns of its own. */
+  is_parent: boolean;
 }
