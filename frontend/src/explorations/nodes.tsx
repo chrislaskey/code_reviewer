@@ -139,7 +139,8 @@ export type ChipData = {
   subtitleIsPath?: boolean;
 };
 
-export function ChipNode({ data }: NodeProps<Node<ChipData, "chip">>) {
+/** A caller or call as a box. `handle` is the ReactFlow connection point, when there is one. */
+export function ChipView({ data, handle }: { data: ChipData; handle?: ReactNode }) {
   const actions = useFlowActions();
   const height = data.compact ? SIZES.compactChipHeight : SIZES.chipHeight;
   const onClick = () =>
@@ -181,12 +182,23 @@ export function ChipNode({ data }: NodeProps<Node<ChipData, "chip">>) {
         </span>
       )}
       {data.markers?.map((marker) => <MarkerIcon key={marker} marker={marker} />)}
-      <Handle
-        type={data.side === "input" ? "source" : "target"}
-        position={data.side === "input" ? Position.Right : Position.Left}
-        style={HANDLE_STYLE}
-      />
+      {handle}
     </div>
+  );
+}
+
+export function ChipNode({ data }: NodeProps<Node<ChipData, "chip">>) {
+  return (
+    <ChipView
+      data={data}
+      handle={
+        <Handle
+          type={data.side === "input" ? "source" : "target"}
+          position={data.side === "input" ? Position.Right : Position.Left}
+          style={HANDLE_STYLE}
+        />
+      }
+    />
   );
 }
 
@@ -403,7 +415,8 @@ export function coverageTone(percent: number): { text: string; bar: string } {
 /** The card has a border the other nodes do not, so its handles sit one pixel higher. */
 const CARD_HANDLE_STYLE = { top: SIZES.handleTop - 1 } as const;
 
-export function FileCardNode({ data }: NodeProps<Node<FileCardData, "file_card">>) {
+/** The file card. `handles` are the ReactFlow connection points, when there are any. */
+export function FileCardView({ data, handles }: { data: FileCardData; handles?: ReactNode }) {
   const { file, ports, focusKey, tabs, stats = "counts", look } = data;
   const actions = useFlowActions();
   const status = CHANGE_STYLES[fileStatus(file)];
@@ -503,13 +516,24 @@ export function FileCardNode({ data }: NodeProps<Node<FileCardData, "file_card">
           />
         )}
       </div>
-      {!ports && (
-        <>
-          <Handle type="target" position={Position.Left} style={CARD_HANDLE_STYLE} />
-          <Handle type="source" position={Position.Right} style={CARD_HANDLE_STYLE} />
-        </>
-      )}
+      {handles}
     </Card>
+  );
+}
+
+export function FileCardNode({ data }: NodeProps<Node<FileCardData, "file_card">>) {
+  return (
+    <FileCardView
+      data={data}
+      handles={
+        data.ports ? undefined : (
+          <>
+            <Handle type="target" position={Position.Left} style={CARD_HANDLE_STYLE} />
+            <Handle type="source" position={Position.Right} style={CARD_HANDLE_STYLE} />
+          </>
+        )
+      }
+    />
   );
 }
 

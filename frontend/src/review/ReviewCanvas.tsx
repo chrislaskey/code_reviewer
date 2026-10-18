@@ -4,13 +4,12 @@ import { FlowCanvas, type FocusNode } from "../explorations/canvas";
 import type { ExampleFile, OutsideMode } from "../explorations/data";
 import { jumpRequest, toggled, useActions } from "../explorations/controls";
 import { canvasHeight } from "../explorations/layout";
-import type { LedgerStyle } from "../explorations/ledger";
 import {
   buildBlocksOnePoint,
   buildChipsOnePoint,
   buildLedgerVariant,
-  type ViewLook,
 } from "../explorations/variants";
+import { BLOCKS_LOOK, CHIPS_LOOK, LEDGER_STYLE } from "./looks";
 
 export type ReviewView = "chips" | "ledger" | "blocks";
 
@@ -20,40 +19,8 @@ export const REVIEW_VIEW_OPTIONS: { value: ReviewView; label: string }[] = [
   { value: "blocks", label: "Node blocks" },
 ];
 
-/** The card header shows the file path alone, as in the chips view. */
-const BLOCKS_LOOK: ViewLook = {
-  solidEdges: true,
-  uniformEdges: true,
-  subtleTones: true,
-  pathSubtitles: true,
-  pathHeader: true,
-  coloredFunctions: false,
-  functionsLabel: true,
-};
-
 const ZOOM = 0.85;
 const BLOCKS_ZOOM = 0.8;
-
-/** H5: path subtitles, solid connectors of one colour and width, plain chips. */
-const CHIPS_LOOK: ViewLook = {
-  solidEdges: true,
-  uniformEdges: true,
-  subtleTones: true,
-  pathSubtitles: true,
-  pathHeader: true,
-  coloredFunctions: false,
-  functionsLabel: false,
-};
-
-/** G1: folded dependencies, two-line callers, counts in the header. */
-const LEDGER_STYLE: LedgerStyle = {
-  stackedInputs: true,
-  pills: false,
-  attention: false,
-  coverage: false,
-  counts: true,
-  order: "by_function",
-};
 
 /**
  * One changed-files canvas in any of the three views. `resultKey` changes with

@@ -352,7 +352,7 @@ function CoverageBadge({ percent }: { percent: number }) {
  * Hover any line, pill or finding to highlight the changed function it belongs
  * to, together with that function's outputs and inputs. Everything else fades.
  */
-export function LedgerNode({ id, data }: NodeProps<Node<LedgerData, "ledger">>) {
+export function LedgerView({ id, data }: { id: string; data: LedgerData }) {
   const { file, outside, style, collapsed, selectedLabel } = data;
   const actions = useFlowActions();
   const [hovered, setHovered] = useState<string | null>(null);
@@ -531,4 +531,8 @@ export function LedgerNode({ id, data }: NodeProps<Node<LedgerData, "ledger">>) 
       )}
     </div>
   );
+}
+
+export function LedgerNode({ id, data }: NodeProps<Node<LedgerData, "ledger">>) {
+  return <LedgerView id={id} data={data} />;
 }

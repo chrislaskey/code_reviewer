@@ -6,6 +6,7 @@ import LedgerVariants from "./pages/explorations/LedgerVariants";
 import ModuleFlowBreadth from "./pages/explorations/ModuleFlowBreadth";
 import ModuleFlowDepth from "./pages/explorations/ModuleFlowDepth";
 import ModuleFlowVariations from "./pages/explorations/ModuleFlowVariations";
+import ReviewHtml from "./pages/review/Html";
 import ReviewIndex from "./pages/review/Index";
 import ReactFlowBasics from "./pages/explorations/ReactFlowBasics";
 import ThemeSwitchers from "./pages/explorations/ThemeSwitchers";
@@ -27,6 +28,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/review" element={<ReviewIndex />} />
+              <Route path="/review/html" element={<ReviewHtml />} />
               <Route path="/explorations" element={<ExplorationsIndex />} />
               <Route path="/explorations/reactflow-basics" element={<ReactFlowBasics />} />
               <Route path="/explorations/module-flow-breadth" element={<ModuleFlowBreadth />} />

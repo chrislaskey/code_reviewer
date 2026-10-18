@@ -10,7 +10,10 @@ export default function TopBar() {
       </Link>
       <nav className="flex gap-4 text-xs text-base-content/60">
         <Link to="/review" className="transition-colors hover:text-base-content">
-          Review
+          Review (ReactFlow)
+        </Link>
+        <Link to="/review/html" className="transition-colors hover:text-base-content">
+          Review (HTML)
         </Link>
         <Link to="/explorations" className="transition-colors hover:text-base-content">
           Explorations

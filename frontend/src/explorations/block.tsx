@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { useFlowActions } from "./actions";
 import { HANDLE_STYLE, SIZES } from "./layout";
@@ -40,7 +41,8 @@ export function blockHeight(rows: BlockRow[]): number {
   return SIZES.listHeader + content + SIZES.listPadding;
 }
 
-export function BlockNode({ data }: NodeProps<Node<BlockData, "block">>) {
+/** A box of callers or calls. `handle` is the ReactFlow connection point, when there is one. */
+export function BlockView({ data, handle }: { data: BlockData; handle?: ReactNode }) {
   const actions = useFlowActions();
   const { focus } = data;
 
@@ -116,11 +118,22 @@ export function BlockNode({ data }: NodeProps<Node<BlockData, "block">>) {
           );
         })}
       </ul>
-      <Handle
-        type={data.side === "input" ? "source" : "target"}
-        position={data.side === "input" ? Position.Right : Position.Left}
-        style={HANDLE_STYLE}
-      />
+      {handle}
     </div>
+  );
+}
+
+export function BlockNode({ data }: NodeProps<Node<BlockData, "block">>) {
+  return (
+    <BlockView
+      data={data}
+      handle={
+        <Handle
+          type={data.side === "input" ? "source" : "target"}
+          position={data.side === "input" ? Position.Right : Position.Left}
+          style={HANDLE_STYLE}
+        />
+      }
+    />
   );
 }

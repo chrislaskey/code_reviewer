@@ -14,8 +14,8 @@ export const SIZES = {
   listItem: 26,
   listCompactItem: 20,
   listPadding: 8,
-  /** Where edges meet every node, from its top, so rows have parallel lines. */
-  handleTop: 20,
+  /** Where edges meet every node, from its top: the middle of the file card header. */
+  handleTop: 31,
 } as const;
 
 export const HANDLE_STYLE = { top: SIZES.handleTop } as const;

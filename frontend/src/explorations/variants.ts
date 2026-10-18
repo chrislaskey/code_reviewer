@@ -1,34 +1,27 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { ChipTone } from "./style";
-import { blockHeight, type BlockData, type BlockRow } from "./block";
+import { blockHeight, type BlockData } from "./block";
 import {
   calleeLabel,
-  callerLabel,
-  findFileForCallee,
-  findFileForCaller,
   isOutsideProject,
-  shortPath,
   splitCallees,
   type ExampleCallee,
   type ExampleCaller,
   type ExampleFile,
   type OutsideMode,
 } from "./data";
+import { blockRowsForCallees, blockRowsForCallers, chipForCallee, chipForCaller, countItems } from "./view_data";
 import { fade, sortFiles, splitFocusKey, withFade, type LedgerSort } from "./depth";
 import { ledgerHeight, type LedgerData, type LedgerStyle } from "./ledger";
 import { SIZES, chipItem, layoutRows, listHeight, makeEdge, type ColumnItem, type Graph } from "./layout";
 import {
-  calleeMarkers,
   calleeTone,
-  callerMarkers,
   callerTone,
   cardHeight,
   type CardLook,
   type CardStats,
-  type ChipData,
   type FileCardData,
   type ListData,
-  type Marker,
 } from "./nodes";
 
 /*
@@ -194,21 +187,7 @@ export function buildChipsOnePoint(
     let previous: string | null = null;
     const left: ColumnItem[] = file.callers.map((caller: ExampleCaller, index) => {
       const id = `${file.id}:in:${index}`;
-      const alsoIn = caller.also_changed ? findFileForCaller(files, caller) : undefined;
-      const data: ChipData = {
-        side: "input",
-        title: callerLabel(caller),
-        subtitle: look?.pathSubtitles
-          ? `${caller.file_path}:${caller.line}`
-          : `${shortPath(caller.file_path)}:${caller.line} → ${caller.calls}`,
-        tone: callerTone(caller),
-        markers: callerMarkers(caller),
-        jumpToFileId: alsoIn?.id,
-        focusKey: `${file.id}:${caller.calls}`,
-        compact: options.compact,
-        subtle,
-        subtitleIsPath: look?.pathSubtitles,
-      };
+      const data = chipForCaller(files, file, caller, { look, compact: options.compact });
       const dimmed = !context.isRelated(caller.calls);
       edges.push(
         fade(
@@ -232,25 +211,8 @@ export function buildChipsOnePoint(
     previous = null;
     const right: ColumnItem[] = shown.map((callee, index) => {
       const id = `${file.id}:out:${index}`;
-      const alsoIn = findFileForCallee(files, callee);
-      const markers: Marker[] = [...calleeMarkers(callee)];
-      if (alsoIn) markers.push("also_changed");
       const outside = isOutsideProject(callee);
-      const data: ChipData = {
-        side: "output",
-        title: calleeLabel(callee),
-        subtitle: look?.pathSubtitles
-          ? callee.path
-          : `from ${callee.from}${callee.call_count > 1 ? ` ×${callee.call_count}` : ""}`,
-        tone: calleeTone(callee),
-        markers,
-        jumpToFileId: alsoIn?.id,
-        focusKey: `${file.id}:${callee.from}`,
-        dimOrigin: outside,
-        compact: options.compact,
-        subtle,
-        subtitleIsPath: look?.pathSubtitles,
-      };
+      const data = chipForCallee(files, file, callee, { look, compact: options.compact });
       const dimmed = !context.isRelated(callee.from);
       const edge = makeEdge(`card->${id}`, cardId, id, {
         tone: edgeTone(calleeTone(callee)),
@@ -313,55 +275,8 @@ export function buildBlocksOnePoint(
     const left: ColumnItem[] = [];
     const right: ColumnItem[] = [];
 
-    const inputRows: BlockRow[] = [];
-    let previous: string | null = null;
-    for (const caller of file.callers) {
-      if (options.groupedByFunction && previous !== caller.calls) {
-        inputRows.push({ kind: "heading", label: caller.calls, focusKey: `${file.id}:${caller.calls}` });
-      }
-      previous = caller.calls;
-      const alsoIn = caller.also_changed ? findFileForCaller(files, caller) : undefined;
-      inputRows.push({
-        kind: "item",
-        title: callerLabel(caller),
-        detail: options.groupedByFunction ? undefined : caller.calls,
-        tone: callerTone(caller),
-        markers: callerMarkers(caller),
-        dim: caller.kind === "test",
-        focusKey: `${file.id}:${caller.calls}`,
-        jumpToFileId: alsoIn?.id,
-      });
-    }
-
-    const { shown, folded } = splitCallees(file.callees, options.outside);
-    const outputRows: BlockRow[] = [];
-    previous = null;
-    for (const callee of shown) {
-      if (options.groupedByFunction && previous !== callee.from) {
-        outputRows.push({ kind: "heading", label: callee.from, focusKey: `${file.id}:${callee.from}` });
-      }
-      previous = callee.from;
-      const alsoIn = findFileForCallee(files, callee);
-      const markers: Marker[] = [...calleeMarkers(callee)];
-      if (alsoIn) markers.push("also_changed");
-      outputRows.push({
-        kind: "item",
-        title: calleeLabel(callee),
-        detail: options.groupedByFunction
-          ? callee.call_count > 1 ? `×${callee.call_count}` : undefined
-          : callee.call_count > 1 ? `×${callee.call_count}` : callee.from,
-        tone: calleeTone(callee),
-        markers,
-        dim: isOutsideProject(callee),
-        focusKey: `${file.id}:${callee.from}`,
-        jumpToFileId: alsoIn?.id,
-      });
-    }
-    if (folded.length > 0) {
-      outputRows.push({ kind: "note", label: `+${folded.length} in dependencies and stdlib` });
-    }
-
-    const countItems = (blockRows: BlockRow[]) => blockRows.filter((row) => row.kind === "item").length;
+    const inputRows = blockRowsForCallers(files, file, options.groupedByFunction);
+    const outputRows = blockRowsForCallees(files, file, options.outside, options.groupedByFunction);
     const dimmed = context.cardDimmed;
 
     if (inputRows.length > 0) {
