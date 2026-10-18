@@ -2,9 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import Home from "./pages/Home";
 import ExplorationsIndex from "./pages/explorations/Index";
-import GroupsBreadth from "./pages/explorations/GroupsBreadth";
 import GroupsFlow from "./pages/explorations/GroupsFlow";
-import GroupsDepth from "./pages/explorations/GroupsDepth";
 import LedgerVariants from "./pages/explorations/LedgerVariants";
 import ModuleFlowBreadth from "./pages/explorations/ModuleFlowBreadth";
 import ModuleFlowDepth from "./pages/explorations/ModuleFlowDepth";
@@ -38,8 +36,6 @@ export default function App() {
               <Route path="/explorations/module-flow-depth" element={<ModuleFlowDepth />} />
               <Route path="/explorations/module-flow-variations" element={<ModuleFlowVariations />} />
               <Route path="/explorations/ledger-variants" element={<LedgerVariants />} />
-              <Route path="/explorations/groups-breadth" element={<GroupsBreadth />} />
-              <Route path="/explorations/groups-depth" element={<GroupsDepth />} />
               <Route path="/explorations/groups-flow" element={<GroupsFlow />} />
               <Route path="/explorations/theme-switchers" element={<ThemeSwitchers />} />
             </Routes>

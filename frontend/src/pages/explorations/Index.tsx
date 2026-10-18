@@ -27,19 +27,9 @@ const EXPLORATIONS = [
     note: "Ledgers without the flow diagram: columns File / Outputs / Inputs, by function as lists or pills, and an attention list across files.",
   },
   {
-    path: "/explorations/groups-breadth",
-    title: "Groups, breadth",
-    note: "The top level of a grouped review drawn six ways (cards, table, sections, tree, dependency matrix, filters), plus the opt-in states and two ways to define groups.",
-  },
-  {
-    path: "/explorations/groups-depth",
-    title: "Groups, depth",
-    note: "Moving across levels: groups and files at the top, subgroups in the middle, the file and function view at the bottom. Drill down, tree and levels, and expand in place.",
-  },
-  {
     path: "/explorations/groups-flow",
-    title: "Groups, flow",
-    note: "Two levels instead of three: the Groups view is the file view one level up (group in the header, files as content), and a file click opens the Functions view. Ledger and node renderers, three ways to navigate.",
+    title: "Groups",
+    note: "Groups are one flat list. The Groups view is the file view one level up (group in the header, files as content), and a file click opens the Functions view. Ledger and node renderers. This is the same component the review page uses.",
   },
   {
     path: "/explorations/theme-switchers",

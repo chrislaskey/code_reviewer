@@ -12,6 +12,7 @@ pub mod external_calls;
 pub mod file_changes;
 pub mod function_changes;
 pub mod function_source;
+pub mod group_changes;
 pub mod language;
 pub mod model;
 pub mod module_rules;

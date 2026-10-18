@@ -111,6 +111,10 @@ export function CompareFormView({
     label: `${commit.short_sha}  ${commit.subject}  (${commit.committed_on})`,
   }));
   const hasRules = form.includeRules.trim() !== "" || form.ignoreRules.trim() !== "";
+  const hasGroups =
+    form.groupConfigPath.trim() !== "" ||
+    form.groupIncludes.trim() !== "" ||
+    form.groupExcludes.trim() !== "";
 
   return (
     <form
@@ -186,6 +190,42 @@ export function CompareFormView({
             function (<code>Enum.reduce</code> or <code>Enum.reduce/3</code>), or a prefix ending
             in <code>*</code> (<code>Shop*</code> covers <code>ShopWeb</code> too). Ignored
             callers and calls disappear; ignoring beats highlighting.
+          </p>
+        </div>
+      </details>
+
+      <details open={hasGroups}>
+        <summary className="cursor-pointer text-[11px] text-base-content/60">Groups</summary>
+        <div className="mt-2 space-y-2">
+          <Field label="Group config file (optional)" className="max-w-xl">
+            <input
+              value={form.groupConfigPath}
+              placeholder=".code_reviewer.toml in the repository is used when this is empty"
+              onChange={(event) => onChange({ groupConfigPath: event.target.value })}
+              spellCheck={false}
+              className={FIELD_CLASS}
+            />
+          </Field>
+          <div className="flex flex-wrap gap-3">
+            <RulesField
+              label="Add to a group (one per line)"
+              placeholder={"data=lib/shop/repo/**\ntests=test/**"}
+              value={form.groupIncludes}
+              onChange={(groupIncludes) => onChange({ groupIncludes })}
+            />
+            <RulesField
+              label="Leave out of a group (one per line)"
+              placeholder={"data=**/*_test.exs"}
+              value={form.groupExcludes}
+              onChange={(groupExcludes) => onChange({ groupExcludes })}
+            />
+          </div>
+          <p className="text-[11px] text-base-content/50">
+            A line is <code>group=pattern</code>, where the group is a name (<code>data</code>)
+            and the pattern is a glob or{" "}
+            <code>regex:</code> expression matched against the path from the repository root.
+            These add to <code>.code_reviewer.toml</code>. With no groups defined, nothing is
+            grouped.
           </p>
         </div>
       </details>

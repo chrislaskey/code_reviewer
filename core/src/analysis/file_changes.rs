@@ -60,6 +60,9 @@ pub struct FileCallee {
     pub call_count: usize,
     /// The called function is itself changed in this review.
     pub is_also_changed: bool,
+    /// The file that defines the function. Only known for functions the project defines.
+    #[serde(default)]
+    pub file_path: Option<String>,
 }
 
 /// Everything the review screen draws for one changed file.
@@ -76,6 +79,9 @@ pub struct FileChange {
     pub functions: Vec<FileFunctionChange>,
     pub callers: Vec<FileCaller>,
     pub callees: Vec<FileCallee>,
+    /// Every group that holds the file. Empty when no groups are defined.
+    #[serde(default)]
+    pub group_ids: Vec<String>,
 }
 
 /// Group function changes by file, sorted by file path.
@@ -126,6 +132,7 @@ fn build_file_change(
             .iter()
             .flat_map(|change| list_callees(change, changed_ids, rules))
             .collect(),
+        group_ids: Vec::new(),
     }
 }
 
@@ -240,6 +247,7 @@ fn list_callees(
             from: change.function.clone(),
             call_count: link.call_lines.len().max(1),
             is_also_changed: changed_ids.contains(&link.function),
+            file_path: None,
         })
         .collect();
     callees.sort_by(|a, b| (!a.is_highlighted, &a.function).cmp(&(!b.is_highlighted, &b.function)));

@@ -5,7 +5,7 @@ import { ChipColumn, Connector, HtmlReview } from "../review/html/HtmlReview";
 import { FlowActionsContext, type FlowActions } from "./actions";
 import type { ExampleFile } from "./data";
 import type { GroupLine, GroupLink, GroupRow } from "./group_rows";
-import { UNGROUPED_ID } from "./groups_data";
+import { ALL_CHANGES_ID, UNGROUPED_ID } from "./groups_data";
 import { LinesLabel, StaleIcon, groupIcon } from "./groups_parts";
 import { SIZES } from "./layout";
 import { LedgerLine, plural, type ChipData, type Marker } from "./nodes";
@@ -13,7 +13,7 @@ import { CHANGE_STYLES } from "./style";
 
 /*
  * The Groups view: the file view one level up. Header is a group, content is its
- * files (or its subgroups), and Outputs and Inputs are the files outside the group.
+ * files, and Outputs and Inputs are the files outside the group.
  * Ledger and node renderers mirror the ones the Functions view already has.
  */
 
@@ -25,7 +25,7 @@ export const RENDERER_OPTIONS: { value: Renderer; label: string }[] = [
 ];
 
 export interface GroupRowHandlers {
-  /** A subgroup line opens that subgroup. A file line opens the functions of the group. */
+  /** A group line (All changes row) scrolls to that group. A file line opens the functions of the group. */
   onOpenLine: (row: GroupRow, line: GroupLine) => void;
   /** A link to another changed file opens that file's group. */
   onOpenLink: (link: GroupLink) => void;
@@ -54,15 +54,16 @@ function linkSubtitle(link: GroupLink): string {
 }
 
 function groupSubtitle(row: GroupRow): string {
+  if (row.group.id === ALL_CHANGES_ID) return "every group";
   return row.group.id === UNGROUPED_ID ? "files in no group" : row.group.id;
 }
 
-/** The inside of a content line: a file or a subgroup, with just its size and lines changed. */
+/** The inside of a content line: a file or a group, with just its size and lines changed. */
 function LineBody({ line }: { line: GroupLine }) {
   const { stats } = line;
-  const size = line.kind === "subgroup" ? plural(stats.file_count, "file") : plural(stats.function_count, "function");
+  const size = line.kind === "group" ? plural(stats.file_count, "file") : plural(stats.function_count, "function");
   const name =
-    line.kind === "subgroup" ? (
+    line.kind === "group" ? (
       <span className="min-w-0 flex-1 truncate font-semibold">{line.label}</span>
     ) : (
       <span className="min-w-0 flex-1">
@@ -85,7 +86,7 @@ function LineBody({ line }: { line: GroupLine }) {
 }
 
 function lineTitle(line: GroupLine): string {
-  return line.kind === "subgroup" ? `Open ${line.label}` : `Open the functions of ${line.label}`;
+  return line.kind === "group" ? `Open ${line.label}` : `Open the functions of ${line.label}`;
 }
 
 /* -- Ledger -------------------------------------------------------------------- */
@@ -153,7 +154,7 @@ export function GroupLedgerRow({ row, handlers }: { row: GroupRow; handlers: Gro
       >
         <Chevron className="size-4 text-base-content/50" />
         <span className={`size-2.5 rounded-full ${status.dot}`} />
-        <h3 className="text-sm font-semibold">{row.title}</h3>
+        <h3 className="text-sm font-semibold">{row.group.label}</h3>
         <span className="font-mono text-[11px] text-base-content/50">{groupSubtitle(row)}</span>
         <span className="ml-auto font-mono text-[11px] text-base-content/60">
           {plural(row.stats.file_count, "file")}
@@ -249,7 +250,7 @@ export function GroupNodeRow({ row, handlers }: { row: GroupRow; handlers: Group
               <CardHeader
                 icon={groupIcon(row.group)}
                 dotClassName={status.dot}
-                title={row.title}
+                title={row.group.label}
                 kindName="Group"
                 subtitle={groupSubtitle(row)}
                 trailing={

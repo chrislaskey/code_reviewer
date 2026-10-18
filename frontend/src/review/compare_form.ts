@@ -22,6 +22,12 @@ export interface CompareForm {
   /** One pattern per line. */
   includeRules: string;
   ignoreRules: string;
+  /** A group config file to use instead of `.code_reviewer.toml` in the repo. */
+  groupConfigPath: string;
+  /** One `<group>=<pattern>` per line, like `--group-include`. */
+  groupIncludes: string;
+  /** One `<group>=<pattern>` per line, like `--group-exclude`. */
+  groupExcludes: string;
 }
 
 export const EMPTY_FORM: CompareForm = {
@@ -32,6 +38,9 @@ export const EMPTY_FORM: CompareForm = {
   baseBranch: "",
   includeRules: "",
   ignoreRules: "",
+  groupConfigPath: "",
+  groupIncludes: "",
+  groupExcludes: "",
 };
 
 const STORAGE_KEY = "code_reviewer.review_form.v2";
@@ -87,12 +96,17 @@ export function buildRequest(form: CompareForm): AnalyzeFileChangesRequest | nul
     include: splitLines(form.includeRules),
     ignore: splitLines(form.ignoreRules),
   };
+  const group_flags = {
+    group_config_path: form.groupConfigPath.trim() || null,
+    include: splitLines(form.groupIncludes),
+    exclude: splitLines(form.groupExcludes),
+  };
 
   switch (form.mode) {
     case "working_tree":
-      return { repo_path, module_rules };
+      return { repo_path, module_rules, group_flags };
     case "commit":
-      return form.commitSha ? { repo_path, head_ref: form.commitSha, module_rules } : null;
+      return form.commitSha ? { repo_path, head_ref: form.commitSha, module_rules, group_flags } : null;
     case "branch":
       return form.headBranch && form.baseBranch && form.headBranch !== form.baseBranch
         ? {
@@ -101,6 +115,7 @@ export function buildRequest(form: CompareForm): AnalyzeFileChangesRequest | nul
             head_ref: form.headBranch,
             compare_from_merge_base: true,
             module_rules,
+            group_flags,
           }
         : null;
   }

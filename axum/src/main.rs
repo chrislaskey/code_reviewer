@@ -54,6 +54,7 @@ fn analysis_error_response(error: AnalysisError) -> ApiError {
     let status = match error {
         AnalysisError::FunctionNotFound(_) => StatusCode::NOT_FOUND,
         AnalysisError::Git(GitError::InvalidRevision(_)) => StatusCode::BAD_REQUEST,
+        AnalysisError::Groups(_) => StatusCode::BAD_REQUEST,
         _ => StatusCode::INTERNAL_SERVER_ERROR,
     };
     (status, error.to_string())

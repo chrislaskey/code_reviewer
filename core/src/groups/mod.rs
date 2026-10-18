@@ -1,4 +1,4 @@
-//! File groups: named, nestable sets of files such as "core/data" or "tests".
+//! File groups: named sets of files such as "data" or "tests".
 //!
 //! Groups are defined by a config file, by command line flags, or by the UI
 //! (which sends the same `GroupConfig` as JSON). A file can belong to many

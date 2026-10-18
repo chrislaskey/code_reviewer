@@ -1,5 +1,6 @@
-import type { FileChange, FunctionId } from "../api/types";
-import type { ExampleFile } from "../explorations/data";
+import type { FileChange, FunctionId, GroupRow } from "../api/types";
+import type { GroupRow as ViewGroupRow } from "../explorations/group_rows";
+import type { GroupedFile } from "../explorations/groups_data";
 
 /*
  * Maps the backend's file changes onto the shape the view builders draw.
@@ -10,9 +11,10 @@ function functionKey(function_id: FunctionId): string {
   return `${function_id.name}/${function_id.arity}`;
 }
 
-export function toViewFiles(files: FileChange[]): ExampleFile[] {
+export function toViewFiles(files: FileChange[]): GroupedFile[] {
   return files.map((file, index) => ({
     id: `file-${index}`,
+    group_ids: file.group_ids,
     path: file.file_path,
     module: file.module,
     status: file.status,
@@ -47,4 +49,26 @@ export function toViewFiles(files: FileChange[]): ExampleFile[] {
       diff: "same",
     })),
   }));
+}
+
+/** Group rows name files by path. The views name them by the id of `toViewFiles`. */
+export function toViewGroupRows(rows: GroupRow[], files: GroupedFile[]): ViewGroupRow[] {
+  const idByPath = new Map(files.map((file) => [file.path, file.id]));
+  return rows.map((row) => ({
+    ...row,
+    lines: row.lines.map((line) => ({
+      ...line,
+      id: line.kind === "file" ? (idByPath.get(line.id) ?? line.id) : line.id,
+    })),
+    outputs: row.outputs.map(toViewLink(idByPath)),
+    inputs: row.inputs.map(toViewLink(idByPath)),
+  }));
+}
+
+function toViewLink(idByPath: Map<string, string>) {
+  return (link: GroupRow["outputs"][number]): ViewGroupRow["outputs"][number] => ({
+    ...link,
+    file_id: link.changed_file_path ? (idByPath.get(link.changed_file_path) ?? null) : null,
+    is_test: false,
+  });
 }

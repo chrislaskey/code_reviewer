@@ -130,6 +130,8 @@ export interface ModuleRules {
 /** Mirrors core::analysis::service::AnalyzeFileChangesRequest. */
 export interface AnalyzeFileChangesRequest extends AnalyzeChangesRequest {
   module_rules?: ModuleRules;
+  /** Which groups to place the changed files in. Without any, nothing is grouped. */
+  group_flags?: GroupFlags;
 }
 
 export interface SkippedFile {
@@ -183,6 +185,8 @@ export interface FileCallee {
   from: FunctionId;
   call_count: number;
   is_also_changed: boolean;
+  /** The file that defines the function. Only known for functions the project defines. */
+  file_path: string | null;
 }
 
 /** Mirrors core::analysis::file_changes::FileChange. */
@@ -193,6 +197,8 @@ export interface FileChange {
   functions: FileFunctionChange[];
   callers: FileCaller[];
   callees: FileCallee[];
+  /** Every group that holds the file. Empty when no groups are defined. */
+  group_ids: string[];
 }
 
 /** Mirrors core::analysis::service::AnalyzeFileChangesResponse. */
@@ -202,6 +208,12 @@ export interface AnalyzeFileChangesResponse {
   /** Sorted by path. */
   files: FileChange[];
   skipped_files: SkippedFile[];
+  /** The groups that hold changed files. Empty when no groups are defined. */
+  groups: GroupSummary[];
+  /** One row for each group in `groups`. */
+  group_rows: GroupRow[];
+  /** Rolls up every top-level group. Null when no groups are defined. */
+  all_changes_row: GroupRow | null;
 }
 
 /** Mirrors core::analysis::service::GetFunctionSourceRequest. */
@@ -262,10 +274,8 @@ export interface GetCallTraceResponse {
 }
 
 /**
- * One group and its nested subgroups. Names are slugs (letters, digits, `_`, `-`).
- * A leaf holds the files matching one of its `include` patterns and none of its
- * `exclude` patterns. A group with `subgroups` is a parent: it holds what its
- * subgroups hold and cannot have `include` or `exclude`.
+ * One group. Names are slugs (letters, digits, `_`, `-`). It holds the files matching
+ * one of its `include` patterns and none of its `exclude` patterns.
  * Patterns are globs matched against repo-relative paths, or `regex:<expression>`.
  * Mirrors core::groups::GroupDefinition.
  */
@@ -274,7 +284,6 @@ export interface GroupDefinition {
   label?: string;
   include?: string[];
   exclude?: string[];
-  subgroups?: Record<string, GroupDefinition>;
 }
 
 /** Keys keep their order. Mirrors core::groups::GroupConfig. */
@@ -286,21 +295,73 @@ export interface GroupConfig {
 export interface GroupFlags {
   /** A config file to use instead of `.code_reviewer.toml` in the repo root. */
   group_config_path?: string | null;
-  /** Each entry is `<group>=<pattern>`, where group may be a path like `core/data`. */
+  /** Each entry is `<group>=<pattern>`. */
   include?: string[];
   exclude?: string[];
 }
 
 /**
- * One group of the flat, ordered list. Empty when no groups are defined (groups are
- * opt in); otherwise ends with the implicit `ungrouped` group.
+ * One group of the ordered list. Empty when no groups are defined (groups are opt
+ * in); otherwise ends with the implicit `ungrouped` group.
  * Mirrors core::groups::GroupSummary.
  */
 export interface GroupSummary {
-  /** Names joined by `/`, like `core/data`. `ungrouped` is the implicit group for the rest. */
+  /** The group name in the config. `ungrouped` is the implicit group for the rest. */
   id: string;
-  parent_id: string | null;
   label: string;
-  /** Rolls up its subgroups and has no patterns of its own. */
-  is_parent: boolean;
+}
+
+/** Mirrors core::analysis::group_changes::GroupStats. */
+export interface GroupStats {
+  file_count: number;
+  function_count: number;
+  function_counts: Record<FunctionChangeKind, number>;
+  added_lines: number;
+  removed_lines: number;
+  /** Callers still calling something removed or renamed. */
+  stale_caller_count: number;
+}
+
+/** One line of a group row: a changed file, or a group on the All changes row. */
+export interface GroupLine {
+  /** The file path, or the group id. */
+  key: string;
+  kind: "file" | "group";
+  id: string;
+  /** The file path, or the group label. */
+  label: string;
+  stats: GroupStats;
+  /** Files only. */
+  status?: FileChangeStatus;
+}
+
+/** A file outside the group on the other end of a call. */
+export interface GroupLink {
+  id: string;
+  side: "input" | "output";
+  path: string;
+  module: string;
+  line_key: string;
+  line_label: string;
+  /** The first group of the other file. */
+  group_id: string;
+  group_label: string;
+  /** Set when the other file is itself changed in this review. */
+  changed_file_path: string | null;
+  call_count: number;
+  /** Inputs only: still calls something removed or renamed. */
+  is_stale: boolean;
+}
+
+/** One group drawn as a row. Mirrors core::analysis::group_changes::GroupRow. */
+export interface GroupRow {
+  group: GroupSummary;
+  stats: GroupStats;
+  status: FileChangeStatus;
+  content_label: "Files" | "Groups";
+  lines: GroupLine[];
+  outputs: GroupLink[];
+  inputs: GroupLink[];
+  /** Calls into dependencies and the standard library, left out of the outputs. */
+  folded_output_count: number;
 }

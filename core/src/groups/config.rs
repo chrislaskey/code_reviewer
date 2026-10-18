@@ -7,10 +7,8 @@ use super::matcher::GroupMatcher;
 /// Every group of a review, as written in the config file or sent by the UI.
 ///
 /// ```toml
-/// [groups.core]
-/// label = "Core"
-///
-/// [groups.core.subgroups.data]
+/// [groups.data]
+/// label = "Data"
 /// include = ["core/src/storage/**"]
 /// exclude = ["**/*_test.*"]
 /// ```
@@ -23,13 +21,8 @@ pub struct GroupConfig {
     pub groups: IndexMap<String, GroupDefinition>,
 }
 
-/// One group, and the subgroups nested inside it.
-///
-/// Either a leaf or a parent:
-/// - A leaf holds the files that match one of its `include` patterns and none
-///   of its `exclude` patterns.
-/// - A parent has `subgroups` and holds exactly the files its subgroups hold.
-///   It cannot have `include` or `exclude`.
+/// One group: the files that match one of its `include` patterns and none of its
+/// `exclude` patterns.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GroupDefinition {
@@ -41,8 +34,6 @@ pub struct GroupDefinition {
     pub include: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub exclude: Vec<String>,
-    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
-    pub subgroups: IndexMap<String, GroupDefinition>,
 }
 
 /// Which pattern list of a group to add to.
@@ -68,20 +59,9 @@ impl GroupConfig {
         GroupMatcher::compile(self)
     }
 
-    /// Add a pattern to a group, creating the group and its parents when missing.
-    pub(super) fn add_pattern(
-        &mut self,
-        group_path: &[String],
-        kind: PatternKind,
-        pattern: String,
-    ) {
-        let Some((first, rest)) = group_path.split_first() else {
-            return;
-        };
-        let mut group = self.groups.entry(first.clone()).or_default();
-        for name in rest {
-            group = group.subgroups.entry(name.clone()).or_default();
-        }
+    /// Add a pattern to a group, creating the group when missing.
+    pub(super) fn add_pattern(&mut self, group_name: &str, kind: PatternKind, pattern: String) {
+        let group = self.groups.entry(group_name.to_string()).or_default();
         match kind {
             PatternKind::Include => group.include.push(pattern),
             PatternKind::Exclude => group.exclude.push(pattern),
@@ -119,28 +99,28 @@ mod tests {
         label = "Core web"
         include = ["web/**"]
 
-        [groups.core]
-        label = "Core"
-
-        [groups.core.subgroups.data]
+        [groups.data]
         include = ["core/src/storage/**"]
         exclude = ["**/*_test.*"]
-
-        [groups.core.subgroups.analysis]
-        include = ["core/src/analysis/**"]
     "#;
 
     #[test]
-    fn test_from_toml_str_reads_nested_groups_in_file_order() {
+    fn test_from_toml_str_reads_groups_in_file_order() {
         let config = GroupConfig::from_toml_str(EXAMPLE, "example").unwrap();
 
         let names: Vec<&String> = config.groups.keys().collect();
-        assert_eq!(names, ["web", "core"]);
-        let core = &config.groups["core"];
-        assert_eq!(core.label.as_deref(), Some("Core"));
-        let subgroup_names: Vec<&String> = core.subgroups.keys().collect();
-        assert_eq!(subgroup_names, ["data", "analysis"]);
-        assert_eq!(core.subgroups["data"].exclude, ["**/*_test.*"]);
+        assert_eq!(names, ["web", "data"]);
+        assert_eq!(config.groups["web"].label.as_deref(), Some("Core web"));
+        assert_eq!(config.groups["data"].exclude, ["**/*_test.*"]);
+    }
+
+    #[test]
+    fn test_from_toml_str_rejects_subgroups() {
+        let toml = "[groups.core.subgroups.data]\ninclude = [\"x\"]";
+
+        let result = GroupConfig::from_toml_str(toml, "example");
+
+        assert!(matches!(result, Err(GroupConfigError::ParseFailed { .. })));
     }
 
     #[test]
@@ -165,7 +145,7 @@ mod tests {
         let from_json: GroupConfig = serde_json::from_str(&json).unwrap();
 
         assert_eq!(from_toml, from_json);
-        assert!(json.find("\"web\"") < json.find("\"core\""));
+        assert!(json.find("\"web\"") < json.find("\"data\""));
     }
 
     #[test]

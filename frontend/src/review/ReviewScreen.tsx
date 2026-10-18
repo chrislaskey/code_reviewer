@@ -23,7 +23,8 @@ import {
   withValidChoices,
   type CompareForm,
 } from "./compare_form";
-import { toViewFiles } from "./view_model";
+import { GroupedReview } from "./GroupedReview";
+import { toViewFiles, toViewGroupRows } from "./view_model";
 
 const OUTSIDE_OPTIONS: { value: OutsideMode; label: string }[] = [
   { value: "dimmed", label: "Dimmed" },
@@ -85,6 +86,15 @@ export function ReviewScreen({ renderer }: { renderer: ReviewRenderer }) {
   const latestRequest = useRef(0);
 
   const viewFiles = useMemo(() => (result ? toViewFiles(result.files) : []), [result]);
+  const viewGroupRows = useMemo(
+    () => (result ? toViewGroupRows(result.group_rows, viewFiles) : []),
+    [result, viewFiles],
+  );
+  const viewAllRow = useMemo(
+    () => (result?.all_changes_row ? toViewGroupRows([result.all_changes_row], viewFiles)[0] : null),
+    [result, viewFiles],
+  );
+  const showGroups = renderer === "html" && viewAllRow !== null;
 
   // Read the branches and commits once the path stops changing.
   useEffect(() => {
@@ -140,6 +150,15 @@ export function ReviewScreen({ renderer }: { renderer: ReviewRenderer }) {
     }
   }
 
+  const otherRendererLink = (
+    <Link
+      to={OTHER_RENDERER_LINK[renderer].to}
+      className="font-mono text-[11px] text-primary hover:underline"
+    >
+      {OTHER_RENDERER_LINK[renderer].label}
+    </Link>
+  );
+
   return (
     <div>
       <CompareFormView
@@ -172,35 +191,42 @@ export function ReviewScreen({ renderer }: { renderer: ReviewRenderer }) {
             </p>
           ) : (
             <>
-              <Toolbar>
-                <SegmentedControl
-                  label="View"
-                  value={view}
-                  onChange={setView}
-                  options={REVIEW_VIEW_OPTIONS}
-                />
-                <SegmentedControl
-                  label="Dependencies and standard library"
-                  value={outside}
-                  onChange={setOutside}
-                  options={OUTSIDE_OPTIONS}
-                />
-                <Link
-                  to={OTHER_RENDERER_LINK[renderer].to}
-                  className="ml-auto font-mono text-[11px] text-primary hover:underline"
-                >
-                  {OTHER_RENDERER_LINK[renderer].label}
-                </Link>
-              </Toolbar>
-              {renderer === "reactflow" ? (
-                <ReviewCanvas
+              {showGroups && result && viewAllRow ? (
+                <GroupedReview
+                  groups={result.groups}
                   files={viewFiles}
-                  view={view}
-                  outside={outside}
-                  resultKey={String(resultNumber)}
+                  allRow={viewAllRow}
+                  rows={viewGroupRows}
+                  toolbarEnd={otherRendererLink}
                 />
               ) : (
-                <HtmlReview files={viewFiles} view={view} outside={outside} />
+                <>
+                  <Toolbar>
+                    <SegmentedControl
+                      label="View"
+                      value={view}
+                      onChange={setView}
+                      options={REVIEW_VIEW_OPTIONS}
+                    />
+                    <SegmentedControl
+                      label="Dependencies and standard library"
+                      value={outside}
+                      onChange={setOutside}
+                      options={OUTSIDE_OPTIONS}
+                    />
+                    <span className="ml-auto">{otherRendererLink}</span>
+                  </Toolbar>
+                  {renderer === "reactflow" ? (
+                    <ReviewCanvas
+                      files={viewFiles}
+                      view={view}
+                      outside={outside}
+                      resultKey={String(resultNumber)}
+                    />
+                  ) : (
+                    <HtmlReview files={viewFiles} view={view} outside={outside} />
+                  )}
+                </>
               )}
               <Legend
                 items={[

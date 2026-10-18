@@ -13,7 +13,7 @@ export interface TreeItem {
   icon?: ReactNode;
   /** Small text at the right end, like a file count. */
   detail?: string;
-  /** Quieter, for "Ungrouped". */
+  /** Quieter, for the default group. */
   dim?: boolean;
   /** Files: monospace and smaller. */
   mono?: boolean;

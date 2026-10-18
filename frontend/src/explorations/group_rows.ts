@@ -1,11 +1,9 @@
 import type { GroupSummary } from "../api/types";
 import { calleePath, fileStatus, type ChangeKind } from "./data";
 import {
-  childGroups,
   filesInGroup,
   findGroup,
   groupIdsForPath,
-  groupPath,
   summarizeFiles,
   type GroupedFile,
   type Stats,
@@ -14,18 +12,18 @@ import {
 /*
  * A group drawn as one row, a level above a file. A file row has changed
  * functions in its File column, calls out as Outputs and callers as Inputs. A
- * group row has the same three columns with files (or subgroups) as content, and
- * the files outside the group that its files call or are called by.
+ * group row has the same three columns with files as content, and the files
+ * outside the group that its files call or are called by.
  */
 
-/** One line of the content column: a changed file, or a subgroup of a parent group. */
+/** One line of the content column: a changed file, or a group on the All changes row. */
 export interface GroupLine {
   /** What hovering the line ties its outputs and inputs to. */
   key: string;
-  kind: "file" | "subgroup";
+  kind: "file" | "group";
   /** File id, or group id. */
   id: string;
-  /** File path, or subgroup label. */
+  /** File path, or group label. */
   label: string;
   stats: Stats;
   /** Files only. */
@@ -55,11 +53,9 @@ export interface GroupLink {
 
 export interface GroupRow {
   group: GroupSummary;
-  /** Heading text. A subgroup shows its parents too, like `Core / Data`. */
-  title: string;
   stats: Stats;
   status: ChangeKind;
-  content_label: "Files" | "Subgroups";
+  content_label: "Files" | "Groups";
   lines: GroupLine[];
   outputs: GroupLink[];
   inputs: GroupLink[];
@@ -74,20 +70,8 @@ function groupStatus(stats: Stats): ChangeKind {
   return "modified";
 }
 
-function mostSpecificGroup(groups: GroupSummary[], ids: string[]): GroupSummary {
-  const leaf = ids.map((id) => findGroup(groups, id)).find((group) => !group.is_parent);
-  return leaf ?? findGroup(groups, ids[0]);
-}
-
-function lineKeysForFile(
-  groups: GroupSummary[],
-  group: GroupSummary,
-  file: GroupedFile,
-): string[] {
-  if (!group.is_parent) return [file.id];
-  return childGroups(groups, group.id)
-    .filter((child) => file.group_ids.includes(child.id))
-    .map((child) => child.id);
+function firstGroup(groups: GroupSummary[], ids: string[]): GroupSummary {
+  return groups.find((group) => ids.includes(group.id)) ?? findGroup(groups, ids[0]);
 }
 
 export function buildGroupRow(
@@ -99,22 +83,14 @@ export function buildGroupRow(
   const groupFiles = filesInGroup(files, groupId);
   const stats = summarizeFiles(groupFiles);
 
-  const lines: GroupLine[] = group.is_parent
-    ? childGroups(groups, groupId).map((child) => ({
-        key: child.id,
-        kind: "subgroup",
-        id: child.id,
-        label: child.label,
-        stats: summarizeFiles(filesInGroup(files, child.id)),
-      }))
-    : groupFiles.map((file) => ({
-        key: file.id,
-        kind: "file",
-        id: file.id,
-        label: file.path,
-        stats: summarizeFiles([file]),
-        status: fileStatus(file),
-      }));
+  const lines: GroupLine[] = groupFiles.map((file) => ({
+    key: file.id,
+    kind: "file",
+    id: file.id,
+    label: file.path,
+    stats: summarizeFiles([file]),
+    status: fileStatus(file),
+  }));
   const lineLabel = (key: string) => lines.find((line) => line.key === key)?.label ?? key;
   const lineOrder = (key: string) => lines.findIndex((line) => line.key === key);
 
@@ -128,7 +104,7 @@ export function buildGroupRow(
     calls: { count: number; stale: boolean; test: boolean },
   ) => {
     const id = `${side}:${key}:${path}`;
-    const otherGroup = mostSpecificGroup(groups, groupIdsForPath(files, path));
+    const otherGroup = firstGroup(groups, groupIdsForPath(files, path));
     const existing = links.get(id);
     if (existing) {
       existing.call_count += calls.count;
@@ -154,7 +130,7 @@ export function buildGroupRow(
 
   let foldedOutputCount = 0;
   for (const file of groupFiles) {
-    for (const key of lineKeysForFile(groups, group, file)) {
+    for (const key of [file.id]) {
       for (const callee of file.callees) {
         if (callee.origin !== "project") {
           foldedOutputCount += 1;
@@ -186,10 +162,9 @@ export function buildGroupRow(
 
   return {
     group,
-    title: groupPath(groups, group.id).map((part) => part.label).join(" / "),
     stats,
     status: groupStatus(stats),
-    content_label: group.is_parent ? "Subgroups" : "Files",
+    content_label: "Files",
     lines,
     outputs: sorted("output"),
     inputs: sorted("input"),

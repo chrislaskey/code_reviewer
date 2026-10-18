@@ -19,8 +19,8 @@ pub const DEFAULT_CONFIG_FILE_NAME: &str = ".code_reviewer.toml";
 /// | `--group-exclude <group>=<pattern>` | `exclude`           |
 ///
 /// The include and exclude flags repeat, and add to what the config file
-/// defines. `<group>` is a name or a `/` path to a subgroup, like `core/data`,
-/// and is created when missing. Only the first `=` splits the flag.
+/// defines. `<group>` is a group name, created when missing. Only the first `=`
+/// splits the flag.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GroupFlags {
     /// A config file to use instead of the default one in the repo root.
@@ -58,18 +58,18 @@ pub fn load_group_config(
 /// Add the include and exclude flags to the config.
 pub fn apply_flags(config: &mut GroupConfig, flags: &GroupFlags) -> Result<(), GroupConfigError> {
     for flag in &flags.include {
-        let (group_path, pattern) = parse_group_flag(flag)?;
-        config.add_pattern(&group_path, PatternKind::Include, pattern);
+        let (group_name, pattern) = parse_group_flag(flag)?;
+        config.add_pattern(&group_name, PatternKind::Include, pattern);
     }
     for flag in &flags.exclude {
-        let (group_path, pattern) = parse_group_flag(flag)?;
-        config.add_pattern(&group_path, PatternKind::Exclude, pattern);
+        let (group_name, pattern) = parse_group_flag(flag)?;
+        config.add_pattern(&group_name, PatternKind::Exclude, pattern);
     }
     Ok(())
 }
 
-/// Split `core/data=lib/db/**` into the group path and the pattern.
-fn parse_group_flag(flag: &str) -> Result<(Vec<String>, String), GroupConfigError> {
+/// Split `data=lib/db/**` into the group name and the pattern.
+fn parse_group_flag(flag: &str) -> Result<(String, String), GroupConfigError> {
     let invalid = |reason: &str| GroupConfigError::InvalidFlag {
         flag: flag.to_string(),
         reason: reason.to_string(),
@@ -81,11 +81,9 @@ fn parse_group_flag(flag: &str) -> Result<(Vec<String>, String), GroupConfigErro
     if pattern.is_empty() {
         return Err(invalid("pattern is empty"));
     }
-    let group_path: Vec<String> = group.trim().split('/').map(str::to_string).collect();
-    for name in &group_path {
-        validate_group_name(name).map_err(|error| invalid(&error.to_string()))?;
-    }
-    Ok((group_path, pattern.to_string()))
+    let group_name = group.trim();
+    validate_group_name(group_name).map_err(|error| invalid(&error.to_string()))?;
+    Ok((group_name.to_string(), pattern.to_string()))
 }
 
 fn read_config_file(path: &Path) -> Result<Option<GroupConfig>, GroupConfigError> {
@@ -117,19 +115,16 @@ mod tests {
     }
 
     #[test]
-    fn test_flags_create_nested_groups_and_keep_equals_signs_in_patterns() {
+    fn test_flags_create_groups_and_keep_equals_signs_in_patterns() {
         let mut config = GroupConfig::default();
 
         apply_flags(
             &mut config,
-            &flags(
-                &["core/data=lib/db/**", "core/data=regex:a=b"],
-                &["core/data=**/*_test.*"],
-            ),
+            &flags(&["data=lib/db/**", "data=regex:a=b"], &["data=**/*_test.*"]),
         )
         .unwrap();
 
-        let data = &config.groups["core"].subgroups["data"];
+        let data = &config.groups["data"];
         assert_eq!(data.include, ["lib/db/**", "regex:a=b"]);
         assert_eq!(data.exclude, ["**/*_test.*"]);
     }
@@ -146,7 +141,7 @@ mod tests {
 
     #[test]
     fn test_malformed_flags_are_rejected() {
-        for bad in ["core", "=x", "core=", "core data=x", "core//data=x"] {
+        for bad in ["core", "=x", "core=", "core data=x", "core/data=x"] {
             let result = apply_flags(&mut GroupConfig::default(), &flags(&[bad], &[]));
             assert!(
                 matches!(result, Err(GroupConfigError::InvalidFlag { .. })),

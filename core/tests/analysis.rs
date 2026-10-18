@@ -463,6 +463,65 @@ mod revisions {
         assert_eq!(orders.functions.len(), 2);
     }
 
+    #[test]
+    fn test_groups_from_flags_reach_the_files_and_rows() {
+        use code_reviewer_core::groups::GroupFlags;
+
+        let dir = repo_with_two_commits();
+        let request = |group_flags: GroupFlags| AnalyzeFileChangesRequest {
+            changes: AnalyzeChangesRequest {
+                repo_path: dir.path().to_string_lossy().to_string(),
+                head_ref: Some("HEAD".to_string()),
+                ..Default::default()
+            },
+            group_flags,
+            ..Default::default()
+        };
+        let service = AnalysisService::new();
+
+        let ungrouped = service
+            .analyze_file_changes(request(GroupFlags::default()))
+            .unwrap();
+        assert!(ungrouped.groups.is_empty());
+        assert!(ungrouped.group_rows.is_empty());
+        assert!(ungrouped.all_changes_row.is_none());
+        assert!(ungrouped.files.iter().all(|f| f.group_ids.is_empty()));
+
+        let grouped = service
+            .analyze_file_changes(request(GroupFlags {
+                include: vec!["payments=lib/shop/billing.ex".to_string()],
+                ..Default::default()
+            }))
+            .unwrap();
+        let ids: Vec<_> = grouped.groups.iter().map(|g| g.id.as_str()).collect();
+        assert_eq!(ids, vec!["payments", "ungrouped"]);
+        let billing = grouped
+            .files
+            .iter()
+            .find(|f| f.file_path == "lib/shop/billing.ex")
+            .unwrap();
+        assert_eq!(billing.group_ids, vec!["payments"]);
+
+        let payments = grouped
+            .group_rows
+            .iter()
+            .find(|row| row.group.id == "payments")
+            .unwrap();
+        assert_eq!(payments.group.label, "payments");
+        assert_eq!(payments.stats.file_count, 1);
+        // Orders calls Billing and is in no group.
+        assert!(payments
+            .inputs
+            .iter()
+            .any(|link| link.path == "lib/shop/orders.ex" && link.group_id == "ungrouped"));
+
+        let bad = service.analyze_file_changes(request(GroupFlags {
+            include: vec!["no equals sign".to_string()],
+            ..Default::default()
+        }));
+        assert!(bad.is_err());
+    }
+
     /// `main` has `first` then `main work` (edits Audit). `feature` branched
     /// after `first` and edits Billing. Checked out: `main`.
     fn repo_with_diverged_branches() -> tempfile::TempDir {
@@ -569,6 +628,7 @@ mod revisions {
                     include: vec!["Stripe".to_string()],
                     ignore: vec!["Shop.Billing".to_string()],
                 },
+                ..Default::default()
             })
             .unwrap();
 
