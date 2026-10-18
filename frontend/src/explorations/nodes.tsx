@@ -35,7 +35,7 @@ import {
   type ExampleCaller,
   type ExampleFile,
 } from "./data";
-import { SIZES } from "./layout";
+import { HANDLE_STYLE, SIZES } from "./layout";
 import { CHANGE_STYLES, SUBTLE_TONE_STYLES, TONE_STYLES, type ChipTone } from "./style";
 
 /* -- Markers ---------------------------------------------------------------- */
@@ -184,6 +184,7 @@ export function ChipNode({ data }: NodeProps<Node<ChipData, "chip">>) {
       <Handle
         type={data.side === "input" ? "source" : "target"}
         position={data.side === "input" ? Position.Right : Position.Left}
+        style={HANDLE_STYLE}
       />
     </div>
   );
@@ -242,6 +243,7 @@ export function ListNode({ data }: NodeProps<Node<ListData, "list">>) {
       <Handle
         type={data.side === "input" ? "source" : "target"}
         position={data.side === "input" ? Position.Right : Position.Left}
+        style={HANDLE_STYLE}
       />
     </div>
   );
@@ -287,6 +289,7 @@ export function GroupNode({ id, data }: NodeProps<Node<GroupData, "module_group"
       <Handle
         type={data.side === "input" ? "source" : "target"}
         position={data.side === "input" ? Position.Right : Position.Left}
+        style={HANDLE_STYLE}
       />
     </div>
   );
@@ -397,6 +400,9 @@ export function coverageTone(percent: number): { text: string; bar: string } {
   return { text: "text-emerald-600 dark:text-emerald-400", bar: "bg-emerald-500" };
 }
 
+/** The card has a border the other nodes do not, so its handles sit one pixel higher. */
+const CARD_HANDLE_STYLE = { top: SIZES.handleTop - 1 } as const;
+
 export function FileCardNode({ data }: NodeProps<Node<FileCardData, "file_card">>) {
   const { file, ports, focusKey, tabs, stats = "counts", look } = data;
   const actions = useFlowActions();
@@ -499,8 +505,8 @@ export function FileCardNode({ data }: NodeProps<Node<FileCardData, "file_card">
       </div>
       {!ports && (
         <>
-          <Handle type="target" position={Position.Left} />
-          <Handle type="source" position={Position.Right} />
+          <Handle type="target" position={Position.Left} style={CARD_HANDLE_STYLE} />
+          <Handle type="source" position={Position.Right} style={CARD_HANDLE_STYLE} />
         </>
       )}
     </Card>

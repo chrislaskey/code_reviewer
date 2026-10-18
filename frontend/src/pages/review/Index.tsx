@@ -71,7 +71,7 @@ export default function ReviewIndex() {
   const [resultNumber, setResultNumber] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<ReviewView>("chips");
+  const [view, setView] = useState<ReviewView>("blocks");
   const [outside, setOutside] = useState<OutsideMode>("hidden");
   const latestRequest = useRef(0);
 

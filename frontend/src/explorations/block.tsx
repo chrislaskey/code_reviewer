@@ -1,6 +1,6 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { useFlowActions } from "./actions";
-import { SIZES } from "./layout";
+import { HANDLE_STYLE, SIZES } from "./layout";
 import { MarkerIcon, type Marker } from "./nodes";
 import type { ChipTone } from "./style";
 
@@ -119,6 +119,7 @@ export function BlockNode({ data }: NodeProps<Node<BlockData, "block">>) {
       <Handle
         type={data.side === "input" ? "source" : "target"}
         position={data.side === "input" ? Position.Right : Position.Left}
+        style={HANDLE_STYLE}
       />
     </div>
   );

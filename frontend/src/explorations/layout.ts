@@ -7,14 +7,18 @@ export const SIZES = {
   chipHeight: 40,
   compactChipHeight: 28,
   chipGap: 10,
-  cardWidth: 300,
+  cardWidth: 460,
   columnGap: 130,
   rowGap: 56,
   listHeader: 28,
   listItem: 26,
   listCompactItem: 20,
   listPadding: 8,
+  /** Where edges meet every node, from its top, so rows have parallel lines. */
+  handleTop: 20,
 } as const;
+
+export const HANDLE_STYLE = { top: SIZES.handleTop } as const;
 
 export interface Graph {
   nodes: Node[];

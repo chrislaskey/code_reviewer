@@ -20,6 +20,17 @@ export const REVIEW_VIEW_OPTIONS: { value: ReviewView; label: string }[] = [
   { value: "blocks", label: "Node blocks" },
 ];
 
+/** The card header shows the file path alone, as in the chips view. */
+const BLOCKS_LOOK: ViewLook = {
+  solidEdges: true,
+  uniformEdges: true,
+  subtleTones: true,
+  pathSubtitles: true,
+  pathHeader: true,
+  coloredFunctions: false,
+  functionsLabel: true,
+};
+
 const ZOOM = 0.85;
 const BLOCKS_ZOOM = 0.8;
 
@@ -81,6 +92,7 @@ export function ReviewCanvas({
         outside,
         stats: "none",
         groupedByFunction: true,
+        look: BLOCKS_LOOK,
       });
     }
     return buildChipsOnePoint(files, {
