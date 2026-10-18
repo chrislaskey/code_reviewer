@@ -1,5 +1,6 @@
 pub mod analysis;
 pub mod git;
+pub mod groups;
 
 use serde::{Deserialize, Serialize};
 

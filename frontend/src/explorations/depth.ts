@@ -40,7 +40,7 @@ import {
 import type { ChipTone } from "./style";
 
 const DIMMED_OPACITY = 0.2;
-const FADE = "transition-opacity duration-200";
+const FADE = "";
 
 export function fade<T extends { style?: CSSProperties }>(item: T, dimmed: boolean): T {
   if (!dimmed) return item;

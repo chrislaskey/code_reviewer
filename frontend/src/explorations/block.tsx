@@ -83,7 +83,7 @@ export function BlockView({ data, handle }: { data: BlockData; handle?: ReactNod
                 {...common}
                 style={{ height: ROW_HEIGHTS.heading }}
                 className={[
-                  "nodrag nopan flex items-end px-2.5 pb-0.5 font-mono text-[10px] font-semibold text-base-content/50 transition-opacity duration-150",
+                  "nodrag nopan flex items-end px-2.5 pb-0.5 font-mono text-[10px] font-semibold text-base-content/50",
                   faded(row.focusKey) ? "opacity-25" : "",
                 ].join(" ")}
               >
@@ -101,7 +101,7 @@ export function BlockView({ data, handle }: { data: BlockData; handle?: ReactNod
               style={{ height: ROW_HEIGHTS.item }}
               title={row.title}
               className={[
-                "nodrag nopan flex cursor-pointer items-center gap-1.5 px-2.5 font-mono text-[11px] transition-[opacity,background-color] duration-150",
+                "nodrag nopan flex cursor-pointer items-center gap-1.5 px-2.5 font-mono text-[11px]",
                 focus === row.focusKey ? "bg-base-content/10" : "hover:bg-base-content/5",
                 faded(row.focusKey) ? "opacity-25" : "",
                 row.dim ? "text-base-content/60" : "",

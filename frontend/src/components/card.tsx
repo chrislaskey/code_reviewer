@@ -149,7 +149,7 @@ export function TabBar({
             aria-selected={selected}
             onClick={() => onSelect(id)}
             className={[
-              "nodrag nopan flex flex-1 flex-col items-center gap-0.5 py-1.5 text-[10px] transition-colors",
+              "nodrag nopan flex flex-1 flex-col items-center gap-0.5 py-1.5 text-[10px]",
               selected
                 ? "font-semibold text-base-content"
                 : "text-base-content/50 hover:text-base-content",

@@ -55,7 +55,7 @@ export default function ExplorationsIndex() {
           <li key={exploration.path}>
             <Link
               to={exploration.path}
-              className="group flex items-baseline justify-between gap-6 py-4 transition-colors hover:bg-base-200/60"
+              className="group flex items-baseline justify-between gap-6 py-4 hover:bg-base-200/60"
             >
               <div className="space-y-1">
                 <h2 className="font-semibold group-hover:text-primary">{exploration.title}</h2>

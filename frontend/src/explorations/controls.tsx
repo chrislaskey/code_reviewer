@@ -90,7 +90,7 @@ export function SegmentedControl<T extends string>({
             type="button"
             onClick={() => onChange(option.value)}
             className={[
-              "px-3 py-1 transition-colors",
+              "px-3 py-1",
               option.value === value
                 ? "bg-base-content font-semibold text-base-100"
                 : "bg-base-100 text-base-content/60 hover:text-base-content",

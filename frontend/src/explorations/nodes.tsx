@@ -156,7 +156,7 @@ export function ChipView({ data, handle }: { data: ChipData; handle?: ReactNode 
       title={data.compact && data.subtitle ? `${data.title}\n${data.subtitle}` : data.title}
       style={{ height, width: SIZES.chipWidth }}
       className={[
-        "flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 shadow-sm transition-colors hover:border-base-content/50",
+        "flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 shadow-sm hover:border-base-content/50",
         (data.subtle ? SUBTLE_TONE_STYLES : TONE_STYLES)[data.tone ?? "neutral"],
         data.tone === "removed" ? "line-through decoration-rose-500/60" : "",
         data.dimOrigin ? "opacity-60" : "",
@@ -284,7 +284,7 @@ export function GroupNode({ id, data }: NodeProps<Node<GroupData, "module_group"
       title={data.title}
       style={{ height: SIZES.chipHeight, width: SIZES.chipWidth }}
       className={[
-        "flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 shadow-sm transition-colors hover:border-base-content/50",
+        "flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 shadow-sm hover:border-base-content/50",
         TONE_STYLES[data.tone ?? "neutral"],
         data.dimOrigin ? "opacity-70" : "",
       ].join(" ")}
@@ -481,7 +481,7 @@ export function FileCardView({ data, handles }: { data: FileCardData; handles?: 
                 onMouseLeave={() => actions.hoverFunction(null)}
                 style={{ height: CARD_PARTS.functionRow }}
                 className={[
-                  "nodrag nopan relative flex cursor-pointer items-center gap-2 px-4 transition-colors",
+                  "nodrag nopan relative flex cursor-pointer items-center gap-2 px-4",
                   selected ? "bg-base-content/10" : "hover:bg-base-content/5",
                 ].join(" ")}
                 title={fnStyle.label}
@@ -612,7 +612,7 @@ export function LedgerLine({
       title={label}
       style={{ height }}
       className={[
-        "nodrag nopan flex items-center gap-2 rounded-md px-2 font-mono text-[11px] transition-[opacity,background-color,box-shadow] duration-150",
+        "nodrag nopan flex items-center gap-2 rounded-md px-2 font-mono text-[11px]",
         onClick ? "cursor-pointer" : "cursor-default",
         highlighted || selected ? "bg-base-content/10" : "hover:bg-base-content/5",
         selected ? "ring-1 ring-base-content/30" : "",

@@ -260,3 +260,40 @@ export interface GetCallTraceResponse {
   /** True when max_depth or max_node_count cut the tree short. */
   truncated: boolean;
 }
+
+/**
+ * One group and its nested subgroups. Names are slugs (letters, digits, `_`, `-`).
+ * A group holds the files matching one of its own `include` patterns and none of
+ * its own `exclude` patterns, plus every file held by a subgroup.
+ * Patterns are globs matched against repo-relative paths, or `regex:<expression>`.
+ * Mirrors core::groups::GroupDefinition.
+ */
+export interface GroupDefinition {
+  /** Shown instead of the name. */
+  label?: string;
+  include?: string[];
+  exclude?: string[];
+  subgroups?: Record<string, GroupDefinition>;
+}
+
+/** Keys keep their order. Mirrors core::groups::GroupConfig. */
+export interface GroupConfig {
+  groups: Record<string, GroupDefinition>;
+}
+
+/** Group options of the command line. Mirrors core::groups::GroupFlags. */
+export interface GroupFlags {
+  /** A config file to use instead of `.code_reviewer.toml` in the repo root. */
+  group_config_path?: string | null;
+  /** Each entry is `<group>=<pattern>`, where group may be a path like `core/data`. */
+  include?: string[];
+  exclude?: string[];
+}
+
+/** One group of the flat, ordered list. Mirrors core::groups::GroupSummary. */
+export interface GroupSummary {
+  /** Names joined by `/`, like `core/data`. */
+  id: string;
+  parent_id: string | null;
+  label: string;
+}

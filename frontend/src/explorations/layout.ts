@@ -146,7 +146,7 @@ export function makeEdge(
     targetHandle: options.targetHandle,
     label: options.label,
     data: options.data,
-    className: "transition-opacity duration-200",
+    className: "",
     style: {
       stroke: color,
       strokeWidth: options.width ?? 1.5,

@@ -43,7 +43,7 @@ type HoverState = { hovered: string | null; setHovered: (key: string | null) => 
 
 function rowClasses(state: HoverState, key: string): string {
   const faded = state.hovered !== null && state.hovered !== key;
-  return `transition-opacity duration-150 ${faded ? "opacity-25" : ""}`;
+  return `${faded ? "opacity-25" : ""}`;
 }
 
 function FunctionLabel({ fn }: { fn: ChangedFunction }) {

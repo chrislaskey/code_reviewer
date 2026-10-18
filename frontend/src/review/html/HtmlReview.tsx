@@ -101,7 +101,7 @@ function ChipColumn({
         return (
           <div
             key={index}
-            className="flex items-center transition-opacity duration-150"
+            className="flex items-center"
             style={{
               marginTop: index === 0 ? 0 : startsGroup ? GROUP_GAP : SIZES.chipGap,
               opacity: dimmed ? DIMMED_OPACITY : 1,
@@ -241,7 +241,7 @@ export function HtmlReview({
   outside: OutsideMode;
 }) {
   return (
-    <div className="overflow-x-auto bg-base-200/40">
+    <div className="dot-grid overflow-x-auto">
       <div className={`mx-auto w-max p-8 ${view === "ledger" ? "space-y-4" : "space-y-14"}`}>
         {files.map((file) =>
           view === "ledger" ? (

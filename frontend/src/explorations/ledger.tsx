@@ -291,7 +291,7 @@ function Pill({
       title={entry.label}
       style={{ height: PART.pill }}
       className={[
-        "nodrag nopan inline-flex max-w-full items-center gap-1 rounded-full border px-2 font-mono text-[11px] transition-[opacity,background-color,box-shadow] duration-150",
+        "nodrag nopan inline-flex max-w-full items-center gap-1 rounded-full border px-2 font-mono text-[11px]",
         entry.fold ? "border-dashed border-base-content/20 text-base-content/50" : TONE_STYLES[entry.tone],
         onClick ? "cursor-pointer" : "cursor-default",
         entry.dim && !entry.fold ? "text-base-content/60" : "",
@@ -466,7 +466,7 @@ export function LedgerView({ id, data }: { id: string; data: LedgerData }) {
               onMouseLeave={() => setHovered(null)}
               style={{ height: PART.pill }}
               className={[
-                "nodrag nopan inline-flex max-w-full items-center gap-1 rounded-full border px-2 font-mono text-[11px] transition-shadow",
+                "nodrag nopan inline-flex max-w-full items-center gap-1 rounded-full border px-2 font-mono text-[11px]",
                 TONE_STYLES[finding.tone],
                 hovered === finding.hoverKey ? "ring-1 ring-base-content/40" : "",
               ].join(" ")}

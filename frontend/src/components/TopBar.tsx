@@ -9,13 +9,13 @@ export default function TopBar() {
         Code Reviewer
       </Link>
       <nav className="flex gap-4 text-xs text-base-content/60">
-        <Link to="/review" className="transition-colors hover:text-base-content">
+        <Link to="/review" className="hover:text-base-content">
           Review (ReactFlow)
         </Link>
-        <Link to="/review/html" className="transition-colors hover:text-base-content">
+        <Link to="/review/html" className="hover:text-base-content">
           Review (HTML)
         </Link>
-        <Link to="/explorations" className="transition-colors hover:text-base-content">
+        <Link to="/explorations" className="hover:text-base-content">
           Explorations
         </Link>
       </nav>

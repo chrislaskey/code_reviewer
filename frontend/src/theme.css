@@ -42,6 +42,12 @@ body {
   --xy-handle-border-color-default: var(--color-base-100);
 }
 
+/* The same dotted grid as the ReactFlow canvas, for plain HTML pages. */
+.dot-grid {
+  background-image: radial-gradient(circle, #91919a 0.5px, transparent 0.5px);
+  background-size: 18px 18px;
+}
+
 /*
  * ReactFlow turns pointer events off on nodes when the canvas has nothing
  * selectable or draggable, which makes hover and click on our own node
