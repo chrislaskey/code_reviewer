@@ -1,9 +1,18 @@
 import { memo, useMemo, useState } from "react";
+import { DocumentTextIcon } from "@heroicons/react/16/solid";
+import { Card, CardHeader } from "../../components/card";
 import { FlowActionsContext, type FlowActions } from "../../explorations/actions";
 import { BlockView, type BlockData } from "../../explorations/block";
-import { splitCallees, type ExampleFile, type OutsideMode } from "../../explorations/data";
+import {
+  fileStatus,
+  splitCallees,
+  type ExampleFile,
+  type OutsideMode,
+} from "../../explorations/data";
 import { SIZES } from "../../explorations/layout";
 import { LedgerView } from "../../explorations/ledger";
+import { useOpenAllState } from "../../explorations/open_all";
+import { CHANGE_STYLES } from "../../explorations/style";
 import {
   ChipView,
   FileCardView,
@@ -17,6 +26,7 @@ import {
   chipForCaller,
   countItems,
 } from "../../explorations/view_data";
+import { CodeFooter, FileCodeFooter, type CodeLayout } from "./CodeFooter";
 import { BLOCKS_LOOK, CHIPS_LOOK, LEDGER_STYLE } from "../looks";
 import type { ReviewView } from "../ReviewCanvas";
 
@@ -205,17 +215,40 @@ const NodeRow = memo(function NodeRow({
   );
 });
 
+/** The node view of a file that was not parsed: only the header. */
+function PlainFileCard({ file }: { file: ExampleFile }) {
+  const status = CHANGE_STYLES[fileStatus(file)];
+  return (
+    <div id={`review-file-${file.id}`}>
+      <Card>
+        <div style={{ width: SIZES.cardWidth - 2 }}>
+          <CardHeader
+            icon={DocumentTextIcon}
+            dotClassName={status.dot}
+            title={file.module}
+            subtitle={file.path}
+            subtitleClippedAtStart
+          />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 const LedgerRow = memo(function LedgerRow({
   file,
   outside,
+  codeLayout,
 }: {
   file: ExampleFile;
   outside: OutsideMode;
+  codeLayout: CodeLayout;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [expanded, setExpanded] = useOpenAllState(true);
+  const collapsed = !expanded;
   const actions = useMemo<FlowActions>(
-    () => ({ ...NO_ACTIONS, toggle: () => setCollapsed((current) => !current) }),
-    [],
+    () => ({ ...NO_ACTIONS, toggle: () => setExpanded((current) => !current) }),
+    [setExpanded],
   );
   const data = useMemo(
     () => ({ file, outside, style: LEDGER_STYLE, collapsed, selectedLabel: null }),
@@ -224,7 +257,17 @@ const LedgerRow = memo(function LedgerRow({
   return (
     <FlowActionsContext.Provider value={actions}>
       <div id={`review-file-${file.id}`}>
-        <LedgerView id={`${file.id}:ledger`} data={data} />
+        <LedgerView
+          id={`${file.id}:ledger`}
+          data={data}
+          footer={(hoveredKey) =>
+            file.plain ? (
+              <FileCodeFooter file={file} />
+            ) : (
+              <CodeFooter functions={file.functions} hoveredKey={hoveredKey} layout={codeLayout} />
+            )
+          }
+        />
       </div>
     </FlowActionsContext.Provider>
   );
@@ -235,17 +278,21 @@ export function HtmlReview({
   files,
   view,
   outside,
+  codeLayout = "per_function",
 }: {
   files: ExampleFile[];
   view: ReviewView;
   outside: OutsideMode;
+  codeLayout?: CodeLayout;
 }) {
   return (
     <div className="dot-grid overflow-x-auto">
       <div className={`mx-auto w-max p-8 ${view === "ledger" ? "space-y-4" : "space-y-14"}`}>
         {files.map((file) =>
           view === "ledger" ? (
-            <LedgerRow key={file.id} file={file} outside={outside} />
+            <LedgerRow key={file.id} file={file} outside={outside} codeLayout={codeLayout} />
+          ) : file.plain ? (
+            <PlainFileCard key={file.id} file={file} />
           ) : (
             <NodeRow key={file.id} files={files} file={file} view={view} outside={outside} />
           ),

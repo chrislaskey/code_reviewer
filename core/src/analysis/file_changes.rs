@@ -6,6 +6,7 @@ use super::function_changes::{FunctionChange, FunctionChangeKind};
 use super::model::FunctionId;
 use super::module_rules::ModuleRules;
 use super::project_index::CallLink;
+use crate::git::{ChangedPath, ChangedPathStatus};
 
 /// What happened to a file, judged from its changed functions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -65,6 +66,17 @@ pub struct FileCallee {
     pub file_path: Option<String>,
 }
 
+/// Whether the file was parsed for functions and calls.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FileKind {
+    /// Has changed functions, callers and calls.
+    #[default]
+    Parsed,
+    /// Any other changed file: only its path, status and text.
+    Unparsed,
+}
+
 /// Everything the review screen draws for one changed file.
 ///
 /// Callers and callees follow the order of the changed functions. Within one
@@ -73,13 +85,19 @@ pub struct FileCallee {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileChange {
     pub file_path: String,
-    /// The module of the first changed function.
+    #[serde(default)]
+    pub kind: FileKind,
+    /// The path in the base. Only set for an unparsed file that was renamed.
+    #[serde(default)]
+    pub previous_path: Option<String>,
+    /// The module of the first changed function. For an unparsed file, its
+    /// capitalized file name.
     pub module: String,
     pub status: FileChangeStatus,
     pub functions: Vec<FileFunctionChange>,
     pub callers: Vec<FileCaller>,
     pub callees: Vec<FileCallee>,
-    /// Every group that holds the file. Empty when no groups are defined.
+    /// Every group that holds the file.
     #[serde(default)]
     pub group_ids: Vec<String>,
 }
@@ -115,6 +133,8 @@ fn build_file_change(
 ) -> FileChange {
     FileChange {
         file_path: file_path.to_string(),
+        kind: FileKind::Parsed,
+        previous_path: None,
         module: changes
             .first()
             .map(|change| change.function.module.clone())
@@ -134,6 +154,43 @@ fn build_file_change(
             .collect(),
         group_ids: Vec::new(),
     }
+}
+
+/// The file name with a capital first letter: `lib/hello/world.md` is `World.md`.
+fn title_from_path(path: &str) -> String {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    let mut characters = name.chars();
+    match characters.next() {
+        Some(first) => first.to_uppercase().chain(characters).collect(),
+        None => String::new(),
+    }
+}
+
+/// Add an entry for every changed path that has no parsed file, then sort by path.
+///
+/// Files of any type are listed, so a README or a config file shows up too.
+pub fn add_unparsed_files(files: &mut Vec<FileChange>, changed_paths: &[ChangedPath]) {
+    for changed in changed_paths {
+        if files.iter().any(|file| file.file_path == changed.path) {
+            continue;
+        }
+        files.push(FileChange {
+            file_path: changed.path.clone(),
+            kind: FileKind::Unparsed,
+            previous_path: changed.previous_path.clone(),
+            module: title_from_path(&changed.path),
+            status: match changed.status {
+                ChangedPathStatus::Added => FileChangeStatus::Added,
+                ChangedPathStatus::Modified => FileChangeStatus::Modified,
+                ChangedPathStatus::Removed => FileChangeStatus::Removed,
+            },
+            functions: Vec::new(),
+            callers: Vec::new(),
+            callees: Vec::new(),
+            group_ids: Vec::new(),
+        });
+    }
+    files.sort_by(|a, b| a.file_path.cmp(&b.file_path));
 }
 
 fn file_status(changes: &[&FunctionChange]) -> FileChangeStatus {

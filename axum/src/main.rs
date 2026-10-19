@@ -11,11 +11,13 @@ use code_reviewer_core::{
     analysis::{
         call_trace::GetCallTraceResponse,
         error::AnalysisError,
+        file_diff::FileDiff,
+        function_diff::FunctionDiff,
         function_source::FunctionSource,
         service::{
             AnalysisService, AnalyzeChangesRequest, AnalyzeChangesResponse,
             AnalyzeFileChangesRequest, AnalyzeFileChangesResponse, GetCallTraceRequest,
-            GetFunctionSourceRequest,
+            GetFileDiffsRequest, GetFunctionDiffsRequest, GetFunctionSourceRequest,
         },
     },
     git::{
@@ -55,6 +57,9 @@ fn analysis_error_response(error: AnalysisError) -> ApiError {
         AnalysisError::FunctionNotFound(_) => StatusCode::NOT_FOUND,
         AnalysisError::Git(GitError::InvalidRevision(_)) => StatusCode::BAD_REQUEST,
         AnalysisError::Groups(_) => StatusCode::BAD_REQUEST,
+        AnalysisError::EmptyFunctionDiffTarget | AnalysisError::EmptyFileDiffTarget => {
+            StatusCode::BAD_REQUEST
+        }
         _ => StatusCode::INTERNAL_SERVER_ERROR,
     };
     (status, error.to_string())
@@ -97,6 +102,20 @@ async fn get_function_source(
     run_analysis(service, move |service| service.get_function_source(request)).await
 }
 
+async fn get_function_diffs(
+    State(service): State<Arc<AnalysisService>>,
+    Json(request): Json<GetFunctionDiffsRequest>,
+) -> Result<Json<Vec<FunctionDiff>>, ApiError> {
+    run_analysis(service, move |service| service.get_function_diffs(request)).await
+}
+
+async fn get_file_diffs(
+    State(service): State<Arc<AnalysisService>>,
+    Json(request): Json<GetFileDiffsRequest>,
+) -> Result<Json<Vec<FileDiff>>, ApiError> {
+    run_analysis(service, move |service| service.get_file_diffs(request)).await
+}
+
 async fn get_call_trace(
     State(service): State<Arc<AnalysisService>>,
     Json(request): Json<GetCallTraceRequest>,
@@ -123,6 +142,8 @@ fn api_routes() -> Router {
         .route("/api/analyze_changes", post(analyze_changes))
         .route("/api/analyze_file_changes", post(analyze_file_changes))
         .route("/api/get_function_source", post(get_function_source))
+        .route("/api/get_function_diffs", post(get_function_diffs))
+        .route("/api/get_file_diffs", post(get_file_diffs))
         .route("/api/get_call_trace", post(get_call_trace))
         .with_state(analysis_service)
 }

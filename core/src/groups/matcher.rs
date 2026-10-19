@@ -22,8 +22,8 @@ pub struct GroupSummary {
 
 /// A checked `GroupConfig`, ready to place files into groups.
 ///
-/// Groups are opt in. With no groups defined nothing is grouped: no group is
-/// listed and every file gets an empty list of ids, with no default group.
+/// Files that no group holds are in the implicit default group, so with no
+/// groups defined every file is in it.
 #[derive(Debug)]
 pub struct GroupMatcher {
     groups: Vec<CompiledGroup>,
@@ -63,18 +63,8 @@ impl GroupMatcher {
         Ok(Self { groups })
     }
 
-    /// True when at least one group is defined, so files should be grouped.
-    pub fn has_groups(&self) -> bool {
-        !self.groups.is_empty()
-    }
-
-    /// Every group in config order.
-    ///
-    /// Ends with the implicit "Default group" when any group is defined.
+    /// Every group in config order, ending with the implicit "Default group".
     pub fn list_groups(&self) -> Vec<GroupSummary> {
-        if !self.has_groups() {
-            return Vec::new();
-        }
         let mut summaries: Vec<GroupSummary> = self
             .groups
             .iter()
@@ -92,13 +82,9 @@ impl GroupMatcher {
 
     /// The ids of every group that holds this file, in config order.
     ///
-    /// A file in no group gets `["ungrouped"]`, unless no groups are defined at
-    /// all, which gives an empty list. `file_path` is relative to the repo
-    /// root, with `/` separators.
+    /// A file in no group gets `["ungrouped"]`. `file_path` is relative to the
+    /// repo root, with `/` separators.
     pub fn list_group_ids_for_file(&self, file_path: &str) -> Vec<String> {
-        if !self.has_groups() {
-            return Vec::new();
-        }
         let mut ids: Vec<String> = self
             .groups
             .iter()
@@ -212,12 +198,12 @@ mod tests {
     }
 
     #[test]
-    fn test_with_no_groups_nothing_is_grouped() {
+    fn test_with_no_groups_every_file_is_in_the_default_group() {
         let matcher = matcher("");
 
-        assert!(!matcher.has_groups());
-        assert!(matcher.list_groups().is_empty());
-        assert!(ids(&matcher, "README.md").is_empty());
+        let listed: Vec<String> = matcher.list_groups().into_iter().map(|g| g.id).collect();
+        assert_eq!(listed, ["ungrouped"]);
+        assert_eq!(ids(&matcher, "README.md"), ["ungrouped"]);
     }
 
     #[test]

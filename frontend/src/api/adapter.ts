@@ -7,6 +7,10 @@ import type {
   ListBranchesAndRecentCommitsResponse,
   GetFunctionSourceRequest,
   FunctionSource,
+  FunctionDiff,
+  GetFunctionDiffsRequest,
+  FileDiff,
+  GetFileDiffsRequest,
   GetCallTraceRequest,
   GetCallTraceResponse,
   GreetRequest,
@@ -47,6 +51,12 @@ export interface BackendAdapter {
   getFunctionSource(
     request: GetFunctionSourceRequest,
   ): Promise<FunctionSource>;
+
+  /** Get whole functions with the lines that changed between the base and the head marked. */
+  getFunctionDiffs(request: GetFunctionDiffsRequest): Promise<FunctionDiff[]>;
+
+  /** Get the changed lines of files of any type, with a few lines of context. */
+  getFileDiffs(request: GetFileDiffsRequest): Promise<FileDiff[]>;
 
   /** Follow every call above or below a function through the whole project. */
   getCallTrace(request: GetCallTraceRequest): Promise<GetCallTraceResponse>;

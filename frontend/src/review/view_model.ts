@@ -1,4 +1,11 @@
-import type { FileChange, FunctionId, GroupRow } from "../api/types";
+import type {
+  FileChange,
+  FileDiffTarget,
+  FileFunctionChange,
+  FunctionDiffTarget,
+  FunctionId,
+  GroupRow,
+} from "../api/types";
 import type { GroupRow as ViewGroupRow } from "../explorations/group_rows";
 import type { GroupedFile } from "../explorations/groups_data";
 
@@ -11,6 +18,30 @@ function functionKey(function_id: FunctionId): string {
   return `${function_id.name}/${function_id.arity}`;
 }
 
+function toFileDiffTarget(file: FileChange): FileDiffTarget {
+  switch (file.status) {
+    case "added":
+      return { old_path: null, new_path: file.file_path };
+    case "removed":
+      return { old_path: file.file_path, new_path: null };
+    case "modified":
+      return { old_path: file.previous_path ?? file.file_path, new_path: file.file_path };
+  }
+}
+
+function toDiffTarget(change: FileFunctionChange): FunctionDiffTarget {
+  switch (change.kind) {
+    case "added":
+      return { old_function: null, new_function: change.function };
+    case "removed":
+      return { old_function: change.function, new_function: null };
+    case "renamed":
+      return { old_function: change.previous_function, new_function: change.function };
+    case "modified":
+      return { old_function: change.function, new_function: change.function };
+  }
+}
+
 export function toViewFiles(files: FileChange[]): GroupedFile[] {
   return files.map((file, index) => ({
     id: `file-${index}`,
@@ -18,6 +49,8 @@ export function toViewFiles(files: FileChange[]): GroupedFile[] {
     path: file.file_path,
     module: file.module,
     status: file.status,
+    plain: file.kind === "unparsed",
+    file_diff_target: file.kind === "unparsed" ? toFileDiffTarget(file) : undefined,
     functions: file.functions.map((change) => ({
       name: change.function.name,
       arity: change.function.arity,
@@ -27,6 +60,7 @@ export function toViewFiles(files: FileChange[]): GroupedFile[] {
       previous_name: change.previous_function
         ? functionKey(change.previous_function)
         : undefined,
+      diff_target: toDiffTarget(change),
     })),
     callers: file.callers.map((caller) => ({
       module: caller.function.module,

@@ -5,11 +5,13 @@ use code_reviewer_core::{
     analysis::{
         call_trace::GetCallTraceResponse,
         error::AnalysisError,
+        file_diff::FileDiff,
+        function_diff::FunctionDiff,
         function_source::FunctionSource,
         service::{
             AnalysisService, AnalyzeChangesRequest, AnalyzeChangesResponse,
             AnalyzeFileChangesRequest, AnalyzeFileChangesResponse, GetCallTraceRequest,
-            GetFunctionSourceRequest,
+            GetFileDiffsRequest, GetFunctionDiffsRequest, GetFunctionSourceRequest,
         },
     },
     git::{
@@ -92,6 +94,22 @@ async fn get_function_source(
 }
 
 #[tauri::command]
+async fn get_function_diffs(
+    service: State<'_, Arc<AnalysisService>>,
+    request: GetFunctionDiffsRequest,
+) -> Result<Vec<FunctionDiff>, String> {
+    run_analysis(&service, move |service| service.get_function_diffs(request)).await
+}
+
+#[tauri::command]
+async fn get_file_diffs(
+    service: State<'_, Arc<AnalysisService>>,
+    request: GetFileDiffsRequest,
+) -> Result<Vec<FileDiff>, String> {
+    run_analysis(&service, move |service| service.get_file_diffs(request)).await
+}
+
+#[tauri::command]
 async fn get_call_trace(
     service: State<'_, Arc<AnalysisService>>,
     request: GetCallTraceRequest,
@@ -111,6 +129,8 @@ pub fn run() {
             analyze_changes,
             analyze_file_changes,
             get_function_source,
+            get_function_diffs,
+            get_file_diffs,
             get_call_trace
         ])
         .run(tauri::generate_context!())

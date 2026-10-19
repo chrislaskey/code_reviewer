@@ -130,7 +130,7 @@ export interface ModuleRules {
 /** Mirrors core::analysis::service::AnalyzeFileChangesRequest. */
 export interface AnalyzeFileChangesRequest extends AnalyzeChangesRequest {
   module_rules?: ModuleRules;
-  /** Which groups to place the changed files in. Without any, nothing is grouped. */
+  /** Which groups to place the changed files in. Without any, every file is in the default group. */
   group_flags?: GroupFlags;
 }
 
@@ -189,15 +189,22 @@ export interface FileCallee {
   file_path: string | null;
 }
 
+/** Mirrors core::analysis::file_changes::FileKind. */
+export type FileKind = "parsed" | "unparsed";
+
 /** Mirrors core::analysis::file_changes::FileChange. */
 export interface FileChange {
+  /** `parsed` has functions and calls. `unparsed` is any other changed file. */
+  kind: FileKind;
+  /** The path in the base. Only set for an unparsed file that was renamed. */
+  previous_path: string | null;
   file_path: string;
   module: string;
   status: FileChangeStatus;
   functions: FileFunctionChange[];
   callers: FileCaller[];
   callees: FileCallee[];
-  /** Every group that holds the file. Empty when no groups are defined. */
+  /** Every group that holds the file. */
   group_ids: string[];
 }
 
@@ -208,12 +215,12 @@ export interface AnalyzeFileChangesResponse {
   /** Sorted by path. */
   files: FileChange[];
   skipped_files: SkippedFile[];
-  /** The groups that hold changed files. Empty when no groups are defined. */
+  /** The groups that hold changed files. */
   groups: GroupSummary[];
   /** One row for each group in `groups`. */
   group_rows: GroupRow[];
-  /** Rolls up every top-level group. Null when no groups are defined. */
-  all_changes_row: GroupRow | null;
+  /** Rolls up every group. */
+  all_changes_row: GroupRow;
 }
 
 /** Mirrors core::analysis::service::GetFunctionSourceRequest. */
@@ -236,6 +243,68 @@ export interface FunctionSource {
   start_line: number;
   end_line: number;
   lines: SourceLine[];
+}
+
+/** Mirrors core::analysis::function_diff::DiffLineKind. */
+export type DiffLineKind = "context" | "added" | "removed";
+
+/** Mirrors core::analysis::function_diff::DiffLine. */
+export interface DiffLine {
+  kind: DiffLineKind;
+  /** Null for added lines. */
+  old_number: number | null;
+  /** Null for removed lines. */
+  new_number: number | null;
+  text: string;
+}
+
+/** The function in the base and in the head. Either is null when it does not exist there. */
+export interface FunctionDiffTarget {
+  old_function: FunctionId | null;
+  new_function: FunctionId | null;
+}
+
+/** Mirrors core::analysis::service::GetFunctionDiffsRequest. */
+export interface GetFunctionDiffsRequest {
+  repo_path: string;
+  base_commit: string;
+  /** Null or omitted when the head is the working tree. */
+  head_commit?: string | null;
+  targets: FunctionDiffTarget[];
+}
+
+/** The whole function with the changed lines marked. Mirrors core::analysis::function_diff::FunctionDiff. */
+export interface FunctionDiff {
+  old_function: FunctionId | null;
+  new_function: FunctionId | null;
+  file_path: string;
+  lines: DiffLine[];
+}
+
+/** The file in the base and in the head. Either is null when it does not exist there. */
+export interface FileDiffTarget {
+  old_path: string | null;
+  new_path: string | null;
+}
+
+/** Mirrors core::analysis::service::GetFileDiffsRequest. */
+export interface GetFileDiffsRequest {
+  repo_path: string;
+  base_commit: string;
+  /** Null or omitted when the head is the working tree. */
+  head_commit?: string | null;
+  targets: FileDiffTarget[];
+}
+
+/** The changed lines of a file with context. Mirrors core::analysis::file_diff::FileDiff. */
+export interface FileDiff {
+  old_path: string | null;
+  new_path: string | null;
+  /** Empty for a binary file. */
+  lines: DiffLine[];
+  is_binary: boolean;
+  /** Lines left out because the file is very long. */
+  omitted_line_count: number;
 }
 
 /** Mirrors core::analysis::service::GetCallTraceRequest. */
@@ -301,8 +370,7 @@ export interface GroupFlags {
 }
 
 /**
- * One group of the ordered list. Empty when no groups are defined (groups are opt
- * in); otherwise ends with the implicit `ungrouped` group.
+ * One group of the ordered list. Ends with the implicit `ungrouped` group.
  * Mirrors core::groups::GroupSummary.
  */
 export interface GroupSummary {

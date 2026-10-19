@@ -5,8 +5,10 @@ use serde::{Deserialize, Serialize};
 
 use super::call_trace::{get_call_trace, CallTraceOptions, GetCallTraceResponse};
 use super::error::AnalysisError;
-use super::file_changes::{group_changes_by_file, FileChange};
+use super::file_changes::{add_unparsed_files, group_changes_by_file, FileChange};
+use super::file_diff::{get_file_diff, FileDiff, FileDiffTarget};
 use super::function_changes::{list_function_changes, FunctionChange};
+use super::function_diff::{get_function_diff, FunctionDiff, FunctionDiffTarget};
 use super::function_source::{get_function_source, FunctionSource};
 use super::group_changes::{group_changed_files, GroupRow};
 use super::model::FunctionId;
@@ -14,7 +16,7 @@ use super::module_rules::ModuleRules;
 use super::project_index::{CallDirection, ProjectIndex, ProjectIndexCache, SkippedFile};
 use crate::git::{
     get_commit_sha, get_merge_base_commit_sha, get_parent_commit_sha, list_changed_line_ranges,
-    ListChangedLineRangesRequest,
+    list_changed_paths, ListChangedLineRangesRequest,
 };
 use crate::groups::{load_group_config, GroupFlags, GroupMatcher, GroupSummary};
 
@@ -44,7 +46,7 @@ pub struct AnalyzeFileChangesRequest {
     #[serde(default)]
     pub module_rules: ModuleRules,
     /// Which groups to place the changed files in. With none defined (no
-    /// `.code_reviewer.toml` and no flags), nothing is grouped.
+    /// `.code_reviewer.toml` and no flags), every file is in the default group.
     #[serde(default)]
     pub group_flags: GroupFlags,
 }
@@ -65,19 +67,16 @@ pub struct AnalyzeFileChangesResponse {
     pub base_commit: String,
     /// `None` when the head is the working tree.
     pub head_commit: Option<String>,
-    /// One entry per changed file, sorted by path.
+    /// One entry per changed file of any type, sorted by path.
     pub files: Vec<FileChange>,
     /// Files in the head that could not be indexed.
     pub skipped_files: Vec<SkippedFile>,
-    /// The groups that hold changed files, in config order. Empty when no groups are defined.
-    #[serde(default)]
+    /// The groups that hold changed files, in config order.
     pub groups: Vec<GroupSummary>,
     /// One row for each group in `groups`.
-    #[serde(default)]
     pub group_rows: Vec<GroupRow>,
-    /// A row that rolls up every top-level group. `None` when no groups are defined.
-    #[serde(default)]
-    pub all_changes_row: Option<GroupRow>,
+    /// A row that rolls up every group.
+    pub all_changes_row: GroupRow,
 }
 
 /// Request for the full source of one function.
@@ -87,6 +86,28 @@ pub struct GetFunctionSourceRequest {
     /// Read from this revision. `None` reads the working tree.
     pub revision: Option<String>,
     pub function: FunctionId,
+}
+
+/// Request for the whole source of changed functions, with the changed lines marked.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetFunctionDiffsRequest {
+    pub repo_path: String,
+    /// The base commit of the comparison (`base_commit` of the file changes).
+    pub base_commit: String,
+    /// The head commit of the comparison. `None` is the working tree.
+    pub head_commit: Option<String>,
+    pub targets: Vec<FunctionDiffTarget>,
+}
+
+/// Request for the changed lines of files, with a few lines of context.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetFileDiffsRequest {
+    pub repo_path: String,
+    /// The base commit of the comparison (`base_commit` of the file changes).
+    pub base_commit: String,
+    /// The head commit of the comparison. `None` is the working tree.
+    pub head_commit: Option<String>,
+    pub targets: Vec<FileDiffTarget>,
 }
 
 /// Request for the full call tree above or below one function.
@@ -206,8 +227,15 @@ impl AnalysisService {
         let group_config = load_group_config(&request.changes.repo_path, &request.group_flags)?;
         let matcher = GroupMatcher::compile(&group_config)?;
 
+        let repo_path = request.changes.repo_path.clone();
         let analysis = self.analyze_changes_with_indexes(request.changes)?;
         let mut files = group_changes_by_file(&analysis.response.changes, &request.module_rules);
+        let changed_paths = list_changed_paths(
+            &repo_path,
+            &analysis.response.base_commit,
+            analysis.response.head_commit.as_deref(),
+        )?;
+        add_unparsed_files(&mut files, &changed_paths);
         set_callee_file_paths(&mut files, &analysis.head_index, &analysis.base_index);
         let grouped = group_changed_files(&mut files, &matcher);
 
@@ -229,6 +257,39 @@ impl AnalysisService {
     ) -> Result<FunctionSource, AnalysisError> {
         let index = self.get_index(&request.repo_path, request.revision.as_deref())?;
         get_function_source(&index, &request.function)
+    }
+
+    /// Get the whole of each changed function, with its added and removed lines marked.
+    pub fn get_function_diffs(
+        &self,
+        request: GetFunctionDiffsRequest,
+    ) -> Result<Vec<FunctionDiff>, AnalysisError> {
+        let base_index = self.get_index(&request.repo_path, Some(&request.base_commit))?;
+        let head_index = self.get_index(&request.repo_path, request.head_commit.as_deref())?;
+        request
+            .targets
+            .iter()
+            .map(|target| get_function_diff(&base_index, &head_index, target))
+            .collect()
+    }
+
+    /// Get the changed lines of each file, with a few lines of context around them.
+    pub fn get_file_diffs(
+        &self,
+        request: GetFileDiffsRequest,
+    ) -> Result<Vec<FileDiff>, AnalysisError> {
+        request
+            .targets
+            .iter()
+            .map(|target| {
+                get_file_diff(
+                    &request.repo_path,
+                    &request.base_commit,
+                    request.head_commit.as_deref(),
+                    target,
+                )
+            })
+            .collect()
     }
 
     /// Follow every call above or below a function, through the whole project.

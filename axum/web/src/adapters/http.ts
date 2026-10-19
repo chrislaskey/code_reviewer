@@ -6,7 +6,11 @@ import type {
   ListBranchesAndRecentCommitsRequest,
   ListBranchesAndRecentCommitsResponse,
   BackendAdapter,
+  FunctionDiff,
   FunctionSource,
+  GetFunctionDiffsRequest,
+  FileDiff,
+  GetFileDiffsRequest,
   GetCallTraceRequest,
   GetCallTraceResponse,
   GetFunctionSourceRequest,
@@ -90,6 +94,14 @@ export const httpAdapter: BackendAdapter = {
     request: GetFunctionSourceRequest,
   ): Promise<FunctionSource> {
     return postJson("get_function_source", request, "Get function source");
+  },
+
+  getFunctionDiffs(request: GetFunctionDiffsRequest): Promise<FunctionDiff[]> {
+    return postJson("get_function_diffs", request, "Get function diffs");
+  },
+
+  getFileDiffs(request: GetFileDiffsRequest): Promise<FileDiff[]> {
+    return postJson("get_file_diffs", request, "Get file diffs");
   },
 
   getCallTrace(request: GetCallTraceRequest): Promise<GetCallTraceResponse> {

@@ -6,6 +6,7 @@ import { FlowActionsContext, type FlowActions } from "./actions";
 import type { ExampleFile } from "./data";
 import type { GroupLine, GroupLink, GroupRow } from "./group_rows";
 import { ALL_CHANGES_ID, UNGROUPED_ID } from "./groups_data";
+import { useOpenAllState } from "./open_all";
 import { LinesLabel, StaleIcon, groupIcon } from "./groups_parts";
 import { SIZES } from "./layout";
 import { LedgerLine, plural, type ChipData, type Marker } from "./nodes";
@@ -17,10 +18,11 @@ import { CHANGE_STYLES } from "./style";
  * Ledger and node renderers mirror the ones the Functions view already has.
  */
 
-export type Renderer = "ledger" | "nodes";
+export type Renderer = "ledger" | "ledger_one_code_block" | "nodes";
 
 export const RENDERER_OPTIONS: { value: Renderer; label: string }[] = [
   { value: "ledger", label: "Ledger" },
+  { value: "ledger_one_code_block", label: "Ledger, one code block" },
   { value: "nodes", label: "Nodes" },
 ];
 
@@ -61,6 +63,7 @@ function groupSubtitle(row: GroupRow): string {
 /** The inside of a content line: a file or a group, with just its size and lines changed. */
 function LineBody({ line }: { line: GroupLine }) {
   const { stats } = line;
+  const hasFunctions = line.kind === "group" || stats.function_count > 0;
   const size = line.kind === "group" ? plural(stats.file_count, "file") : plural(stats.function_count, "function");
   const name =
     line.kind === "group" ? (
@@ -77,8 +80,12 @@ function LineBody({ line }: { line: GroupLine }) {
         <span className={`w-3 shrink-0 text-center font-bold ${status.text}`}>{status.sign}</span>
       )}
       {name}
-      <span className="shrink-0 text-[10px] text-base-content/50">{size}</span>
-      <LinesLabel added={stats.added_lines} removed={stats.removed_lines} />
+      {hasFunctions && (
+        <>
+          <span className="shrink-0 text-[10px] text-base-content/50">{size}</span>
+          <LinesLabel added={stats.added_lines} removed={stats.removed_lines} />
+        </>
+      )}
       <StaleIcon count={stats.stale_caller_count} />
       <ChevronRightIcon className="size-3 shrink-0 text-base-content/30" />
     </>
@@ -113,7 +120,8 @@ function EmptyLine({ children }: { children: string }) {
 /** Hover a line to highlight its outputs and inputs and fade the rest. Same as the file ledger. */
 export function GroupLedgerRow({ row, handlers }: { row: GroupRow; handlers: GroupRowHandlers }) {
   const [hovered, setHovered] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [expanded, setExpanded] = useOpenAllState(true);
+  const collapsed = !expanded;
   const status = CHANGE_STYLES[row.status];
   const Chevron = collapsed ? ChevronRightIcon : ChevronDownIcon;
   const stateOf = (key: string) => ({
@@ -149,7 +157,7 @@ export function GroupLedgerRow({ row, handlers }: { row: GroupRow; handlers: Gro
       className="overflow-hidden rounded-xl border border-base-300 bg-base-100 shadow-sm"
     >
       <header
-        onClick={() => setCollapsed((current) => !current)}
+        onClick={() => setExpanded((current) => !current)}
         className="flex h-[52px] cursor-pointer items-center gap-3 px-4"
       >
         <Chevron className="size-4 text-base-content/50" />
@@ -301,7 +309,7 @@ export function GroupRowView({
   renderer: Renderer;
   handlers: GroupRowHandlers;
 }) {
-  return renderer === "ledger" ? (
+  return renderer !== "nodes" ? (
     <GroupLedgerRow row={row} handlers={handlers} />
   ) : (
     <GroupNodeRow row={row} handlers={handlers} />
@@ -323,7 +331,7 @@ export function GroupRows({
 }) {
   return (
     <div className="dot-grid overflow-x-auto">
-      <div className={`mx-auto w-max p-8 ${renderer === "ledger" ? "space-y-4" : "space-y-14"}`}>
+      <div className={`mx-auto w-max p-8 ${renderer !== "nodes" ? "space-y-4" : "space-y-14"}`}>
         {rows.map((row) => (
           <div key={row.group.id} id={anchor?.(row)}>
             <GroupRowView row={row} renderer={renderer} handlers={handlers} />
@@ -357,6 +365,7 @@ export function FunctionsView({
         files={files}
         view={renderer === "nodes" ? "chips" : "ledger"}
         outside="folded"
+        codeLayout={renderer === "ledger_one_code_block" ? "one_block" : "per_function"}
       />
     </div>
   );

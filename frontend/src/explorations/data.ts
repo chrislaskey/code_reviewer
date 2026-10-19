@@ -1,3 +1,5 @@
+import type { FileDiffTarget, FunctionDiffTarget } from "../api/types";
+
 /*
  * Hardcoded example for the design explorations. Nothing here comes from the
  * backend. The shape mirrors what `analyzeChanges` returns once its function
@@ -19,6 +21,8 @@ export interface ChangedFunction {
   removed_lines?: number;
   /** Set when renamed, as `name/arity`. */
   previous_name?: string;
+  /** Set for real backend data, to load the function's code. */
+  diff_target?: FunctionDiffTarget;
 }
 
 /** A function in another module that calls into this file. */
@@ -59,6 +63,10 @@ export interface ExampleFile {
   coverage_percent?: number;
   /** Set by the backend. Otherwise worked out from the functions. */
   status?: ChangeKind;
+  /** A file that was not parsed: no functions, callers or calls, only its text. */
+  plain?: boolean;
+  /** Set for real backend data, to load the file's text. */
+  file_diff_target?: FileDiffTarget;
   functions: ChangedFunction[];
   callers: ExampleCaller[];
   callees: ExampleCallee[];

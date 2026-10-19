@@ -2,6 +2,12 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DocumentTextIcon } from "@heroicons/react/16/solid";
 import type { GroupSummary } from "../api/types";
 import { SegmentedControl, Toolbar } from "../explorations/controls";
+import {
+  NO_OPEN_ALL_COMMAND,
+  OpenAllButtons,
+  OpenAllContext,
+  type OpenAllCommand,
+} from "../explorations/open_all";
 import type { GroupRow } from "../explorations/group_rows";
 import {
   FunctionsView,
@@ -122,8 +128,9 @@ export function GroupedReview({
   /** Shown at the right end of the toolbar. */
   toolbarEnd?: ReactNode;
 }) {
-  const [renderer, setRenderer] = useState<Renderer>("ledger");
+  const [renderer, setRenderer] = useState<Renderer>("ledger_one_code_block");
   const [view, setView] = useState<View>({ level: "summary", groupId: null });
+  const [openAll, setOpenAll] = useState<OpenAllCommand>(NO_OPEN_ALL_COMMAND);
   const afterRender = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -185,45 +192,50 @@ export function GroupedReview({
     <div>
       <Toolbar>
         <SegmentedControl label="View" value={renderer} onChange={setRenderer} options={RENDERER_OPTIONS} />
+        <OpenAllButtons
+          onCommand={(open) => setOpenAll((current) => ({ version: current.version + 1, open }))}
+        />
         <span className="text-[11px] text-base-content/50">
           Click a group to see its row and files, and a file to see its functions.
         </span>
         {toolbarEnd && <span className="ml-auto">{toolbarEnd}</span>}
       </Toolbar>
-      <ScrollTreeLayout
-        key={view.level}
-        prefix={PREFIX}
-        items={items}
-        resolve={resolveItem}
-        beforeJump={openTreeItem}
-        watchKey={`${renderer}:${view.groupId ?? ""}`}
-        heading={heading}
-      >
-        {view.level === "summary" && (
-          <GroupRows
-            rows={[allRow]}
-            renderer={renderer}
-            handlers={handlers}
-            anchor={(row) => anchorId(PREFIX, row.group.id)}
-          />
-        )}
-        {view.level === "groups" && (
-          <GroupRows
-            rows={rows}
-            renderer={renderer}
-            handlers={handlers}
-            anchor={(row) => anchorId(PREFIX, row.group.id)}
-          />
-        )}
-        {view.level === "functions" && view.groupId !== null && (
-          <FunctionsOfGroup
-            group={findGroup(groups, view.groupId)}
-            row={rows.find((row) => row.group.id === view.groupId)}
-            files={filesInGroup(files, view.groupId)}
-            renderer={renderer}
-          />
-        )}
-      </ScrollTreeLayout>
+      <OpenAllContext.Provider value={openAll}>
+        <ScrollTreeLayout
+          key={view.level}
+          prefix={PREFIX}
+          items={items}
+          resolve={resolveItem}
+          beforeJump={openTreeItem}
+          watchKey={`${renderer}:${view.groupId ?? ""}`}
+          heading={heading}
+        >
+          {view.level === "summary" && (
+            <GroupRows
+              rows={[allRow]}
+              renderer={renderer}
+              handlers={handlers}
+              anchor={(row) => anchorId(PREFIX, row.group.id)}
+            />
+          )}
+          {view.level === "groups" && (
+            <GroupRows
+              rows={rows}
+              renderer={renderer}
+              handlers={handlers}
+              anchor={(row) => anchorId(PREFIX, row.group.id)}
+            />
+          )}
+          {view.level === "functions" && view.groupId !== null && (
+            <FunctionsOfGroup
+              group={findGroup(groups, view.groupId)}
+              row={rows.find((row) => row.group.id === view.groupId)}
+              files={filesInGroup(files, view.groupId)}
+              renderer={renderer}
+            />
+          )}
+        </ScrollTreeLayout>
+      </OpenAllContext.Provider>
     </div>
   );
 }

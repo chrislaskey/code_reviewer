@@ -39,7 +39,7 @@ pub struct GroupFlags {
 /// - With `group_config_path`, the file must exist. A relative path is
 ///   relative to the working directory of the process.
 /// - Without it, `.code_reviewer.toml` in the repo root is used when present,
-///   and no file means no groups.
+///   and no file means every file is in the default group.
 pub fn load_group_config(
     repo_path: &str,
     flags: &GroupFlags,

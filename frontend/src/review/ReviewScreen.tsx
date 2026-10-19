@@ -14,6 +14,7 @@ import {
   ReviewCanvas,
   type ReviewView,
 } from "./ReviewCanvas";
+import { CodeLoadersContext, type CodeLoaders } from "./html/CodeFooter";
 import { HtmlReview } from "./html/HtmlReview";
 import { CompareFormView } from "./CompareFormView";
 import {
@@ -79,6 +80,7 @@ export function ReviewScreen({ renderer }: { renderer: ReviewRenderer }) {
   const [refsError, setRefsError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalyzeFileChangesResponse | null>(null);
   const [resultNumber, setResultNumber] = useState(0);
+  const [resultRepoPath, setResultRepoPath] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<ReviewView>("blocks");
@@ -91,10 +93,25 @@ export function ReviewScreen({ renderer }: { renderer: ReviewRenderer }) {
     [result, viewFiles],
   );
   const viewAllRow = useMemo(
-    () => (result?.all_changes_row ? toViewGroupRows([result.all_changes_row], viewFiles)[0] : null),
+    () => (result ? toViewGroupRows([result.all_changes_row], viewFiles)[0] : null),
     [result, viewFiles],
   );
-  const showGroups = renderer === "html" && viewAllRow !== null;
+  const showGroups = renderer === "html" && viewAllRow !== null && viewFiles.length > 0;
+
+  const codeLoaders = useMemo<CodeLoaders | null>(() => {
+    if (!result) return null;
+    const comparison = {
+      repo_path: resultRepoPath,
+      base_commit: result.base_commit,
+      head_commit: result.head_commit,
+    };
+    return {
+      loadFunctionDiffs: (targets) => backend.getFunctionDiffs({ ...comparison, targets }),
+      loadFileDiffs: (targets) => backend.getFileDiffs({ ...comparison, targets }),
+    };
+  }, [backend, result, resultRepoPath]);
+
+  const canvasFiles = useMemo(() => viewFiles.filter((file) => !file.plain), [viewFiles]);
 
   // Read the branches and commits once the path stops changing.
   useEffect(() => {
@@ -141,6 +158,7 @@ export function ReviewScreen({ renderer }: { renderer: ReviewRenderer }) {
       if (request !== latestRequest.current) return;
       setResult(response);
       setResultNumber(request);
+      setResultRepoPath(analyzeRequest.repo_path);
     } catch (e) {
       if (request !== latestRequest.current) return;
       setResult(null);
@@ -160,87 +178,90 @@ export function ReviewScreen({ renderer }: { renderer: ReviewRenderer }) {
   );
 
   return (
-    <div>
-      <CompareFormView
-        form={form}
-        refs={refs}
-        refsError={refsError}
-        loading={loading}
-        onChange={updateForm}
-        onSubmit={analyze}
-      />
+    <CodeLoadersContext.Provider value={codeLoaders}>
+      <div>
+        <CompareFormView
+          form={form}
+          refs={refs}
+          refsError={refsError}
+          loading={loading}
+          onChange={updateForm}
+          onSubmit={analyze}
+        />
 
-      {error && (
-        <p className="border-b border-base-300 bg-rose-500/10 px-4 py-3 font-mono text-xs text-rose-700 dark:text-rose-300">
-          {error}
-        </p>
-      )}
+        {error && (
+          <p className="border-b border-base-300 bg-rose-500/10 px-4 py-3 font-mono text-xs text-rose-700 dark:text-rose-300">
+            {error}
+          </p>
+        )}
 
-      {!result && !error && !loading && (
-        <p className="px-6 py-10 text-sm text-base-content/50">
-          Enter the path of a git repository with Elixir code, then analyze its changes.
-        </p>
-      )}
+        {!result && !error && !loading && (
+          <p className="px-6 py-10 text-sm text-base-content/50">
+            Enter the path of a git repository with Elixir code, then analyze its changes.
+          </p>
+        )}
 
-      {result && (
-        <>
-          <ResultSummary result={result} />
-          {result.files.length === 0 ? (
-            <p className="px-6 py-10 text-sm text-base-content/50">
-              No functions were added, changed or removed.
-            </p>
-          ) : (
-            <>
-              {showGroups && result && viewAllRow ? (
-                <GroupedReview
-                  groups={result.groups}
-                  files={viewFiles}
-                  allRow={viewAllRow}
-                  rows={viewGroupRows}
-                  toolbarEnd={otherRendererLink}
+        {result && (
+          <>
+            <ResultSummary result={result} />
+            {result.files.length === 0 ? (
+              <p className="px-6 py-10 text-sm text-base-content/50">
+                No functions were added, changed or removed.
+              </p>
+            ) : (
+              <>
+                {showGroups && result && viewAllRow ? (
+                  <GroupedReview
+                    key={resultNumber}
+                    groups={result.groups}
+                    files={viewFiles}
+                    allRow={viewAllRow}
+                    rows={viewGroupRows}
+                    toolbarEnd={otherRendererLink}
+                  />
+                ) : (
+                  <>
+                    <Toolbar>
+                      <SegmentedControl
+                        label="View"
+                        value={view}
+                        onChange={setView}
+                        options={REVIEW_VIEW_OPTIONS}
+                      />
+                      <SegmentedControl
+                        label="Dependencies and standard library"
+                        value={outside}
+                        onChange={setOutside}
+                        options={OUTSIDE_OPTIONS}
+                      />
+                      <span className="ml-auto">{otherRendererLink}</span>
+                    </Toolbar>
+                    {renderer === "reactflow" ? (
+                      <ReviewCanvas
+                        files={canvasFiles}
+                        view={view}
+                        outside={outside}
+                        resultKey={String(resultNumber)}
+                      />
+                    ) : (
+                      <HtmlReview files={viewFiles} view={view} outside={outside} />
+                    )}
+                  </>
+                )}
+                <Legend
+                  items={[
+                    { label: "stale caller", swatch: <MarkerIcon marker="stale" /> },
+                    {
+                      label: "also changed, click to jump",
+                      swatch: <MarkerIcon marker="also_changed" />,
+                    },
+                  ]}
                 />
-              ) : (
-                <>
-                  <Toolbar>
-                    <SegmentedControl
-                      label="View"
-                      value={view}
-                      onChange={setView}
-                      options={REVIEW_VIEW_OPTIONS}
-                    />
-                    <SegmentedControl
-                      label="Dependencies and standard library"
-                      value={outside}
-                      onChange={setOutside}
-                      options={OUTSIDE_OPTIONS}
-                    />
-                    <span className="ml-auto">{otherRendererLink}</span>
-                  </Toolbar>
-                  {renderer === "reactflow" ? (
-                    <ReviewCanvas
-                      files={viewFiles}
-                      view={view}
-                      outside={outside}
-                      resultKey={String(resultNumber)}
-                    />
-                  ) : (
-                    <HtmlReview files={viewFiles} view={view} outside={outside} />
-                  )}
-                </>
-              )}
-              <Legend
-                items={[
-                  { label: "stale caller", swatch: <MarkerIcon marker="stale" /> },
-                  {
-                    label: "also changed, click to jump",
-                    swatch: <MarkerIcon marker="also_changed" />,
-                  },
-                ]}
-              />
-            </>
-          )}
-        </>
-      )}
-    </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </CodeLoadersContext.Provider>
   );
 }

@@ -7,7 +7,11 @@ import type {
   ListBranchesAndRecentCommitsRequest,
   ListBranchesAndRecentCommitsResponse,
   BackendAdapter,
+  FunctionDiff,
   FunctionSource,
+  GetFunctionDiffsRequest,
+  FileDiff,
+  GetFileDiffsRequest,
   GetCallTraceRequest,
   GetCallTraceResponse,
   GetFunctionSourceRequest,
@@ -61,6 +65,14 @@ export const tauriAdapter: BackendAdapter = {
     request: GetFunctionSourceRequest,
   ): Promise<FunctionSource> {
     return invoke<FunctionSource>("get_function_source", { request });
+  },
+
+  getFunctionDiffs(request: GetFunctionDiffsRequest): Promise<FunctionDiff[]> {
+    return invoke<FunctionDiff[]>("get_function_diffs", { request });
+  },
+
+  getFileDiffs(request: GetFileDiffsRequest): Promise<FileDiff[]> {
+    return invoke<FileDiff[]>("get_file_diffs", { request });
   },
 
   getCallTrace(request: GetCallTraceRequest): Promise<GetCallTraceResponse> {

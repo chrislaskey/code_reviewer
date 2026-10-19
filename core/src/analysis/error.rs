@@ -23,4 +23,10 @@ pub enum AnalysisError {
 
     #[error("function not found in the project index: {0}")]
     FunctionNotFound(String),
+
+    #[error("a function diff needs an old function, a new function, or both")]
+    EmptyFunctionDiffTarget,
+
+    #[error("a file diff needs an old path, a new path, or both")]
+    EmptyFileDiffTarget,
 }

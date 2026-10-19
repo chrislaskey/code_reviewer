@@ -464,6 +464,180 @@ mod revisions {
     }
 
     #[test]
+    fn test_function_diffs_mark_the_changed_lines_of_the_whole_function() {
+        use code_reviewer_core::analysis::function_diff::{DiffLineKind, FunctionDiffTarget};
+        use code_reviewer_core::analysis::service::GetFunctionDiffsRequest;
+
+        let dir = repo_with_two_commits();
+        let service = AnalysisService::new();
+        let response = service
+            .analyze_file_changes(AnalyzeFileChangesRequest {
+                changes: AnalyzeChangesRequest {
+                    repo_path: dir.path().to_string_lossy().to_string(),
+                    head_ref: Some("HEAD".to_string()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .unwrap();
+        let changes: Vec<_> = response.files.iter().flat_map(|f| &f.functions).collect();
+        let targets: Vec<FunctionDiffTarget> = changes
+            .iter()
+            .map(|change| match change.kind {
+                FunctionChangeKind::Added => FunctionDiffTarget {
+                    old_function: None,
+                    new_function: Some(change.function.clone()),
+                },
+                FunctionChangeKind::Removed => FunctionDiffTarget {
+                    old_function: Some(change.function.clone()),
+                    new_function: None,
+                },
+                FunctionChangeKind::Modified => FunctionDiffTarget {
+                    old_function: Some(change.function.clone()),
+                    new_function: Some(change.function.clone()),
+                },
+                FunctionChangeKind::Renamed => FunctionDiffTarget {
+                    old_function: change.previous_function.clone(),
+                    new_function: Some(change.function.clone()),
+                },
+            })
+            .collect();
+
+        let diffs = service
+            .get_function_diffs(GetFunctionDiffsRequest {
+                repo_path: dir.path().to_string_lossy().to_string(),
+                base_commit: response.base_commit.clone(),
+                head_commit: response.head_commit.clone(),
+                targets,
+            })
+            .unwrap();
+
+        assert_eq!(diffs.len(), changes.len());
+        for (change, diff) in changes.iter().zip(&diffs) {
+            let has = |kind| diff.lines.iter().any(|line| line.kind == kind);
+            assert!(!diff.lines.is_empty());
+            match change.kind {
+                FunctionChangeKind::Added => {
+                    assert!(diff.lines.iter().all(|l| l.kind == DiffLineKind::Added));
+                }
+                FunctionChangeKind::Removed => {
+                    assert!(diff.lines.iter().all(|l| l.kind == DiffLineKind::Removed));
+                }
+                FunctionChangeKind::Modified => {
+                    assert!(has(DiffLineKind::Added) || has(DiffLineKind::Removed));
+                }
+                FunctionChangeKind::Renamed => {}
+            }
+        }
+
+        let empty = service.get_function_diffs(GetFunctionDiffsRequest {
+            repo_path: dir.path().to_string_lossy().to_string(),
+            base_commit: response.base_commit,
+            head_commit: response.head_commit,
+            targets: vec![FunctionDiffTarget {
+                old_function: None,
+                new_function: None,
+            }],
+        });
+        assert!(empty.is_err());
+    }
+
+    #[test]
+    fn test_files_of_any_type_are_listed_and_their_text_is_diffed() {
+        use code_reviewer_core::analysis::file_changes::FileKind;
+        use code_reviewer_core::analysis::file_diff::FileDiffTarget;
+        use code_reviewer_core::analysis::function_diff::DiffLineKind;
+        use code_reviewer_core::analysis::service::GetFileDiffsRequest;
+
+        let dir = repo_with_two_commits();
+        let repo = dir.path();
+        write(repo, "README.md", "# Shop\nold line\n");
+        write(repo, "notes/old.txt", "gone\n");
+        write(repo, "assets/logo.bin", "\u{0}\u{1}");
+        commit(repo, "docs");
+        write(repo, "README.md", "# Shop\nnew line\n");
+        write(repo, "lib/hello/world.md", "hello\n");
+        write(repo, "assets/logo.bin", "\u{0}\u{2}");
+        std::fs::remove_file(repo.join("notes/old.txt")).unwrap();
+        commit(repo, "edit docs");
+
+        let service = AnalysisService::new();
+        let response = service
+            .analyze_file_changes(AnalyzeFileChangesRequest {
+                changes: AnalyzeChangesRequest {
+                    repo_path: repo.to_string_lossy().to_string(),
+                    head_ref: Some("HEAD".to_string()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .unwrap();
+
+        let listed: Vec<_> = response
+            .files
+            .iter()
+            .map(|f| (f.file_path.as_str(), f.module.as_str(), f.status, f.kind))
+            .collect();
+        use code_reviewer_core::analysis::file_changes::FileChangeStatus::*;
+        assert_eq!(
+            listed,
+            [
+                ("README.md", "README.md", Modified, FileKind::Unparsed),
+                ("assets/logo.bin", "Logo.bin", Modified, FileKind::Unparsed),
+                ("lib/hello/world.md", "World.md", Added, FileKind::Unparsed),
+                ("notes/old.txt", "Old.txt", Removed, FileKind::Unparsed),
+            ]
+        );
+        assert_eq!(response.all_changes_row.stats.file_count, 4);
+        assert_eq!(response.group_rows[0].stats.file_count, 4);
+
+        let target = |old: Option<&str>, new: Option<&str>| FileDiffTarget {
+            old_path: old.map(str::to_string),
+            new_path: new.map(str::to_string),
+        };
+        let diffs = service
+            .get_file_diffs(GetFileDiffsRequest {
+                repo_path: repo.to_string_lossy().to_string(),
+                base_commit: response.base_commit.clone(),
+                head_commit: response.head_commit.clone(),
+                targets: vec![
+                    target(Some("README.md"), Some("README.md")),
+                    target(None, Some("lib/hello/world.md")),
+                    target(Some("notes/old.txt"), None),
+                    target(Some("assets/logo.bin"), Some("assets/logo.bin")),
+                ],
+            })
+            .unwrap();
+
+        let readme: Vec<_> = diffs[0]
+            .lines
+            .iter()
+            .map(|l| (l.kind, l.text.as_str()))
+            .collect();
+        assert_eq!(
+            readme,
+            [
+                (DiffLineKind::Context, "# Shop"),
+                (DiffLineKind::Removed, "old line"),
+                (DiffLineKind::Added, "new line"),
+            ]
+        );
+        assert_eq!(diffs[1].lines.len(), 1);
+        assert_eq!(diffs[1].lines[0].kind, DiffLineKind::Added);
+        assert_eq!(diffs[2].lines[0].kind, DiffLineKind::Removed);
+        assert!(diffs[3].is_binary);
+        assert!(diffs[3].lines.is_empty());
+
+        let working_tree = service.get_file_diffs(GetFileDiffsRequest {
+            repo_path: repo.to_string_lossy().to_string(),
+            base_commit: response.base_commit,
+            head_commit: None,
+            targets: vec![target(None, None)],
+        });
+        assert!(working_tree.is_err());
+    }
+
+    #[test]
     fn test_groups_from_flags_reach_the_files_and_rows() {
         use code_reviewer_core::groups::GroupFlags;
 
@@ -482,10 +656,11 @@ mod revisions {
         let ungrouped = service
             .analyze_file_changes(request(GroupFlags::default()))
             .unwrap();
-        assert!(ungrouped.groups.is_empty());
-        assert!(ungrouped.group_rows.is_empty());
-        assert!(ungrouped.all_changes_row.is_none());
-        assert!(ungrouped.files.iter().all(|f| f.group_ids.is_empty()));
+        let ids: Vec<_> = ungrouped.groups.iter().map(|g| g.id.as_str()).collect();
+        assert_eq!(ids, vec!["ungrouped"]);
+        assert_eq!(ungrouped.group_rows.len(), 1);
+        assert_eq!(ungrouped.all_changes_row.lines.len(), 1);
+        assert!(ungrouped.files.iter().all(|f| f.group_ids == ["ungrouped"]));
 
         let grouped = service
             .analyze_file_changes(request(GroupFlags {

@@ -118,13 +118,13 @@ pub struct GroupRow {
 }
 
 /// The groups that hold changed files, and a row for each.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GroupedChanges {
-    /// In config order, ending with the default group. Empty when no groups are defined.
+    /// In config order, ending with the default group.
     pub groups: Vec<GroupSummary>,
     pub rows: Vec<GroupRow>,
-    /// One row above every top-level group. `None` when no groups are defined.
-    pub all_changes_row: Option<GroupRow>,
+    /// One row above every group.
+    pub all_changes_row: GroupRow,
 }
 
 /// The id of the all changes row. A group name cannot contain `@`, so it never clashes.
@@ -132,12 +132,8 @@ pub const ALL_CHANGES_GROUP_ID: &str = "@all";
 
 /// Set the group ids of every file, then build a row for each group that holds a changed file.
 ///
-/// With no groups defined nothing is grouped: the files keep empty group ids
-/// and there are no groups and no rows.
+/// With no groups defined every file is in the default group.
 pub fn group_changed_files(files: &mut [FileChange], matcher: &GroupMatcher) -> GroupedChanges {
-    if !matcher.has_groups() {
-        return GroupedChanges::default();
-    }
     for file in files.iter_mut() {
         file.group_ids = matcher.list_group_ids_for_file(&file.file_path);
     }
@@ -155,7 +151,7 @@ pub fn group_changed_files(files: &mut [FileChange], matcher: &GroupMatcher) -> 
         .iter()
         .map(|group| build_group_row(group, &all_groups, files, &mut path_groups))
         .collect();
-    let all_changes_row = Some(build_all_changes_row(&groups, files));
+    let all_changes_row = build_all_changes_row(&groups, files);
     GroupedChanges {
         groups,
         rows,
@@ -476,6 +472,8 @@ mod tests {
 
     fn file(path: &str, module: &str) -> FileChange {
         FileChange {
+            kind: Default::default(),
+            previous_path: None,
             file_path: path.to_string(),
             module: module.to_string(),
             status: FileChangeStatus::Modified,
@@ -513,16 +511,17 @@ mod tests {
     }
 
     #[test]
-    fn test_nothing_is_grouped_without_groups() {
+    fn test_without_groups_every_file_is_in_the_default_group() {
         let matcher = GroupConfig::default().compile().unwrap();
         let mut files = sample_files();
 
         let grouped = group_changed_files(&mut files, &matcher);
 
-        assert!(grouped.groups.is_empty());
-        assert!(grouped.rows.is_empty());
-        assert!(grouped.all_changes_row.is_none());
-        assert!(files.iter().all(|file| file.group_ids.is_empty()));
+        let ids: Vec<&str> = grouped.groups.iter().map(|g| g.id.as_str()).collect();
+        assert_eq!(ids, ["ungrouped"]);
+        assert_eq!(grouped.rows.len(), 1);
+        assert_eq!(grouped.rows[0].stats.file_count, files.len());
+        assert!(files.iter().all(|file| file.group_ids == ["ungrouped"]));
     }
 
     #[test]
@@ -564,7 +563,7 @@ mod tests {
 
         let grouped = group_changed_files(&mut files, &matcher());
 
-        let all = grouped.all_changes_row.unwrap();
+        let all = grouped.all_changes_row;
         assert_eq!(all.group.id, ALL_CHANGES_GROUP_ID);
         assert_eq!(all.content_label, GroupContentLabel::Groups);
         assert_eq!(all.stats.file_count, file_count);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { Node, NodeProps } from "@xyflow/react";
 import {
   ChevronDownIcon,
@@ -259,7 +259,7 @@ function bodyHeights(data: Omit<LedgerData, "collapsed" | "selectedLabel">) {
 export function ledgerHeight(data: LedgerData): number {
   const strip = data.style.attention ? stripHeight(findingsFor(data.file)) : 0;
   const top = PART.border + PART.header + strip;
-  if (data.collapsed) return top;
+  if (data.collapsed || data.file.plain) return top;
   const heights = bodyHeights(data);
   const tallest = Math.max(heights.file, heights.outputs, heights.inputs);
   return top + PART.divider + PART.padding * 2 + PART.label + tallest;
@@ -351,13 +351,26 @@ function CoverageBadge({ percent }: { percent: number }) {
  * Hover any line, pill or finding to highlight the changed function it belongs
  * to, together with that function's outputs and inputs. Everything else fades.
  */
-export function LedgerView({ id, data }: { id: string; data: LedgerData }) {
+export function LedgerView({
+  id,
+  data,
+  footer,
+}: {
+  id: string;
+  data: LedgerData;
+  /**
+   * Shown under the columns while expanded, given the key of the function being hovered.
+   * Gives the ledger the height of its content.
+   */
+  footer?: (hoveredKey: string | null) => ReactNode;
+}) {
   const { file, outside, style, collapsed, selectedLabel } = data;
+  const plain = file.plain === true;
   const actions = useFlowActions();
   const [hovered, setHovered] = useState<string | null>(null);
   const status = CHANGE_STYLES[fileStatus(file)];
   const Chevron = collapsed ? ChevronRightIcon : ChevronDownIcon;
-  const findings = style.attention ? findingsFor(file) : [];
+  const findings = style.attention && !plain ? findingsFor(file) : [];
   const outputs = outputEntries(file, outside, style.order);
   const inputs = inputEntries(file, style.order);
 
@@ -420,7 +433,7 @@ export function LedgerView({ id, data }: { id: string; data: LedgerData }) {
 
   return (
     <div
-      style={{ width: LEDGER_WIDTH, height: ledgerHeight(data) }}
+      style={{ width: LEDGER_WIDTH, height: footer && !collapsed ? undefined : ledgerHeight(data) }}
       className="overflow-hidden rounded-xl border border-base-300 bg-base-100 shadow-sm"
     >
       <header
@@ -433,8 +446,8 @@ export function LedgerView({ id, data }: { id: string; data: LedgerData }) {
         <h3 className="text-sm font-semibold">{file.module}</h3>
         <span className="font-mono text-[11px] text-base-content/50">{file.path}</span>
         <span className="ml-auto flex items-center gap-4 font-mono text-[11px] text-base-content/60">
-          {style.counts && <span>{plural(file.functions.length, "function")}</span>}
-          {style.coverage && file.coverage_percent !== undefined && (
+          {style.counts && !plain && <span>{plural(file.functions.length, "function")}</span>}
+          {style.coverage && !plain && file.coverage_percent !== undefined && (
             <CoverageBadge percent={file.coverage_percent} />
           )}
         </span>
@@ -464,7 +477,7 @@ export function LedgerView({ id, data }: { id: string; data: LedgerData }) {
         </div>
       )}
 
-      {!collapsed && (
+      {!collapsed && !plain && (
         <div
           style={{
             padding: PART.padding,
@@ -515,6 +528,7 @@ export function LedgerView({ id, data }: { id: string; data: LedgerData }) {
           </div>
         </div>
       )}
+      {!collapsed && footer?.(hovered)}
     </div>
   );
 }

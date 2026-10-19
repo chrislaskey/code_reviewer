@@ -129,7 +129,7 @@ pub struct ListChangedLineRangesResponse {
 
 const DEFAULT_BASE_REF: &str = "HEAD";
 
-fn run_git(repo_path: &str, arguments: &[&str]) -> Result<String, GitError> {
+fn run_git_bytes(repo_path: &str, arguments: &[&str]) -> Result<Vec<u8>, GitError> {
     let output = Command::new("git")
         .args(arguments)
         .current_dir(repo_path)
@@ -142,7 +142,11 @@ fn run_git(repo_path: &str, arguments: &[&str]) -> Result<String, GitError> {
             stderr: String::from_utf8_lossy(&output.stderr).to_string(),
         });
     }
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    Ok(output.stdout)
+}
+
+fn run_git(repo_path: &str, arguments: &[&str]) -> Result<String, GitError> {
+    run_git_bytes(repo_path, arguments).map(|bytes| String::from_utf8_lossy(&bytes).to_string())
 }
 
 /// List every file git tracks or could track (untracked files that are not ignored).
@@ -213,6 +217,121 @@ pub fn list_changed_line_ranges(
 
     files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(ListChangedLineRangesResponse { files })
+}
+
+/// What happened to a path between the base and the head.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChangedPathStatus {
+    Added,
+    Modified,
+    Removed,
+}
+
+/// One path that differs between the base and the head, of any file type.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChangedPath {
+    pub path: String,
+    /// The path in the base. Only set when the file was renamed or copied.
+    pub previous_path: Option<String>,
+    pub status: ChangedPathStatus,
+}
+
+/// List every path that differs between `base_commit` and `head_commit`, or
+/// the working tree when there is no `head_commit`. Renames are followed.
+/// Untracked files count as added (working tree only). Sorted by path.
+pub fn list_changed_paths(
+    repo_path: &str,
+    base_commit: &str,
+    head_commit: Option<&str>,
+) -> Result<Vec<ChangedPath>, GitError> {
+    // Both are full SHAs from `get_commit_sha`, so they cannot be read as options.
+    let mut arguments = vec![
+        "-c",
+        "core.quotePath=false",
+        "diff",
+        "--name-status",
+        "-z",
+        "-M",
+        "--no-ext-diff",
+        "--no-color",
+        "--relative",
+        base_commit,
+    ];
+    if let Some(head_commit) = head_commit {
+        arguments.push(head_commit);
+    }
+    let mut paths = parse_name_status(&run_git(repo_path, &arguments)?)?;
+
+    if head_commit.is_none() {
+        let untracked = run_git(
+            repo_path,
+            &["ls-files", "-z", "--others", "--exclude-standard"],
+        )?;
+        paths.extend(
+            untracked
+                .split('\0')
+                .filter(|path| !path.is_empty())
+                .map(|path| ChangedPath {
+                    path: path.to_string(),
+                    previous_path: None,
+                    status: ChangedPathStatus::Added,
+                }),
+        );
+    }
+
+    paths.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(paths)
+}
+
+/// Parse `git diff --name-status -z`: `M\0path\0` and `R100\0old\0new\0`.
+fn parse_name_status(output: &str) -> Result<Vec<ChangedPath>, GitError> {
+    let mut fields = output.split('\0').filter(|field| !field.is_empty());
+    let mut paths = Vec::new();
+    while let Some(code) = fields.next() {
+        let mut next_path = || {
+            fields
+                .next()
+                .map(str::to_string)
+                .ok_or_else(|| GitError::UnexpectedOutput(format!("no path after {code}")))
+        };
+        let changed = match code.chars().next() {
+            Some('A') => ChangedPath {
+                path: next_path()?,
+                previous_path: None,
+                status: ChangedPathStatus::Added,
+            },
+            Some('D') => ChangedPath {
+                path: next_path()?,
+                previous_path: None,
+                status: ChangedPathStatus::Removed,
+            },
+            Some('R' | 'C') => {
+                let previous_path = next_path()?;
+                ChangedPath {
+                    path: next_path()?,
+                    previous_path: Some(previous_path),
+                    status: ChangedPathStatus::Modified,
+                }
+            }
+            Some('M' | 'T' | 'U' | 'X') => ChangedPath {
+                path: next_path()?,
+                previous_path: None,
+                status: ChangedPathStatus::Modified,
+            },
+            _ => return Err(GitError::UnexpectedOutput(code.to_string())),
+        };
+        paths.push(changed);
+    }
+    Ok(paths)
+}
+
+/// Read one file as it was in a commit, as raw bytes.
+pub fn get_file_bytes_at_commit(
+    repo_path: &str,
+    commit_sha: &str,
+    file_path: &str,
+) -> Result<Vec<u8>, GitError> {
+    run_git_bytes(repo_path, &["show", &format!("{commit_sha}:{file_path}")])
 }
 
 fn list_untracked_files_as_changed(repo_path: &str) -> Result<Vec<ChangedFileLines>, GitError> {
@@ -583,6 +702,33 @@ fn parse_hunk_new_range(hunk_header: &str) -> Option<LineRange> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_parse_name_status_reads_every_kind_of_change() {
+        let output = "A\0new.md\0M\0lib/a.ex\0D\0old.txt\0R087\0from.md\0to.md\0";
+
+        let paths = parse_name_status(output).unwrap();
+
+        let summary: Vec<(&str, Option<&str>, ChangedPathStatus)> = paths
+            .iter()
+            .map(|p| (p.path.as_str(), p.previous_path.as_deref(), p.status))
+            .collect();
+        assert_eq!(
+            summary,
+            [
+                ("new.md", None, ChangedPathStatus::Added),
+                ("lib/a.ex", None, ChangedPathStatus::Modified),
+                ("old.txt", None, ChangedPathStatus::Removed),
+                ("to.md", Some("from.md"), ChangedPathStatus::Modified),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_name_status_rejects_a_missing_path() {
+        assert!(parse_name_status("M\0").is_err());
+        assert!(parse_name_status("Z\0x\0").is_err());
+    }
 
     #[test]
     fn test_parse_porcelain_modified() {

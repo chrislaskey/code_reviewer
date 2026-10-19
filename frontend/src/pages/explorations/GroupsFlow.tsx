@@ -64,7 +64,7 @@ function OneLevelUp({ renderer }: { renderer: Renderer }) {
 }
 
 export default function GroupsFlow() {
-  const [renderer, setRenderer] = useState<Renderer>("ledger");
+  const [renderer, setRenderer] = useState<Renderer>("ledger_one_code_block");
   return (
     <ExplorationPage
       title="Groups"
