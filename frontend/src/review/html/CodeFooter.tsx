@@ -365,7 +365,7 @@ function openLinkOutsideApp(event: MouseEvent<HTMLElement>) {
   if (/^https?:\/\//i.test(link.href)) window.open(link.href, "_blank", "noopener,noreferrer");
 }
 
-/** The new version of the changed text as HTML. The backend leaves raw HTML out of it. */
+/** The new version of the changed text as HTML. Added blocks are marked green. The backend leaves raw HTML out of it. */
 function MarkdownHunks({ hunks }: { hunks: string[] }) {
   if (hunks.length === 0) {
     return (

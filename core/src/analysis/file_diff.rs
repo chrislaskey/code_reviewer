@@ -38,7 +38,8 @@ pub struct FileDiff {
     pub omitted_line_count: usize,
     /// True for a Markdown file, which also has `html_hunks`.
     pub is_markdown: bool,
-    /// The new version of each stretch of changed lines as HTML. Empty unless Markdown.
+    /// The new version of each stretch of changed lines as HTML, with the blocks that
+    /// hold added lines marked by a `data-added` attribute. Empty unless Markdown.
     pub html_hunks: Vec<String>,
 }
 

@@ -155,6 +155,11 @@ body {
 
 /* Rendered Markdown (GitHub flavored). The HTML comes from the backend. */
 .markdown-html {
+  --added-gutter: 2rem;
+  --added-bar-left: 0.5rem;
+  --added-bar-width: 4px;
+  position: relative;
+  padding-left: var(--added-gutter);
   font-size: 13px;
   line-height: 1.55;
   overflow-wrap: anywhere;
@@ -162,6 +167,48 @@ body {
 
 .markdown-html > * + * {
   margin-top: 0.75rem;
+}
+
+/*
+ * A block that holds added lines. The backend marks it with `data-added`.
+ * The bar is drawn in the gutter, so the content does not move.
+ */
+.markdown-html [data-added] {
+  position: relative;
+}
+
+.markdown-html [data-added]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--added-bar-left) - var(--added-gutter));
+  width: var(--added-bar-width);
+  background: color-mix(in oklab, #10b981 60%, transparent);
+}
+
+/* List items sit inside the padding of their lists. */
+.markdown-html li[data-added]::before {
+  left: calc(var(--added-bar-left) - var(--added-gutter) - 1.5rem);
+}
+
+.markdown-html li li[data-added]::before {
+  left: calc(var(--added-bar-left) - var(--added-gutter) - 3rem);
+}
+
+.markdown-html li li li[data-added]::before {
+  left: calc(var(--added-bar-left) - var(--added-gutter) - 4.5rem);
+}
+
+/* A table scrolls sideways and would clip the gutter, so its rows carry the bar. */
+.markdown-html table[data-added]::before,
+.markdown-html tr[data-added]::before {
+  content: none;
+}
+
+.markdown-html table[data-added] tr > :first-child,
+.markdown-html tr[data-added] > :first-child {
+  box-shadow: inset var(--added-bar-width) 0 0 color-mix(in oklab, #10b981 60%, transparent);
 }
 
 .markdown-html h1,
@@ -237,13 +284,15 @@ body {
 }
 
 .markdown-html pre {
-  overflow-x: auto;
   padding: 0.75rem;
   border-radius: 6px;
   background: color-mix(in oklab, var(--color-base-content) 7%, transparent);
 }
 
+/* The code scrolls sideways, not the pre, so the pre can show the gutter bar. */
 .markdown-html pre code {
+  display: block;
+  overflow-x: auto;
   padding: 0;
   background: none;
 }

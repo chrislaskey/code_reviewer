@@ -307,7 +307,7 @@ export interface FileDiff {
   omitted_line_count: number;
   /** True for a Markdown file, which also has `html_hunks`. */
   is_markdown: boolean;
-  /** The new version of each stretch of changed lines as HTML. Empty unless Markdown. */
+  /** The new version of each stretch of changed lines as HTML. Blocks that hold added lines carry a `data-added` attribute. Empty unless Markdown. */
   html_hunks: string[];
 }
 
