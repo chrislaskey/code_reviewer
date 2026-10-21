@@ -12,6 +12,7 @@ use code_reviewer_core::{
             AnalysisService, AnalyzeChangesRequest, AnalyzeChangesResponse,
             AnalyzeFileChangesRequest, AnalyzeFileChangesResponse, GetCallTraceRequest,
             GetFileDiffsRequest, GetFunctionDiffsRequest, GetFunctionSourceRequest,
+            GetTestCallStackRequest, GetTestCallStackResponse, ListTestsRequest, ListTestsResponse,
         },
     },
     git::{
@@ -117,6 +118,25 @@ async fn get_call_trace(
     run_analysis(&service, move |service| service.get_call_trace(request)).await
 }
 
+#[tauri::command]
+async fn list_tests(
+    service: State<'_, Arc<AnalysisService>>,
+    request: ListTestsRequest,
+) -> Result<ListTestsResponse, String> {
+    run_analysis(&service, move |service| service.list_tests(request)).await
+}
+
+#[tauri::command]
+async fn get_test_call_stack(
+    service: State<'_, Arc<AnalysisService>>,
+    request: GetTestCallStackRequest,
+) -> Result<GetTestCallStackResponse, String> {
+    run_analysis(&service, move |service| {
+        service.get_test_call_stack(request)
+    })
+    .await
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -131,7 +151,9 @@ pub fn run() {
             get_function_source,
             get_function_diffs,
             get_file_diffs,
-            get_call_trace
+            get_call_trace,
+            list_tests,
+            get_test_call_stack
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

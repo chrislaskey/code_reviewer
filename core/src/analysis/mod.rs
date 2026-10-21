@@ -21,3 +21,4 @@ pub mod model;
 pub mod module_rules;
 pub mod project_index;
 pub mod service;
+pub mod test_call_stack;

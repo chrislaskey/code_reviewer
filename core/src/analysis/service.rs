@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -7,13 +8,16 @@ use super::call_trace::{get_call_trace, CallTraceOptions, GetCallTraceResponse};
 use super::error::AnalysisError;
 use super::file_changes::{add_unparsed_files, group_changes_by_file, FileChange};
 use super::file_diff::{get_file_diff, FileDiff, FileDiffTarget};
-use super::function_changes::{list_function_changes, FunctionChange};
+use super::function_changes::{list_function_changes, FunctionChange, FunctionChangeKind};
 use super::function_diff::{get_function_diff, FunctionDiff, FunctionDiffTarget};
 use super::function_source::{get_function_source, FunctionSource};
 use super::group_changes::{group_changed_files, GroupRow};
 use super::model::FunctionId;
 use super::module_rules::ModuleRules;
 use super::project_index::{CallDirection, ProjectIndex, ProjectIndexCache, SkippedFile};
+use super::test_call_stack::{
+    get_test_call_stack, list_tests, CallStackFrame, TestCallStackOptions, TestSummary,
+};
 use crate::git::{
     get_commit_sha, get_merge_base_commit_sha, get_parent_commit_sha, list_changed_line_ranges,
     list_changed_paths, ListChangedLineRangesRequest,
@@ -120,6 +124,43 @@ pub struct GetCallTraceRequest {
     pub direction: CallDirection,
     pub max_depth: Option<usize>,
     pub max_node_count: Option<usize>,
+}
+
+/// Request for the tests in the head of a comparison.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ListTestsRequest {
+    #[serde(flatten)]
+    pub changes: AnalyzeChangesRequest,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListTestsResponse {
+    pub base_commit: String,
+    /// `None` when the head is the working tree.
+    pub head_commit: Option<String>,
+    /// Every test in the head, by file and then by line.
+    pub tests: Vec<TestSummary>,
+}
+
+/// Request for the calls below one test, walked top to bottom and marked against the base.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetTestCallStackRequest {
+    #[serde(flatten)]
+    pub changes: AnalyzeChangesRequest,
+    pub test: FunctionId,
+    #[serde(default)]
+    pub options: TestCallStackOptions,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetTestCallStackResponse {
+    pub base_commit: String,
+    /// `None` when the head is the working tree.
+    pub head_commit: Option<String>,
+    pub test: FunctionId,
+    pub frames: Vec<CallStackFrame>,
+    /// True when the options cut the walk short.
+    pub truncated: bool,
 }
 
 /// A finished comparison, with the two indexes it was made from.
@@ -247,6 +288,47 @@ impl AnalysisService {
             groups: grouped.groups,
             group_rows: grouped.rows,
             all_changes_row: grouped.all_changes_row,
+        })
+    }
+
+    /// List every test in the head, marking the ones the comparison added or modified.
+    pub fn list_tests(
+        &self,
+        request: ListTestsRequest,
+    ) -> Result<ListTestsResponse, AnalysisError> {
+        let analysis = self.analyze_changes_with_indexes(request.changes)?;
+        let changed_functions: HashMap<FunctionId, FunctionChangeKind> = analysis
+            .response
+            .changes
+            .iter()
+            .filter(|change| change.kind != FunctionChangeKind::Removed)
+            .map(|change| (change.function.clone(), change.kind))
+            .collect();
+        Ok(ListTestsResponse {
+            base_commit: analysis.response.base_commit,
+            head_commit: analysis.response.head_commit,
+            tests: list_tests(&analysis.head_index, &changed_functions),
+        })
+    }
+
+    /// Walk every call below a test, top to bottom, with each project function marked against the base.
+    pub fn get_test_call_stack(
+        &self,
+        request: GetTestCallStackRequest,
+    ) -> Result<GetTestCallStackResponse, AnalysisError> {
+        let analysis = self.analyze_changes_with_indexes(request.changes)?;
+        let stack = get_test_call_stack(
+            &analysis.base_index,
+            &analysis.head_index,
+            &request.test,
+            request.options,
+        )?;
+        Ok(GetTestCallStackResponse {
+            base_commit: analysis.response.base_commit,
+            head_commit: analysis.response.head_commit,
+            test: stack.test,
+            frames: stack.frames,
+            truncated: stack.truncated,
         })
     }
 

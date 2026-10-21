@@ -13,6 +13,10 @@ import type {
   GetFileDiffsRequest,
   GetCallTraceRequest,
   GetCallTraceResponse,
+  GetTestCallStackRequest,
+  GetTestCallStackResponse,
+  ListTestsRequest,
+  ListTestsResponse,
   GetFunctionSourceRequest,
   GreetRequest,
   GreetResponse,
@@ -106,5 +110,13 @@ export const httpAdapter: BackendAdapter = {
 
   getCallTrace(request: GetCallTraceRequest): Promise<GetCallTraceResponse> {
     return postJson("get_call_trace", request, "Get call trace");
+  },
+
+  listTests(request: ListTestsRequest): Promise<ListTestsResponse> {
+    return postJson("list_tests", request, "List tests");
+  },
+
+  getTestCallStack(request: GetTestCallStackRequest): Promise<GetTestCallStackResponse> {
+    return postJson("get_test_call_stack", request, "Get test call stack");
   },
 };

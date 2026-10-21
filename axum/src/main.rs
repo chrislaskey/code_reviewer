@@ -18,6 +18,7 @@ use code_reviewer_core::{
             AnalysisService, AnalyzeChangesRequest, AnalyzeChangesResponse,
             AnalyzeFileChangesRequest, AnalyzeFileChangesResponse, GetCallTraceRequest,
             GetFileDiffsRequest, GetFunctionDiffsRequest, GetFunctionSourceRequest,
+            GetTestCallStackRequest, GetTestCallStackResponse, ListTestsRequest, ListTestsResponse,
         },
     },
     git::{
@@ -123,6 +124,20 @@ async fn get_call_trace(
     run_analysis(service, move |service| service.get_call_trace(request)).await
 }
 
+async fn list_tests(
+    State(service): State<Arc<AnalysisService>>,
+    Json(request): Json<ListTestsRequest>,
+) -> Result<Json<ListTestsResponse>, ApiError> {
+    run_analysis(service, move |service| service.list_tests(request)).await
+}
+
+async fn get_test_call_stack(
+    State(service): State<Arc<AnalysisService>>,
+    Json(request): Json<GetTestCallStackRequest>,
+) -> Result<Json<GetTestCallStackResponse>, ApiError> {
+    run_analysis(service, move |service| service.get_test_call_stack(request)).await
+}
+
 /// Health check endpoint.
 async fn health() -> &'static str {
     "ok"
@@ -145,6 +160,8 @@ fn api_routes() -> Router {
         .route("/api/get_function_diffs", post(get_function_diffs))
         .route("/api/get_file_diffs", post(get_file_diffs))
         .route("/api/get_call_trace", post(get_call_trace))
+        .route("/api/list_tests", post(list_tests))
+        .route("/api/get_test_call_stack", post(get_test_call_stack))
         .with_state(analysis_service)
 }
 

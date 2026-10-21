@@ -15,6 +15,9 @@ export default function TopBar() {
         <Link to="/review/html" className="hover:text-base-content">
           Review (HTML)
         </Link>
+        <Link to="/review/test-call-stack" className="hover:text-base-content">
+          Test call stack
+        </Link>
         <Link to="/explorations" className="hover:text-base-content">
           Explorations
         </Link>

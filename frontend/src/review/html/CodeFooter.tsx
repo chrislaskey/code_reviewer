@@ -158,14 +158,15 @@ function CodeLine({ line, tokens }: { line: DiffLine; tokens: SyntaxToken[] | nu
 }
 
 /** True when lines were left out between the two, judged by their line numbers. */
-function hasGapBetween(previous: DiffLine | undefined, line: DiffLine): boolean {
+export function hasGapBetween(previous: DiffLine | undefined, line: DiffLine): boolean {
   if (!previous) return false;
   const jumped = (before: number | null, after: number | null) =>
     before !== null && after !== null && after > before + 1;
   return jumped(previous.old_number, line.old_number) || jumped(previous.new_number, line.new_number);
 }
 
-function CodeLines({ lines, language }: { lines: DiffLine[]; language: string | null }) {
+/** The lines of a diff with gutters, signs and syntax colours. */
+export function CodeLines({ lines, language }: { lines: DiffLine[]; language: string | null }) {
   const tokens = useMemo(() => highlightDiffLines(lines, language), [lines, language]);
   return (
     <div className="nodrag nopan overflow-x-auto pb-2 font-mono text-[11px] leading-5">

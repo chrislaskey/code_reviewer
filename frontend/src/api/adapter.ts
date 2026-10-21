@@ -13,6 +13,10 @@ import type {
   GetFileDiffsRequest,
   GetCallTraceRequest,
   GetCallTraceResponse,
+  GetTestCallStackRequest,
+  GetTestCallStackResponse,
+  ListTestsRequest,
+  ListTestsResponse,
   GreetRequest,
   GreetResponse,
   ListChangedFilesRequest,
@@ -60,4 +64,10 @@ export interface BackendAdapter {
 
   /** Follow every call above or below a function through the whole project. */
   getCallTrace(request: GetCallTraceRequest): Promise<GetCallTraceResponse>;
+
+  /** List every test in the head of a comparison. */
+  listTests(request: ListTestsRequest): Promise<ListTestsResponse>;
+
+  /** Walk every call below a test, top to bottom, with each project function marked against the base. */
+  getTestCallStack(request: GetTestCallStackRequest): Promise<GetTestCallStackResponse>;
 }

@@ -14,6 +14,10 @@ import type {
   GetFileDiffsRequest,
   GetCallTraceRequest,
   GetCallTraceResponse,
+  GetTestCallStackRequest,
+  GetTestCallStackResponse,
+  ListTestsRequest,
+  ListTestsResponse,
   GetFunctionSourceRequest,
   ChangedFile,
   GreetRequest,
@@ -77,5 +81,13 @@ export const tauriAdapter: BackendAdapter = {
 
   getCallTrace(request: GetCallTraceRequest): Promise<GetCallTraceResponse> {
     return invoke<GetCallTraceResponse>("get_call_trace", { request });
+  },
+
+  listTests(request: ListTestsRequest): Promise<ListTestsResponse> {
+    return invoke<ListTestsResponse>("list_tests", { request });
+  },
+
+  getTestCallStack(request: GetTestCallStackRequest): Promise<GetTestCallStackResponse> {
+    return invoke<GetTestCallStackResponse>("get_test_call_stack", { request });
   },
 };

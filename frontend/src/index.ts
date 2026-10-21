@@ -51,4 +51,11 @@ export type {
   TraceStopReason,
   CallTraceNode,
   GetCallTraceResponse,
+  TestSummary,
+  ListTestsRequest,
+  ListTestsResponse,
+  TestCallStackOptions,
+  GetTestCallStackRequest,
+  CallStackFrame,
+  GetTestCallStackResponse,
 } from "./api/types";

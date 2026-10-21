@@ -437,3 +437,71 @@ export interface GroupRow {
   /** Calls into dependencies and the standard library, left out of the outputs. */
   folded_output_count: number;
 }
+
+/** Mirrors core::analysis::test_call_stack::TestSummary. */
+export interface TestSummary {
+  function: FunctionId;
+  file_path: string;
+  start_line: number;
+  end_line: number;
+  /** Guessed from the file path (`/live/`) or module name (`LiveTest`). */
+  is_live_view_test: boolean;
+  /** Set when the test itself was added or modified in the comparison. */
+  change: FunctionChangeKind | null;
+}
+
+/** Mirrors core::analysis::service::ListTestsRequest: the same comparison as a review. */
+export type ListTestsRequest = AnalyzeChangesRequest;
+
+export interface ListTestsResponse {
+  base_commit: string;
+  head_commit: string | null;
+  /** Every test in the head, by file and then by line. */
+  tests: TestSummary[];
+}
+
+/** Mirrors core::analysis::test_call_stack::TestCallStackOptions. */
+export interface TestCallStackOptions {
+  /** Omitted follows calls until every function was shown once. */
+  max_depth?: number | null;
+  /** Omitted uses the server default of 2000. */
+  max_frame_count?: number | null;
+}
+
+/** Mirrors core::analysis::service::GetTestCallStackRequest. */
+export interface GetTestCallStackRequest extends AnalyzeChangesRequest {
+  test: FunctionId;
+  options?: TestCallStackOptions;
+}
+
+/** Mirrors core::analysis::test_call_stack::CallStackFrame. */
+export interface CallStackFrame {
+  function: FunctionId;
+  /** Zero on the test, one more for each call below it. */
+  depth: number;
+  /** False for functions outside the project (deps, standard library), which have no source here. */
+  defined_in_project: boolean;
+  /** Where the function is defined. Null outside the project. */
+  file_path: string | null;
+  /** File and lines of the call that led here. Empty on the test. */
+  call_file_path: string | null;
+  call_lines: number[];
+  crosses_module_boundary: boolean;
+  /** Null when the function reads the same in the base, or is outside the project. */
+  change: FunctionChangeKind | null;
+  /** The whole function in the head, each line marked against the base. Empty outside the project. */
+  lines: DiffLine[];
+  /** True when the function was already walked above, so its calls are not listed again. */
+  repeated: boolean;
+  stop_reason: TraceStopReason | null;
+}
+
+/** Mirrors core::analysis::service::GetTestCallStackResponse. */
+export interface GetTestCallStackResponse {
+  base_commit: string;
+  head_commit: string | null;
+  test: FunctionId;
+  frames: CallStackFrame[];
+  /** True when the options cut the walk short. */
+  truncated: boolean;
+}

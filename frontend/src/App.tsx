@@ -9,6 +9,8 @@ import ModuleFlowDepth from "./pages/explorations/ModuleFlowDepth";
 import ModuleFlowVariations from "./pages/explorations/ModuleFlowVariations";
 import ReviewHtml from "./pages/review/Html";
 import ReviewIndex from "./pages/review/Index";
+import ReviewTestCallStack from "./pages/review/TestCallStack";
+import ReviewTestCallStackFlow from "./pages/review/TestCallStackFlow";
 import ReactFlowBasics from "./pages/explorations/ReactFlowBasics";
 import ThemeSwitchers from "./pages/explorations/ThemeSwitchers";
 import { ThemeProvider } from "./theme/ThemeProvider";
@@ -30,6 +32,8 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/review" element={<ReviewIndex />} />
               <Route path="/review/html" element={<ReviewHtml />} />
+              <Route path="/review/test-call-stack" element={<ReviewTestCallStack />} />
+              <Route path="/review/test-call-stack/flow" element={<ReviewTestCallStackFlow />} />
               <Route path="/explorations" element={<ExplorationsIndex />} />
               <Route path="/explorations/reactflow-basics" element={<ReactFlowBasics />} />
               <Route path="/explorations/module-flow-breadth" element={<ModuleFlowBreadth />} />
