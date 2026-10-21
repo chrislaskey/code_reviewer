@@ -16,6 +16,7 @@ pub mod function_diff;
 pub mod function_source;
 pub mod group_changes;
 pub mod language;
+pub mod markdown_html;
 pub mod model;
 pub mod module_rules;
 pub mod project_index;

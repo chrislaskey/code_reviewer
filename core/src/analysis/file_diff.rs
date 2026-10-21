@@ -5,6 +5,7 @@ use similar::{ChangeTag, TextDiff};
 
 use super::error::AnalysisError;
 use super::function_diff::{DiffLine, DiffLineKind};
+use super::markdown_html::{is_markdown_path, render_new_version_hunks};
 use crate::git::get_file_bytes_at_commit;
 
 /// Lines of unchanged text kept around each change.
@@ -35,6 +36,10 @@ pub struct FileDiff {
     pub is_binary: bool,
     /// Lines left out after `MAX_FILE_DIFF_LINES`.
     pub omitted_line_count: usize,
+    /// True for a Markdown file, which also has `html_hunks`.
+    pub is_markdown: bool,
+    /// The new version of each stretch of changed lines as HTML. Empty unless Markdown.
+    pub html_hunks: Vec<String>,
 }
 
 /// Line by line difference of two texts, keeping only the changes and their context.
@@ -113,12 +118,25 @@ pub fn get_file_diff(
     let omitted_line_count = lines.len().saturating_sub(MAX_FILE_DIFF_LINES);
     lines.truncate(MAX_FILE_DIFF_LINES);
 
+    let is_markdown = target
+        .new_path
+        .as_deref()
+        .or(target.old_path.as_deref())
+        .is_some_and(is_markdown_path);
+    let html_hunks = if is_markdown {
+        render_new_version_hunks(&lines)
+    } else {
+        Vec::new()
+    };
+
     Ok(FileDiff {
         old_path: target.old_path.clone(),
         new_path: target.new_path.clone(),
         lines,
         is_binary,
         omitted_line_count,
+        is_markdown,
+        html_hunks,
     })
 }
 

@@ -305,6 +305,10 @@ export interface FileDiff {
   is_binary: boolean;
   /** Lines left out because the file is very long. */
   omitted_line_count: number;
+  /** True for a Markdown file, which also has `html_hunks`. */
+  is_markdown: boolean;
+  /** The new version of each stretch of changed lines as HTML. Empty unless Markdown. */
+  html_hunks: string[];
 }
 
 /** Mirrors core::analysis::service::GetCallTraceRequest. */

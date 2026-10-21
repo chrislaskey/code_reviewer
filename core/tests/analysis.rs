@@ -622,6 +622,13 @@ mod revisions {
                 (DiffLineKind::Added, "new line"),
             ]
         );
+        assert!(diffs[0].is_markdown);
+        assert_eq!(diffs[0].html_hunks.len(), 1);
+        assert!(diffs[0].html_hunks[0].contains("<h1>Shop</h1>"));
+        assert!(diffs[0].html_hunks[0].contains("new line"));
+        assert!(!diffs[0].html_hunks[0].contains("old line"));
+        assert!(!diffs[2].is_markdown);
+        assert!(diffs[2].html_hunks.is_empty());
         assert_eq!(diffs[1].lines.len(), 1);
         assert_eq!(diffs[1].lines[0].kind, DiffLineKind::Added);
         assert_eq!(diffs[2].lines[0].kind, DiffLineKind::Removed);

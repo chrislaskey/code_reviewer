@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { ChevronRightIcon } from "@heroicons/react/16/solid";
 import type {
   DiffLine,
@@ -13,8 +21,15 @@ import {
   type ChangedFunction,
   type ExampleFile,
 } from "../../explorations/data";
+import { SegmentedControl } from "../../explorations/controls";
 import { useOpenAllState } from "../../explorations/open_all";
 import { CHANGE_STYLES } from "../../explorations/style";
+import {
+  ELIXIR,
+  highlightDiffLines,
+  languageForPath,
+  type SyntaxToken,
+} from "./syntax_highlight";
 
 /*
  * The code under a ledger. A parsed file shows the whole of each changed
@@ -109,7 +124,24 @@ function Gutter({ number }: { number: number | null }) {
   );
 }
 
-function CodeLine({ line }: { line: DiffLine }) {
+function LineText({ line, tokens }: { line: DiffLine; tokens: SyntaxToken[] | null }) {
+  if (!tokens) return <>{line.text}</>;
+  return (
+    <>
+      {tokens.map((token, index) =>
+        token.className ? (
+          <span key={index} className={token.className}>
+            {token.text}
+          </span>
+        ) : (
+          token.text
+        ),
+      )}
+    </>
+  );
+}
+
+function CodeLine({ line, tokens }: { line: DiffLine; tokens: SyntaxToken[] | null }) {
   const style = LINE_STYLES[line.kind];
   return (
     <div className={`flex ${style.row}`}>
@@ -118,7 +150,9 @@ function CodeLine({ line }: { line: DiffLine }) {
       <span className={`w-4 shrink-0 select-none text-center font-bold ${style.signText}`}>
         {style.sign}
       </span>
-      <span className="whitespace-pre pr-4">{line.text}</span>
+      <span className="code-syntax whitespace-pre pr-4">
+        <LineText line={line} tokens={tokens} />
+      </span>
     </div>
   );
 }
@@ -131,7 +165,8 @@ function hasGapBetween(previous: DiffLine | undefined, line: DiffLine): boolean 
   return jumped(previous.old_number, line.old_number) || jumped(previous.new_number, line.new_number);
 }
 
-function CodeLines({ lines }: { lines: DiffLine[] }) {
+function CodeLines({ lines, language }: { lines: DiffLine[]; language: string | null }) {
+  const tokens = useMemo(() => highlightDiffLines(lines, language), [lines, language]);
   return (
     <div className="nodrag nopan overflow-x-auto pb-2 font-mono text-[11px] leading-5">
       <div className="w-max min-w-full">
@@ -140,7 +175,7 @@ function CodeLines({ lines }: { lines: DiffLine[] }) {
             {hasGapBetween(lines[index - 1], line) && (
               <div className="select-none bg-base-content/5 pl-20 text-base-content/35">⋯</div>
             )}
-            <CodeLine line={line} />
+            <CodeLine line={line} tokens={tokens[index]} />
           </div>
         ))}
       </div>
@@ -223,7 +258,7 @@ function FunctionCode({
         <ChevronOpenIcon open={open} />
         <FunctionHeading change={change} diff={diff} />
       </button>
-      {open && <CodeLines lines={diff?.lines ?? []} />}
+      {open && <CodeLines lines={diff?.lines ?? []} language={ELIXIR} />}
     </div>
   );
 }
@@ -258,7 +293,7 @@ function OneBlockCode({
       {open &&
         shown.map((index) => (
           <div key={functionKey(changes[index])} className="border-t border-base-content/10 first:border-t-0">
-            <CodeLines lines={diffs[index]?.lines ?? []} />
+            <CodeLines lines={diffs[index]?.lines ?? []} language={ELIXIR} />
           </div>
         ))}
     </div>
@@ -315,8 +350,47 @@ export function CodeFooter({
 
 /* -- Other files: the changed lines of the text ------------------------------- */
 
-function FileCode({ diff }: { diff: FileDiff }) {
+type MarkdownView = "html" | "raw";
+
+const MARKDOWN_VIEW_OPTIONS: { value: MarkdownView; label: string }[] = [
+  { value: "html", label: "HTML" },
+  { value: "raw", label: "Raw" },
+];
+
+/** Keep a click on a link from navigating the app away. Web links open in a new tab. */
+function openLinkOutsideApp(event: MouseEvent<HTMLElement>) {
+  const link = (event.target as HTMLElement).closest("a");
+  if (!link) return;
+  event.preventDefault();
+  if (/^https?:\/\//i.test(link.href)) window.open(link.href, "_blank", "noopener,noreferrer");
+}
+
+/** The new version of the changed text as HTML. The backend leaves raw HTML out of it. */
+function MarkdownHunks({ hunks }: { hunks: string[] }) {
+  if (hunks.length === 0) {
+    return (
+      <p className="px-3 pb-2 font-mono text-[11px] text-base-content/50">
+        Nothing is left of this text in the new version. Choose Raw to see the removed lines.
+      </p>
+    );
+  }
+  return (
+    <div className="nodrag nopan px-3 pb-2" onClick={openLinkOutsideApp}>
+      {hunks.map((html, index) => (
+        <div key={index}>
+          {index > 0 && <div className="my-2 select-none text-base-content/35">⋯</div>}
+          <div className="markdown-html" dangerouslySetInnerHTML={{ __html: html }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FileCode({ diff, language }: { diff: FileDiff; language: string | null }) {
   const [open, setOpen] = useOpenAllState(false);
+  const [markdownView, setMarkdownView] = useState<MarkdownView>("html");
+  const canShowHtml = diff.is_markdown && !diff.is_binary;
+  const showHtml = canShowHtml && markdownView === "html";
   return (
     <div>
       <button
@@ -328,12 +402,22 @@ function FileCode({ diff }: { diff: FileDiff }) {
         <span className="text-base-content/70">{diff.is_binary ? "Binary file" : "Changed lines"}</span>
         <LineCounts lines={diff.lines} />
       </button>
+      {open && canShowHtml && (
+        <div className="nodrag nopan flex justify-end px-3 pb-2">
+          <SegmentedControl
+            value={markdownView}
+            onChange={setMarkdownView}
+            options={MARKDOWN_VIEW_OPTIONS}
+          />
+        </div>
+      )}
       {open && diff.is_binary && (
         <p className="px-3 pb-2 font-mono text-[11px] text-base-content/50">
           The contents of a binary file are not shown.
         </p>
       )}
-      {open && !diff.is_binary && <CodeLines lines={diff.lines} />}
+      {open && showHtml && <MarkdownHunks hunks={diff.html_hunks} />}
+      {open && !diff.is_binary && !showHtml && <CodeLines lines={diff.lines} language={language} />}
       {open && diff.omitted_line_count > 0 && (
         <p className="px-3 pb-2 font-mono text-[11px] text-base-content/50">
           {diff.omitted_line_count} more lines are not shown.
@@ -361,7 +445,7 @@ export function FileCodeFooter({ file }: { file: ExampleFile }) {
     <FooterFrame>
       <LoadMessage loaded={loaded} />
       {loaded.state === "ready" && loaded.items[0] && (
-        <FileCode diff={loaded.items[0]} />
+        <FileCode diff={loaded.items[0]} language={languageForPath(file.path)} />
       )}
     </FooterFrame>
   );
