@@ -5,26 +5,26 @@
 
 export const CHANGE_STYLES = {
   added: {
-    dot: "bg-emerald-500",
-    text: "text-emerald-600 dark:text-emerald-400",
+    dot: "bg-success",
+    text: "text-success",
     label: "added",
     sign: "+",
   },
   modified: {
-    dot: "bg-amber-400",
-    text: "text-amber-600 dark:text-amber-400",
+    dot: "bg-warning",
+    text: "text-warning",
     label: "modified",
     sign: "~",
   },
   removed: {
-    dot: "bg-rose-500",
-    text: "text-rose-600 dark:text-rose-400",
+    dot: "bg-error",
+    text: "text-error",
     label: "removed",
     sign: "−",
   },
   renamed: {
-    dot: "bg-violet-500",
-    text: "text-violet-600 dark:text-violet-400",
+    dot: "bg-info",
+    text: "text-info",
     label: "renamed",
     sign: "↔",
   },
@@ -37,24 +37,24 @@ export const MARKERS = {
   stale: {
     icon: "hero-exclamation-triangle-micro",
     label: "Still calls a removed or renamed function",
-    className: "text-rose-600 dark:text-rose-400",
+    className: "text-error",
   },
   also_changed: {
     icon: "hero-link-micro",
     label: "Also changed in this review. Click to jump to it.",
-    className: "text-amber-600 dark:text-amber-400",
+    className: "text-warning",
   },
 };
 
 /** The colour of a line or chip. Stale callers stand out; the rest look the same. */
 export const TONE_STYLES = {
   neutral: "border-base-300 bg-base-100",
-  stale: "border-rose-500/60 bg-rose-500/10",
+  stale: "border-error/60 bg-error/10",
 };
 
 export const EDGE_COLORS = {
-  neutral: "#94a3b8",
-  stale: "#f43f5e",
+  neutral: "color-mix(in oklab, var(--color-base-content) 45%, transparent)",
+  stale: "var(--color-error)",
 };
 
 export function plural(count, noun) {

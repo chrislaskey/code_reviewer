@@ -59,10 +59,10 @@
     showGroup: (groupId) => onShowGroup(groupId),
   });
 
-  // The canvas follows the page's theme, which the theme toggle sets on <html>.
+  // The canvas follows the page's theme, which the theme menu sets on <html>.
   /** @returns {"light" | "dark"} */
   function currentColorMode() {
-    return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    return getComputedStyle(document.documentElement).colorScheme === "dark" ? "dark" : "light";
   }
 
   let colorMode = $state(currentColorMode());

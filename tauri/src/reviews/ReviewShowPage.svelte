@@ -145,7 +145,7 @@
   {:else if loading}
     <p class="px-6 py-10 text-sm text-base-content/50">Analyzing the changes…</p>
   {:else if error}
-    <p class="border-b border-base-300 bg-rose-500/10 px-4 py-3 font-mono text-xs text-rose-700 dark:text-rose-300">{error}</p>
+    <p class="border-b border-base-300 bg-error/10 px-4 py-3 font-mono text-xs text-error">{error}</p>
   {:else if result.files.length === 0}
     <p class="px-6 py-10 text-sm text-base-content/50">Nothing changed between the two.</p>
   {:else}

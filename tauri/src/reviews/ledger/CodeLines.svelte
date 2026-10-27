@@ -7,8 +7,8 @@
 
   const LINE_STYLES = {
     context: { row: "", sign: " ", signText: "" },
-    added: { row: "bg-emerald-500/15", sign: "+", signText: "text-emerald-600 dark:text-emerald-400" },
-    removed: { row: "bg-rose-500/15", sign: "−", signText: "text-rose-600 dark:text-rose-400" },
+    added: { row: "bg-success/15", sign: "+", signText: "text-success" },
+    removed: { row: "bg-error/15", sign: "−", signText: "text-error" },
   };
 
   let tokens = $derived(highlightDiffLines(lines, language));

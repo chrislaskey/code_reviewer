@@ -5,6 +5,6 @@
 </script>
 
 <span class={["font-mono text-[11px]", class_]} title="Lines added and removed">
-  <span class="text-emerald-600 dark:text-emerald-400">+{added}</span>
-  <span class="text-rose-600 dark:text-rose-400">−{removed}</span>
+  <span class="text-success">+{added}</span>
+  <span class="text-error">−{removed}</span>
 </span>

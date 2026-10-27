@@ -1,15 +1,15 @@
-<!-- The strip across the top of every page: the app's two features and the
-     theme toggle. `current` names the feature the page belongs to. -->
+<!-- The pill across the top of every page: the app's two features and the
+     theme menu. `current` names the feature the page belongs to. -->
 <script>
-  import ThemeToggle from "./ThemeToggle.svelte";
+  import ThemeMenu from "./ThemeMenu.svelte";
   import { homeUrl, reviewNewUrl, sessionsIndexUrl } from "../routes.js";
 
   /** @type {{ current?: "home" | "reviews" | "sessions" }} */
   let { current = "home" } = $props();
 
   const LINKS = [
-    { id: "reviews", label: "Reviews", href: reviewNewUrl() },
     { id: "sessions", label: "Sessions", href: sessionsIndexUrl() },
+    { id: "reviews", label: "Review", href: reviewNewUrl() },
   ];
 </script>
 
@@ -19,6 +19,6 @@
     <a href={link.href} class:current={current === link.id}>{link.label}</a>
   {/each}
   <div class="ml-auto">
-    <ThemeToggle />
+    <ThemeMenu />
   </div>
 </nav>

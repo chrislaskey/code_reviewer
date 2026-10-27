@@ -46,7 +46,7 @@
   {#if loaded.state === "loading"}
     <p class="px-3 py-2 font-mono text-[11px] text-base-content/50">Loading code…</p>
   {:else if loaded.state === "failed"}
-    <p class="px-3 py-2 font-mono text-[11px] text-rose-700 dark:text-rose-300">{loaded.message}</p>
+    <p class="px-3 py-2 font-mono text-[11px] text-error">{loaded.message}</p>
   {:else}
     <button
       type="button"

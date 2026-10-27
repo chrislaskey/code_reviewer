@@ -1,11 +1,11 @@
 /* The sessions pages. Shared styles are in ../styles.css. */
 
 :root {
-  --git-clean: #2da44e;
-  --git-dirty: #c69026;
-  --git-staged: #2da44e;
-  --git-unstaged: #cf222e;
-  --git-untracked: #a845b5;
+  --git-clean: var(--color-success);
+  --git-dirty: var(--color-warning);
+  --git-staged: var(--color-success);
+  --git-unstaged: var(--color-error);
+  --git-untracked: var(--color-info);
 }
 
 .page.wide {

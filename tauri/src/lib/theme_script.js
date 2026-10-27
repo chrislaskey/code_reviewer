@@ -1,5 +1,5 @@
 // Sets the daisyUI theme on <html> before the first paint and switches it on
-// the `phx:set-theme` events the theme toggle dispatches. The choice is kept
+// the `phx:set-theme` events the theme menu dispatches. The choice is kept
 // in localStorage under `phx:theme`, and "system" follows the OS setting.
 //
 // Not bundled: it has to run before the page paints, so vite.config.js

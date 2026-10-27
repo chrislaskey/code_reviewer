@@ -64,9 +64,14 @@ for each feature) are in Tailwind's base layer, so utility classes in markup
 win over them. Don't give the app's own elements class names daisyUI also
 defines, like `card`, `status`, `label` or `container`.
 
+Each page loads its stylesheet with a `<link>` in its HTML `<head>`, not an
+`import` in its JS entry. In dev, Vite only injects imported CSS once the
+module runs, so the page first paints unstyled and flashes white on every
+navigation.
+
 The theme is chosen by `data-theme` on `<html>`. `src/lib/theme_script.js`
 sets it before the first paint and switches it on the `phx:set-theme` events
-the theme toggle dispatches, keeping the choice in `localStorage`;
+the theme menu dispatches, keeping the choice in `localStorage`;
 `vite.config.js` inlines the script where a page has the
 `<!-- theme-script -->` marker.
 
@@ -80,7 +85,7 @@ src/
   lib/
     backend.js                           every call to the Rust side
     routes.js                            every page's URL and query parameters
-    components/                          Button, Header, Icon, ThemeToggle, ChoiceMenu, MenuChoice and the AppNav strip
+    components/                          Button, Header, Icon, ThemeMenu, ChoiceMenu, MenuChoice and the AppNav strip
     theme.css, theme_script.js           daisyUI themes and the script that applies them
     log.svelte.js, LogList.svelte        the log the sessions pages show
   reviews/

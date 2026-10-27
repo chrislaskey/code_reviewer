@@ -10,7 +10,7 @@
 {#if count > 0}
   <span
     title="{plural(count, 'caller')} still calling a removed or renamed function"
-    class="inline-flex shrink-0 text-rose-600 dark:text-rose-400"
+    class="inline-flex shrink-0 text-error"
   >
     <Icon name="hero-exclamation-triangle-micro" class="size-3.5" />
   </span>

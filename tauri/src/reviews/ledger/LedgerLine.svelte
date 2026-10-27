@@ -48,7 +48,7 @@
     highlighted ? "bg-base-content/10" : "hover:bg-base-content/5",
     faded ? "opacity-25" : "",
     dim ? "text-base-content/60" : "",
-    stale ? "text-rose-700 dark:text-rose-300" : "",
+    stale ? "text-error" : "",
   ]}
 >
   {#if children}

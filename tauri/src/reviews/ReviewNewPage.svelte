@@ -196,7 +196,7 @@
       <Button variant="primary" type="submit" disabled={request === null}>Review changes</Button>
       <p class="text-[11px] text-base-content/50">{describeComparison(form)}</p>
       {#if refsError && form.mode !== "working_tree"}
-        <p class="text-[11px] text-rose-600 dark:text-rose-400">Could not read the branches: {refsError}</p>
+        <p class="text-[11px] text-error">Could not read the branches: {refsError}</p>
       {/if}
     </div>
   </form>

@@ -1,9 +1,9 @@
-/* The daisyUI plugin, the light and dark themes, the dark variant and the
-   font. The themes are the Starter Pack's (its Phoenix app's assets/css/theme.css), so
-   the app looks the same once a web UI joins it. */
+/* The daisyUI plugin with all its themes, the light and dark themes and the
+   font. Light and dark are the Starter Pack's (its Phoenix app's
+   assets/css/theme.css), so the app looks the same once a web UI joins it. */
 
 @plugin "daisyui" {
-  themes: false;
+  themes: all;
 }
 
 @plugin "daisyui/theme" {
@@ -75,9 +75,6 @@
   --depth: 1;
   --noise: 0;
 }
-
-/* Use the data attribute for dark mode  */
-@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
 /* Plus Jakarta Sans, the default sans-serif font, as in the Starter Pack.
    Vendored in src/public/fonts so it works offline, served from /fonts.
