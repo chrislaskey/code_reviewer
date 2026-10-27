@@ -1,0 +1,11 @@
+/* Tailwind and daisyUI with the app's light and dark themes. The app's own
+   styles go in the base layer, so utility classes in markup win over them. */
+
+@import "tailwindcss" source(none);
+@import "./lib/theme.css";
+@source "./";
+
+/* Makes the "hero-#{ICON}" classes the Icon component uses */
+@plugin "../vendor/heroicons.js";
+
+@import "./styles.css" layer(base);

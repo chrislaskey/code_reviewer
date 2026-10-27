@@ -1,0 +1,314 @@
+/* The review pages: a page-wide layout, the dotted canvas background, syntax
+   colours for code and the rendered Markdown of changed documents. */
+
+@theme {
+  /* Syntax colours, from GitHub's light theme. */
+  --syntax-keyword: #cf222e;
+  --syntax-entity: #8250df;
+  --syntax-constant: #0550ae;
+  --syntax-string: #0a3069;
+  --syntax-variable: #953800;
+  --syntax-comment: #6e7781;
+  --syntax-tag: #116329;
+  --syntax-heading: #0550ae;
+  --syntax-list: #735c0f;
+}
+
+[data-theme="dark"] {
+  /* Syntax colours, from GitHub's dark theme. */
+  --syntax-keyword: #ff7b72;
+  --syntax-entity: #d2a8ff;
+  --syntax-constant: #79c0ff;
+  --syntax-string: #a5d6ff;
+  --syntax-variable: #ffa657;
+  --syntax-comment: #8b949e;
+  --syntax-tag: #7ee787;
+  --syntax-heading: #1f6feb;
+  --syntax-list: #f2cc60;
+}
+
+/* The page fills the window: the nav and toolbars stay, the content scrolls. */
+.review-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.review-page .review-content {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.review-page .review-canvas {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* The same dotted grid as the canvas, for the ledger. */
+.dot-grid {
+  background-image: radial-gradient(circle, #91919a 0.5px, transparent 0.5px);
+  background-size: 18px 18px;
+}
+
+/* The canvas: let the page's own colours show through. */
+.svelte-flow {
+  --xy-background-color: transparent;
+  --xy-edge-stroke-default: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  --xy-handle-background-color-default: color-mix(in oklab, var(--color-base-content) 40%, transparent);
+  --xy-handle-border-color-default: var(--color-base-100);
+}
+
+/* Nodes are neither draggable nor selectable, which turns their pointer
+   events off. Our nodes handle their own clicks and hovers. */
+.svelte-flow .svelte-flow__node {
+  pointer-events: all !important;
+}
+
+/* Syntax highlighting for code. The classes come from highlight.js. */
+.code-syntax .hljs-doctag,
+.code-syntax .hljs-keyword,
+.code-syntax .hljs-template-tag,
+.code-syntax .hljs-template-variable,
+.code-syntax .hljs-type,
+.code-syntax .hljs-variable.language_ {
+  color: var(--syntax-keyword);
+}
+
+.code-syntax .hljs-title {
+  color: var(--syntax-entity);
+}
+
+.code-syntax .hljs-attr,
+.code-syntax .hljs-attribute,
+.code-syntax .hljs-literal,
+.code-syntax .hljs-meta,
+.code-syntax .hljs-number,
+.code-syntax .hljs-operator,
+.code-syntax .hljs-variable,
+.code-syntax .hljs-selector-attr,
+.code-syntax .hljs-selector-class,
+.code-syntax .hljs-selector-id {
+  color: var(--syntax-constant);
+}
+
+.code-syntax .hljs-regexp,
+.code-syntax .hljs-string,
+.code-syntax .hljs-meta .hljs-string {
+  color: var(--syntax-string);
+}
+
+.code-syntax .hljs-built_in,
+.code-syntax .hljs-symbol {
+  color: var(--syntax-variable);
+}
+
+.code-syntax .hljs-comment,
+.code-syntax .hljs-code,
+.code-syntax .hljs-formula {
+  color: var(--syntax-comment);
+}
+
+.code-syntax .hljs-name,
+.code-syntax .hljs-quote,
+.code-syntax .hljs-selector-tag,
+.code-syntax .hljs-selector-pseudo {
+  color: var(--syntax-tag);
+}
+
+.code-syntax .hljs-subst,
+.code-syntax .hljs-emphasis,
+.code-syntax .hljs-strong {
+  color: inherit;
+}
+
+.code-syntax .hljs-section {
+  color: var(--syntax-heading);
+  font-weight: bold;
+}
+
+.code-syntax .hljs-bullet {
+  color: var(--syntax-list);
+}
+
+.code-syntax .hljs-emphasis {
+  font-style: italic;
+}
+
+.code-syntax .hljs-strong {
+  font-weight: bold;
+}
+
+/* Rendered Markdown (GitHub flavored). The HTML comes from the backend. */
+.markdown-html {
+  --added-gutter: 2rem;
+  --added-bar-left: 0.5rem;
+  --added-bar-width: 4px;
+  position: relative;
+  padding-left: var(--added-gutter);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.markdown-html > * + * {
+  margin-top: 0.75rem;
+}
+
+/* A block that holds added lines. The backend marks it with `data-added`.
+   The bar is drawn in the gutter, so the content does not move. */
+.markdown-html [data-added] {
+  position: relative;
+}
+
+.markdown-html [data-added]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--added-bar-left) - var(--added-gutter));
+  width: var(--added-bar-width);
+  background: color-mix(in oklab, #10b981 60%, transparent);
+}
+
+.markdown-html li[data-added]::before {
+  left: calc(var(--added-bar-left) - var(--added-gutter) - 1.5rem);
+}
+
+.markdown-html li li[data-added]::before {
+  left: calc(var(--added-bar-left) - var(--added-gutter) - 3rem);
+}
+
+.markdown-html li li li[data-added]::before {
+  left: calc(var(--added-bar-left) - var(--added-gutter) - 4.5rem);
+}
+
+/* A table scrolls sideways and would clip the gutter, so its rows carry the bar. */
+.markdown-html table[data-added]::before,
+.markdown-html tr[data-added]::before {
+  content: none;
+}
+
+.markdown-html table[data-added] tr > :first-child,
+.markdown-html tr[data-added] > :first-child {
+  box-shadow: inset var(--added-bar-width) 0 0 color-mix(in oklab, #10b981 60%, transparent);
+}
+
+.markdown-html h1,
+.markdown-html h2,
+.markdown-html h3,
+.markdown-html h4,
+.markdown-html h5,
+.markdown-html h6 {
+  font-weight: 600;
+  line-height: 1.25;
+  margin-top: 1.25rem;
+  text-transform: none;
+  letter-spacing: normal;
+  color: inherit;
+}
+
+.markdown-html h1 {
+  font-size: 1.6em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid color-mix(in oklab, var(--color-base-content) 15%, transparent);
+}
+
+.markdown-html h2 {
+  font-size: 1.3em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid color-mix(in oklab, var(--color-base-content) 15%, transparent);
+}
+
+.markdown-html h3 {
+  font-size: 1.1em;
+}
+
+.markdown-html a {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.markdown-html ul,
+.markdown-html ol {
+  padding-left: 1.5rem;
+}
+
+.markdown-html ul {
+  list-style: disc;
+}
+
+.markdown-html ol {
+  list-style: decimal;
+}
+
+.markdown-html li + li {
+  margin-top: 0.25rem;
+}
+
+.markdown-html li.task-list-item {
+  list-style: none;
+  margin-left: -1.25rem;
+}
+
+.markdown-html li.task-list-item input {
+  margin-right: 0.4rem;
+}
+
+.markdown-html blockquote {
+  padding-left: 1rem;
+  border-left: 3px solid color-mix(in oklab, var(--color-base-content) 25%, transparent);
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+}
+
+.markdown-html code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--color-base-content) 10%, transparent);
+}
+
+.markdown-html pre {
+  padding: 0.75rem;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--color-base-content) 7%, transparent);
+}
+
+.markdown-html pre code {
+  display: block;
+  overflow-x: auto;
+  padding: 0;
+  background: none;
+}
+
+.markdown-html table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.markdown-html th,
+.markdown-html td {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid color-mix(in oklab, var(--color-base-content) 20%, transparent);
+}
+
+.markdown-html th {
+  font-weight: 600;
+  background: color-mix(in oklab, var(--color-base-content) 6%, transparent);
+}
+
+.markdown-html hr {
+  border-color: color-mix(in oklab, var(--color-base-content) 20%, transparent);
+}
+
+.markdown-html img {
+  max-width: 100%;
+}
+
+.markdown-html del {
+  opacity: 0.7;
+}

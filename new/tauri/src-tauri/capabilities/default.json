@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "The main window: reviews a repository's changes and lists, creates and opens Claude Code sessions in tmux",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "allow-list-branches-and-recent-commits",
+    "allow-analyze-file-changes",
+    "allow-get-function-diffs",
+    "allow-get-file-diffs",
+    "allow-get-session-settings",
+    "allow-list-sessions",
+    "allow-create-session",
+    "allow-show-session-in-terminal-app"
+  ]
+}

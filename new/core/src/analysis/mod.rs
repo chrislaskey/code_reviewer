@@ -1,0 +1,24 @@
+//! Static code analysis: parse source with tree-sitter, index functions and
+//! calls, then answer questions about changed functions and call paths.
+//!
+//! Language support is one `LanguageAnalyzer` per language. Everything else
+//! is shared.
+
+pub mod call_trace;
+pub mod changed_functions;
+mod elixir;
+pub mod error;
+pub mod external_calls;
+pub mod file_changes;
+pub mod file_diff;
+pub mod function_changes;
+pub mod function_diff;
+pub mod function_source;
+pub mod group_changes;
+pub mod language;
+pub mod markdown_html;
+pub mod model;
+pub mod module_rules;
+pub mod project_index;
+pub mod service;
+pub mod test_call_stack;

@@ -1,0 +1,31 @@
+#!/bin/bash
+# Runs every check AGENTS.md asks for, Rust and frontend.
+set -e
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+echo "=== Rust format check ==="
+cargo fmt --all -- --check
+
+echo "=== Rust linter ==="
+cargo clippy --workspace --all-targets -- -D warnings
+
+echo "=== Rust tests ==="
+cargo test --workspace --all-targets
+
+echo "=== Frontend: svelte-check ==="
+(cd tauri && pnpm check)
+
+echo "=== Frontend: build ==="
+(cd tauri && pnpm build)
+
+echo "=== Security audit ==="
+if ! cargo audit --version >/dev/null 2>&1; then
+  echo "Installing cargo-audit..."
+  cargo install cargo-audit
+fi
+cargo audit
+
+echo ""
+echo "All checks passed!"

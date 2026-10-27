@@ -1,19 +1,5 @@
-# Build outputs
-/target
-node_modules
-dist
-dist-ssr
+# Git worktrees kept in the repository root: Claude Code's and other tools'
+/.claude/worktrees/
+/.worktrees/
 
-# Logs
-*.log
-
-# OS
 .DS_Store
-
-# Editor
-.idea
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?

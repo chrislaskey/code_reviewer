@@ -1,0 +1,101 @@
+# Code Reviewer desktop app
+
+A [Tauri](https://tauri.app) app: Rust commands in `src-tauri/`, pages in
+`src/` as a [Svelte](https://svelte.dev) app built with [Vite](https://vite.dev),
+one HTML entry per page. What it does and why it is built this way is in
+`../README.md` and `../docs/decisions.md`.
+
+## Running
+
+Prerequisites: Rust (stable), the Tauri CLI
+(`cargo install tauri-cli --version '^2' --locked`), Xcode command line
+tools, and Node and pnpm (see `.tool-versions`). Install the packages once
+with `pnpm install`.
+
+```sh
+cargo tauri dev        # or ../bin/dev
+```
+
+`cargo tauri dev` starts the Vite dev server on port 1420 (`pnpm dev`) and
+loads the window from it, so changes to `src/` show up without a restart.
+`pnpm check` type-checks the Svelte components, `pnpm build` builds `dist/`,
+and `cargo tauri build` makes the macOS app bundle under
+`../target/release/bundle`.
+
+Logs go to stderr. Set `RUST_LOG=code_reviewer_lib=debug` for more.
+
+## Pages
+
+| Page | Mounts | Does |
+| --- | --- | --- |
+| `src/index.html` | `HomePage.svelte` | Links to the two features |
+| `src/reviews/new.html` | `reviews/ReviewNewPage.svelte` | The form: repository, what to compare, rules, groups |
+| `src/reviews/show.html` | `reviews/ReviewShowPage.svelte` | Runs the comparison in the URL and shows the Node and Ledger views |
+| `src/sessions/index.html` | `sessions/SessionsIndexPage.svelte` | The tmux and Claude Code sessions, refreshed every 5 seconds |
+| `src/sessions/new.html` | `sessions/SessionNewPage.svelte` | Creates a session and opens it in the terminal app |
+
+Pages link to each other by path (`/reviews/new.html`), which works on the
+dev server and in the bundled app alike. The review request travels to the
+show page as JSON in the `request` query parameter.
+
+## How the pages talk to Rust
+
+Every call goes through `src/lib/backend.js`, one function per Tauri
+command, with the request and response shapes of the `core` crate. Nothing
+else imports `@tauri-apps/api`. The commands are in `src-tauri/src/lib.rs`
+(sessions) and `src-tauri/src/review.rs` (reviews), listed in
+`src-tauri/build.rs` so each gets an `allow-*` permission, which
+`src-tauri/capabilities/default.json` grants to the main window.
+
+## Styling
+
+`src/app.css` runs Tailwind v4 with daisyUI and the Starter Pack's light and
+dark themes (`src/lib/theme.css`), and makes the `hero-*` icon classes from
+the `heroicons` npm package (`vendor/heroicons.js`). The app's own styles
+(`src/styles.css`, and `src/reviews/styles.css`, `src/sessions/styles.css`
+for each feature) are in Tailwind's base layer, so utility classes in markup
+win over them. Don't give the app's own elements class names daisyUI also
+defines, like `card`, `status`, `label` or `container`.
+
+The theme is chosen by `data-theme` on `<html>`. `src/lib/theme_script.js`
+sets it before the first paint and switches it on the `phx:set-theme` events
+the theme toggle dispatches, keeping the choice in `localStorage`;
+`vite.config.js` inlines the script where a page has the
+`<!-- theme-script -->` marker.
+
+## Layout
+
+```
+src/
+  index.html, main.js, HomePage.svelte   the home page
+  app.css, styles.css                    Tailwind with the theme, and the app's own styles
+  lib/
+    backend.js                           every call to the Rust side
+    components/                          Button, Header, Icon, ThemeToggle and the AppNav strip
+    theme.css, theme_script.js           daisyUI themes and the script that applies them
+    log.svelte.js, LogList.svelte        the log the sessions pages show
+  reviews/
+    new.html, new.js, ReviewNewPage.svelte
+    show.html, show.js, ReviewShowPage.svelte
+    review_form.js                       the form, its storage and the request it builds
+    view_model.js                        the backend's files and group rows as the views draw them
+    change_styles.js                     colours and markers: what changed, what is risky
+    nodes/                               the Node view: SvelteFlow canvas, group card and link chip nodes, layout
+    ledger/                              the Ledger view: ledgers, lines, code footers, syntax colours
+  sessions/
+    index.html, index.js, SessionsIndexPage.svelte
+    new.html, new.js, SessionNewPage.svelte
+    TmuxSession.svelte, TmuxPane.svelte, ClaudeCodeSession.svelte, ...
+vite.config.js                           the pages, Tailwind, the theme script and the dev server port
+vendor/heroicons.js                      the Tailwind plugin making the hero-* icon classes
+src-tauri/
+  src/lib.rs                             the app: state, the sessions commands
+  src/review.rs                          the review commands around the core crate
+  src/sessions.rs                        detects the settings, lists, creates and shows sessions
+  src/tmux.rs, terminal_app.rs, process.rs, claude_code.rs, git.rs
+                                         runs tmux, controls terminal apps, lists processes, reads
+                                         Claude Code's session statuses and a directory's git status
+  Info.plist                             merged into the app bundle's Info.plist
+  capabilities/                          which window may call which command
+  tauri.conf.json                        the Tauri configuration
+```

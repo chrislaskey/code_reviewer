@@ -1,0 +1,11 @@
+#!/bin/bash
+# Starts the desktop app in dev mode: Vite on port 1420, then the Tauri window.
+set -e
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT/tauri"
+
+if [ ! -d node_modules ]; then
+  pnpm install
+fi
+cargo tauri dev "$@"
