@@ -2,7 +2,7 @@
 
 A macOS desktop app with two features:
 
-* **Reviews**: what a change did in an Elixir repository, function by
+* **Reviews**: what a change did in an Elixir or Rust repository, function by
   function, file by file and group by group. Pick a repository and what to
   compare (uncommitted changes, one commit, or a branch against another), then
   read it on a canvas of groups and files, or as ledgers of functions, calls,

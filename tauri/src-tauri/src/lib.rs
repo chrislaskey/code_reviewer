@@ -1,7 +1,7 @@
 //! The Code Reviewer desktop app: a Tauri shell with two features.
 //!
-//!   * Reviews (`review`): what a git comparison changed in an Elixir
-//!     repository, function by function, file by file and group by group,
+//!   * Reviews (`review`): what a git comparison changed in an Elixir or
+//!     Rust repository, function by function, file by file and group by group,
 //!     computed by the `code_reviewer_core` crate.
 //!   * Sessions (`sessions`): the tmux sessions the app started, named
 //!     `cr-<name>`, with the Claude Code status in each, and its git

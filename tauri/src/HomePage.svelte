@@ -18,7 +18,7 @@
   <section>
     <h2>Reviews</h2>
     <p><a href={reviewNewUrl()}>Review the changes of a repository →</a></p>
-    <p class="muted">Pick a git repository with Elixir code and what to compare: uncommitted changes, one commit, or one branch against another.</p>
+    <p class="muted">Pick a git repository with Elixir or Rust code and what to compare: uncommitted changes, one commit, or one branch against another.</p>
   </section>
 
   <section>

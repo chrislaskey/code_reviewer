@@ -1,6 +1,7 @@
 use super::elixir::ElixirAnalyzer;
 use super::error::AnalysisError;
 use super::model::FileSymbols;
+use super::rust::RustAnalyzer;
 
 /// Extracts functions and calls from source files of one language.
 ///
@@ -16,7 +17,8 @@ pub trait LanguageAnalyzer: Send + Sync {
 }
 
 static ELIXIR_ANALYZER: ElixirAnalyzer = ElixirAnalyzer;
-static ANALYZERS: &[&dyn LanguageAnalyzer] = &[&ELIXIR_ANALYZER];
+static RUST_ANALYZER: RustAnalyzer = RustAnalyzer;
+static ANALYZERS: &[&dyn LanguageAnalyzer] = &[&ELIXIR_ANALYZER, &RUST_ANALYZER];
 
 /// Finds the analyzer for a file path by its extension.
 pub fn find_analyzer_for_path(file_path: &str) -> Option<&'static dyn LanguageAnalyzer> {

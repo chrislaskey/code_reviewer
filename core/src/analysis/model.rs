@@ -31,6 +31,8 @@ impl fmt::Display for FunctionId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FunctionKind {
+    /// A Rust `fn`: free, associated, a method or a trait default method.
+    Fn,
     Def,
     Defp,
     Defmacro,
@@ -38,7 +40,7 @@ pub enum FunctionKind {
     Defguard,
     Defguardp,
     Defdelegate,
-    /// An ExUnit `test` block, modeled as a zero-arity function.
+    /// An ExUnit `test` block or a Rust `#[test]` function, modeled as a zero-arity function.
     Test,
 }
 
@@ -123,6 +125,15 @@ impl ImportDirective {
 /// A call as written in source, before it is matched to a definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RawCallTarget {
+    /// A call the source does not pin to one definition, such as a Rust
+    /// `value.method(args)` whose receiver type is unknown. It resolves only
+    /// when exactly one function of that name (and arity, when known) is
+    /// defined in `modules`, or anywhere in the project when `modules` is empty.
+    ByName {
+        modules: Vec<String>,
+        name: String,
+        arity: Option<usize>,
+    },
     /// `Module.function(args)` with the module name already alias-resolved.
     Remote {
         module: String,

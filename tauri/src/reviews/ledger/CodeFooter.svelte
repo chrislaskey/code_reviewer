@@ -8,10 +8,10 @@
   import { plural } from "../change_styles.js";
   import CodeLines from "./CodeLines.svelte";
   import { followOpenAllCommand } from "./open_all.svelte.js";
-  import { ELIXIR } from "./syntax_highlight.js";
+  import { languageForPath } from "./syntax_highlight.js";
 
-  /** @type {{ functions: any[], hoveredKey: string | null }} */
-  let { functions, hoveredKey } = $props();
+  /** @type {{ path: string, functions: any[], hoveredKey: string | null }} */
+  let { path, functions, hoveredKey } = $props();
 
   const loaders = getContext("review-code");
 
@@ -39,6 +39,7 @@
   let previewing = $derived(hoveredIndex >= 0);
   let open = $derived(pinned.open || previewing);
   let shown = $derived(previewing ? [hoveredIndex] : functions.map((_, index) => index));
+  let language = $derived(languageForPath(path));
 </script>
 
 <div class="border-t border-base-content/10">
@@ -59,7 +60,7 @@
     {#if open}
       {#each shown as index (index)}
         <div class="border-t border-base-content/10 first:border-t-0">
-          <CodeLines lines={loaded.items[index]?.lines ?? []} language={ELIXIR} />
+          <CodeLines lines={loaded.items[index]?.lines ?? []} {language} />
         </div>
       {/each}
     {/if}

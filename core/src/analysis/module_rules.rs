@@ -10,6 +10,9 @@ use super::model::FunctionId;
 /// - `Shop.Orders.place/2` matches one arity.
 /// - `Shop*` matches anything that starts with `Shop`, so `ShopWeb` and `ShopTest` too.
 ///
+/// Rust paths work the same with `::`: `app::git` matches `app::git` and
+/// `app::git::Repo`, and `app::git::run` or `app::git.run` names the function.
+///
 /// Ignoring wins over including.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModuleRules {
@@ -44,14 +47,24 @@ fn matches_any(patterns: &[String], function: &FunctionId) -> bool {
 fn matches_pattern(pattern: &str, function: &FunctionId) -> bool {
     let module_and_name = format!("{}.{}", function.module, function.name);
     let full_name = format!("{module_and_name}/{}", function.arity);
+    let path_and_name = format!("{}::{}", function.module, function.name);
+    let full_path = format!("{path_and_name}/{}", function.arity);
 
     if let Some(prefix) = pattern.strip_suffix('*') {
-        return full_name.starts_with(prefix);
+        return full_name.starts_with(prefix) || full_path.starts_with(prefix);
     }
-    function.module == pattern
-        || function.module.starts_with(&format!("{pattern}."))
+    is_module_or_child(&function.module, pattern)
         || module_and_name == pattern
         || full_name == pattern
+        || path_and_name == pattern
+        || full_path == pattern
+}
+
+/// `Shop` covers `Shop.Orders`, and `app::git` covers `app::git::Repo`.
+fn is_module_or_child(module: &str, pattern: &str) -> bool {
+    module
+        .strip_prefix(pattern)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('.') || rest.starts_with("::"))
 }
 
 #[cfg(test)]
@@ -97,6 +110,18 @@ mod tests {
         assert!(!rules.is_ignored(&function("Enum", "map", 2)));
         assert!(rules.is_ignored(&function("Map", "get", 3)));
         assert!(!rules.is_ignored(&function("Map", "get", 2)));
+    }
+
+    #[test]
+    fn test_rust_paths_match_with_double_colons() {
+        let rules = rules(&["app::git"], &["app::git::Repo::open/1", "app::util.log"]);
+
+        assert!(rules.is_included(&function("app::git", "run", 2)));
+        assert!(rules.is_included(&function("app::git::Repo", "open", 1)));
+        assert!(!rules.is_included(&function("app::github", "run", 2)));
+        assert!(rules.is_ignored(&function("app::git::Repo", "open", 1)));
+        assert!(!rules.is_ignored(&function("app::git::Repo", "open", 2)));
+        assert!(rules.is_ignored(&function("app::util", "log", 3)));
     }
 
     #[test]

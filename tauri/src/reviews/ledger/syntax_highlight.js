@@ -45,9 +45,6 @@ for (const [name, definition] of Object.entries(LANGUAGES)) {
   hljs.registerLanguage(name, definition);
 }
 
-/** The language of the code in functions of a parsed file. */
-export const ELIXIR = "elixir";
-
 const LANGUAGE_BY_EXTENSION = {
   ex: "elixir",
   exs: "elixir",

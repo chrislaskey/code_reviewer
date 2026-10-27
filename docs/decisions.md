@@ -143,7 +143,7 @@ nodes did with a React context. The canvas pans on scroll and zooms with
 **Decision:** one layout, the prototype's default: one block per file holding
 the code of every changed function, closed at first. Hovering a function in
 the ledger shows only its code; a click keeps it open. Files that were not
-parsed (anything but Elixir with changed functions) show their changed lines
+parsed (anything but Elixir or Rust with changed functions) show their changed lines
 with context, and Markdown files can switch between the rendered HTML the
 backend produces and the raw lines, as before.
 
@@ -296,7 +296,57 @@ sessions. The menu itself became shared with Complete: `ChoiceMenu` (the
 button, the caret, closing) and `MenuChoice` (a label, a sentence, a link
 or a button) in `src/lib/components`.
 
-## 15. Left out on purpose
+## 15. Rust files, read the same way as Elixir
+
+Reviews of this app itself need its Rust read as Elixir is: functions by
+file, calls out, callers in, tests. **Decision:** a second `LanguageAnalyzer`
+on the tree-sitter-rust grammar (`core/src/analysis/rust.rs`), with the
+shared index, changes, diffs and call links untouched apart from two
+additions. Everything after parsing is still language independent.
+
+What a Rust function is called: the file's module path from the Cargo
+layout (`core/src/git.rs` is `core::git`, `src/lib.rs` is `crate`, a
+nested `mod tests` is `core::git::tests`), plus the type for methods
+(`core::git::Repo.open/1`). The arity leaves out `self`, so it is the number
+of arguments a call writes. A one-function `impl` block (`impl From<A> for
+B`, `impl Display for B`) is read as that function with its header; a type
+with several such impls merges them into one function with several clause
+ranges, as Elixir clauses are. `#[test]` functions are tests. Doc comments
+and attributes directly above a function belong to it.
+
+How calls are matched, without a type checker:
+
+- Paths follow `use` declarations, `crate`, `super`, `self`, `Self` and the
+  file's own items: `Billing::charge(x)` and `self.total()` name one module.
+  `use super::*` in a test module makes an unknown `Foo` any `Foo` of the
+  globbed modules. These resolve only against functions the project
+  defines (`RawCallTarget::ByName`, new), so a derived or standard method
+  reached through a project type (`Foo::default()`) is dropped, not shown
+  as an outside call.
+- A method call on any other value (`order.total()`) is matched by name
+  and arity alone, and only when the project defines exactly one such
+  function. Names the standard library uses everywhere (`get`, `push`,
+  `len`, `iter`, ...) are never matched this way.
+- Paths outside the crate (`std::fs::read_to_string`, `serde_json::from_str`)
+  are calls outside the project, dimmed or hidden as Elixir dependencies
+  are. A path into another workspace crate uses the package name
+  (`code_reviewer_core::git`) while the index names the crate by its
+  directory (`core::git`); the resolver accepts a module that ends the same
+  way after the first segment when there is exactly one (the second shared
+  addition).
+- Arguments of macros (`assert_eq!`, `format!`, `vec!`) are parsed again as
+  expressions, in place, so calls inside them are found with their lines.
+- `Self::helper` or `Type::helper` passed as a value (to `map`) is a call
+  with unknown arity. A bare `helper` passed as a value is not: it cannot
+  be told from a variable.
+
+Module rules accept `::` paths as well as `.` ones: `core::git` covers
+`core::git::Repo`, and `core::git::run_git` or `core::git.run_git` names
+the function. Function labels keep the tool's `Module.name/arity` form for
+both languages. The ledger highlights function code in the file's language
+instead of always Elixir.
+
+## 16. Left out on purpose
 
 Each of these existed in a prototype or the template and was dropped from
 the MVP. See `docs/suggestions/` for the list to bring back from.
@@ -312,13 +362,13 @@ the MVP. See `docs/suggestions/` for the list to bring back from.
 - Opening links from rendered Markdown in the browser (clicking one does
   nothing).
 
-## 16. Verification
+## 17. Verification
 
 `bin/check` runs what `AGENTS.md` asks for: `cargo fmt --check`, `cargo
 clippy --workspace --all-targets -D warnings`, `cargo test --workspace`,
 `cargo audit`, plus `pnpm check` (svelte-check) and `pnpm build`.
 
-## 17. What was verified
+## 18. What was verified
 
 On 2026-10-27, with `bin/check` passing (fmt, clippy, 126 Rust tests,
 svelte-check, Vite build, cargo audit with two allowed unmaintained-crate
@@ -361,6 +411,16 @@ warnings from Tauri's dependency tree):
   to `analyze_file_changes`, Edit review opened the form filled in from it,
   and a flat link (with repeated `group_include` parameters) against the
   real core on a test repository showed its groups and files.
+- After decision 15: `bin/check` passing (154 Rust tests, the new
+  ones in `core/src/analysis/rust.rs` and `core/tests/rust_analysis.rs`).
+  Indexing this repository found 562 functions in 43 Rust files, 154 of
+  them tests, with 968 calls resolved to project functions and 247 outside
+  it, including a Tauri command's call into `core` through the package
+  name. The show page was driven in headless Chrome on the worktree's own
+  uncommitted changes with `invoke` bridged to the real core: the Rust files
+  were parsed, the ledger listed `name/arity` functions with their outputs
+  and callers across files, and the code footer showed doc comments,
+  attributes and Rust syntax colours.
 - Not exercised: creating a session and opening one in the terminal app
   (both would open windows on the Mac the tests ran on). The code paths are
   the Starter Pack's, unchanged apart from where the settings come from.

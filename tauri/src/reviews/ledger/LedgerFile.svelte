@@ -150,7 +150,7 @@
     {#if file.plain}
       <FileCodeFooter {file} />
     {:else}
-      <CodeFooter functions={file.functions} hoveredKey={hovered} />
+      <CodeFooter path={file.path} functions={file.functions} hoveredKey={hovered} />
     {/if}
   {/if}
 </div>

@@ -23,3 +23,24 @@ Ideas and prototype features not in the rewrite. None are planned.
 - Open links in rendered Markdown in the browser. Tauri's opener plugin
   would do it; clicking a link does nothing now.
 - Remember recent repositories on the new review page.
+
+## Rust analysis
+
+- Name crates by their Cargo package name instead of their directory, read
+  from each `Cargo.toml`, so a path into another workspace crate matches
+  exactly rather than by its tail (`find_function_in_other_crate`).
+- Resolve method calls on values by type where the source makes it plain:
+  a `let x = Foo::new()` or a `x: &Foo` parameter in the same function, so
+  `x.total()` names `Foo.total` without the unique-name rule.
+- Calls written as `Type::method(&value, args)` (UFCS) have one argument
+  more than the method's arity and do not match; count the receiver when
+  the path names a method.
+- Record macro invocations (`my_macro!()`) as calls to a project macro, and
+  functions that `macro_rules!` or derive macros generate.
+- Show the `impl` header (trait and type) of a method in the ledger, since
+  `from/1` alone does not say which `From` it is.
+- Link trait method calls to every implementation when the receiver's type
+  is a `dyn Trait` or generic bound, instead of dropping them as ambiguous.
+- Title a Rust file's ledger card by the file's module (`core::analysis::rust`)
+  instead of the module of its first changed function, which is the type of
+  the first changed method (`core::analysis::rust::RustAnalyzer`).

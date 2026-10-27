@@ -97,6 +97,7 @@ pub struct ProjectIndex {
     files: BTreeMap<String, IndexedFile>,
     functions: BTreeMap<FunctionId, FunctionDefinition>,
     functions_by_module_and_name: HashMap<(String, String), Vec<FunctionId>>,
+    functions_by_name: HashMap<String, Vec<FunctionId>>,
     outgoing_calls: HashMap<FunctionId, Vec<CallEdge>>,
     incoming_calls: HashMap<FunctionId, Vec<CallEdge>>,
     skipped_files: Vec<SkippedFile>,
@@ -202,6 +203,10 @@ impl ProjectIndex {
                     .entry((function.id.module.clone(), function.id.name.clone()))
                     .or_default()
                     .push(function.id.clone());
+                self.functions_by_name
+                    .entry(function.id.name.clone())
+                    .or_default()
+                    .push(function.id.clone());
                 self.functions.insert(function.id.clone(), function.clone());
             }
         }
@@ -236,17 +241,30 @@ impl ProjectIndex {
     }
 
     /// Returns the callee and whether the project defines it. Local calls
-    /// that match nothing (`if`, `Kernel` functions, `use` injections) are dropped.
+    /// that match nothing (`if`, `Kernel` functions, `use` injections) are
+    /// dropped, as are by-name calls that match nothing or more than one function.
     fn resolve_call_target(&self, target: &RawCallTarget) -> Option<(FunctionId, bool)> {
         match target {
+            RawCallTarget::ByName {
+                modules,
+                name,
+                arity,
+            } => self
+                .find_only_function_named(modules, name, *arity)
+                .map(|id| (id, true)),
             RawCallTarget::Remote {
                 module,
                 name,
                 arity,
-            } => Some(match self.find_defined_function(module, name, *arity) {
-                Some(id) => (id, true),
-                None => (FunctionId::new(module, name, *arity), false),
-            }),
+            } => Some(
+                match self
+                    .find_defined_function(module, name, *arity)
+                    .or_else(|| self.find_function_in_other_crate(module, name, *arity))
+                {
+                    Some(id) => (id, true),
+                    None => (FunctionId::new(module, name, *arity), false),
+                },
+            ),
             RawCallTarget::Local {
                 module,
                 name,
@@ -265,6 +283,58 @@ impl ProjectIndex {
                     .map(|id| (id, true))
             }
         }
+    }
+
+    /// A Rust path names another workspace crate by its package name
+    /// (`code_reviewer_core::git`), while the index names the crate by its
+    /// directory (`core::git`). Matches the path after the crate when exactly
+    /// one indexed module ends the same way.
+    fn find_function_in_other_crate(
+        &self,
+        module: &str,
+        name: &str,
+        arity: usize,
+    ) -> Option<FunctionId> {
+        let (_, path_in_crate) = module.split_once("::")?;
+        let suffix = format!("::{path_in_crate}");
+        let mut candidates = self
+            .functions_by_name
+            .get(name)
+            .map_or(&[][..], Vec::as_slice)
+            .iter()
+            .filter(|id| id.module.ends_with(&suffix))
+            .filter(|id| {
+                self.functions
+                    .get(id)
+                    .is_some_and(|function| function.accepts_arity(arity))
+            });
+        let only = candidates.next()?;
+        candidates.next().is_none().then(|| only.clone())
+    }
+
+    /// The one function called `name` in `modules` (anywhere when empty) that
+    /// takes `arity` arguments, or `None` when there is none or more than one.
+    fn find_only_function_named(
+        &self,
+        modules: &[String],
+        name: &str,
+        arity: Option<usize>,
+    ) -> Option<FunctionId> {
+        let mut candidates = self
+            .functions_by_name
+            .get(name)
+            .map_or(&[][..], Vec::as_slice)
+            .iter()
+            .filter(|id| modules.is_empty() || modules.contains(&id.module))
+            .filter(|id| {
+                arity.is_none_or(|arity| {
+                    self.functions
+                        .get(id)
+                        .is_some_and(|function| function.accepts_arity(arity))
+                })
+            });
+        let only = candidates.next()?;
+        candidates.next().is_none().then(|| only.clone())
     }
 
     fn find_defined_function(&self, module: &str, name: &str, arity: usize) -> Option<FunctionId> {

@@ -90,7 +90,7 @@
   <Header>
     New review
     {#snippet subtitle()}
-      A git repository with Elixir code, and what to compare.
+      A git repository with Elixir or Rust code, and what to compare.
     {/snippet}
   </Header>
 
@@ -98,7 +98,7 @@
     <div class="flex flex-wrap items-end gap-3">
       <label class="flex min-w-72 flex-1 flex-col gap-1 text-[11px] text-base-content/60">
         Repository path
-        <input bind:value={form.repoPath} placeholder="/path/to/elixir/project" spellcheck="false" class={FIELD_CLASS} />
+        <input bind:value={form.repoPath} placeholder="/path/to/project" spellcheck="false" class={FIELD_CLASS} />
       </label>
       <SegmentedControl value={form.mode} options={COMPARE_MODE_OPTIONS} onchange={(mode) => (form.mode = mode)} />
     </div>
