@@ -35,17 +35,20 @@ export function getSessionSettings() {
   return invoke("get_session_settings");
 }
 
-/** The tmux sessions with what runs in each pane, and the Claude Code sessions. */
+/** The tmux sessions this app started (named with its prefix), each with its Claude Code status. */
 export function listSessions() {
   return invoke("list_sessions");
 }
 
-/** Creates a tmux session running `command` in `directory` and opens it in the terminal app. */
-export function createSession({ name, directory, command }) {
-  return invoke("create_session", { name, directory, command });
+/**
+ * Creates a git worktree of `repository` on a branch named `name` and a tmux session named `<prefix>-<name>` in it
+ * running `command`, and opens it in the terminal app.
+ */
+export function createSession({ name, repository, command }) {
+  return invoke("create_session", { name, repository, command });
 }
 
-/** Brings a tmux session's terminal window to the front, or opens one. */
+/** Brings the terminal window of one of the app's sessions to the front, or opens one. `name` includes the prefix. */
 export function showSessionInTerminalApp(name) {
   return invoke("show_session_in_terminal_app", { name });
 }

@@ -3,14 +3,16 @@
 //!   * Reviews (`review`): what a git comparison changed in an Elixir
 //!     repository, function by function, file by file and group by group,
 //!     computed by the `code_reviewer_core` crate.
-//!   * Sessions (`sessions`): the user's tmux sessions and Claude Code
-//!     sessions, with new sessions opened in their terminal app.
+//!   * Sessions (`sessions`): the tmux sessions the app started, named
+//!     `cr-<name>`, with the Claude Code status in each. A new session is a
+//!     git worktree of a repository with a tmux session in it, opened in
+//!     the user's terminal app.
 //!
 //! The pages are in `../src`, one HTML entry per page. They call the
 //! commands below through `src/lib/backend.js` and nothing else.
 
 mod claude_code;
-mod git;
+mod git_worktree;
 mod process;
 mod review;
 mod sessions;
@@ -23,7 +25,7 @@ use code_reviewer_core::analysis::service::AnalysisService;
 use tauri::{Manager, State};
 use tokio::sync::OnceCell;
 
-use sessions::{DetectedSettings, SessionList};
+use sessions::{DetectedSettings, SessionStatus};
 use terminal_app::ShowOutcome;
 
 /// What the commands share, managed by Tauri.
@@ -77,27 +79,29 @@ async fn get_session_settings(state: State<'_, AppState>) -> Result<DetectedSett
     Ok(state.session_settings().await.clone())
 }
 
-/// The tmux sessions with what runs in each pane, and the Claude Code sessions.
+/// The tmux sessions the app started, each with its Claude Code status.
 #[tauri::command]
-async fn list_sessions(state: State<'_, AppState>) -> Result<SessionList, String> {
+async fn list_sessions(state: State<'_, AppState>) -> Result<Vec<SessionStatus>, String> {
     let settings = state.session_settings().await;
-    sessions::list_sessions(&settings.settings.tmux_path).await
+    sessions::list_sessions(&settings.settings).await
 }
 
-/// Creates a tmux session in `directory`, types `command` into it and opens
-/// it in the terminal app.
+/// Creates a git worktree of `repository` on a branch named `name` and a
+/// tmux session named `<prefix>-<name>` in it, types `command` into it and
+/// opens it in the terminal app.
 #[tauri::command]
 async fn create_session(
     state: State<'_, AppState>,
     name: String,
-    directory: String,
+    repository: String,
     command: String,
 ) -> Result<ShowOutcome, String> {
     let settings = state.session_settings().await;
-    sessions::create_session(&settings.settings, &name, &directory, &command).await
+    sessions::create_session(&settings.settings, &name, &repository, &command).await
 }
 
-/// Brings a tmux session's terminal window to the front, or opens one.
+/// Brings the terminal window of one of the app's sessions to the front, or
+/// opens one. `name` is the full session name, prefix included.
 #[tauri::command]
 async fn show_session_in_terminal_app(
     state: State<'_, AppState>,

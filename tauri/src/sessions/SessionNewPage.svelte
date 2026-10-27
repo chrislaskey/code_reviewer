@@ -1,5 +1,6 @@
-<!-- The new session page: creates a tmux session running a command in a
-     directory and opens it in the terminal app, then returns to the list. -->
+<!-- The new session page: creates a git worktree of a repository and a tmux
+     session named with the app's prefix in it, running a command, opens it in
+     the terminal app and returns to the list. -->
 <script>
   import { onMount } from "svelte";
   import AppNav from "../lib/components/AppNav.svelte";
@@ -9,15 +10,16 @@
   import { log } from "../lib/log.svelte.js";
   import LogList from "../lib/LogList.svelte";
 
-  let newSession = $state({ name: "claude", directory: "", command: "claude" });
+  let newSession = $state({ name: "", repository: "", command: "claude" });
   let creating = $state(false);
+  let prefix = $state("");
 
   async function submit(event) {
     event.preventDefault();
     const name = newSession.name.trim();
     creating = true;
     try {
-      await createSession({ name, directory: newSession.directory, command: newSession.command });
+      await createSession({ name, repository: newSession.repository, command: newSession.command });
       window.location.href = "/sessions/index.html";
     } catch (error) {
       log(`Creating ${name} failed: ${error}`);
@@ -28,7 +30,8 @@
   onMount(() => {
     getSessionSettings()
       .then((detected) => {
-        if (newSession.directory === "") newSession.directory = detected.directory;
+        prefix = detected.settings.session_name_prefix;
+        if (newSession.repository === "") newSession.repository = detected.directory;
       })
       .catch((error) => log(`Detecting the settings failed: ${error}`));
   });
@@ -41,18 +44,22 @@
   <Header>
     New session
     {#snippet subtitle()}
-      A tmux session running your shell in a directory, with a command typed into it, opened in your terminal app.
+      A git worktree of a repository on a branch named after the session, with a tmux session named {prefix}-… running
+      your shell in it and a command typed in, opened in your terminal app.
     {/snippet}
   </Header>
 
   <form class="panel new-session" onsubmit={submit}>
     <label>
       Name
-      <input bind:value={newSession.name} required spellcheck="false" />
+      <span class="prefixed-input">
+        <span class="prefix" title="Sessions started here are named with this prefix">{prefix}-</span>
+        <input bind:value={newSession.name} required spellcheck="false" placeholder="fix-login" />
+      </span>
     </label>
     <label class="directory-field">
-      Directory
-      <input bind:value={newSession.directory} required spellcheck="false" placeholder="Detecting…" />
+      Repository
+      <input bind:value={newSession.repository} required spellcheck="false" placeholder="Detecting…" />
     </label>
     <label>
       Command
@@ -61,7 +68,10 @@
     <Button variant="primary" type="submit" disabled={creating}>{creating ? "Creating…" : "Create and open"}</Button>
   </form>
   <p class="muted hint">
-    A leading <code>~</code> in the directory is your home directory. Leave the command empty for a shell at a prompt.
+    The worktree goes in the repository's <code>.worktrees/&lt;name&gt;</code> directory, on a new branch from the
+    repository's current commit, or on the existing branch of that name. The prefix tells the sessions list which tmux
+    sessions were started here. A leading <code>~</code> is your home directory. Leave the command empty for a shell at
+    a prompt.
   </p>
 
   <LogList />

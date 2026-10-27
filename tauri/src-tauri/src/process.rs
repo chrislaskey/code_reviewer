@@ -1,12 +1,9 @@
-//! Lists the processes on the machine with `ps`, to tell what runs in a tmux
-//! pane.
+//! Lists the processes on the machine with `ps`, to tell whether Claude
+//! Code runs in a tmux pane and whether a Claude Code session's process is
+//! still alive.
 
 use serde::Serialize;
 use tokio::process::Command;
-
-/// Programs that mean a pane is sitting at a prompt when they are in the
-/// foreground.
-const SHELLS: [&str; 8] = ["sh", "bash", "zsh", "fish", "dash", "ksh", "tcsh", "nu"];
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Process {
@@ -46,10 +43,6 @@ pub enum ProcessState {
 }
 
 impl Process {
-    pub fn is_shell(&self) -> bool {
-        SHELLS.contains(&self.name.as_str())
-    }
-
     pub fn is_claude_code(&self) -> bool {
         self.name == "claude"
     }
@@ -146,7 +139,7 @@ mod tests {
         let shell = parse_process("45380 45306 45380 96377 ttys008  Ss     0.0 -zsh")
             .expect("the line parses");
         assert_eq!(shell.name, "zsh");
-        assert!(shell.is_shell());
+        assert!(!shell.is_claude_code());
         assert!(!shell.in_foreground);
 
         let daemon = parse_process("  1     0     1     0 ??       Ss     0.3 /sbin/launchd")

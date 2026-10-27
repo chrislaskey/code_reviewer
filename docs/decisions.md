@@ -156,7 +156,57 @@ actually bites.
 The template's list and create were on one page; they are now
 `sessions/index.html` and `sessions/new.html`, following index/new.
 
-## 10. Left out on purpose
+## 10. Sessions: only the app's own, by name prefix
+
+The template listed every tmux session on the user's server, window by
+window and pane by pane, with the processes and git status of each pane, and
+every running Claude Code session underneath. For this app the question is
+narrower: which review sessions did it start, and is Claude Code busy or
+idle in each. **Decision:** every session the app creates is named
+`<prefix>-<name>`, with the prefix `cr` (a constant in `sessions.rs`, held
+in `Settings.session_name_prefix` so the pages read it and a settings form
+could edit it), and the list shows only sessions named so. The new session
+form shows the prefix in front of the name.
+
+For each listed session the Rust side finds the Claude Code session running
+in one of its panes: the one whose status file in `~/.claude/sessions` names
+the pane, else a `claude` process on one of the panes' ttys, which has no
+status (shown as "unknown"). The card shows that status, the directory of
+the current pane, and the Copy and Open buttons. The pane rows, process
+lists, git statuses and the separate Claude Code list were dropped (see
+`docs/suggestions/sessions.md`), and with them the app's `git.rs` module.
+
+Options considered: a tmux environment variable or a session option to mark
+the app's sessions instead of the name. The name is visible in `tmux ls` and
+in the terminal window title, costs one `list-sessions` call to filter, and
+survives tmux restarts the same way; the others would need a second call per
+session.
+
+## 11. Sessions: a new session is a worktree
+
+The template's form made a tmux session in any directory. A review session
+here is meant to work on a branch of its own without touching the user's
+checkout. **Decision:** the form takes a repository instead of a directory,
+and `create_session` first adds a git worktree at
+`<repository>/.worktrees/<name>` (`git_worktree.rs`), on a branch named
+`<name>` created from the repository's current HEAD, or on the existing
+branch of that name, then starts the tmux session in it. The name is one
+value for the branch, the worktree directory and the tmux session
+(`cr-<name>`), so the session name validation covers the branch name too.
+
+`/.worktrees/` is appended to the repository's `.git/info/exclude` the first
+time, when git doesn't already ignore it, so the worktrees never show as
+untracked in the main checkout and nothing has to be committed. A
+repository without commits is refused with a message, since there is no
+HEAD to branch from. The worktree is left in place when the tmux session
+ends; removing it is listed in `docs/suggestions/sessions.md`.
+
+Options: Claude Code's own `.claude/worktrees/<name>` layout, or a sibling
+directory next to the repository. `.worktrees/` keeps the app's worktrees
+apart from the ones Claude Code manages (it cleans up its own), and inside
+the repository where they are found again.
+
+## 12. Left out on purpose
 
 Each of these existed in a prototype or the template and was dropped from
 the MVP. See `docs/suggestions/` for the list to bring back from.
@@ -171,13 +221,13 @@ the MVP. See `docs/suggestions/` for the list to bring back from.
 - Opening links from rendered Markdown in the browser (clicking one does
   nothing).
 
-## 11. Verification
+## 13. Verification
 
 `bin/check` runs what `AGENTS.md` asks for: `cargo fmt --check`, `cargo
 clippy --workspace --all-targets -D warnings`, `cargo test --workspace`,
 `cargo audit`, plus `pnpm check` (svelte-check) and `pnpm build`.
 
-## 12. What was verified
+## 14. What was verified
 
 On 2026-10-27, with `bin/check` passing (fmt, clippy, 126 Rust tests,
 svelte-check, Vite build, cargo audit with two allowed unmaintained-crate
@@ -194,6 +244,14 @@ warnings from Tauri's dependency tree):
   function to preview its code and pinning it, and a jump link scrolling to
   another file; the sessions page listing tmux and Claude Code sessions; the
   new session form with the detected directory.
+- Later the same day, after decision 10: the sessions page listing only
+  `cr-` sessions (one with a shell at a prompt, created with tmux directly
+  for the check) and the new session form showing the `cr-` prefix, driven
+  the same way.
+- After decision 11: `git_worktree.rs` is covered by tests on temporary
+  repositories (a new branch, an existing branch, a repository without
+  commits, the exclude file). Creating a session end to end opens a terminal
+  window, so that was left to the user.
 - Not exercised: creating a session and opening one in the terminal app
   (both would open windows on the Mac the tests ran on). The code paths are
   the Starter Pack's, unchanged apart from where the settings come from.

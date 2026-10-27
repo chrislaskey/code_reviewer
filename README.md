@@ -7,9 +7,10 @@ A macOS desktop app with two features:
   compare (uncommitted changes, one commit, or a branch against another), then
   read it on a canvas of groups and files, or as ledgers of functions, calls,
   callers and code.
-* **Sessions**: the tmux sessions on this Mac with what runs in each pane, the
-  Claude Code sessions, and a form to start a new session running Claude Code
-  in a directory and open it in your terminal app.
+* **Sessions**: the tmux sessions this app started, named `cr-<name>`, with
+  the Claude Code status (busy, idle) in each, and a form to start a new one:
+  a git worktree of a repository on a branch named `<name>`, with a tmux
+  session running Claude Code in it, opened in your terminal app.
 
 It is built on the [Starter Pack](../existing/) template's Tauri app, with
 the analysis from the earlier prototypes in `../existing/`. The decisions

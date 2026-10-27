@@ -1,7 +1,10 @@
+<!-- One of the app's tmux sessions: its name, the Claude Code status in it,
+     and the ways to get to it (the attach command to copy, or Open). -->
 <script>
   import Button from "../lib/components/Button.svelte";
+  import ClaudeCodePill from "./ClaudeCodePill.svelte";
   import Pill from "./Pill.svelte";
-  import TmuxPane from "./TmuxPane.svelte";
+  import ShortPath from "./ShortPath.svelte";
 
   let { session, homeDirectory, onOpen, onCopy } = $props();
 
@@ -9,20 +12,33 @@
   let attachCommand = $derived(`tmux attach -t ${session.name}`);
   let attachCommandElement;
 
-  // tmux names windows after their program by default, which for Claude Code
-  // is its version number, so use the readable program name then.
-  function windowName(tmuxWindow) {
-    const pane = tmuxWindow.panes.find((pane) => pane.active) ?? tmuxWindow.panes[0];
-    if (pane && tmuxWindow.name === pane.current_command && pane.foreground_program) {
-      return pane.foreground_program;
-    }
-    return tmuxWindow.name;
+  let claudeCodeDetails = $derived.by(() => {
+    const claudeCode = session.claude_code;
+    if (!claudeCode) return "";
+    const parts = [];
+    if (claudeCode.version) parts.push(`v${claudeCode.version}`);
+    parts.push(`pid ${claudeCode.pid}`);
+    if (claudeCode.status_updated_at) parts.push(`status changed ${timeAgo(claudeCode.status_updated_at)}`);
+    return parts.join(" · ");
+  });
+
+  function timeAgo(milliseconds) {
+    const seconds = Math.max(0, Math.round((Date.now() - milliseconds) / 1000));
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`;
+    return `${Math.round(seconds / 86400)}d ago`;
   }
 </script>
 
 <div class="panel">
   <div class="session-header">
     <span class="name">{session.name}</span>
+    {#if session.claude_code}
+      <ClaudeCodePill session={session.claude_code} />
+    {:else}
+      <Pill text="no claude" title="No Claude Code is running in the session" />
+    {/if}
     <Pill text={attached ? "attached" : "detached"} kind={attached ? "pill-good" : ""} />
     <div class="attach">
       <code bind:this={attachCommandElement} title="Paste into any terminal to attach">{attachCommand}</code>
@@ -30,13 +46,10 @@
       <Button class="btn btn-primary btn-sm" onclick={() => onOpen(session.name)}>Open</Button>
     </div>
   </div>
-
-  {#each session.windows as tmuxWindow (tmuxWindow.index)}
-    <div class="window-label">
-      Window {tmuxWindow.index} · {windowName(tmuxWindow)}{tmuxWindow.active ? " · current" : ""}
-    </div>
-    {#each tmuxWindow.panes as pane (pane.id)}
-      <TmuxPane {tmuxWindow} {pane} {homeDirectory} />
-    {/each}
-  {/each}
+  <div class="session-details">
+    <ShortPath path={session.directory ?? ""} {homeDirectory} />
+    <span class="muted">
+      {session.window_count} {session.window_count === 1 ? "window" : "windows"}{claudeCodeDetails ? ` · ${claudeCodeDetails}` : ""}
+    </span>
+  </div>
 </div>

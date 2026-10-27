@@ -22,7 +22,7 @@
 
   <section>
     <h2>Sessions</h2>
-    <p><a href="/sessions/index.html">Your tmux and Claude Code sessions →</a></p>
-    <p class="muted">See what runs in each tmux pane, open a session in your terminal app, or start a new one running Claude Code.</p>
+    <p><a href="/sessions/index.html">The Claude Code sessions started here →</a></p>
+    <p class="muted">See whether Claude Code is busy or idle in each tmux session this app started, open one in your terminal app, or start a new one.</p>
   </section>
 </main>

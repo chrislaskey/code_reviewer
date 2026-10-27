@@ -31,8 +31,8 @@ Logs go to stderr. Set `RUST_LOG=code_reviewer_lib=debug` for more.
 | `src/index.html` | `HomePage.svelte` | Links to the two features |
 | `src/reviews/new.html` | `reviews/ReviewNewPage.svelte` | The form: repository, what to compare, rules, groups |
 | `src/reviews/show.html` | `reviews/ReviewShowPage.svelte` | Runs the comparison in the URL and shows the Node and Ledger views |
-| `src/sessions/index.html` | `sessions/SessionsIndexPage.svelte` | The tmux and Claude Code sessions, refreshed every 5 seconds |
-| `src/sessions/new.html` | `sessions/SessionNewPage.svelte` | Creates a session and opens it in the terminal app |
+| `src/sessions/index.html` | `sessions/SessionsIndexPage.svelte` | The tmux sessions the app started, with the Claude Code status in each, refreshed every 5 seconds |
+| `src/sessions/new.html` | `sessions/SessionNewPage.svelte` | Creates a worktree of a repository and a session named `cr-<name>` in it, and opens it in the terminal app |
 
 Pages link to each other by path (`/reviews/new.html`), which works on the
 dev server and in the bundled app alike. The review request travels to the
@@ -85,16 +85,17 @@ src/
   sessions/
     index.html, index.js, SessionsIndexPage.svelte
     new.html, new.js, SessionNewPage.svelte
-    TmuxSession.svelte, TmuxPane.svelte, ClaudeCodeSession.svelte, ...
+    TmuxSession.svelte, ClaudeCodePill.svelte, Pill.svelte, ShortPath.svelte
 vite.config.js                           the pages, Tailwind, the theme script and the dev server port
 vendor/heroicons.js                      the Tailwind plugin making the hero-* icon classes
 src-tauri/
   src/lib.rs                             the app: state, the sessions commands
   src/review.rs                          the review commands around the core crate
-  src/sessions.rs                        detects the settings, lists, creates and shows sessions
-  src/tmux.rs, terminal_app.rs, process.rs, claude_code.rs, git.rs
-                                         runs tmux, controls terminal apps, lists processes, reads
-                                         Claude Code's session statuses and a directory's git status
+  src/sessions.rs                        detects the settings, names sessions with the prefix, lists,
+                                         creates and shows them
+  src/tmux.rs, git_worktree.rs, terminal_app.rs, process.rs, claude_code.rs
+                                         runs tmux, adds git worktrees, controls terminal apps, lists
+                                         processes and reads Claude Code's session statuses
   Info.plist                             merged into the app bundle's Info.plist
   capabilities/                          which window may call which command
   tauri.conf.json                        the Tauri configuration

@@ -81,6 +81,25 @@ pub async fn list_sessions(processes: &[Process]) -> Vec<ClaudeCodeSession> {
     sessions
 }
 
+impl ClaudeCodeSession {
+    /// A session known only by its process: one whose status file isn't
+    /// written yet, or a Claude Code that writes none.
+    pub fn without_status_file(pid: u32) -> Self {
+        Self {
+            pid,
+            session_id: None,
+            name: None,
+            cwd: None,
+            status: None,
+            version: None,
+            tmux_session_name: None,
+            tmux_pane_id: None,
+            tmux_location: None,
+            status_updated_at: None,
+        }
+    }
+}
+
 impl From<SessionFile> for ClaudeCodeSession {
     fn from(file: SessionFile) -> Self {
         Self {
