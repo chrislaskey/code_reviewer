@@ -1,8 +1,0 @@
-# Git worktrees kept in the repository root: Claude Code's and other tools'
-/.claude/worktrees/
-/.worktrees/
-
-.DS_Store
-
-# The Cargo workspace build output
-/target

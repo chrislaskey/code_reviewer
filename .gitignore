@@ -3,3 +3,6 @@
 /.worktrees/
 
 .DS_Store
+
+# The Cargo workspace build output
+/target
