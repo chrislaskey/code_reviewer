@@ -173,6 +173,10 @@
   min-width: 14rem;
 }
 
+.new-session .port-field input {
+  width: 6rem;
+}
+
 .prefixed-input {
   display: flex;
   align-items: center;

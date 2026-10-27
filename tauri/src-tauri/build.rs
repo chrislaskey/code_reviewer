@@ -7,6 +7,7 @@ fn main() {
         "get_function_diffs",
         "get_file_diffs",
         "get_session_settings",
+        "get_default_session_port",
         "list_sessions",
         "create_session",
         "continue_session",

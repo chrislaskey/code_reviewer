@@ -1,17 +1,18 @@
 <!-- The new session page: creates a git worktree of a repository and a tmux
-     session named with the app's prefix in it, running a command, opens it in
-     the terminal app and returns to the list. -->
+     session named with the app's prefix in it, with a port of its own in
+     PORT and a command typed in, opens it in the terminal app and returns to
+     the list. -->
 <script>
   import { sessionsIndexUrl } from "../lib/routes.js";
   import { onMount } from "svelte";
   import AppNav from "../lib/components/AppNav.svelte";
   import Button from "../lib/components/Button.svelte";
   import Header from "../lib/components/Header.svelte";
-  import { createSession, getSessionSettings } from "../lib/backend.js";
+  import { createSession, getDefaultSessionPort, getSessionSettings } from "../lib/backend.js";
   import { log } from "../lib/log.svelte.js";
   import LogList from "../lib/LogList.svelte";
 
-  let newSession = $state({ name: "", repository: "", command: "claude" });
+  let newSession = $state({ name: "", repository: "", command: "claude", port: "" });
   let creating = $state(false);
   let prefix = $state("");
 
@@ -20,7 +21,12 @@
     const name = newSession.name.trim();
     creating = true;
     try {
-      await createSession({ name, repository: newSession.repository, command: newSession.command });
+      await createSession({
+        name,
+        repository: newSession.repository,
+        command: newSession.command,
+        port: Number(newSession.port),
+      });
       window.location.href = sessionsIndexUrl();
     } catch (error) {
       log(`Creating ${name} failed: ${error}`);
@@ -35,6 +41,11 @@
         if (newSession.repository === "") newSession.repository = detected.directory;
       })
       .catch((error) => log(`Detecting the settings failed: ${error}`));
+    getDefaultSessionPort()
+      .then((port) => {
+        if (newSession.port === "") newSession.port = String(port);
+      })
+      .catch((error) => log(`Finding a free port failed: ${error}`));
   });
 </script>
 
@@ -66,13 +77,19 @@
       Command
       <input bind:value={newSession.command} spellcheck="false" />
     </label>
+    <label class="port-field">
+      Port
+      <input bind:value={newSession.port} type="number" min="1024" max="65535" required placeholder="Finding…" />
+    </label>
     <Button variant="primary" type="submit" disabled={creating}>{creating ? "Creating…" : "Create and open"}</Button>
   </form>
   <p class="muted hint">
     The worktree goes in the repository's <code>.worktrees/{prefix}-&lt;name&gt;</code> directory, on a new branch of
     that name from the repository's current commit, or on the existing branch. The prefix tells the sessions list which
     tmux sessions and worktrees were made here. A leading <code>~</code> is your home directory. Leave the command empty
-    for a shell at a prompt.
+    for a shell at a prompt. The port is set in the session's <code>PORT</code> variable, for the servers started in
+    the worktree to listen on, so each session's app runs on a port of its own; the suggested one is the lowest from
+    4001 up that no session started here holds.
   </p>
 
   <LogList />

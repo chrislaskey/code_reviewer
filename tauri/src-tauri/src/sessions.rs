@@ -12,6 +12,12 @@
 //! and a session can be continued in them. A session is finished by merging
 //! its branch or closing its worktree, as `bin/worktree` does.
 //!
+//! Every session gets a port of its own in its `PORT` variable, so the
+//! servers started in different worktrees don't collide: the lowest from
+//! `FIRST_SESSION_PORT` up that no running session holds, unless the user
+//! picks one in the form. A repository's `bin/dev` reads it for the servers
+//! it starts, as this repository's does.
+//!
 //! The settings are detected once per app run (see `AppState` in `lib.rs`)
 //! and passed to every call.
 
@@ -40,6 +46,13 @@ const WATCHED_DIRECTORIES: [&str; 1] = ["~/code"];
 const CONTINUE_COMMAND: &str = "claude --continue";
 /// The branch a finished session's branch is merged into.
 const MAIN_BRANCH: &str = "main";
+/// The port the first session gets; the next free one after it for each
+/// session after that, so with no gaps it's 4000 + the session count + 1.
+const FIRST_SESSION_PORT: u16 = 4001;
+/// Ports below this need root.
+const LOWEST_ALLOWED_PORT: u16 = 1024;
+/// The variable a session's port is set in.
+const PORT_VARIABLE: &str = "PORT";
 const FALLBACK_SHELL: &str = "/bin/zsh";
 /// Where tmux usually is: Homebrew on Apple Silicon, Homebrew on Intel and
 /// MacPorts.
@@ -131,6 +144,8 @@ pub struct SessionStatus {
     pub claude_code: Option<ClaudeCodeSession>,
     /// The git status of the directory, when it's in a repository.
     pub git: Option<GitStatus>,
+    /// The port in the session's `PORT` variable, when it has one.
+    pub port: Option<u16>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -145,12 +160,7 @@ pub struct WorktreeStatus {
 /// without a session.
 pub async fn list_sessions(settings: &Settings) -> Result<SessionList, String> {
     let tmux = Tmux::new(&settings.tmux_path);
-    let sessions: Vec<Session> = tmux
-        .list_sessions()
-        .await?
-        .into_iter()
-        .filter(|session| has_session_name_prefix(&settings.session_name_prefix, &session.name))
-        .collect();
+    let sessions = list_app_sessions(&tmux, settings).await?;
 
     let worktrees: Vec<Worktree> = list_worktrees(settings)
         .await
@@ -182,6 +192,70 @@ pub async fn list_sessions(settings: &Settings) -> Result<SessionList, String> {
         sessions,
         worktrees,
     })
+}
+
+/// The running tmux sessions the app started (see `has_session_name_prefix`).
+async fn list_app_sessions(tmux: &Tmux, settings: &Settings) -> Result<Vec<Session>, String> {
+    Ok(tmux
+        .list_sessions()
+        .await?
+        .into_iter()
+        .filter(|session| has_session_name_prefix(&settings.session_name_prefix, &session.name))
+        .collect())
+}
+
+/// The port a new session gets unless the user picks one: the lowest from
+/// `FIRST_SESSION_PORT` up that none of the app's running sessions holds.
+pub async fn get_default_session_port(settings: &Settings) -> Result<u16, String> {
+    let tmux = Tmux::new(&settings.tmux_path);
+    let used: Vec<u16> = list_session_ports(&tmux, settings)
+        .await?
+        .into_iter()
+        .map(|(_, port)| port)
+        .collect();
+    Ok(lowest_free_port(&used))
+}
+
+/// The ports the app's running sessions hold, with the session's name.
+async fn list_session_ports(
+    tmux: &Tmux,
+    settings: &Settings,
+) -> Result<Vec<(String, u16)>, String> {
+    let sessions = list_app_sessions(tmux, settings).await?;
+    let ports = get_session_ports(tmux, &sessions).await;
+    Ok(sessions
+        .into_iter()
+        .zip(ports)
+        .filter_map(|(session, port)| Some((session.name, port?)))
+        .collect())
+}
+
+/// The port of each session, all asked at the same time. A session with no
+/// `PORT` variable, or one that isn't a number, has none.
+async fn get_session_ports(tmux: &Tmux, sessions: &[Session]) -> Vec<Option<u16>> {
+    join_all(sessions.iter().map(|session| async move {
+        tmux.get_environment_variable(&session.name, PORT_VARIABLE)
+            .await
+            .ok()
+            .flatten()
+            .and_then(|value| value.parse().ok())
+    }))
+    .await
+}
+
+fn lowest_free_port(used: &[u16]) -> u16 {
+    (FIRST_SESSION_PORT..=u16::MAX)
+        .find(|port| !used.contains(port))
+        .unwrap_or(FIRST_SESSION_PORT)
+}
+
+fn validate_port(port: u16) -> Result<(), String> {
+    if port < LOWEST_ALLOWED_PORT {
+        return Err(format!(
+            "Port {port} needs root, pick one of {LOWEST_ALLOWED_PORT} or more"
+        ));
+    }
+    Ok(())
 }
 
 /// The git status of each directory, all asked at the same time.
@@ -232,10 +306,12 @@ async fn get_session_statuses(
     let panes = tmux.list_panes().await?;
     let processes = process::list_processes().await?;
     let claude_code_sessions = claude_code::list_sessions(&processes).await;
+    let ports = get_session_ports(tmux, &sessions).await;
 
     Ok(sessions
         .into_iter()
-        .map(|session| {
+        .zip(ports)
+        .map(|(session, port)| {
             let session_panes: Vec<&Pane> = panes
                 .iter()
                 .filter(|pane| pane.session_name == session.name)
@@ -245,6 +321,7 @@ async fn get_session_statuses(
                 claude_code: find_claude_code(&session_panes, &processes, &claude_code_sessions),
                 session,
                 git: None,
+                port,
             }
         })
         .collect())
@@ -295,17 +372,20 @@ fn runs_in_pane(session: &ClaudeCodeSession, pane: &Pane) -> bool {
 /// Creates a session named `<prefix>-<name>`: a git worktree of
 /// `repository` on a branch of that same name (see
 /// `git_worktree::add_worktree`) and a tmux session running the user's
-/// shell in it, with `command` typed in, opened in the terminal app.
+/// shell in it with `PORT` set to `port`, with `command` typed in, opened
+/// in the terminal app.
 pub async fn create_session(
     settings: &Settings,
     name: &str,
     repository: &str,
     command: &str,
+    port: u16,
 ) -> Result<ShowOutcome, String> {
     let name = name.trim();
     tmux::validate_session_name(name)?;
     let session_name = add_session_name_prefix(&settings.session_name_prefix, name);
     tmux::validate_session_name(&session_name)?;
+    validate_port(port)?;
     let repository = expand_home(repository.trim());
     if !repository.is_dir() {
         return Err(format!("{} is not a directory", repository.display()));
@@ -316,6 +396,15 @@ pub async fn create_session(
     if tmux.has_session(&session_name).await? {
         return Err(format!(
             "A session named {session_name} already exists, open it from the list"
+        ));
+    }
+    let holder = list_session_ports(&tmux, settings)
+        .await?
+        .into_iter()
+        .find(|(_, held)| *held == port);
+    if let Some((holder, _)) = holder {
+        return Err(format!(
+            "Port {port} is used by the session {holder}, pick another"
         ));
     }
 
@@ -337,13 +426,14 @@ pub async fn create_session(
         },
         worktree.branch
     );
-    start_session_in_directory(settings, &session_name, &worktree.path, command).await
+    start_session_in_directory(settings, &session_name, &worktree.path, command, port).await
 }
 
 /// Starts a session again in one of the app's worktrees (see
 /// `SessionList::worktrees`): a tmux session named after the worktree,
-/// running the user's shell in it with `CONTINUE_COMMAND` typed in, opened
-/// in the terminal app. `name` is the worktree's name, prefix included.
+/// running the user's shell in it with the default port (see
+/// `get_default_session_port`) and `CONTINUE_COMMAND` typed in, opened in
+/// the terminal app. `name` is the worktree's name, prefix included.
 pub async fn continue_session(settings: &Settings, name: &str) -> Result<ShowOutcome, String> {
     let worktree = find_worktree(settings, name).await?;
     let tmux = Tmux::new(&settings.tmux_path);
@@ -352,8 +442,16 @@ pub async fn continue_session(settings: &Settings, name: &str) -> Result<ShowOut
             "A session named {name} is already running, open it from the list"
         ));
     }
+    let port = get_default_session_port(settings).await?;
 
-    start_session_in_directory(settings, name, Path::new(&worktree.path), CONTINUE_COMMAND).await
+    start_session_in_directory(
+        settings,
+        name,
+        Path::new(&worktree.path),
+        CONTINUE_COMMAND,
+        port,
+    )
+    .await
 }
 
 /// Finishes a session by merging its branch into the main branch, a
@@ -411,20 +509,24 @@ async fn close_tmux_session_if_running(
 }
 
 /// Creates the tmux session `session_name` running the user's shell in
-/// `directory`, types `command` into it and opens it in the terminal app.
+/// `directory` with `PORT` set to `port`, types `command` into it and opens
+/// it in the terminal app.
 async fn start_session_in_directory(
     settings: &Settings,
     session_name: &str,
     directory: &Path,
     command: &str,
+    port: u16,
 ) -> Result<ShowOutcome, String> {
     let tmux = Tmux::new(&settings.tmux_path);
     tmux.create_session(
         session_name,
         &settings.shell,
         &directory.display().to_string(),
+        &[(PORT_VARIABLE, &port.to_string())],
     )
     .await?;
+    log::info!("Started the session {session_name} with {PORT_VARIABLE}={port}");
     tmux.show_session_in_window_title(session_name).await?;
     if !command.trim().is_empty() {
         tmux.send_command(session_name, command.trim()).await?;
@@ -628,6 +730,21 @@ mod tests {
             current_pane(&review_panes).map(|pane| pane.id.as_str()),
             Some("%2")
         );
+    }
+
+    #[test]
+    fn gives_the_lowest_free_port() {
+        assert_eq!(lowest_free_port(&[]), 4001);
+        assert_eq!(lowest_free_port(&[4001, 4002]), 4003);
+        assert_eq!(lowest_free_port(&[4002, 4040]), 4001);
+        assert_eq!(lowest_free_port(&[4001, 4003]), 4002);
+    }
+
+    #[test]
+    fn refuses_ports_that_need_root() {
+        assert!(validate_port(80).is_err());
+        assert!(validate_port(1024).is_ok());
+        assert!(validate_port(4001).is_ok());
     }
 
     #[test]

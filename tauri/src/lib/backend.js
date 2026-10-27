@@ -35,6 +35,11 @@ export function getSessionSettings() {
   return invoke("get_session_settings");
 }
 
+/** The port a new session gets unless the user picks one: the lowest free one among this app's running sessions. */
+export function getDefaultSessionPort() {
+  return invoke("get_default_session_port");
+}
+
 /**
  * The tmux sessions this app started (named with its prefix), each with its Claude Code status, and its git worktrees
  * with no session running.
@@ -44,11 +49,11 @@ export function listSessions() {
 }
 
 /**
- * Creates a git worktree of `repository` and a tmux session in it, both named `<prefix>-<name>`, running `command`,
- * and opens it in the terminal app.
+ * Creates a git worktree of `repository` and a tmux session in it, both named `<prefix>-<name>`, with `PORT` set to
+ * `port` and `command` typed in, and opens it in the terminal app.
  */
-export function createSession({ name, repository, command }) {
-  return invoke("create_session", { name, repository, command });
+export function createSession({ name, repository, command, port }) {
+  return invoke("create_session", { name, repository, command, port });
 }
 
 /** Starts a tmux session again in one of the app's worktrees, named after it, and opens it in the terminal app. */

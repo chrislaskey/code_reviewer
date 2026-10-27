@@ -32,7 +32,7 @@ tauri/           the desktop app
   src-tauri/     the Tauri crate: the commands the pages call
 docs/            decisions.md, and suggestions/ for what was left out
 bin/check        every check: fmt, clippy, tests, svelte-check, build, audit
-bin/dev          cargo tauri dev
+bin/dev          cargo tauri dev, with Vite and Tauri on $PORT when set (the sessions set one per worktree)
 ```
 
 ## Running

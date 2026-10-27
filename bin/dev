@@ -1,11 +1,25 @@
 #!/bin/bash
-# Starts the desktop app in dev mode: Vite on port 1420, then the Tauri window.
+# Starts the desktop app in dev mode: Vite, then the Tauri window loading it.
+#
+# Vite listens on $PORT when set, else on 1420, and Tauri is pointed at it. The
+# app's sessions set PORT in each worktree's tmux session (see
+# tauri/src-tauri/src/sessions.rs), so every worktree's app runs on a port of
+# its own. A repository with several servers would spread them from PORT, say
+# PORT for the first and PORT + 1000 for the next, which keeps consecutive
+# session ports apart.
 set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT/tauri"
 
+PORT="${PORT:-1420}"
+case "$PORT" in
+  ''|*[!0-9]*) echo "bin/dev: PORT must be a number, got '$PORT'" >&2; exit 1 ;;
+esac
+export PORT
+
 if [ ! -d node_modules ]; then
   pnpm install
 fi
-cargo tauri dev "$@"
+echo "bin/dev: Vite and the Tauri window on http://localhost:$PORT"
+cargo tauri dev --config "{\"build\":{\"devUrl\":\"http://localhost:$PORT\"}}" "$@"

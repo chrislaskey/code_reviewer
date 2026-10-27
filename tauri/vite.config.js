@@ -26,15 +26,19 @@ function themeScript() {
   };
 }
 
+// The dev server listens on PORT when set (the app's sessions set one per
+// worktree, and bin/dev points Tauri at it), else on 1420.
+const PORT = Number(process.env.PORT) || 1420;
+
 // One HTML entry per page. `cargo tauri dev` loads the dev server (see
-// `build.devUrl` in src-tauri/tauri.conf.json), and `cargo tauri build`
-// bundles `dist/`.
+// `build.devUrl` in src-tauri/tauri.conf.json, overridden by bin/dev), and
+// `cargo tauri build` bundles `dist/`.
 export default defineConfig({
   root: "src",
   plugins: [themeScript(), tailwindcss(), svelte()],
   clearScreen: false,
   server: {
-    port: 1420,
+    port: PORT,
     strictPort: true,
     watch: { ignored: ["**/src-tauri/**"] },
   },

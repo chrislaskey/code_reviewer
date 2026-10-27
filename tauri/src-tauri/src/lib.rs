@@ -68,6 +68,7 @@ pub fn run() {
             review::get_function_diffs,
             review::get_file_diffs,
             get_session_settings,
+            get_default_session_port,
             list_sessions,
             create_session,
             continue_session,
@@ -85,6 +86,14 @@ async fn get_session_settings(state: State<'_, AppState>) -> Result<DetectedSett
     Ok(state.session_settings().await.clone())
 }
 
+/// The port a new session gets unless the user picks one: the lowest free
+/// one among the app's running sessions.
+#[tauri::command]
+async fn get_default_session_port(state: State<'_, AppState>) -> Result<u16, String> {
+    let settings = state.session_settings().await;
+    sessions::get_default_session_port(&settings.settings).await
+}
+
 /// The tmux sessions the app started, each with its Claude Code status, and
 /// its worktrees without a session.
 #[tauri::command]
@@ -94,17 +103,18 @@ async fn list_sessions(state: State<'_, AppState>) -> Result<SessionList, String
 }
 
 /// Creates a git worktree of `repository` on a branch named `name` and a
-/// tmux session named `<prefix>-<name>` in it, types `command` into it and
-/// opens it in the terminal app.
+/// tmux session named `<prefix>-<name>` in it with `PORT` set to `port`,
+/// types `command` into it and opens it in the terminal app.
 #[tauri::command]
 async fn create_session(
     state: State<'_, AppState>,
     name: String,
     repository: String,
     command: String,
+    port: u16,
 ) -> Result<ShowOutcome, String> {
     let settings = state.session_settings().await;
-    sessions::create_session(&settings.settings, &name, &repository, &command).await
+    sessions::create_session(&settings.settings, &name, &repository, &command, port).await
 }
 
 /// Starts a tmux session again in one of the app's worktrees, named after

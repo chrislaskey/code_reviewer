@@ -1,6 +1,7 @@
 <!-- One of the app's tmux sessions: its name, the Claude Code status in it,
      the ways to get to it (the attach command to copy, or Open), its git
-     status, the Review menu into Reviews and the Complete menu to finish it. -->
+     status, its port, the Review menu into Reviews and the Complete menu to
+     finish it. -->
 <script>
   import Button from "../lib/components/Button.svelte";
   import ClaudeCodePill from "./ClaudeCodePill.svelte";
@@ -62,5 +63,8 @@
     <span class="muted">
       {session.window_count} {session.window_count === 1 ? "window" : "windows"}{claudeCodeDetails ? ` · ${claudeCodeDetails}` : ""}
     </span>
+    {#if session.port}
+      <span class="muted" title="The session's PORT variable, for the servers started in it">port {session.port}</span>
+    {/if}
   </div>
 </div>

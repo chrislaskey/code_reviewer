@@ -10,6 +10,7 @@
     "allow-get-function-diffs",
     "allow-get-file-diffs",
     "allow-get-session-settings",
+    "allow-get-default-session-port",
     "allow-list-sessions",
     "allow-create-session",
     "allow-continue-session",

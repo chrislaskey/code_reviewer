@@ -346,7 +346,43 @@ the function. Function labels keep the tool's `Module.name/arity` form for
 both languages. The ledger highlights function code in the file's language
 instead of always Elixir.
 
-## 16. Left out on purpose
+## 16. Sessions: a port per session, in `PORT`
+
+Most repositories reviewed here are web apps with a dev server, and two
+worktrees of the same repository start it on the same port, so the second
+fails or, worse, the user tests the wrong one. **Decision:** every session
+gets a port of its own, set in its tmux environment as `PORT` (`tmux
+new-session -e`, tmux 3.2 or later), so the shell and everything started in
+the session see it. The new session form has a Port field, filled in with
+the lowest port from 4001 up that none of the app's running sessions holds
+(`get_default_session_port`, read back with `tmux show-environment`), which
+with no gaps is 4000 + the session count + 1; the user may type another,
+and a port another session holds or one below 1024 is refused. Continue
+takes the default without asking. The session card shows the port.
+
+The repository decides what to do with the number. This repository's
+`bin/dev` makes Vite listen on `PORT` and points Tauri at it with
+`--config`, keeping 1420 when `PORT` is unset so nothing changes outside a
+session. A repository with several servers (a Phoenix app with an Axum
+server, say) spreads them from `PORT`, such as `PORT` for the first and
+`PORT + 1000` for the next, so consecutive session ports never meet. The
+same number can tell dev databases apart (`myapp_dev_4001`).
+
+Options considered: a small slot number (1, 2, 3) with each repository
+deriving `4000 + slot * 10 + offset`, which handles several servers with
+blocks of ten but makes every repository do arithmetic before a
+single-server app works, and leaves the form showing a number nobody can
+paste into a browser; named ports the repository declares in a file of its
+own, which is the most explicit but adds a format to maintain; and dynamic
+ports each server picks at start, which need no allocation but change
+between runs. `PORT` works with no change for the many servers that already
+read it, and the form shows the address the app will be on.
+
+The port is not remembered with the worktree: a continued session gets the
+lowest free port again, which can differ from the last run. Remembering it
+is in `docs/suggestions/sessions.md`.
+
+## 17. Left out on purpose
 
 Each of these existed in a prototype or the template and was dropped from
 the MVP. See `docs/suggestions/` for the list to bring back from.
@@ -362,13 +398,13 @@ the MVP. See `docs/suggestions/` for the list to bring back from.
 - Opening links from rendered Markdown in the browser (clicking one does
   nothing).
 
-## 17. Verification
+## 18. Verification
 
 `bin/check` runs what `AGENTS.md` asks for: `cargo fmt --check`, `cargo
 clippy --workspace --all-targets -D warnings`, `cargo test --workspace`,
 `cargo audit`, plus `pnpm check` (svelte-check) and `pnpm build`.
 
-## 18. What was verified
+## 19. What was verified
 
 On 2026-10-27, with `bin/check` passing (fmt, clippy, 126 Rust tests,
 svelte-check, Vite build, cargo audit with two allowed unmaintained-crate
@@ -424,3 +460,13 @@ warnings from Tauri's dependency tree):
 - Not exercised: creating a session and opening one in the terminal app
   (both would open windows on the Mac the tests ran on). The code paths are
   the Starter Pack's, unchanged apart from where the settings come from.
+- After decision 16: `tmux.rs` creates a session with a variable set and
+  reads it back on a private tmux server, the lowest free port and the
+  port check are unit tests, and `bin/check` passes. Vite started with
+  `PORT=1422` listened there. The new session form and the list were driven
+  in headless Chrome with a canned `invoke`: the Port field filled in from
+  `get_default_session_port`, the form sent the typed port as a number, and
+  the cards showed `port 4001` and nothing for a session without one. Not
+  exercised: `bin/dev` opening the Tauri window on the overridden dev URL,
+  and a session created end to end with `PORT` in its environment (both
+  open windows).
