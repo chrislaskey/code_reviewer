@@ -6,9 +6,8 @@ Ideas and prototype features not in the rewrite. None are planned.
 
 - The file-level views on the canvas: chips and blocks around a file card,
   with one edge per caller and call (`existing/frontend/src/explorations/`).
-- "Open all" and "Close all" for every ledger and code block.
-- The "Dimmed / Hidden" choice for calls into dependencies and the standard
-  library. They are always folded into a count now.
+- The "Folded" choice for calls into dependencies and the standard library:
+  one "+N in dependencies and stdlib" line instead of dimming or hiding them.
 - The "Ledger" code layout with one closed block per function, next to the
   one-block layout the MVP has.
 - The test call stack: list the tests of the head and walk the calls below

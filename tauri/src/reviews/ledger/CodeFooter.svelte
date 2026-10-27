@@ -7,6 +7,7 @@
   import Icon from "../../lib/components/Icon.svelte";
   import { plural } from "../change_styles.js";
   import CodeLines from "./CodeLines.svelte";
+  import { followOpenAllCommand } from "./open_all.svelte.js";
   import { ELIXIR } from "./syntax_highlight.js";
 
   /** @type {{ functions: any[], hoveredKey: string | null }} */
@@ -33,10 +34,10 @@
     };
   });
 
-  let pinned = $state(false);
+  const pinned = followOpenAllCommand(false);
   let hoveredIndex = $derived(functions.findIndex((fn) => fn.key === hoveredKey));
   let previewing = $derived(hoveredIndex >= 0);
-  let open = $derived(pinned || previewing);
+  let open = $derived(pinned.open || previewing);
   let shown = $derived(previewing ? [hoveredIndex] : functions.map((_, index) => index));
 </script>
 
@@ -49,7 +50,7 @@
   {:else}
     <button
       type="button"
-      onclick={() => (pinned = !pinned)}
+      onclick={() => (pinned.open = !pinned.open)}
       class={["flex h-8 w-full cursor-pointer items-center gap-2 px-3 text-left font-mono text-xs", previewing ? "bg-base-content/5" : ""]}
     >
       <Icon name="hero-chevron-right-micro" class={["size-3.5 text-base-content/50 transition-transform", open ? "rotate-90" : ""]} />

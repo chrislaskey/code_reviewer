@@ -8,8 +8,14 @@
   import LinkChipNode from "./LinkChipNode.svelte";
   import { buildGroupGraph, groupNodeId } from "./layout.js";
 
-  /** @type {{ rows: any[], onOpenFile: (groupId: string, fileId: string) => void }} */
-  let { rows, onOpenFile } = $props();
+  /**
+   * @type {{
+   *   rows: any[],
+   *   onOpenFile: (groupId: string, fileId: string) => void,
+   *   onShowGroup: (groupId: string) => void,
+   * }}
+   */
+  let { rows, onOpenFile, onShowGroup } = $props();
 
   const nodeTypes = { group_card: GroupCardNode, link_chip: LinkChipNode };
   const { fitView } = useSvelteFlow();
@@ -22,6 +28,25 @@
     edges = graph.edges;
   });
 
+  // A group asked for before the canvas has measured its nodes is shown once it has.
+  let initialized = false;
+  let pendingGroupId = null;
+
+  /** Moves the canvas to the group's row. */
+  export function showGroup(groupId) {
+    if (!initialized) {
+      pendingGroupId = groupId;
+      return;
+    }
+    fitView({ nodes: [{ id: groupNodeId(groupId) }], padding: 0.4, maxZoom: 1, duration: 500 });
+  }
+
+  function showPendingGroup() {
+    initialized = true;
+    if (pendingGroupId !== null) showGroup(pendingGroupId);
+    pendingGroupId = null;
+  }
+
   /** The content line the pointer is over: its chips stay, the others fade. */
   const focus = $state({ key: null });
 
@@ -31,8 +56,7 @@
       focus.key = key;
     },
     openFile: (groupId, fileId) => onOpenFile(groupId, fileId),
-    showGroup: (groupId) =>
-      fitView({ nodes: [{ id: groupNodeId(groupId) }], padding: 0.4, maxZoom: 1, duration: 500 }),
+    showGroup: (groupId) => onShowGroup(groupId),
   });
 
   // The canvas follows the page's theme, which the theme toggle sets on <html>.
@@ -64,6 +88,7 @@
   elementsSelectable={false}
   panOnScroll={true}
   zoomOnScroll={false}
+  oninit={showPendingGroup}
 >
   <Background variant={BackgroundVariant.Dots} gap={18} size={1} />
   <Controls showLock={false} />
