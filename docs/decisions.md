@@ -108,13 +108,20 @@ layouts, an "outside the project" toggle). **Decision:** exactly two:
   files it calls out to as chips on the right, with edges between them. The
   "All changes" row at the top lists the groups. Clicking a file opens the
   Ledger view of its group; clicking a group, or a chip of a file that is
-  itself changed, scrolls the canvas to that group. Hovering a line fades the
+  itself changed, moves the canvas to that group. Hovering a line fades the
   chips of the other lines.
 - **Ledger view** (`src/reviews/ledger/`, plain HTML): the file and function
   level. The files of one group, each as a ledger with three columns (File:
-  the changed functions; Outputs: calls into the project; Inputs: callers in
-  other modules) and a Code footer. A tree on the left lists the groups and
-  the open group's files.
+  the changed functions; Outputs: the calls they make, with calls into
+  dependencies and the standard library dimmed or hidden by a toolbar
+  toggle; Inputs: callers in other modules) and a Code footer. "Open all"
+  and "Close all" on the toolbar open or close every ledger and code block.
+- **The tree** (`src/reviews/ReviewTree.svelte`) sits beside both views, like
+  the file list of a pull request: All changes, every group under it, and
+  the files of the chosen group under that group. One click always means the
+  same view, as in the prototype: All changes and a group show the Node view
+  moved to that row (a group also lists its files); a file shows the Ledger
+  view of its group scrolled to the file.
 
 Heights on the canvas are computed from the content (`nodes/layout.js`), as
 in the prototype, so nothing measures the DOM.
@@ -164,8 +171,9 @@ the MVP. See `docs/suggestions/` for the list to bring back from.
 - The Axum server, the shared React frontend and `BackendAdapter`.
 - The explorations pages, the test call stack pages and the ReactFlow
   file-level views.
-- "Open all" and "Close all" buttons; the "Dimmed / Hidden" toggle for calls
-  into dependencies (they are always folded into a count now).
+- The "Folded" choice for calls into dependencies (a "+N in dependencies and
+  stdlib" line); only "Dimmed / Hidden" remain.
+- Highlighting the tree item of the section on screen as the page scrolls.
 - The Phoenix window, login, websocket client, offline sync and quick search.
 - Editable session settings.
 - Opening links from rendered Markdown in the browser (clicking one does

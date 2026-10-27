@@ -27,21 +27,28 @@
   --syntax-list: #f2cc60;
 }
 
-/* The page fills the window: the nav and toolbars stay, the content scrolls. */
+/* The page fills the window: the nav and toolbars stay, the tree and the
+   content beside it scroll on their own. */
 .review-page {
   display: flex;
   flex-direction: column;
   height: 100vh;
 }
 
-.review-page .review-content {
+.review-page .review-body {
+  display: flex;
   min-height: 0;
+  flex: 1;
+}
+
+.review-page .review-content {
+  min-width: 0;
   flex: 1;
   overflow: auto;
 }
 
 .review-page .review-canvas {
-  min-height: 0;
+  min-width: 0;
   flex: 1;
   overflow: hidden;
 }

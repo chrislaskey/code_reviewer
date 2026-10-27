@@ -113,8 +113,6 @@ pub struct GroupRow {
     pub lines: Vec<GroupLine>,
     pub outputs: Vec<GroupLink>,
     pub inputs: Vec<GroupLink>,
-    /// Calls into dependencies and the standard library, left out of the outputs.
-    pub folded_output_count: usize,
 }
 
 /// The groups that hold changed files, and a row for each.
@@ -326,12 +324,6 @@ fn build_all_changes_row(groups: &[GroupSummary], files: &[FileChange]) -> Group
             status: None,
         })
         .collect();
-    let folded_output_count = files
-        .iter()
-        .flat_map(|file| &file.callees)
-        .filter(|callee| callee.file_path.is_none() || !callee.is_highlighted)
-        .count();
-
     GroupRow {
         group: GroupSummary {
             id: ALL_CHANGES_GROUP_ID.to_string(),
@@ -343,7 +335,6 @@ fn build_all_changes_row(groups: &[GroupSummary], files: &[FileChange]) -> Group
         lines,
         outputs: Vec::new(),
         inputs: Vec::new(),
-        folded_output_count,
     }
 }
 
@@ -357,7 +348,6 @@ fn build_group_row(
     let stats = summarize_files(&group_files);
     let lines = build_lines(&group_files);
 
-    let mut folded_output_count = 0;
     let mut collector = LinkCollector {
         all_groups,
         files,
@@ -372,7 +362,6 @@ fn build_group_row(
                 .as_deref()
                 .filter(|_| callee.is_highlighted);
             let Some(path) = path else {
-                folded_output_count += 1;
                 continue;
             };
             let group_ids = path_groups.list_group_ids(path).to_vec();
@@ -408,7 +397,6 @@ fn build_group_row(
         outputs: collector.list_sorted(GroupLinkSide::Output),
         inputs: collector.list_sorted(GroupLinkSide::Input),
         lines,
-        folded_output_count,
     }
 }
 
@@ -598,7 +586,6 @@ mod tests {
         );
         assert_eq!(business.outputs[0].call_count, 2);
         assert_eq!(business.outputs[1].changed_file_path, None);
-        assert_eq!(business.folded_output_count, 1);
         assert_eq!(business.inputs.len(), 1);
         assert_eq!(business.inputs[0].group_id, "web");
         assert!(business.inputs[0].is_stale);

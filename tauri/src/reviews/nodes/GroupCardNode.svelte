@@ -1,6 +1,7 @@
 <!-- A group as a card: the group in the header, its files as the content.
      On the All changes row the content is the groups. A file line opens the
-     Ledger view of its group; a group line scrolls the canvas to that group. -->
+     Ledger view of its group; a group line shows that group, which moves the
+     canvas to it and lists its files in the tree. -->
 <script>
   import { getContext } from "svelte";
   import { Handle, Position } from "@xyflow/svelte";

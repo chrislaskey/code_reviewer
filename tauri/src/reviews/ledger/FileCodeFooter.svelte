@@ -7,6 +7,7 @@
   import SegmentedControl from "../SegmentedControl.svelte";
   import CodeLines from "./CodeLines.svelte";
   import LineCounts from "./LineCounts.svelte";
+  import { followOpenAllCommand } from "./open_all.svelte.js";
   import { languageForPath } from "./syntax_highlight.js";
 
   /** @type {{ file: any }} */
@@ -38,7 +39,7 @@
     };
   });
 
-  let open = $state(false);
+  const opened = followOpenAllCommand(false);
   let markdownView = $state("html");
   let language = $derived(languageForPath(file.path));
   let diff = $derived(loaded.state === "ready" ? loaded.diff : null);
@@ -61,14 +62,14 @@
   {:else if diff}
     <button
       type="button"
-      onclick={() => (open = !open)}
+      onclick={() => (opened.open = !opened.open)}
       class="flex h-8 w-full cursor-pointer items-center gap-2 px-3 text-left font-mono text-xs"
     >
-      <Icon name="hero-chevron-right-micro" class={["size-3.5 text-base-content/50 transition-transform", open ? "rotate-90" : ""]} />
+      <Icon name="hero-chevron-right-micro" class={["size-3.5 text-base-content/50 transition-transform", opened.open ? "rotate-90" : ""]} />
       <span class="text-base-content/70">{diff.is_binary ? "Binary file" : "Changed lines"}</span>
       <LineCounts lines={diff.lines} />
     </button>
-    {#if open}
+    {#if opened.open}
       {#if canShowHtml}
         <div class="flex justify-end px-3 pb-2">
           <SegmentedControl value={markdownView} options={MARKDOWN_VIEW_OPTIONS} onchange={(value) => (markdownView = value)} />
