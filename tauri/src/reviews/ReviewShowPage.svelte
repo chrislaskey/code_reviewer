@@ -10,6 +10,7 @@
   import { onMount, setContext, tick } from "svelte";
   import AppNav from "../lib/components/AppNav.svelte";
   import { analyzeFileChanges, getFileDiffs, getFunctionDiffs } from "../lib/backend.js";
+  import { reviewNewUrl, reviewRequestFromSearch } from "../lib/routes.js";
   import { plural } from "./change_styles.js";
   import MarkerIcon from "./MarkerIcon.svelte";
   import ReviewTree from "./ReviewTree.svelte";
@@ -19,7 +20,7 @@
   import ReviewLedgerView from "./ledger/ReviewLedgerView.svelte";
   import { createOpenAllCommand } from "./ledger/open_all.svelte.js";
   import ReviewNodeView from "./nodes/ReviewNodeView.svelte";
-  import { describeRequest, requestFromLocation } from "./review_form.js";
+  import { describeRequest } from "./review_form.js";
   import { ALL_CHANGES_ID, findFileById, toViewFiles, toViewGroupRows } from "./view_model.js";
 
   const VIEW_OPTIONS = [
@@ -32,7 +33,7 @@
     { value: "hidden", label: "Hidden" },
   ];
 
-  const request = requestFromLocation(window.location);
+  const request = reviewRequestFromSearch(window.location.search);
 
   let result = $state(null);
   let error = $state(null);
@@ -134,12 +135,12 @@
         {/if}
       {/if}
     {/if}
-    <a href="/reviews/new.html" class="ml-auto text-primary">Edit review</a>
+    <a href={reviewNewUrl(request)} class="ml-auto text-primary">Edit review</a>
   </div>
 
   {#if request === null}
     <p class="px-6 py-10 text-sm text-base-content/50">
-      This page needs a review to show. <a href="/reviews/new.html">Start a new review.</a>
+      This page needs a review to show. <a href={reviewNewUrl()}>Start a new review.</a>
     </p>
   {:else if loading}
     <p class="px-6 py-10 text-sm text-base-content/50">Analyzing the changes…</p>

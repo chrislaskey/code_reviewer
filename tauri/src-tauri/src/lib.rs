@@ -4,14 +4,17 @@
 //!     repository, function by function, file by file and group by group,
 //!     computed by the `code_reviewer_core` crate.
 //!   * Sessions (`sessions`): the tmux sessions the app started, named
-//!     `cr-<name>`, with the Claude Code status in each. A new session is a
-//!     git worktree of a repository with a tmux session in it, opened in
-//!     the user's terminal app.
+//!     `cr-<name>`, with the Claude Code status in each, and its git
+//!     worktrees (named the same) without a session. A new session is a
+//!     worktree of a repository with a tmux session in it, opened in the
+//!     user's terminal app; a worktree's session can be continued, and
+//!     finished by merging its branch or closing its worktree.
 //!
 //! The pages are in `../src`, one HTML entry per page. They call the
 //! commands below through `src/lib/backend.js` and nothing else.
 
 mod claude_code;
+mod git;
 mod git_worktree;
 mod process;
 mod review;
@@ -25,7 +28,7 @@ use code_reviewer_core::analysis::service::AnalysisService;
 use tauri::{Manager, State};
 use tokio::sync::OnceCell;
 
-use sessions::{DetectedSettings, SessionStatus};
+use sessions::{DetectedSettings, SessionList};
 use terminal_app::ShowOutcome;
 
 /// What the commands share, managed by Tauri.
@@ -67,6 +70,9 @@ pub fn run() {
             get_session_settings,
             list_sessions,
             create_session,
+            continue_session,
+            merge_session,
+            close_session,
             show_session_in_terminal_app,
         ])
         .run(tauri::generate_context!())
@@ -79,9 +85,10 @@ async fn get_session_settings(state: State<'_, AppState>) -> Result<DetectedSett
     Ok(state.session_settings().await.clone())
 }
 
-/// The tmux sessions the app started, each with its Claude Code status.
+/// The tmux sessions the app started, each with its Claude Code status, and
+/// its worktrees without a session.
 #[tauri::command]
-async fn list_sessions(state: State<'_, AppState>) -> Result<Vec<SessionStatus>, String> {
+async fn list_sessions(state: State<'_, AppState>) -> Result<SessionList, String> {
     let settings = state.session_settings().await;
     sessions::list_sessions(&settings.settings).await
 }
@@ -98,6 +105,33 @@ async fn create_session(
 ) -> Result<ShowOutcome, String> {
     let settings = state.session_settings().await;
     sessions::create_session(&settings.settings, &name, &repository, &command).await
+}
+
+/// Starts a tmux session again in one of the app's worktrees, named after
+/// it, and opens it in the terminal app. `name` is the worktree's name,
+/// prefix included.
+#[tauri::command]
+async fn continue_session(state: State<'_, AppState>, name: String) -> Result<ShowOutcome, String> {
+    let settings = state.session_settings().await;
+    sessions::continue_session(&settings.settings, &name).await
+}
+
+/// Merges a session's branch into the main branch (fast-forward only),
+/// removes its worktree, deletes the branch and closes its tmux session.
+/// `name` is the worktree's name, prefix included. Returns what was done.
+#[tauri::command]
+async fn merge_session(state: State<'_, AppState>, name: String) -> Result<String, String> {
+    let settings = state.session_settings().await;
+    sessions::merge_session(&settings.settings, &name).await
+}
+
+/// Removes a session's worktree, keeping its branch, and closes its tmux
+/// session. `name` is the worktree's name, prefix included. Returns what was
+/// done.
+#[tauri::command]
+async fn close_session(state: State<'_, AppState>, name: String) -> Result<String, String> {
+    let settings = state.session_settings().await;
+    sessions::close_session(&settings.settings, &name).await
 }
 
 /// Brings the terminal window of one of the app's sessions to the front, or

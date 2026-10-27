@@ -58,16 +58,16 @@ multi-page), and name the pages by what they do:
 | --- | --- | --- |
 | Home | `src/index.html` | Links to the two features |
 | New review | `src/reviews/new.html` | The form: repository, what to compare, rules, groups |
-| Show review | `src/reviews/show.html?request=…` | Runs the comparison and shows it |
+| Show review | `src/reviews/show.html?repo_path=…` | Runs the comparison and shows it |
 | Sessions | `src/sessions/index.html` | The tmux and Claude Code sessions |
 | New session | `src/sessions/new.html` | Creates a session and opens it |
 
-The review request travels from the form to the show page as JSON in one
-query parameter. Options: a client-side router in one page, or server state.
-Neither exists in the template; the query keeps every page independent and
-makes a review reloadable and linkable. The form is also remembered in
-`localStorage`, as in the prototype, so "Edit review" opens on the same
-choices.
+The review request travels from the form to the show page in the query
+(at first as JSON in one parameter, since decision 14 as named parameters).
+Options: a client-side router in one page, or server state. Neither exists
+in the template; the query keeps every page independent and makes a review
+reloadable and linkable. The form is also remembered in `localStorage`, as
+in the prototype, so a new review starts from the last one.
 
 ## 5. Naming the backend commands
 
@@ -195,11 +195,12 @@ The template's form made a tmux session in any directory. A review session
 here is meant to work on a branch of its own without touching the user's
 checkout. **Decision:** the form takes a repository instead of a directory,
 and `create_session` first adds a git worktree at
-`<repository>/.worktrees/<name>` (`git_worktree.rs`), on a branch named
-`<name>` created from the repository's current HEAD, or on the existing
-branch of that name, then starts the tmux session in it. The name is one
-value for the branch, the worktree directory and the tmux session
-(`cr-<name>`), so the session name validation covers the branch name too.
+`<repository>/.worktrees/cr-<name>` (`git_worktree.rs`), on a branch named
+`cr-<name>` created from the repository's current HEAD, or on the existing
+branch of that name, then starts the tmux session in it. The branch, the
+worktree directory and the tmux session share the one name, prefix
+included, so the worktree is matched to its session by name alone and the
+session name validation covers the branch name too.
 
 `/.worktrees/` is appended to the repository's `.git/info/exclude` the first
 time, when git doesn't already ignore it, so the worktrees never show as
@@ -213,7 +214,89 @@ directory next to the repository. `.worktrees/` keeps the app's worktrees
 apart from the ones Claude Code manages (it cleans up its own), and inside
 the repository where they are found again.
 
-## 12. Left out on purpose
+## 12. Sessions: worktrees outlive tmux and can be continued
+
+After a restart the tmux sessions are gone but the worktrees remain, with
+the work and Claude Code's conversation in them. **Decision:** the list
+also shows the app's worktrees with no session running, under the sessions,
+with a Continue button that starts a tmux session named after the worktree
+in it, types `claude --continue` (a constant, `CONTINUE_COMMAND`) and opens
+it in the terminal app.
+
+The worktrees are found in the repositories under watched directories: a
+configurable list (`Settings.watched_directories`, `~/code` by default),
+each looked at together with its first-level subdirectories, and `git
+worktree list --porcelain` run in every one that has a `.git` entry. Only
+worktrees whose directory is named `cr-…` count, as with the sessions. A
+worktree whose session is running shows as the session, not twice.
+
+Options: record the worktrees the app creates in a file of its own, or scan
+for worktrees with `find`. Asking git in the watched repositories needs no
+state the user could lose or that could go stale, and the first-level scan
+costs one `git worktree list` per repository every refresh, which is quick
+for a directory of a few dozen repositories.
+
+## 13. Sessions: finished from the list, with the git status in view
+
+`bin/worktree` (on `main` since the rewrite) finishes a worktree from inside
+it: `merge` fast-forwards `main` with the branch, removes the worktree,
+deletes the branch and closes the tmux session; `close` removes the worktree,
+keeps the branch and closes the session. Both refuse uncommitted changes.
+**Decision:** the same two actions on every session and worktree card,
+done by the Rust side (`git_worktree::
+merge_worktree` and `close_worktree`, then `tmux kill-session`) with the
+same refusals and the same order, git first and tmux last so a refusal
+leaves the session running. The main branch is a setting
+(`Settings.main_branch`, `main`) like the prefix. The command answers with a
+sentence saying what was done, which the page logs.
+
+Each card also shows the git status of its directory, as a shell prompt
+does: the branch, coloured by whether the worktree is dirty, then counts of
+staged, unstaged, untracked and conflicted files and how far the branch is
+ahead of or behind its upstream. This brought back the `git.rs` module and
+`GitStatus.svelte` dropped in decision 10, now once per session or worktree
+rather than once per pane.
+
+The two actions sit behind one Complete button with a caret, a dropdown of
+"Merge into main" and "Turn into branch", each with a sentence saying what
+it does, since the script's `merge` and `close` names don't say what
+happens to the branch. Both choices are disabled while the status is dirty,
+with the reason under them, since the Rust side would refuse.
+
+No confirmation dialog: as with the script, nothing is lost. Merge into main
+is a fast-forward and Turn into branch keeps the branch, and both refuse a
+dirty worktree.
+
+## 14. Pages link to each other by URL, through one module
+
+The Sessions list wanted a way into Reviews: review the uncommitted changes
+of a worktree, or everything its branch changed against `main`. The first
+such link between the two features, and more will follow (a session from a
+review, a commit from a card).
+**Decision:** a page's input is its query, flat and named the way a web
+server would read it (`/reviews/show.html?repo_path=…&base_ref=main&
+head_ref=cr-fix&compare_from_merge_base=true`, a list as a repeated key),
+and `src/lib/routes.js` is the one module that knows every page's path and
+parameters: `reviewShowUrl(request)`, `reviewNewUrl(request)`,
+`sessionsIndexUrl()` and so on, and `reviewRequestFromSearch(search)` for
+the page reading its query. The parameter names are the core crate's request
+fields, so the URL is the request. Every link in the app goes through it,
+the nav strip and the home page included, and nothing else spells out a
+path. The show page's `request` JSON parameter went away: a named query is
+readable, hand-writable and what a web server would take unchanged, so the
+same links keep working if a server joins the app. "Edit review" now links
+to the new page with the request in the query, and the form starts from it
+(`formFromRequest`) rather than from `localStorage`.
+
+So the Review menu on a card is a `ChoiceMenu` of plain links: "Recent
+changes" is `reviewShowUrl({ repo_path })`, "All changes" is the branch
+against the main branch from the merge base. Nothing in the sessions code
+knows how reviews work, and nothing in the reviews code knows about
+sessions. The menu itself became shared with Complete: `ChoiceMenu` (the
+button, the caret, closing) and `MenuChoice` (a label, a sentence, a link
+or a button) in `src/lib/components`.
+
+## 15. Left out on purpose
 
 Each of these existed in a prototype or the template and was dropped from
 the MVP. See `docs/suggestions/` for the list to bring back from.
@@ -229,13 +312,13 @@ the MVP. See `docs/suggestions/` for the list to bring back from.
 - Opening links from rendered Markdown in the browser (clicking one does
   nothing).
 
-## 13. Verification
+## 16. Verification
 
 `bin/check` runs what `AGENTS.md` asks for: `cargo fmt --check`, `cargo
 clippy --workspace --all-targets -D warnings`, `cargo test --workspace`,
 `cargo audit`, plus `pnpm check` (svelte-check) and `pnpm build`.
 
-## 14. What was verified
+## 17. What was verified
 
 On 2026-10-27, with `bin/check` passing (fmt, clippy, 126 Rust tests,
 svelte-check, Vite build, cargo audit with two allowed unmaintained-crate
@@ -256,10 +339,28 @@ warnings from Tauri's dependency tree):
   `cr-` sessions (one with a shell at a prompt, created with tmux directly
   for the check) and the new session form showing the `cr-` prefix, driven
   the same way.
-- After decision 11: `git_worktree.rs` is covered by tests on temporary
-  repositories (a new branch, an existing branch, a repository without
-  commits, the exclude file). Creating a session end to end opens a terminal
-  window, so that was left to the user.
+- After decisions 11 and 12: `git_worktree.rs` is covered by tests on
+  temporary repositories (a new branch, an existing branch, a repository
+  without commits, the exclude file, listing the worktrees under a watched
+  directory). The sessions page was driven in headless Chrome again with a
+  `cr-` worktree of a temporary repository under a watched directory,
+  showing the worktree card with Continue. Creating or continuing a session
+  end to end opens a terminal window, so that was left to the user.
+- After decision 13: merging and closing are covered by tests on temporary
+  repositories (a merge, a dirty worktree refused, a diverged branch
+  refused, a clean close keeping the branch). The page was driven again
+  with a temporary repository holding a clean and a dirty worktree and a
+  tmux session in the clean one: the git status showed on each card, the
+  choices were disabled on the dirty one, and Merge into main on the clean one
+  merged, removed the worktree and closed the session through the page.
+  The Complete menu was then checked the same way with a canned `invoke`
+  (no Rust side), as only the page changed: both choices, the sentences,
+  disabled on a dirty worktree, closing on an outside click and on Escape.
+- After decision 14: the Review menu's links were followed in the same
+  headless setup: the show page sent the request parsed from the flat query
+  to `analyze_file_changes`, Edit review opened the form filled in from it,
+  and a flat link (with repeated `group_include` parameters) against the
+  real core on a test repository showed its groups and files.
 - Not exercised: creating a session and opening one in the terminal app
   (both would open windows on the Mac the tests ran on). The code paths are
   the Starter Pack's, unchanged apart from where the settings come from.

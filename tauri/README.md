@@ -31,12 +31,16 @@ Logs go to stderr. Set `RUST_LOG=code_reviewer_lib=debug` for more.
 | `src/index.html` | `HomePage.svelte` | Links to the two features |
 | `src/reviews/new.html` | `reviews/ReviewNewPage.svelte` | The form: repository, what to compare, rules, groups |
 | `src/reviews/show.html` | `reviews/ReviewShowPage.svelte` | Runs the comparison in the URL and shows the Node and Ledger views |
-| `src/sessions/index.html` | `sessions/SessionsIndexPage.svelte` | The tmux sessions the app started, with the Claude Code status in each, refreshed every 5 seconds |
-| `src/sessions/new.html` | `sessions/SessionNewPage.svelte` | Creates a worktree of a repository and a session named `cr-<name>` in it, and opens it in the terminal app |
+| `src/sessions/index.html` | `sessions/SessionsIndexPage.svelte` | The tmux sessions the app started, with the Claude Code and git status in each, then its worktrees without a session; the Review menu opens one's changes in Reviews and the Complete menu finishes one. Refreshed every 5 seconds |
+| `src/sessions/new.html` | `sessions/SessionNewPage.svelte` | Creates a worktree of a repository and a session in it, both named `cr-<name>`, and opens it in the terminal app |
 
 Pages link to each other by path (`/reviews/new.html`), which works on the
-dev server and in the bundled app alike. The review request travels to the
-show page as JSON in the `request` query parameter.
+dev server and in the bundled app alike, and only through `src/lib/routes.js`,
+which knows every page's path and query parameters. A page's input is its
+query, flat and named after the core crate's request fields
+(`/reviews/show.html?repo_path=…&base_ref=main&head_ref=cr-fix&compare_from_merge_base=true`,
+a list as a repeated key), so a review is a link, from the form, from a
+session card, or from a bookmark.
 
 ## How the pages talk to Rust
 
@@ -51,7 +55,10 @@ else imports `@tauri-apps/api`. The commands are in `src-tauri/src/lib.rs`
 
 `src/app.css` runs Tailwind v4 with daisyUI and the Starter Pack's light and
 dark themes (`src/lib/theme.css`), and makes the `hero-*` icon classes from
-the `heroicons` npm package (`vendor/heroicons.js`). The app's own styles
+the `heroicons` npm package (`vendor/heroicons.js`). The theme also sets the
+font, Plus Jakarta Sans, vendored in `src/public/fonts` (copied from the
+Starter Pack, OFL licence alongside) and served from `/fonts`, so it works
+offline. The app's own styles
 (`src/styles.css`, and `src/reviews/styles.css`, `src/sessions/styles.css`
 for each feature) are in Tailwind's base layer, so utility classes in markup
 win over them. Don't give the app's own elements class names daisyUI also
@@ -69,15 +76,17 @@ the theme toggle dispatches, keeping the choice in `localStorage`;
 src/
   index.html, main.js, HomePage.svelte   the home page
   app.css, styles.css                    Tailwind with the theme, and the app's own styles
+  public/fonts/                          Plus Jakarta Sans, served from /fonts
   lib/
     backend.js                           every call to the Rust side
-    components/                          Button, Header, Icon, ThemeToggle and the AppNav strip
+    routes.js                            every page's URL and query parameters
+    components/                          Button, Header, Icon, ThemeToggle, ChoiceMenu, MenuChoice and the AppNav strip
     theme.css, theme_script.js           daisyUI themes and the script that applies them
     log.svelte.js, LogList.svelte        the log the sessions pages show
   reviews/
     new.html, new.js, ReviewNewPage.svelte
     show.html, show.js, ReviewShowPage.svelte
-    review_form.js                       the form, its storage and the request it builds
+    review_form.js                       the form, its storage, the request it builds and back
     view_model.js                        the backend's files and group rows as the views draw them
     change_styles.js                     colours and markers: what changed, what is risky
     nodes/                               the Node view: SvelteFlow canvas, group card and link chip nodes, layout
@@ -85,7 +94,7 @@ src/
   sessions/
     index.html, index.js, SessionsIndexPage.svelte
     new.html, new.js, SessionNewPage.svelte
-    TmuxSession.svelte, ClaudeCodePill.svelte, Pill.svelte, ShortPath.svelte
+    TmuxSession.svelte, GitWorktree.svelte, ReviewMenu.svelte, CompleteMenu.svelte, GitStatus.svelte, ClaudeCodePill.svelte, ...
 vite.config.js                           the pages, Tailwind, the theme script and the dev server port
 vendor/heroicons.js                      the Tailwind plugin making the hero-* icon classes
 src-tauri/
@@ -93,9 +102,10 @@ src-tauri/
   src/review.rs                          the review commands around the core crate
   src/sessions.rs                        detects the settings, names sessions with the prefix, lists,
                                          creates and shows them
-  src/tmux.rs, git_worktree.rs, terminal_app.rs, process.rs, claude_code.rs
-                                         runs tmux, adds git worktrees, controls terminal apps, lists
-                                         processes and reads Claude Code's session statuses
+  src/tmux.rs, git_worktree.rs, git.rs, terminal_app.rs, process.rs, claude_code.rs
+                                         runs tmux, adds, lists, merges and closes git worktrees, reads a
+                                         directory's git status, controls terminal apps, lists processes
+                                         and reads Claude Code's session statuses
   Info.plist                             merged into the app bundle's Info.plist
   capabilities/                          which window may call which command
   tauri.conf.json                        the Tauri configuration

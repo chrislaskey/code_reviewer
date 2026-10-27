@@ -1,5 +1,6 @@
 // What to review: the form on the new review page, as the user fills it in,
-// and how it becomes the request the show page runs.
+// how it becomes the request the show page runs (see lib/routes.js for how
+// the request travels in the URL), and back.
 
 /** @typedef {"working_tree" | "commit" | "branch"} CompareMode */
 
@@ -101,6 +102,24 @@ export function buildRequest(form) {
   }
 }
 
+/** The form that builds a request, to edit a review that arrived as a link. */
+export function formFromRequest(request) {
+  const mode = request.base_ref && request.head_ref ? "branch" : request.head_ref ? "commit" : "working_tree";
+  return {
+    ...EMPTY_FORM,
+    repoPath: request.repo_path,
+    mode,
+    commitSha: mode === "commit" ? request.head_ref : "",
+    headBranch: mode === "branch" ? request.head_ref : "",
+    baseBranch: mode === "branch" ? request.base_ref : "",
+    includeRules: (request.module_rules?.include ?? []).join("\n"),
+    ignoreRules: (request.module_rules?.ignore ?? []).join("\n"),
+    groupConfigPath: request.group_flags?.group_config_path ?? "",
+    groupIncludes: (request.group_flags?.include ?? []).join("\n"),
+    groupExcludes: (request.group_flags?.exclude ?? []).join("\n"),
+  };
+}
+
 /** A sentence saying what the form will review. */
 export function describeComparison(form) {
   switch (form.mode) {
@@ -115,28 +134,6 @@ export function describeComparison(form) {
       return `What ${form.headBranch || "the branch"} changed since it branched off ${form.baseBranch || "the other branch"}, like a pull request.`;
     default:
       return "";
-  }
-}
-
-/* -- The show page's URL -------------------------------------------------------- */
-
-const REQUEST_PARAM = "request";
-
-/** The show page for a request. The request travels as JSON in the query. */
-export function showPageUrl(request) {
-  const query = new URLSearchParams({ [REQUEST_PARAM]: JSON.stringify(request) });
-  return `/reviews/show.html?${query}`;
-}
-
-/** The request in the show page's URL, or null when there is none. */
-export function requestFromLocation(location) {
-  const raw = new URLSearchParams(location.search).get(REQUEST_PARAM);
-  if (!raw) return null;
-  try {
-    const request = JSON.parse(raw);
-    return typeof request?.repo_path === "string" ? request : null;
-  } catch {
-    return null;
   }
 }
 

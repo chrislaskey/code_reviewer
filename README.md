@@ -9,8 +9,15 @@ A macOS desktop app with two features:
   callers and code.
 * **Sessions**: the tmux sessions this app started, named `cr-<name>`, with
   the Claude Code status (busy, idle) in each, and a form to start a new one:
-  a git worktree of a repository on a branch named `<name>`, with a tmux
-  session running Claude Code in it, opened in your terminal app.
+  a git worktree of a repository and a tmux session, both named `cr-<name>`,
+  running Claude Code, opened in your terminal app. After a restart the
+  worktrees are found again in the repositories under `~/code`, and a
+  session can be continued in one. Each shows its git status, and is
+  finished from its Complete menu: Merge into `main` (fast-forward `main`,
+  remove the worktree, delete the branch) or Turn into branch (remove the
+  worktree, keep the branch), as `bin/worktree` does. Its Review menu opens
+  the worktree's uncommitted changes, or everything its branch changed
+  against `main`, in Reviews.
 
 It is built on the [Starter Pack](../existing/) template's Tauri app, with
 the analysis from the earlier prototypes in `../existing/`. The decisions

@@ -6,26 +6,40 @@
 //!
 //! The app shares the user's tmux server, so it tells its own sessions apart
 //! by name: every session it creates is named `<prefix>-<name>` (see
-//! `SESSION_NAME_PREFIX`), and the list shows only those.
+//! `SESSION_NAME_PREFIX`), and the list shows only those. Its git worktrees
+//! are named the same, so after a restart, when the tmux sessions are gone,
+//! they are found again in the repositories under the watched directories
+//! and a session can be continued in them. A session is finished by merging
+//! its branch or closing its worktree, as `bin/worktree` does.
 //!
 //! The settings are detected once per app run (see `AppState` in `lib.rs`)
 //! and passed to every call.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use futures_util::future::join_all;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
 use crate::claude_code::{self, ClaudeCodeSession};
-use crate::git_worktree;
+use crate::git::{self, GitStatus};
+use crate::git_worktree::{self, Worktree};
 use crate::process::{self, Process};
 use crate::terminal_app::{self, InstalledTerminalApp, ShowOutcome, TerminalApp};
 use crate::tmux::{self, Pane, Session, Tmux};
 
 /// What the names of the sessions the app creates start with, as
-/// `<prefix>-<name>`. The list shows only sessions named so.
+/// `<prefix>-<name>`. The list shows only sessions and worktrees named so.
 const SESSION_NAME_PREFIX: &str = "cr";
+/// Where the app's worktrees are looked for: these directories and their
+/// first-level subdirectories that are git repositories.
+const WATCHED_DIRECTORIES: [&str; 1] = ["~/code"];
+/// Typed into a session continued in an existing worktree.
+const CONTINUE_COMMAND: &str = "claude --continue";
+/// The branch a finished session's branch is merged into.
+const MAIN_BRANCH: &str = "main";
 const FALLBACK_SHELL: &str = "/bin/zsh";
 /// Where tmux usually is: Homebrew on Apple Silicon, Homebrew on Intel and
 /// MacPorts.
@@ -42,8 +56,13 @@ pub struct Settings {
     pub shell: String,
     pub terminal_app: TerminalApp,
     pub tmux_path: String,
-    /// Sessions the app creates are named `<session_name_prefix>-<name>`.
+    /// Sessions and worktrees the app creates are named
+    /// `<session_name_prefix>-<name>`.
     pub session_name_prefix: String,
+    /// Where the app's worktrees are looked for, with `~` allowed.
+    pub watched_directories: Vec<String>,
+    /// The branch Merge fast-forwards with a session's branch.
+    pub main_branch: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -72,6 +91,8 @@ pub async fn detect_settings() -> DetectedSettings {
             terminal_app,
             tmux_path,
             session_name_prefix: SESSION_NAME_PREFIX.to_string(),
+            watched_directories: WATCHED_DIRECTORIES.map(str::to_string).to_vec(),
+            main_branch: MAIN_BRANCH.to_string(),
         },
         terminal_apps,
         directory: detect_directory().display().to_string(),
@@ -93,6 +114,14 @@ pub fn has_session_name_prefix(prefix: &str, session_name: &str) -> bool {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub struct SessionList {
+    pub sessions: Vec<SessionStatus>,
+    /// The app's worktrees with no tmux session running in them, for a
+    /// session to be continued in.
+    pub worktrees: Vec<WorktreeStatus>,
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct SessionStatus {
     #[serde(flatten)]
     pub session: Session,
@@ -100,11 +129,21 @@ pub struct SessionStatus {
     pub directory: Option<String>,
     /// The Claude Code session running in one of the session's panes.
     pub claude_code: Option<ClaudeCodeSession>,
+    /// The git status of the directory, when it's in a repository.
+    pub git: Option<GitStatus>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct WorktreeStatus {
+    #[serde(flatten)]
+    pub worktree: Worktree,
+    pub git: Option<GitStatus>,
 }
 
 /// The tmux sessions the app started (see `has_session_name_prefix`), each
-/// with the Claude Code session running in it.
-pub async fn list_sessions(settings: &Settings) -> Result<Vec<SessionStatus>, String> {
+/// with the Claude Code session running in it, and the app's worktrees
+/// without a session.
+pub async fn list_sessions(settings: &Settings) -> Result<SessionList, String> {
     let tmux = Tmux::new(&settings.tmux_path);
     let sessions: Vec<Session> = tmux
         .list_sessions()
@@ -112,10 +151,84 @@ pub async fn list_sessions(settings: &Settings) -> Result<Vec<SessionStatus>, St
         .into_iter()
         .filter(|session| has_session_name_prefix(&settings.session_name_prefix, &session.name))
         .collect();
+
+    let worktrees: Vec<Worktree> = list_worktrees(settings)
+        .await
+        .into_iter()
+        .filter(|worktree| !sessions.iter().any(|session| session.name == worktree.name))
+        .collect();
+    let mut sessions = get_session_statuses(&tmux, sessions).await?;
+
+    let directories = sessions
+        .iter()
+        .filter_map(|session| session.directory.as_deref())
+        .chain(worktrees.iter().map(|worktree| worktree.path.as_str()));
+    let git_statuses = get_git_statuses(directories).await;
+    for session in &mut sessions {
+        session.git = session
+            .directory
+            .as_ref()
+            .and_then(|directory| git_statuses.get(directory).cloned());
+    }
+    let worktrees = worktrees
+        .into_iter()
+        .map(|worktree| WorktreeStatus {
+            git: git_statuses.get(&worktree.path).cloned(),
+            worktree,
+        })
+        .collect();
+
+    Ok(SessionList {
+        sessions,
+        worktrees,
+    })
+}
+
+/// The git status of each directory, all asked at the same time.
+async fn get_git_statuses<'a>(
+    directories: impl Iterator<Item = &'a str>,
+) -> HashMap<String, GitStatus> {
+    let mut directories: Vec<&str> = directories.collect();
+    directories.sort_unstable();
+    directories.dedup();
+
+    let statuses = join_all(
+        directories
+            .iter()
+            .map(|directory| git::get_status(directory)),
+    )
+    .await;
+    directories
+        .into_iter()
+        .zip(statuses)
+        .filter_map(|(directory, status)| Some((directory.to_string(), status?)))
+        .collect()
+}
+
+/// The app's worktrees (named with the prefix) in the repositories under the
+/// watched directories.
+async fn list_worktrees(settings: &Settings) -> Vec<Worktree> {
+    let directories: Vec<PathBuf> = settings
+        .watched_directories
+        .iter()
+        .map(|directory| expand_home(directory))
+        .collect();
+    git_worktree::list_worktrees(&directories)
+        .await
+        .into_iter()
+        .filter(|worktree| has_session_name_prefix(&settings.session_name_prefix, &worktree.name))
+        .collect()
+}
+
+/// Each session with the Claude Code session running in it. Panes and
+/// processes are listed only when there are sessions to look at.
+async fn get_session_statuses(
+    tmux: &Tmux,
+    sessions: Vec<Session>,
+) -> Result<Vec<SessionStatus>, String> {
     if sessions.is_empty() {
         return Ok(Vec::new());
     }
-
     let panes = tmux.list_panes().await?;
     let processes = process::list_processes().await?;
     let claude_code_sessions = claude_code::list_sessions(&processes).await;
@@ -131,6 +244,7 @@ pub async fn list_sessions(settings: &Settings) -> Result<Vec<SessionStatus>, St
                 directory: current_pane(&session_panes).map(|pane| pane.current_path.clone()),
                 claude_code: find_claude_code(&session_panes, &processes, &claude_code_sessions),
                 session,
+                git: None,
             }
         })
         .collect())
@@ -179,9 +293,9 @@ fn runs_in_pane(session: &ClaudeCodeSession, pane: &Pane) -> bool {
 }
 
 /// Creates a session named `<prefix>-<name>`: a git worktree of
-/// `repository` on a branch named `name` (see `git_worktree::add_worktree`)
-/// and a tmux session running the user's shell in it, with `command` typed
-/// in, opened in the terminal app.
+/// `repository` on a branch of that same name (see
+/// `git_worktree::add_worktree`) and a tmux session running the user's
+/// shell in it, with `command` typed in, opened in the terminal app.
 pub async fn create_session(
     settings: &Settings,
     name: &str,
@@ -205,7 +319,14 @@ pub async fn create_session(
         ));
     }
 
-    let worktree = git_worktree::add_worktree(&repository_root, name).await?;
+    if git_worktree::worktree_path(&repository_root, &session_name).exists() {
+        return Err(format!(
+            "A worktree named {session_name} already exists in {}, continue it from the list",
+            repository_root.display()
+        ));
+    }
+
+    let worktree = git_worktree::add_worktree(&repository_root, &session_name).await?;
     log::info!(
         "Added the worktree {} on the {} branch {}",
         worktree.path.display(),
@@ -216,18 +337,100 @@ pub async fn create_session(
         },
         worktree.branch
     );
-    tmux.create_session(
-        &session_name,
-        &settings.shell,
-        &worktree.path.display().to_string(),
-    )
-    .await?;
-    tmux.show_session_in_window_title(&session_name).await?;
-    if !command.trim().is_empty() {
-        tmux.send_command(&session_name, command.trim()).await?;
+    start_session_in_directory(settings, &session_name, &worktree.path, command).await
+}
+
+/// Starts a session again in one of the app's worktrees (see
+/// `SessionList::worktrees`): a tmux session named after the worktree,
+/// running the user's shell in it with `CONTINUE_COMMAND` typed in, opened
+/// in the terminal app. `name` is the worktree's name, prefix included.
+pub async fn continue_session(settings: &Settings, name: &str) -> Result<ShowOutcome, String> {
+    let worktree = find_worktree(settings, name).await?;
+    let tmux = Tmux::new(&settings.tmux_path);
+    if tmux.has_session(name).await? {
+        return Err(format!(
+            "A session named {name} is already running, open it from the list"
+        ));
     }
 
-    terminal_app::open_window(settings.terminal_app, &settings.tmux_path, &session_name).await?;
+    start_session_in_directory(settings, name, Path::new(&worktree.path), CONTINUE_COMMAND).await
+}
+
+/// Finishes a session by merging its branch into the main branch, a
+/// fast-forward only (see `git_worktree::merge_worktree`), removing its
+/// worktree, deleting the branch and closing its tmux session, like
+/// `bin/worktree merge`. `name` is the worktree's name, prefix included.
+/// Returns what was done, for the log.
+pub async fn merge_session(settings: &Settings, name: &str) -> Result<String, String> {
+    let worktree = find_worktree(settings, name).await?;
+    git_worktree::merge_worktree(&worktree, &settings.main_branch).await?;
+    let session_closed = close_tmux_session_if_running(settings, name).await?;
+    Ok(format!(
+        "Merged {name} into {}, removed the worktree and deleted the branch{session_closed}",
+        settings.main_branch
+    ))
+}
+
+/// Finishes a session by removing its worktree, keeping the branch, and
+/// closing its tmux session, like `bin/worktree close`. `name` is the
+/// worktree's name, prefix included. Returns what was done, for the log.
+pub async fn close_session(settings: &Settings, name: &str) -> Result<String, String> {
+    let worktree = find_worktree(settings, name).await?;
+    git_worktree::close_worktree(&worktree, &settings.main_branch).await?;
+    let session_closed = close_tmux_session_if_running(settings, name).await?;
+    Ok(format!(
+        "Removed the worktree of {name}, keeping its branch{session_closed}"
+    ))
+}
+
+/// One of the app's worktrees, by name.
+async fn find_worktree(settings: &Settings, name: &str) -> Result<Worktree, String> {
+    tmux::validate_session_name(name)?;
+    if !has_session_name_prefix(&settings.session_name_prefix, name) {
+        return Err(format!("{name} is not a worktree this app created"));
+    }
+    list_worktrees(settings)
+        .await
+        .into_iter()
+        .find(|worktree| worktree.name == name)
+        .ok_or_else(|| format!("There is no worktree named {name} under the watched directories"))
+}
+
+/// Closes the tmux session `name` when it's running. Returns a phrase for
+/// the log.
+async fn close_tmux_session_if_running(
+    settings: &Settings,
+    name: &str,
+) -> Result<&'static str, String> {
+    let tmux = Tmux::new(&settings.tmux_path);
+    if !tmux.has_session(name).await? {
+        return Ok("");
+    }
+    tmux.kill_session(name).await?;
+    Ok(", and closed the tmux session")
+}
+
+/// Creates the tmux session `session_name` running the user's shell in
+/// `directory`, types `command` into it and opens it in the terminal app.
+async fn start_session_in_directory(
+    settings: &Settings,
+    session_name: &str,
+    directory: &Path,
+    command: &str,
+) -> Result<ShowOutcome, String> {
+    let tmux = Tmux::new(&settings.tmux_path);
+    tmux.create_session(
+        session_name,
+        &settings.shell,
+        &directory.display().to_string(),
+    )
+    .await?;
+    tmux.show_session_in_window_title(session_name).await?;
+    if !command.trim().is_empty() {
+        tmux.send_command(session_name, command.trim()).await?;
+    }
+
+    terminal_app::open_window(settings.terminal_app, &settings.tmux_path, session_name).await?;
     Ok(ShowOutcome::Opened)
 }
 

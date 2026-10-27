@@ -35,17 +35,38 @@ export function getSessionSettings() {
   return invoke("get_session_settings");
 }
 
-/** The tmux sessions this app started (named with its prefix), each with its Claude Code status. */
+/**
+ * The tmux sessions this app started (named with its prefix), each with its Claude Code status, and its git worktrees
+ * with no session running.
+ */
 export function listSessions() {
   return invoke("list_sessions");
 }
 
 /**
- * Creates a git worktree of `repository` on a branch named `name` and a tmux session named `<prefix>-<name>` in it
- * running `command`, and opens it in the terminal app.
+ * Creates a git worktree of `repository` and a tmux session in it, both named `<prefix>-<name>`, running `command`,
+ * and opens it in the terminal app.
  */
 export function createSession({ name, repository, command }) {
   return invoke("create_session", { name, repository, command });
+}
+
+/** Starts a tmux session again in one of the app's worktrees, named after it, and opens it in the terminal app. */
+export function continueSession(name) {
+  return invoke("continue_session", { name });
+}
+
+/**
+ * Merges a session's branch into the main branch (fast-forward only), removes its worktree, deletes the branch and
+ * closes its tmux session. Resolves to a sentence saying what was done.
+ */
+export function mergeSession(name) {
+  return invoke("merge_session", { name });
+}
+
+/** Removes a session's worktree, keeping its branch, and closes its tmux session. Resolves to what was done. */
+export function closeSession(name) {
+  return invoke("close_session", { name });
 }
 
 /** Brings the terminal window of one of the app's sessions to the front, or opens one. `name` includes the prefix. */

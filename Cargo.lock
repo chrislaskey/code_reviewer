@@ -397,6 +397,7 @@ version = "0.1.0"
 dependencies = [
  "code_reviewer_core",
  "env_logger",
+ "futures-util",
  "log",
  "serde",
  "serde_json",

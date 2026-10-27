@@ -10,7 +10,6 @@
   --accent: var(--color-primary);
   --pending: #e0a800;
   --joined: #2da44e;
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
   font-size: 15px;
   -webkit-font-smoothing: antialiased;
 }
@@ -147,4 +146,15 @@ textarea {
   border: 1px solid var(--border-color);
   background: var(--color-base-100);
   color: var(--fg);
+}
+
+/* ChoiceMenu: a choice's label and the sentence under it */
+.choice-menu .choice {
+  font-weight: 600;
+}
+
+.choice-menu .explanation {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.3;
 }

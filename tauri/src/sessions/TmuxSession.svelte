@@ -1,12 +1,16 @@
 <!-- One of the app's tmux sessions: its name, the Claude Code status in it,
-     and the ways to get to it (the attach command to copy, or Open). -->
+     the ways to get to it (the attach command to copy, or Open), its git
+     status, the Review menu into Reviews and the Complete menu to finish it. -->
 <script>
   import Button from "../lib/components/Button.svelte";
   import ClaudeCodePill from "./ClaudeCodePill.svelte";
+  import CompleteMenu from "./CompleteMenu.svelte";
+  import GitStatus from "./GitStatus.svelte";
+  import ReviewMenu from "./ReviewMenu.svelte";
   import Pill from "./Pill.svelte";
   import ShortPath from "./ShortPath.svelte";
 
-  let { session, homeDirectory, onOpen, onCopy } = $props();
+  let { session, homeDirectory, mainBranch, onOpen, onCopy, onMerge, onClose } = $props();
 
   let attached = $derived(session.attached_clients > 0);
   let attachCommand = $derived(`tmux attach -t ${session.name}`);
@@ -44,10 +48,17 @@
       <code bind:this={attachCommandElement} title="Paste into any terminal to attach">{attachCommand}</code>
       <Button class="btn btn-primary btn-soft btn-sm" onclick={() => onCopy(attachCommand, attachCommandElement)}>Copy</Button>
       <Button class="btn btn-primary btn-sm" onclick={() => onOpen(session.name)}>Open</Button>
+      {#if session.directory}
+        <ReviewMenu directory={session.directory} git={session.git} {mainBranch} />
+      {/if}
+      <CompleteMenu name={session.name} git={session.git} {mainBranch} {onMerge} {onClose} />
     </div>
   </div>
   <div class="session-details">
     <ShortPath path={session.directory ?? ""} {homeDirectory} />
+    {#if session.git}
+      <GitStatus git={session.git} />
+    {/if}
     <span class="muted">
       {session.window_count} {session.window_count === 1 ? "window" : "windows"}{claudeCodeDetails ? ` · ${claudeCodeDetails}` : ""}
     </span>

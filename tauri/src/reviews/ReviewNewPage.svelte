@@ -1,25 +1,30 @@
 <!-- The new review page: pick the repository, what to compare, and which
-     modules to highlight or ignore. Submitting opens the show page. -->
+     modules to highlight or ignore. Submitting opens the show page. Opened
+     with a request in its URL, as from Edit review, the form starts from it;
+     otherwise from the last one submitted. -->
 <script>
   import AppNav from "../lib/components/AppNav.svelte";
   import Button from "../lib/components/Button.svelte";
   import Header from "../lib/components/Header.svelte";
   import { listBranchesAndRecentCommits } from "../lib/backend.js";
+  import { reviewRequestFromSearch, reviewShowUrl } from "../lib/routes.js";
   import SegmentedControl from "./SegmentedControl.svelte";
   import {
     COMPARE_MODE_OPTIONS,
     buildRequest,
     describeComparison,
+    formFromRequest,
     loadForm,
     saveForm,
-    showPageUrl,
     withValidChoices,
   } from "./review_form.js";
 
   const FIELD_CLASS =
     "rounded-lg border border-base-300 bg-base-100 px-2.5 py-1.5 font-mono text-xs text-base-content placeholder:text-base-content/30";
 
-  let form = $state(loadForm());
+  const linkedRequest = reviewRequestFromSearch(window.location.search);
+
+  let form = $state(linkedRequest ? formFromRequest(linkedRequest) : loadForm());
   let refs = $state(null);
   let refsError = $state(null);
 
@@ -75,7 +80,7 @@
     event.preventDefault();
     if (request === null) return;
     saveForm(form);
-    window.location.href = showPageUrl(request);
+    window.location.href = reviewShowUrl(request);
   }
 </script>
 

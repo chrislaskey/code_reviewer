@@ -210,6 +210,12 @@ impl Tmux {
         .await
     }
 
+    /// Ends the session and everything running in it.
+    pub async fn kill_session(&self, name: &str) -> Result<(), String> {
+        self.run_checked(&["kill-session", "-t", &exact_target(name)])
+            .await
+    }
+
     /// Types `command` into the session's active pane and presses Enter. The
     /// shell reads it once it has started.
     pub async fn send_command(&self, name: &str, command: &str) -> Result<(), String> {
@@ -447,10 +453,13 @@ mod tests {
         let client_ttys = tmux.list_client_ttys(name).await;
         let exists = tmux.has_session(name).await;
         let prefix_matches = tmux.has_session("exam").await;
+        tmux.kill_session(name).await.expect("session is killed");
+        let exists_after_kill = tmux.has_session(name).await;
 
         assert!(screen.contains("sent-42"), "screen was: {screen}");
         assert_eq!(exists, Ok(true));
         assert_eq!(prefix_matches, Ok(false));
+        assert_eq!(exists_after_kill, Ok(false));
         assert_eq!(client_ttys, Ok(Vec::new()));
         let sessions = sessions.expect("sessions are listed");
         assert_eq!(sessions.len(), 1);

@@ -12,6 +12,9 @@
     "allow-get-session-settings",
     "allow-list-sessions",
     "allow-create-session",
+    "allow-continue-session",
+    "allow-merge-session",
+    "allow-close-session",
     "allow-show-session-in-terminal-app"
   ]
 }

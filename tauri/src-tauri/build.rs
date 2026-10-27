@@ -9,6 +9,9 @@ fn main() {
         "get_session_settings",
         "list_sessions",
         "create_session",
+        "continue_session",
+        "merge_session",
+        "close_session",
         "show_session_in_terminal_app",
     ]);
 

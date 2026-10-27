@@ -1,5 +1,13 @@
 /* The sessions pages. Shared styles are in ../styles.css. */
 
+:root {
+  --git-clean: #2da44e;
+  --git-dirty: #c69026;
+  --git-staged: #2da44e;
+  --git-unstaged: #cf222e;
+  --git-untracked: #a845b5;
+}
+
 .page.wide {
   max-width: 980px;
 }
@@ -86,6 +94,46 @@
   flex-shrink: 0;
   white-space: nowrap;
   font-size: 0.8rem;
+}
+
+/* Git status, like a shell prompt: branch ✔ staged ✘ unstaged ✂ untracked. */
+
+.git {
+  flex-shrink: 0;
+  max-width: 22rem;
+  display: flex;
+  gap: 0.4rem;
+  white-space: nowrap;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+}
+
+.git-branch {
+  color: var(--git-clean);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.git-branch.dirty {
+  color: var(--git-dirty);
+}
+
+.git-staged {
+  color: var(--git-staged);
+}
+
+.git-unstaged,
+.git-conflicted {
+  color: var(--git-unstaged);
+}
+
+.git-untracked {
+  color: var(--git-untracked);
+}
+
+.git-sync {
+  color: var(--muted);
 }
 
 /* Long paths keep their end visible. */
