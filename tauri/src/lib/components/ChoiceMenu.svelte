@@ -15,7 +15,7 @@
    */
 
   /** @type {Props} */
-  let { label, title, class: class_ = "btn btn-ghost btn-sm", children } = $props();
+  let { label, title, class: class_ = "btn btn-ghost", children } = $props();
 
   let open = $state(false);
   let element;
@@ -40,7 +40,7 @@
     {label}
     <Icon name="hero-chevron-down-micro" class="size-4" />
   </summary>
-  <ul class="dropdown-content menu choice-menu w-[22rem] bg-base-100 rounded-box shadow-sm">
+  <ul class="dropdown-content menu choice-menu w-[24rem] bg-base-100 rounded-box shadow-sm">
     {@render children({ close })}
   </ul>
 </details>

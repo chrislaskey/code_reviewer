@@ -84,7 +84,7 @@
     <p class="border-b border-base-300 bg-error/10 px-4 py-3 font-mono text-xs text-error">{tests.message}</p>
   {:else if tests.state === "ready"}
     <div class="full-page-body">
-      <aside class="flex w-80 shrink-0 flex-col border-r border-base-300 bg-base-100">
+      <aside class="flex w-80 shrink-0 flex-col border-r border-base-300 bg-base-200">
         <TestPicker tests={tests.value.tests} {selected} onSelect={(test) => selectTest(test.function)} />
       </aside>
       <div class="full-page-content flex flex-col">

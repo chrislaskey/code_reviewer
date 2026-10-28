@@ -188,7 +188,7 @@
 
 <svelte:window onfocus={refresh} />
 
-<StillWaves bind:this={waves} />
+<StillWaves bind:this={waves} rippleOnLoad />
 
 <AppNav current="sessions" />
 
@@ -237,7 +237,7 @@
           </p>
         </InfoPopover>
       </div>
-      <Button class="btn btn-ghost btn-sm" onclick={refreshFromButton}>
+      <Button class="btn btn-ghost" onclick={refreshFromButton}>
         <Icon name="hero-arrow-path-micro" class="size-4" />
         Refresh
       </Button>

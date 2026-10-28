@@ -2,7 +2,6 @@
      and when the repository has LiveView tests a switch keeps only those. -->
 <script>
   import { CHANGE_STYLES } from "../lib/change_styles.js";
-  import { FIELD_CLASS } from "../lib/components/ComparisonFields.svelte";
   import { sameFunction, testLabel } from "./call_stack.js";
 
   /** @type {{ tests: any[], selected: any | null, onSelect: (test: any) => void }} */
@@ -34,7 +33,7 @@
 </script>
 
 <div class="space-y-2 border-b border-base-300 p-3">
-  <input bind:value={search} placeholder="Find a test" spellcheck="false" class={["w-full", FIELD_CLASS]} />
+  <input bind:value={search} placeholder="Find a test" spellcheck="false" class="w-full rounded-lg border border-base-300 bg-base-100 px-2.5 py-1.5 font-mono text-xs text-base-content placeholder:text-base-content/30" />
   {#if hasLiveViewTests}
     <label class="flex items-center gap-2 text-[11px] text-base-content/60">
       <input type="checkbox" bind:checked={liveViewOnly} />

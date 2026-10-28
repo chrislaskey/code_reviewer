@@ -7,6 +7,7 @@
   import Button from "../lib/components/Button.svelte";
   import ComparisonFields from "../lib/components/ComparisonFields.svelte";
   import Header from "../lib/components/Header.svelte";
+  import StillWaves from "../lib/components/StillWaves.svelte";
   import {
     EMPTY_COMPARISON_FORM,
     buildComparison,
@@ -34,9 +35,11 @@
   }
 </script>
 
+<StillWaves rippleOnLoad />
+
 <AppNav current="traces" />
 
-<main class="mx-auto max-w-3xl px-6 py-6">
+<main class="with-waves mx-auto max-w-3xl px-6 pt-8">
   <Header>
     New trace
     {#snippet subtitle()}
@@ -44,14 +47,14 @@
     {/snippet}
   </Header>
 
-  <form onsubmit={submit} class="space-y-4 rounded-xl border border-base-300 bg-base-100 px-4 py-4">
+  <form onsubmit={submit} class="space-y-5 rounded-xl border border-base-300 bg-base-100 p-6">
     <ComparisonFields bind:form onRefsError={(message) => (refsError = message)} />
 
     <div class="flex flex-wrap items-center gap-3">
       <Button variant="primary" type="submit" disabled={request === null}>List tests</Button>
-      <p class="text-[11px] text-base-content/50">{describeComparison(form)}</p>
+      <p class="text-sm text-base-content/50">{describeComparison(form)}</p>
       {#if refsError && form.mode !== "working_tree"}
-        <p class="text-[11px] text-error">Could not read the branches: {refsError}</p>
+        <p class="text-sm text-error">Could not read the branches: {refsError}</p>
       {/if}
     </div>
   </form>

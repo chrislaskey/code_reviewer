@@ -30,7 +30,7 @@
   <summary class="flex cursor-pointer list-none text-base-content/50 hover:text-base-content" {title}>
     <Icon name={icon} class="size-[1.1rem]" />
   </summary>
-  <div class="dropdown-content z-10 mt-1 w-[30rem] rounded-box bg-base-100 p-3 text-xs leading-relaxed text-base-content/70 shadow-sm">
+  <div class="dropdown-content z-10 mt-1 w-[30rem] rounded-box bg-base-100 p-4 text-sm leading-relaxed text-base-content/70 shadow-sm">
     {@render children()}
   </div>
 </details>

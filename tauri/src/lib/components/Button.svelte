@@ -12,7 +12,7 @@
 
   const variants = { primary: "btn-primary" };
 
-  let classes = $derived(class_ ?? ["btn", variants[variant] ?? "btn-primary btn-soft"]);
+  let classes = $derived(class_ ?? ["btn text-base", variants[variant] ?? "btn-primary btn-soft"]);
 </script>
 
 {#if rest.href}

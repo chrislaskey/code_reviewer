@@ -2,6 +2,9 @@
   import { onMount } from "svelte";
   import { mountStillWaves } from "../waves/still_waves.js";
 
+  /** @type {{ rippleOnLoad?: boolean }} */
+  let { rippleOnLoad = false } = $props();
+
   let stage;
   let waves;
 
@@ -22,6 +25,7 @@
 
   onMount(() => {
     waves = mountStillWaves(stage);
+    if (rippleOnLoad) ripple(35);
     return waves.destroy;
   });
 </script>

@@ -5,7 +5,7 @@
 <script module>
   /** The classes of an input or select on the new review and new trace pages. */
   export const FIELD_CLASS =
-    "rounded-lg border border-base-300 bg-base-100 px-2.5 py-1.5 font-mono text-xs text-base-content placeholder:text-base-content/30";
+    "rounded-lg border border-base-300 bg-base-100 px-3 py-2 font-mono text-sm text-base-content placeholder:text-base-content/30";
 </script>
 
 <script>
@@ -62,16 +62,16 @@
   });
 </script>
 
-<div class="flex flex-wrap items-end gap-3">
-  <label class="flex min-w-72 flex-1 flex-col gap-1 text-[11px] text-base-content/60">
+<div class="flex flex-wrap items-end gap-4">
+  <label class="flex min-w-72 flex-1 flex-col gap-1.5 text-sm text-base-content/60">
     Repository path
     <input bind:value={form.repoPath} placeholder="/path/to/project" spellcheck="false" class={FIELD_CLASS} />
   </label>
-  <SegmentedControl value={form.mode} options={COMPARE_MODE_OPTIONS} onchange={(mode) => (form.mode = mode)} />
+  <SegmentedControl size="medium" value={form.mode} options={COMPARE_MODE_OPTIONS} onchange={(mode) => (form.mode = mode)} />
 </div>
 
 {#if form.mode === "commit"}
-  <label class="flex flex-col gap-1 text-[11px] text-base-content/60">
+  <label class="flex flex-col gap-1.5 text-sm text-base-content/60">
     Commit
     <select bind:value={form.commitSha} class={FIELD_CLASS}>
       {#each withRemembered(form.commitSha, commitOptions) as option (option.value)}
@@ -83,8 +83,8 @@
   </label>
 {/if}
 {#if form.mode === "branch"}
-  <div class="flex flex-wrap items-end gap-3">
-    <label class="flex min-w-48 flex-col gap-1 text-[11px] text-base-content/60">
+  <div class="flex flex-wrap items-end gap-4">
+    <label class="flex min-w-48 flex-col gap-1.5 text-sm text-base-content/60">
       This branch
       <select bind:value={form.headBranch} class={FIELD_CLASS}>
         {#each withRemembered(form.headBranch, branchOptions) as option (option.value)}
@@ -94,7 +94,7 @@
         {/each}
       </select>
     </label>
-    <label class="flex min-w-48 flex-col gap-1 text-[11px] text-base-content/60">
+    <label class="flex min-w-48 flex-col gap-1.5 text-sm text-base-content/60">
       Against
       <select bind:value={form.baseBranch} class={FIELD_CLASS}>
         {#each withRemembered(form.baseBranch, branchOptions) as option (option.value)}

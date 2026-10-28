@@ -11,12 +11,12 @@
   let { actions, children, subtitle } = $props();
 </script>
 
-<header class={[actions != null && "flex items-center justify-between gap-6", "pb-4"]}>
+<header class={[actions != null && "flex items-center justify-between gap-6", "pb-6"]}>
   <div>
-    <h1 class="text-lg font-semibold leading-8">
+    <h1 class="text-2xl font-semibold leading-9">
       {@render children?.()}
     </h1>
-    {#if subtitle != null}<p class="text-sm text-base-content/70">
+    {#if subtitle != null}<p class="mt-1 text-base-content/70">
       {@render subtitle?.()}
     </p>{/if}
   </div>

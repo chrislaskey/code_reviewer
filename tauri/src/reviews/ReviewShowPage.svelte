@@ -173,7 +173,7 @@
       </ul>
     </Toolbar>
     <div class="full-page-body">
-      <aside class="w-60 shrink-0 overflow-y-auto border-r border-base-300 bg-base-100">
+      <aside class="w-60 shrink-0 overflow-y-auto border-r border-base-300 bg-base-200">
         <ReviewTree
           {allChangesRow}
           groups={result.groups}

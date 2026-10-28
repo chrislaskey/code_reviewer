@@ -2,12 +2,15 @@
 <script>
   import AppNav from "./lib/components/AppNav.svelte";
   import Header from "./lib/components/Header.svelte";
+  import StillWaves from "./lib/components/StillWaves.svelte";
   import { reviewNewUrl, sessionsIndexUrl, traceNewUrl } from "./lib/routes.js";
 </script>
 
+<StillWaves rippleOnLoad />
+
 <AppNav current="home" />
 
-<main class="page">
+<main class="page with-waves">
   <Header>
     Code Reviewer
     {#snippet subtitle()}

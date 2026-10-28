@@ -65,7 +65,7 @@
       style="padding-left: {12 + item.depth * INDENT}px"
       class={[
         "flex w-full items-center gap-1.5 py-1 pr-3 text-left",
-        item.selected ? "bg-primary/10 font-semibold" : "hover:bg-base-200/70",
+        item.selected ? "bg-primary/10 font-semibold" : "hover:bg-base-content/5",
         item.dim ? "text-base-content/60" : "",
         item.mono ? "font-mono text-[11px]" : "text-xs",
       ]}
