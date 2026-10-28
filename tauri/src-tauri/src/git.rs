@@ -1,7 +1,8 @@
-//! Reads the git status of a directory: branch, how far it is ahead of and
-//! behind its upstream, and how many files are staged, unstaged, untracked
-//! and conflicted.
+//! Reads the git status of a directory: the repository's name, branch, how
+//! far it is ahead of and behind its upstream, and how many files are
+//! staged, unstaged, untracked and conflicted.
 
+use std::path::Path;
 use std::time::Duration;
 
 use serde::Serialize;
@@ -13,6 +14,8 @@ const GIT_STATUS_TIMEOUT: Duration = Duration::from_secs(3);
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct GitStatus {
+    /// The main checkout's name, shared by its worktrees, e.g. `code_reviewer`.
+    pub repository_name: Option<String>,
     /// `None` when HEAD is detached.
     pub branch: Option<String>,
     /// The first 7 characters of HEAD's commit, `None` before the first
@@ -32,6 +35,18 @@ pub struct GitStatus {
     pub conflicted: u32,
     /// Whether any file is staged, unstaged, untracked or conflicted.
     pub dirty: bool,
+    /// The kind of change most in need of attention, `None` when clean.
+    pub most_important_change: Option<GitChange>,
+}
+
+/// A kind of uncommitted change, most in need of attention first.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum GitChange {
+    Conflicted,
+    Unstaged,
+    Untracked,
+    Staged,
 }
 
 /// The git status of `directory`, or `None` when it isn't in a git
@@ -56,7 +71,37 @@ pub async fn get_status(directory: &str) -> Option<GitStatus> {
     if !output.status.success() {
         return None;
     }
-    Some(parse_status(&String::from_utf8_lossy(&output.stdout)))
+    let mut status = parse_status(&String::from_utf8_lossy(&output.stdout));
+    status.repository_name = get_repository_name(directory).await;
+    Some(status)
+}
+
+async fn get_repository_name(directory: &str) -> Option<String> {
+    let output = Command::new("git")
+        .args(["-C", directory])
+        .args(["rev-parse", "--path-format=absolute", "--git-common-dir"])
+        .kill_on_drop(true)
+        .output();
+    let output = tokio::time::timeout(GIT_STATUS_TIMEOUT, output)
+        .await
+        .ok()?
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    repository_name_of(String::from_utf8_lossy(&output.stdout).trim())
+}
+
+/// `/code/app/.git` is `app`'s, and a bare `/code/app.git` is `app`.
+fn repository_name_of(common_dir: &str) -> Option<String> {
+    let common_dir = Path::new(common_dir);
+    let repository = if common_dir.file_name()? == ".git" {
+        common_dir.parent()?
+    } else {
+        common_dir
+    };
+    let name = repository.file_name()?.to_string_lossy();
+    Some(name.strip_suffix(".git").unwrap_or(&name).to_string())
 }
 
 /// Parses `git status --porcelain=v2 --branch`, see `git help status`.
@@ -85,7 +130,20 @@ fn parse_status(output: &str) -> GitStatus {
         }
     }
     status.dirty = status.staged + status.unstaged + status.untracked + status.conflicted > 0;
+    status.most_important_change = most_important_change(&status);
     status
+}
+
+fn most_important_change(status: &GitStatus) -> Option<GitChange> {
+    [
+        (status.conflicted, GitChange::Conflicted),
+        (status.unstaged, GitChange::Unstaged),
+        (status.untracked, GitChange::Untracked),
+        (status.staged, GitChange::Staged),
+    ]
+    .into_iter()
+    .find(|(count, _)| *count > 0)
+    .map(|(_, change)| change)
 }
 
 fn parse_branch_header(header: &str, status: &mut GitStatus) {
@@ -133,6 +191,7 @@ u UU N... 100644 100644 100644 100644 abc abc abc conflict.rs
         assert_eq!(
             parse_status(output),
             GitStatus {
+                repository_name: None,
                 branch: Some("main".into()),
                 commit: Some("1234567".into()),
                 upstream: Some("origin/main".into()),
@@ -143,7 +202,26 @@ u UU N... 100644 100644 100644 100644 abc abc abc conflict.rs
                 untracked: 2,
                 conflicted: 1,
                 dirty: true,
+                most_important_change: Some(GitChange::Conflicted),
             }
+        );
+    }
+
+    #[test]
+    fn ranks_unstaged_over_untracked_over_staged() {
+        let change = |output: &str| parse_status(output).most_important_change;
+        let staged = "1 M. N... 100644 100644 100644 abc abc staged.rs\n";
+        let untracked = "? untracked.rs\n";
+        let unstaged = "1 .M N... 100644 100644 100644 abc abc unstaged.rs\n";
+        assert_eq!(change(""), None);
+        assert_eq!(change(staged), Some(GitChange::Staged));
+        assert_eq!(
+            change(&format!("{staged}{untracked}")),
+            Some(GitChange::Untracked)
+        );
+        assert_eq!(
+            change(&format!("{staged}{untracked}{unstaged}")),
+            Some(GitChange::Unstaged)
         );
     }
 
@@ -156,6 +234,16 @@ u UU N... 100644 100644 100644 100644 abc abc abc conflict.rs
 
         let initial = parse_status("# branch.oid (initial)\n# branch.head main\n");
         assert_eq!(initial.commit, None);
+    }
+
+    #[test]
+    fn names_the_repository_from_its_common_dir() {
+        assert_eq!(
+            repository_name_of("/code/code_reviewer/.git").as_deref(),
+            Some("code_reviewer")
+        );
+        assert_eq!(repository_name_of("/code/app.git").as_deref(), Some("app"));
+        assert_eq!(repository_name_of("/").as_deref(), None);
     }
 
     #[tokio::test]
@@ -188,10 +276,17 @@ u UU N... 100644 100644 100644 100644 abc abc abc conflict.rs
         let status = status.expect("it's a repository");
         assert_eq!(status.branch.as_deref(), Some("test-branch"));
         assert_eq!(
+            status.repository_name,
+            directory
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+        );
+        assert_eq!(
             (status.staged, status.unstaged, status.untracked),
             (1, 1, 1)
         );
         assert!(status.dirty);
+        assert_eq!(status.most_important_change, Some(GitChange::Unstaged));
         assert_eq!(outside, None);
     }
 }

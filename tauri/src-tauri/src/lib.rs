@@ -82,6 +82,7 @@ pub fn run() {
             merge_session,
             close_session,
             show_session_in_terminal_app,
+            open_session_in_browser,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -160,4 +161,14 @@ async fn show_session_in_terminal_app(
 ) -> Result<ShowOutcome, String> {
     let settings = state.session_settings().await;
     sessions::show_session_in_terminal_app(&settings.settings, &name).await
+}
+
+/// Opens a session's `http://localhost:<port>` in the browser. Returns the URL.
+#[tauri::command]
+async fn open_session_in_browser(
+    state: State<'_, AppState>,
+    name: String,
+) -> Result<String, String> {
+    let settings = state.session_settings().await;
+    sessions::open_session_in_browser(&settings.settings, &name).await
 }

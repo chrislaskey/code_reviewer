@@ -90,3 +90,8 @@ export function closeSession(name) {
 export function showSessionInTerminalApp(name) {
   return invoke("show_session_in_terminal_app", { name });
 }
+
+/** Opens a session's `http://localhost:<port>` in the browser. Returns the URL. */
+export function openSessionInBrowser(name) {
+  return invoke("open_session_in_browser", { name });
+}

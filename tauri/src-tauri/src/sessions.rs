@@ -85,8 +85,6 @@ pub struct DetectedSettings {
     /// The repository new sessions are worktrees of, unless the user picks
     /// another.
     pub directory: String,
-    /// For showing paths in it as `~/...`.
-    pub home_directory: Option<String>,
 }
 
 pub async fn detect_settings() -> DetectedSettings {
@@ -109,7 +107,6 @@ pub async fn detect_settings() -> DetectedSettings {
         },
         terminal_apps,
         directory: detect_directory().display().to_string(),
-        home_directory: std::env::var("HOME").ok(),
     }
 }
 
@@ -563,6 +560,39 @@ pub async fn show_session_in_terminal_app(
     .await
 }
 
+/// Opens `http://localhost:<PORT>` of one of the app's sessions in the
+/// browser. Returns the URL.
+pub async fn open_session_in_browser(settings: &Settings, name: &str) -> Result<String, String> {
+    tmux::validate_session_name(name)?;
+    if !has_session_name_prefix(&settings.session_name_prefix, name) {
+        return Err(format!("{name} is not a session this app started"));
+    }
+    let tmux = Tmux::new(&settings.tmux_path);
+    let port: u16 = tmux
+        .get_environment_variable(name, PORT_VARIABLE)
+        .await?
+        .and_then(|value| value.parse().ok())
+        .ok_or_else(|| format!("{name} has no {PORT_VARIABLE} to open"))?;
+
+    let url = localhost_url(port);
+    let output = Command::new("open")
+        .arg(&url)
+        .output()
+        .await
+        .map_err(|error| format!("Could not run open: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "Opening {url} failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(url)
+}
+
+fn localhost_url(port: u16) -> String {
+    format!("http://localhost:{port}")
+}
+
 /// The root of the git repository the app runs in, else the directory it
 /// runs in. Apps launched from Finder run in `/`, so then the user's home
 /// directory.
@@ -730,6 +760,24 @@ mod tests {
             current_pane(&review_panes).map(|pane| pane.id.as_str()),
             Some("%2")
         );
+    }
+
+    #[tokio::test]
+    async fn opens_only_the_apps_sessions_in_the_browser() {
+        let settings = Settings {
+            shell: "/bin/zsh".into(),
+            terminal_app: TerminalApp::Terminal,
+            tmux_path: "tmux".into(),
+            session_name_prefix: "cr".into(),
+            watched_directories: vec![],
+            main_branch: "main".into(),
+        };
+        let refused = open_session_in_browser(&settings, "other-session").await;
+        assert_eq!(
+            refused,
+            Err("other-session is not a session this app started".into())
+        );
+        assert_eq!(localhost_url(4040), "http://localhost:4040");
     }
 
     #[test]

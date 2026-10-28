@@ -18,6 +18,7 @@
     "allow-continue-session",
     "allow-merge-session",
     "allow-close-session",
-    "allow-show-session-in-terminal-app"
+    "allow-show-session-in-terminal-app",
+    "allow-open-session-in-browser"
   ]
 }

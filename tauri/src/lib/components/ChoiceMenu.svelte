@@ -15,7 +15,7 @@
    */
 
   /** @type {Props} */
-  let { label, title, class: class_ = "btn btn-primary btn-soft btn-sm", children } = $props();
+  let { label, title, class: class_ = "btn btn-ghost btn-sm", children } = $props();
 
   let open = $state(false);
   let element;

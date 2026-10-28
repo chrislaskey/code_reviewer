@@ -16,6 +16,7 @@ fn main() {
         "merge_session",
         "close_session",
         "show_session_in_terminal_app",
+        "open_session_in_browser",
     ]);
 
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(manifest))

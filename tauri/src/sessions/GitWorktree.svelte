@@ -1,36 +1,40 @@
-<!-- One of the app's git worktrees with no tmux session running in it, as
-     after a restart, with its git status, the way to start a session again,
-     the Review and Trace menus into those features and the Complete menu to
-     finish it. -->
 <script>
-  import Button from "../lib/components/Button.svelte";
+  import ChoiceMenu from "../lib/components/ChoiceMenu.svelte";
+  import MenuChoice from "../lib/components/MenuChoice.svelte";
   import { reviewShowUrl, traceShowUrl } from "../lib/routes.js";
+  import Badge from "./Badge.svelte";
   import ChangesMenu from "./ChangesMenu.svelte";
-  import CompleteMenu from "./CompleteMenu.svelte";
-  import GitStatus from "./GitStatus.svelte";
-  import Pill from "./Pill.svelte";
-  import ShortPath from "./ShortPath.svelte";
+  import GitMenu from "./GitMenu.svelte";
+  import RepositoryName from "./RepositoryName.svelte";
 
-  let { worktree, homeDirectory, mainBranch, onContinue, onMerge, onClose } = $props();
+  let { worktree, mainBranch, onContinue, onMerge, onClose } = $props();
 </script>
 
 <div class="panel">
   <div class="session-header">
-    <span class="name">{worktree.name}</span>
-    <Pill text="no session" title="No tmux session is running in the worktree" />
-    <div class="attach">
-      <Button class="btn btn-primary btn-sm" onclick={() => onContinue(worktree.name)}>Continue</Button>
+    <span class="session-title">
+      <span class="name no-session">{worktree.name}</span>
+      <RepositoryName path={worktree.path} git={worktree.git} />
+    </span>
+    <Badge text="no session" kind="badge-ghost" title="No tmux session is running in the worktree" />
+    <div class="session-actions">
+      <ChoiceMenu label="Open" title="Start a session in the worktree">
+        {#snippet children({ close })}
+          <MenuChoice
+            label="Open new tmux session"
+            explanation="Starts a tmux session in the worktree, opens it in the terminal app and types"
+            onclick={() => {
+              close();
+              onContinue(worktree.name);
+            }}
+          >
+            <code class="whitespace-nowrap">claude --continue</code>
+          </MenuChoice>
+        {/snippet}
+      </ChoiceMenu>
       <ChangesMenu label="Review" title="Open the changes in Reviews" directory={worktree.path} git={worktree.git} {mainBranch} urlFor={reviewShowUrl} />
       <ChangesMenu label="Trace" title="Trace a test through the changes in Traces" directory={worktree.path} git={worktree.git} {mainBranch} urlFor={traceShowUrl} />
-      <CompleteMenu name={worktree.name} git={worktree.git} {mainBranch} {onMerge} {onClose} />
+      <GitMenu name={worktree.name} git={worktree.git} {mainBranch} {onMerge} {onClose} />
     </div>
-  </div>
-  <div class="session-details">
-    <ShortPath path={worktree.path} {homeDirectory} />
-    {#if worktree.git}
-      <GitStatus git={worktree.git} />
-    {:else}
-      <span class="muted">{worktree.branch ? `branch ${worktree.branch}` : "detached HEAD"}</span>
-    {/if}
   </div>
 </div>
