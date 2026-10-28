@@ -12,6 +12,7 @@
     "allow-list-tests",
     "allow-get-test-call-stack",
     "allow-get-session-settings",
+    "allow-get-default-session-port",
     "allow-list-sessions",
     "allow-create-session",
     "allow-continue-session",

@@ -9,6 +9,7 @@ fn main() {
         "list_tests",
         "get_test_call_stack",
         "get_session_settings",
+        "get_default_session_port",
         "list_sessions",
         "create_session",
         "continue_session",

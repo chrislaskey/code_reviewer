@@ -59,7 +59,7 @@ multi-page), and name the pages by what they do:
 | Home | `src/index.html` | Links to the two features |
 | New review | `src/reviews/new.html` | The form: repository, what to compare, rules, groups |
 | Show review | `src/reviews/show.html?repo_path=…` | Runs the comparison and shows it |
-| New trace | `src/traces/new.html` | The form: repository, what to compare (decision 19) |
+| New trace | `src/traces/new.html` | The form: repository, what to compare (decision 20) |
 | Show trace | `src/traces/show.html?repo_path=…&test_name=…` | Lists the tests and walks the calls below the picked one |
 | Sessions | `src/sessions/index.html` | The tmux and Claude Code sessions |
 | New session | `src/sessions/new.html` | Creates a session and opens it |
@@ -82,8 +82,8 @@ already has a function, and list/get/create/show otherwise:
 | `analyze_file_changes` | `AnalysisService::analyze_file_changes` |
 | `get_function_diffs` | `AnalysisService::get_function_diffs` |
 | `get_file_diffs` | `AnalysisService::get_file_diffs` |
-| `list_tests` | `AnalysisService::list_tests` (decision 19) |
-| `get_test_call_stack` | `AnalysisService::get_test_call_stack` (decision 19) |
+| `list_tests` | `AnalysisService::list_tests` (decision 20) |
+| `get_test_call_stack` | `AnalysisService::get_test_call_stack` (decision 20) |
 | `get_session_settings` | `sessions::detect_settings` (cached) |
 | `list_sessions` | `sessions::list_sessions` |
 | `create_session` | `sessions::create_session` |
@@ -98,8 +98,8 @@ renamed to `list_sessions` and `open_tmux_session` to
 Only the commands the features use are exposed. The core crate's other
 entry points (`analyze_changes`, `get_function_source`, `get_call_trace`)
 stay in the library, tested, but have no command, no page and no UI
-(`list_tests` and `get_test_call_stack` got theirs in decision 19). The prototype's `greet` and `list_changed_files`
-commands were removed.
+(`list_tests` and `get_test_call_stack` got theirs in decision 20). The
+prototype's `greet` and `list_changed_files` commands were removed.
 
 ## 6. The two review views
 
@@ -350,14 +350,50 @@ the function. Function labels keep the tool's `Module.name/arity` form for
 both languages. The ledger highlights function code in the file's language
 instead of always Elixir.
 
-## 16. Left out on purpose
+## 16. Sessions: a port per session, in `PORT`
+
+Most repositories reviewed here are web apps with a dev server, and two
+worktrees of the same repository start it on the same port, so the second
+fails or, worse, the user tests the wrong one. **Decision:** every session
+gets a port of its own, set in its tmux environment as `PORT` (`tmux
+new-session -e`, tmux 3.2 or later), so the shell and everything started in
+the session see it. The new session form has a Port field, filled in with
+the lowest port from 4001 up that none of the app's running sessions holds
+(`get_default_session_port`, read back with `tmux show-environment`), which
+with no gaps is 4000 + the session count + 1; the user may type another,
+and a port another session holds or one below 1024 is refused. Continue
+takes the default without asking. The session card shows the port.
+
+The repository decides what to do with the number. This repository's
+`bin/dev` makes Vite listen on `PORT` and points Tauri at it with
+`--config`, keeping 1420 when `PORT` is unset so nothing changes outside a
+session. A repository with several servers (a Phoenix app with an Axum
+server, say) spreads them from `PORT`, such as `PORT` for the first and
+`PORT + 1000` for the next, so consecutive session ports never meet. The
+same number can tell dev databases apart (`myapp_dev_4001`).
+
+Options considered: a small slot number (1, 2, 3) with each repository
+deriving `4000 + slot * 10 + offset`, which handles several servers with
+blocks of ten but makes every repository do arithmetic before a
+single-server app works, and leaves the form showing a number nobody can
+paste into a browser; named ports the repository declares in a file of its
+own, which is the most explicit but adds a format to maintain; and dynamic
+ports each server picks at start, which need no allocation but change
+between runs. `PORT` works with no change for the many servers that already
+read it, and the form shows the address the app will be on.
+
+The port is not remembered with the worktree: a continued session gets the
+lowest free port again, which can differ from the last run. Remembering it
+is in `docs/suggestions/sessions.md`.
+
+## 17. Left out on purpose
 
 Each of these existed in a prototype or the template and was dropped from
 the MVP. See `docs/suggestions/` for the list to bring back from.
 
 - The Axum server, the shared React frontend and `BackendAdapter`.
 - The explorations pages and the ReactFlow file-level views. The test call
-  stack page came back as Traces in decision 19; its canvas version did not.
+  stack page came back as Traces in decision 20; its canvas version did not.
 - The "Folded" choice for calls into dependencies (a "+N in dependencies and
   stdlib" line); only "Dimmed / Hidden" remain.
 - Highlighting the tree item of the section on screen as the page scrolls.
@@ -366,7 +402,90 @@ the MVP. See `docs/suggestions/` for the list to bring back from.
 - Opening links from rendered Markdown in the browser (clicking one does
   nothing).
 
-## 19. Traces: the test call stack, back as a feature
+## 18. Verification
+
+`bin/check` runs what `AGENTS.md` asks for: `cargo fmt --check`, `cargo
+clippy --workspace --all-targets -D warnings`, `cargo test --workspace`,
+`cargo audit`, plus `pnpm check` (svelte-check) and `pnpm build`.
+
+## 19. What was verified
+
+On 2026-10-27, with `bin/check` passing (fmt, clippy, 126 Rust tests,
+svelte-check, Vite build, cargo audit with two allowed unmaintained-crate
+warnings from Tauri's dependency tree):
+
+- `cargo tauri dev` builds and opens the app without errors.
+- The pages were driven in headless Chrome against the Vite dev server, with
+  Tauri's `invoke` bridged over HTTP to the same Rust code the commands call
+  (a throwaway bridge outside the repository). Checked by screenshot: the
+  home page; the new review form reading the branches of a repository and
+  submitting; the show page in the Node view with group cards, chips and
+  edges, hover fading, a chip click scrolling to a group, light and dark;
+  the Ledger view with the tree, the three columns, markers, hovering a
+  function to preview its code and pinning it, and a jump link scrolling to
+  another file; the sessions page listing tmux and Claude Code sessions; the
+  new session form with the detected directory.
+- Later the same day, after decision 10: the sessions page listing only
+  `cr-` sessions (one with a shell at a prompt, created with tmux directly
+  for the check) and the new session form showing the `cr-` prefix, driven
+  the same way.
+- After decisions 11 and 12: `git_worktree.rs` is covered by tests on
+  temporary repositories (a new branch, an existing branch, a repository
+  without commits, the exclude file, listing the worktrees under a watched
+  directory). The sessions page was driven in headless Chrome again with a
+  `cr-` worktree of a temporary repository under a watched directory,
+  showing the worktree card with Continue. Creating or continuing a session
+  end to end opens a terminal window, so that was left to the user.
+- After decision 13: merging and closing are covered by tests on temporary
+  repositories (a merge, a dirty worktree refused, a diverged branch
+  refused, a clean close keeping the branch). The page was driven again
+  with a temporary repository holding a clean and a dirty worktree and a
+  tmux session in the clean one: the git status showed on each card, the
+  choices were disabled on the dirty one, and Merge into main on the clean one
+  merged, removed the worktree and closed the session through the page.
+  The Complete menu was then checked the same way with a canned `invoke`
+  (no Rust side), as only the page changed: both choices, the sentences,
+  disabled on a dirty worktree, closing on an outside click and on Escape.
+- After decision 14: the Review menu's links were followed in the same
+  headless setup: the show page sent the request parsed from the flat query
+  to `analyze_file_changes`, Edit review opened the form filled in from it,
+  and a flat link (with repeated `group_include` parameters) against the
+  real core on a test repository showed its groups and files.
+- After decision 15: `bin/check` passing (154 Rust tests, the new
+  ones in `core/src/analysis/rust.rs` and `core/tests/rust_analysis.rs`).
+  Indexing this repository found 562 functions in 43 Rust files, 154 of
+  them tests, with 968 calls resolved to project functions and 247 outside
+  it, including a Tauri command's call into `core` through the package
+  name. The show page was driven in headless Chrome on the worktree's own
+  uncommitted changes with `invoke` bridged to the real core: the Rust files
+  were parsed, the ledger listed `name/arity` functions with their outputs
+  and callers across files, and the code footer showed doc comments,
+  attributes and Rust syntax colours.
+- Not exercised: creating a session and opening one in the terminal app
+  (both would open windows on the Mac the tests ran on). The code paths are
+  the Starter Pack's, unchanged apart from where the settings come from.
+- After decision 16: `tmux.rs` creates a session with a variable set and
+  reads it back on a private tmux server, the lowest free port and the
+  port check are unit tests, and `bin/check` passes. Vite started with
+  `PORT=1422` listened there. The new session form and the list were driven
+  in headless Chrome with a canned `invoke`: the Port field filled in from
+  `get_default_session_port`, the form sent the typed port as a number, and
+  the cards showed `port 4001` and nothing for a session without one. Not
+  exercised: `bin/dev` opening the Tauri window on the overridden dev URL,
+  and a session created end to end with `PORT` in its environment (both
+  open windows).
+- After decision 20: `bin/check` passing. The trace pages were driven in
+  headless Chrome with `invoke` bridged to the real core: the new form
+  submitting to the show page; this repository's 154 Rust tests listed and
+  one walked (101 frames, 152 with system calls shown); a two-commit Elixir
+  repository where the walked test reached a modified function, shown as a
+  card with its diff, with Prev and Next change stepping to it and Close
+  children and Close code folding the stack; the picked test kept in the
+  URL across a reload and Edit trace filling the form. The sessions page
+  was driven with a canned `invoke`: both cards show Review and Trace menus
+  with the renamed choices linking to the two show pages.
+
+## 20. Traces: the test call stack, back as a feature
 
 The prototype's spike listed the tests of a comparison and walked the calls
 below one, top to bottom like a stack trace, with each project function
@@ -430,76 +549,3 @@ instead of a feature of its own. The two take different inputs (a review
 has rules and groups, a trace has a test), show different things and are
 linked to separately from a session card, so separate pages keep each
 page's query the request, as decision 14 wants.
-
-## 17. Verification
-
-`bin/check` runs what `AGENTS.md` asks for: `cargo fmt --check`, `cargo
-clippy --workspace --all-targets -D warnings`, `cargo test --workspace`,
-`cargo audit`, plus `pnpm check` (svelte-check) and `pnpm build`.
-
-## 18. What was verified
-
-On 2026-10-27, with `bin/check` passing (fmt, clippy, 126 Rust tests,
-svelte-check, Vite build, cargo audit with two allowed unmaintained-crate
-warnings from Tauri's dependency tree):
-
-- `cargo tauri dev` builds and opens the app without errors.
-- The pages were driven in headless Chrome against the Vite dev server, with
-  Tauri's `invoke` bridged over HTTP to the same Rust code the commands call
-  (a throwaway bridge outside the repository). Checked by screenshot: the
-  home page; the new review form reading the branches of a repository and
-  submitting; the show page in the Node view with group cards, chips and
-  edges, hover fading, a chip click scrolling to a group, light and dark;
-  the Ledger view with the tree, the three columns, markers, hovering a
-  function to preview its code and pinning it, and a jump link scrolling to
-  another file; the sessions page listing tmux and Claude Code sessions; the
-  new session form with the detected directory.
-- Later the same day, after decision 10: the sessions page listing only
-  `cr-` sessions (one with a shell at a prompt, created with tmux directly
-  for the check) and the new session form showing the `cr-` prefix, driven
-  the same way.
-- After decisions 11 and 12: `git_worktree.rs` is covered by tests on
-  temporary repositories (a new branch, an existing branch, a repository
-  without commits, the exclude file, listing the worktrees under a watched
-  directory). The sessions page was driven in headless Chrome again with a
-  `cr-` worktree of a temporary repository under a watched directory,
-  showing the worktree card with Continue. Creating or continuing a session
-  end to end opens a terminal window, so that was left to the user.
-- After decision 13: merging and closing are covered by tests on temporary
-  repositories (a merge, a dirty worktree refused, a diverged branch
-  refused, a clean close keeping the branch). The page was driven again
-  with a temporary repository holding a clean and a dirty worktree and a
-  tmux session in the clean one: the git status showed on each card, the
-  choices were disabled on the dirty one, and Merge into main on the clean one
-  merged, removed the worktree and closed the session through the page.
-  The Complete menu was then checked the same way with a canned `invoke`
-  (no Rust side), as only the page changed: both choices, the sentences,
-  disabled on a dirty worktree, closing on an outside click and on Escape.
-- After decision 14: the Review menu's links were followed in the same
-  headless setup: the show page sent the request parsed from the flat query
-  to `analyze_file_changes`, Edit review opened the form filled in from it,
-  and a flat link (with repeated `group_include` parameters) against the
-  real core on a test repository showed its groups and files.
-- After decision 15: `bin/check` passing (154 Rust tests, the new
-  ones in `core/src/analysis/rust.rs` and `core/tests/rust_analysis.rs`).
-  Indexing this repository found 562 functions in 43 Rust files, 154 of
-  them tests, with 968 calls resolved to project functions and 247 outside
-  it, including a Tauri command's call into `core` through the package
-  name. The show page was driven in headless Chrome on the worktree's own
-  uncommitted changes with `invoke` bridged to the real core: the Rust files
-  were parsed, the ledger listed `name/arity` functions with their outputs
-  and callers across files, and the code footer showed doc comments,
-  attributes and Rust syntax colours.
-- Not exercised: creating a session and opening one in the terminal app
-  (both would open windows on the Mac the tests ran on). The code paths are
-  the Starter Pack's, unchanged apart from where the settings come from.
-- After decision 19: `bin/check` passing. The trace pages were driven in
-  headless Chrome with `invoke` bridged to the real core: the new form
-  submitting to the show page; this repository's 154 Rust tests listed and
-  one walked (101 frames, 152 with system calls shown); a two-commit Elixir
-  repository where the walked test reached a modified function, shown as a
-  card with its diff, with Prev and Next change stepping to it and Close
-  children and Close code folding the stack; the picked test kept in the
-  URL across a reload and Edit trace filling the form. The sessions page
-  was driven with a canned `invoke`: both cards show Review and Trace menus
-  with the renamed choices linking to the two show pages.

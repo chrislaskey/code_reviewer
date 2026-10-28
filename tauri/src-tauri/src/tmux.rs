@@ -172,25 +172,51 @@ impl Tmux {
 
     /// Starts a detached session running `shell` as a login shell, so it
     /// gets the user's full environment even when the app was launched from
-    /// Finder.
+    /// Finder. `environment` is set in the session's environment, so the
+    /// shell and everything started in the session see it (tmux 3.2 or
+    /// later), and `get_environment_variable` reads it back.
     pub async fn create_session(
         &self,
         name: &str,
         shell: &str,
         working_directory: &str,
+        environment: &[(&str, &str)],
     ) -> Result<(), String> {
-        self.run_checked(&[
-            "new-session",
-            "-d",
-            "-s",
-            name,
-            "-c",
-            working_directory,
-            "--",
-            shell,
-            "-l",
-        ])
-        .await
+        let assignments: Vec<String> = environment
+            .iter()
+            .map(|(variable, value)| format!("{variable}={value}"))
+            .collect();
+        let mut args = vec!["new-session", "-d", "-s", name, "-c", working_directory];
+        for assignment in &assignments {
+            args.extend(["-e", assignment]);
+        }
+        args.extend(["--", shell, "-l"]);
+        self.run_checked(&args).await
+    }
+
+    /// The value of `variable` in the session's environment, `None` when
+    /// the session has no such variable (or has unset it).
+    pub async fn get_environment_variable(
+        &self,
+        name: &str,
+        variable: &str,
+    ) -> Result<Option<String>, String> {
+        let output = self
+            .run(&["show-environment", "-t", &exact_target(name), variable])
+            .await?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            if stderr.contains("unknown variable") {
+                return Ok(None);
+            }
+            return Err(format!("tmux show-environment failed: {}", stderr.trim()));
+        }
+        let line = String::from_utf8_lossy(&output.stdout);
+        Ok(line
+            .trim_end()
+            .strip_prefix(variable)
+            .and_then(|rest| rest.strip_prefix('='))
+            .map(str::to_string))
     }
 
     /// Makes terminals attached to the session show `window_title` as their
@@ -430,24 +456,26 @@ mod tests {
         let tmux = &server.tmux;
         let name = "example";
 
-        tmux.create_session(name, "/bin/sh", "/tmp")
+        tmux.create_session(name, "/bin/sh", "/tmp", &[("EXAMPLE_PORT", "4242")])
             .await
             .expect("session is created");
         tmux.show_session_in_window_title(name)
             .await
             .expect("title is set");
-        tmux.send_command(name, "echo sent-$((40 + 2))")
+        tmux.send_command(name, "echo sent-$EXAMPLE_PORT")
             .await
             .expect("command is sent");
 
         let mut screen = String::new();
         for _ in 0..50 {
             screen = tmux.capture_pane(name).await;
-            if screen.contains("sent-42") {
+            if screen.contains("sent-4242") {
                 break;
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
+        let port = tmux.get_environment_variable(name, "EXAMPLE_PORT").await;
+        let missing = tmux.get_environment_variable(name, "EXAMPLE_MISSING").await;
         let sessions = tmux.list_sessions().await;
         let panes = tmux.list_panes().await;
         let client_ttys = tmux.list_client_ttys(name).await;
@@ -456,7 +484,9 @@ mod tests {
         tmux.kill_session(name).await.expect("session is killed");
         let exists_after_kill = tmux.has_session(name).await;
 
-        assert!(screen.contains("sent-42"), "screen was: {screen}");
+        assert!(screen.contains("sent-4242"), "screen was: {screen}");
+        assert_eq!(port, Ok(Some("4242".to_string())));
+        assert_eq!(missing, Ok(None));
         assert_eq!(exists, Ok(true));
         assert_eq!(prefix_matches, Ok(false));
         assert_eq!(exists_after_kill, Ok(false));

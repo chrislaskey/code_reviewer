@@ -24,6 +24,17 @@ Ideas and template features not in the rewrite. None are planned.
   the repository's current HEAD now.
 - Remember the command a session was created with, so Continue can type it
   again instead of `claude --continue`.
+- Remember a session's port with its worktree (in the repository's git
+  config, say), so Continue starts it on the same port as before instead of
+  the lowest free one, and bookmarks keep working. A Port field on Continue
+  would do too.
+- Make the port on a session card a link that opens
+  `http://localhost:<port>` in the browser (needs the opener plugin).
+- A slot number next to `PORT` for repositories with several servers, each
+  reserving a block of ports, instead of spreading them by a thousand from
+  `PORT`.
+- Check that a session's port is free on the Mac, not only among the app's
+  sessions, since another app may hold it.
 - Look deeper than the first level of the watched directories for
   repositories, or follow `git worktree list` from any one repository.
 - Choose the directory with a folder picker instead of typing the path.
