@@ -53,7 +53,7 @@ else imports `@tauri-apps/api`. The commands are in `src-tauri/src/lib.rs`
 
 ## Styling
 
-`src/app.css` runs Tailwind v4 with daisyUI and the Starter Pack's light and
+`src/app.css` runs Tailwind v4 with daisyUI and its built-in light and
 dark themes (`src/lib/theme.css`), and makes the `hero-*` icon classes from
 the `heroicons` npm package (`vendor/heroicons.js`). The theme also sets the
 font, Plus Jakarta Sans, vendored in `src/public/fonts` (copied from the
