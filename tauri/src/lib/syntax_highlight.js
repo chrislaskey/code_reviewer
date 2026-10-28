@@ -1,5 +1,5 @@
 // Syntax highlighting for the code of a diff. The colours live in
-// ../styles.css (`.code-syntax`), one set for each theme, so a theme switch
+// ./code.css (`.code-syntax`), one set for each theme, so a theme switch
 // needs no rerun.
 
 import hljs from "highlight.js/lib/core";

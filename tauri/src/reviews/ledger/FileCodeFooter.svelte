@@ -4,11 +4,11 @@
 <script>
   import { getContext } from "svelte";
   import Icon from "../../lib/components/Icon.svelte";
-  import SegmentedControl from "../SegmentedControl.svelte";
-  import CodeLines from "./CodeLines.svelte";
+  import SegmentedControl from "../../lib/components/SegmentedControl.svelte";
+  import CodeLines from "../../lib/components/CodeLines.svelte";
   import LineCounts from "./LineCounts.svelte";
   import { followOpenAllCommand } from "./open_all.svelte.js";
-  import { languageForPath } from "./syntax_highlight.js";
+  import { languageForPath } from "../../lib/syntax_highlight.js";
 
   /** @type {{ file: any }} */
   let { file } = $props();

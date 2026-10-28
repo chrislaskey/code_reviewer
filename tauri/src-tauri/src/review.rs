@@ -2,13 +2,10 @@
 //! around `code_reviewer_core`. Each runs on a blocking thread, since the
 //! core reads files and runs git.
 
-use std::sync::Arc;
-
-use code_reviewer_core::analysis::error::AnalysisError;
 use code_reviewer_core::analysis::file_diff::FileDiff;
 use code_reviewer_core::analysis::function_diff::FunctionDiff;
 use code_reviewer_core::analysis::service::{
-    AnalysisService, AnalyzeFileChangesRequest, AnalyzeFileChangesResponse, GetFileDiffsRequest,
+    AnalyzeFileChangesRequest, AnalyzeFileChangesResponse, GetFileDiffsRequest,
     GetFunctionDiffsRequest,
 };
 use code_reviewer_core::git::{
@@ -17,19 +14,7 @@ use code_reviewer_core::git::{
 use tauri::State;
 
 use crate::AppState;
-
-/// Runs `work` on a blocking thread with the app's analysis service.
-async fn run_analysis<T, F>(service: &Arc<AnalysisService>, work: F) -> Result<T, String>
-where
-    T: Send + 'static,
-    F: FnOnce(&AnalysisService) -> Result<T, AnalysisError> + Send + 'static,
-{
-    let service = Arc::clone(service);
-    tauri::async_runtime::spawn_blocking(move || work(&service))
-        .await
-        .map_err(|error| error.to_string())?
-        .map_err(|error| error.to_string())
-}
+use crate::analysis::run_analysis;
 
 /// The branches and latest commits of a repository, to choose what to review.
 #[tauri::command]

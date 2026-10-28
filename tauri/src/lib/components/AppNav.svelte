@@ -1,15 +1,16 @@
-<!-- The pill across the top of every page: the app's two features and the
+<!-- The pill across the top of every page: the app's features and the
      theme menu. `current` names the feature the page belongs to. -->
 <script>
   import ThemeMenu from "./ThemeMenu.svelte";
-  import { homeUrl, reviewNewUrl, sessionsIndexUrl } from "../routes.js";
+  import { homeUrl, reviewNewUrl, sessionsIndexUrl, traceNewUrl } from "../routes.js";
 
-  /** @type {{ current?: "home" | "reviews" | "sessions" }} */
+  /** @type {{ current?: "home" | "reviews" | "traces" | "sessions" }} */
   let { current = "home" } = $props();
 
   const LINKS = [
     { id: "sessions", label: "Sessions", href: sessionsIndexUrl() },
     { id: "reviews", label: "Review", href: reviewNewUrl() },
+    { id: "traces", label: "Trace", href: traceNewUrl() },
   ];
 </script>
 

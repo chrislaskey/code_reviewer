@@ -1,6 +1,6 @@
 <!-- The lines of a diff with two line number gutters, signs and syntax colours. -->
 <script>
-  import { highlightDiffLines } from "./syntax_highlight.js";
+  import { highlightDiffLines } from "../syntax_highlight.js";
 
   /** @type {{ lines: any[], language: string | null }} */
   let { lines, language } = $props();

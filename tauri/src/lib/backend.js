@@ -1,7 +1,7 @@
 // Every call to the Rust side goes through here, so pages and components
 // never call `invoke` themselves. When a web server joins the desktop app,
 // this is the one file that changes. The names are the Tauri commands' (see
-// src-tauri/src/lib.rs and review.rs); the request and response shapes are
+// src-tauri/src/lib.rs, review.rs and trace.rs); the request and response shapes are
 // the core crate's, with snake_case fields.
 
 import { invoke } from "@tauri-apps/api/core";
@@ -26,6 +26,18 @@ export function getFunctionDiffs(request) {
 /** The changed lines of files of any type, with a few lines of context. */
 export function getFileDiffs(request) {
   return invoke("get_file_diffs", { request });
+}
+
+/* -- Traces -------------------------------------------------------------------- */
+
+/** Every test in the head of a comparison, marking the ones it added or modified. */
+export function listTests(request) {
+  return invoke("list_tests", { request });
+}
+
+/** The calls below one test, walked top to bottom, each function marked against the base. */
+export function getTestCallStack(request) {
+  return invoke("get_test_call_stack", { request });
 }
 
 /* -- Sessions ------------------------------------------------------------------ */

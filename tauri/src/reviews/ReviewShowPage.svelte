@@ -11,16 +11,16 @@
   import AppNav from "../lib/components/AppNav.svelte";
   import { analyzeFileChanges, getFileDiffs, getFunctionDiffs } from "../lib/backend.js";
   import { reviewNewUrl, reviewRequestFromSearch } from "../lib/routes.js";
-  import { plural } from "./change_styles.js";
+  import { plural } from "../lib/change_styles.js";
+  import { describeRequest } from "../lib/comparison_form.js";
   import MarkerIcon from "./MarkerIcon.svelte";
   import ReviewTree from "./ReviewTree.svelte";
-  import SegmentedControl from "./SegmentedControl.svelte";
-  import Toolbar from "./Toolbar.svelte";
+  import SegmentedControl from "../lib/components/SegmentedControl.svelte";
+  import Toolbar from "../lib/components/Toolbar.svelte";
   import OpenAllButtons from "./ledger/OpenAllButtons.svelte";
   import ReviewLedgerView from "./ledger/ReviewLedgerView.svelte";
   import { createOpenAllCommand } from "./ledger/open_all.svelte.js";
   import ReviewNodeView from "./nodes/ReviewNodeView.svelte";
-  import { describeRequest } from "./review_form.js";
   import { ALL_CHANGES_ID, findFileById, toViewFiles, toViewGroupRows } from "./view_model.js";
 
   const VIEW_OPTIONS = [
@@ -111,7 +111,7 @@
   });
 </script>
 
-<div class="review-page">
+<div class="full-page">
   <AppNav current="reviews" />
 
   <div class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-base-300 bg-base-100 px-4 py-2 font-mono text-[11px] text-base-content/70">
@@ -172,7 +172,7 @@
         <li class="flex items-center gap-1.5"><MarkerIcon marker="also_changed" /> also changed, click to jump</li>
       </ul>
     </Toolbar>
-    <div class="review-body">
+    <div class="full-page-body">
       <aside class="w-60 shrink-0 overflow-y-auto border-r border-base-300 bg-base-100">
         <ReviewTree
           {allChangesRow}
@@ -185,7 +185,7 @@
         />
       </aside>
       {#if view === "nodes"}
-        <div class="review-canvas">
+        <div class="full-page-canvas">
           <ReviewNodeView
             bind:this={nodeView}
             rows={[allChangesRow, ...groupRows]}
@@ -194,7 +194,7 @@
           />
         </div>
       {:else}
-        <div class="review-content">
+        <div class="full-page-content">
           <ReviewLedgerView
             bind:this={ledgerView}
             group={selectedGroup}

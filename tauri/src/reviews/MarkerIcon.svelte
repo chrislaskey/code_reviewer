@@ -1,7 +1,7 @@
 <!-- A small icon after a caller or call, see MARKERS in change_styles.js. -->
 <script>
   import Icon from "../lib/components/Icon.svelte";
-  import { MARKERS } from "./change_styles.js";
+  import { MARKERS } from "../lib/change_styles.js";
 
   /** @type {{ marker: string }} */
   let { marker } = $props();

@@ -1,12 +1,14 @@
 <!-- One of the app's tmux sessions: its name, the Claude Code status in it,
      the ways to get to it (the attach command to copy, or Open), its git
-     status, the Review menu into Reviews and the Complete menu to finish it. -->
+     status, the Review and Trace menus into those features and the Complete
+     menu to finish it. -->
 <script>
   import Button from "../lib/components/Button.svelte";
+  import { reviewShowUrl, traceShowUrl } from "../lib/routes.js";
+  import ChangesMenu from "./ChangesMenu.svelte";
   import ClaudeCodePill from "./ClaudeCodePill.svelte";
   import CompleteMenu from "./CompleteMenu.svelte";
   import GitStatus from "./GitStatus.svelte";
-  import ReviewMenu from "./ReviewMenu.svelte";
   import Pill from "./Pill.svelte";
   import ShortPath from "./ShortPath.svelte";
 
@@ -49,7 +51,8 @@
       <Button class="btn btn-primary btn-soft btn-sm" onclick={() => onCopy(attachCommand, attachCommandElement)}>Copy</Button>
       <Button class="btn btn-primary btn-sm" onclick={() => onOpen(session.name)}>Open</Button>
       {#if session.directory}
-        <ReviewMenu directory={session.directory} git={session.git} {mainBranch} />
+        <ChangesMenu label="Review" title="Open the changes in Reviews" directory={session.directory} git={session.git} {mainBranch} urlFor={reviewShowUrl} />
+        <ChangesMenu label="Trace" title="Trace a test through the changes in Traces" directory={session.directory} git={session.git} {mainBranch} urlFor={traceShowUrl} />
       {/if}
       <CompleteMenu name={session.name} git={session.git} {mainBranch} {onMerge} {onClose} />
     </div>

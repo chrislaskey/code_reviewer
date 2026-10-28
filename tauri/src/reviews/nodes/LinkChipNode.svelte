@@ -3,7 +3,7 @@
 <script>
   import { getContext } from "svelte";
   import { Handle, Position } from "@xyflow/svelte";
-  import { TONE_STYLES } from "../change_styles.js";
+  import { TONE_STYLES } from "../../lib/change_styles.js";
   import MarkerIcon from "../MarkerIcon.svelte";
   import StartEllipsis from "../StartEllipsis.svelte";
   import { SIZES, linkTone } from "./layout.js";

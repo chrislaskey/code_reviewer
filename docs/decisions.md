@@ -59,6 +59,8 @@ multi-page), and name the pages by what they do:
 | Home | `src/index.html` | Links to the two features |
 | New review | `src/reviews/new.html` | The form: repository, what to compare, rules, groups |
 | Show review | `src/reviews/show.html?repo_path=…` | Runs the comparison and shows it |
+| New trace | `src/traces/new.html` | The form: repository, what to compare (decision 19) |
+| Show trace | `src/traces/show.html?repo_path=…&test_name=…` | Lists the tests and walks the calls below the picked one |
 | Sessions | `src/sessions/index.html` | The tmux and Claude Code sessions |
 | New session | `src/sessions/new.html` | Creates a session and opens it |
 
@@ -80,6 +82,8 @@ already has a function, and list/get/create/show otherwise:
 | `analyze_file_changes` | `AnalysisService::analyze_file_changes` |
 | `get_function_diffs` | `AnalysisService::get_function_diffs` |
 | `get_file_diffs` | `AnalysisService::get_file_diffs` |
+| `list_tests` | `AnalysisService::list_tests` (decision 19) |
+| `get_test_call_stack` | `AnalysisService::get_test_call_stack` (decision 19) |
 | `get_session_settings` | `sessions::detect_settings` (cached) |
 | `list_sessions` | `sessions::list_sessions` |
 | `create_session` | `sessions::create_session` |
@@ -91,10 +95,10 @@ template's `tmux_example` module became `sessions`, with `get_tmux_status`
 renamed to `list_sessions` and `open_tmux_session` to
 `show_session_in_terminal_app`, which says it focuses or opens a window.
 
-Only the commands the two features use are exposed. The core crate's other
-entry points (`analyze_changes`, `get_function_source`, `get_call_trace`,
-`list_tests`, `get_test_call_stack`) stay in the library, tested, but have no
-command, no page and no UI. The prototype's `greet` and `list_changed_files`
+Only the commands the features use are exposed. The core crate's other
+entry points (`analyze_changes`, `get_function_source`, `get_call_trace`)
+stay in the library, tested, but have no command, no page and no UI
+(`list_tests` and `get_test_call_stack` got theirs in decision 19). The prototype's `greet` and `list_changed_files`
 commands were removed.
 
 ## 6. The two review views
@@ -352,8 +356,8 @@ Each of these existed in a prototype or the template and was dropped from
 the MVP. See `docs/suggestions/` for the list to bring back from.
 
 - The Axum server, the shared React frontend and `BackendAdapter`.
-- The explorations pages, the test call stack pages and the ReactFlow
-  file-level views.
+- The explorations pages and the ReactFlow file-level views. The test call
+  stack page came back as Traces in decision 19; its canvas version did not.
 - The "Folded" choice for calls into dependencies (a "+N in dependencies and
   stdlib" line); only "Dimmed / Hidden" remain.
 - Highlighting the tree item of the section on screen as the page scrolls.
@@ -361,6 +365,71 @@ the MVP. See `docs/suggestions/` for the list to bring back from.
 - Editable session settings.
 - Opening links from rendered Markdown in the browser (clicking one does
   nothing).
+
+## 19. Traces: the test call stack, back as a feature
+
+The prototype's spike listed the tests of a comparison and walked the calls
+below one, top to bottom like a stack trace, with each project function
+shown in full and marked against the base (`core/src/analysis/
+test_call_stack.rs`, kept in the library with its tests since decision 5).
+**Decision:** bring it back as the third feature, **Traces**, built the
+same way as Reviews: a new page with the form (`src/traces/new.html`), a
+show page that takes the comparison from its query (`src/traces/show.html`),
+two Tauri commands named after the core functions (`list_tests`,
+`get_test_call_stack`, in `trace.rs`), two functions in `backend.js`, and
+`traceNewUrl`, `traceShowUrl` and `traceRequestFromSearch` in `routes.js`.
+The Trace link sits next to Review in the nav, and every session and
+worktree card has a Trace menu next to its Review menu with the same two
+choices.
+
+The show page lists the tests in the head on the left (by file, with a
+search box, and a "LiveView tests only" switch when the repository has
+any), and the picked test's stack on the right: changed functions as cards
+with their diff, unchanged project functions as one-line cards, calls
+outside the project as slim rows, with guide lines for the depth. The
+toolbar shows or hides the system calls and the unchanged functions, opens
+or closes every frame's code or children, and steps between the changed
+frames. A click on a frame closes its code and the frames below it, or
+opens both again. The picked test goes into the URL (`test_module`,
+`test_name`, `test_arity`, the `FunctionId` fields) with
+`history.replaceState`, so a reload or a bookmark lands on the same stack,
+and "Edit trace" opens the form with the comparison filled in. The plain
+HTML renderer was kept and the ReactFlow one left out
+(`docs/suggestions/traces.md`).
+
+Rather than copy the review pages, what both features need moved to
+`src/lib/`, where the next feature finds it too:
+
+- `comparison_form.js`: the comparison fields of a form (repository, mode,
+  commit, branches), `buildComparison`, `comparisonFormFromRequest`,
+  `describeComparison`, `describeRequest`, and `loadForm`/`saveForm` with
+  a storage key per page. `reviews/review_form.js` builds on it, adding the
+  module rules and groups.
+- `components/ComparisonFields.svelte`: those fields as markup, reading the
+  repository's branches and commits as the review form did.
+- `components/SegmentedControl.svelte`, `components/Toolbar.svelte`,
+  `components/CodeLines.svelte`, `syntax_highlight.js` and
+  `change_styles.js`, moved out of `src/reviews/`.
+- `code_page.css`: the layout of a page that fills the window
+  (`.full-page`, was `.review-page`), the dotted background and the syntax
+  colours, imported by both features' `app.css`.
+- `routes.js` reads and writes the comparison parameters in one place for
+  both request shapes.
+
+On the Rust side the `run_analysis` helper (the blocking thread around the
+core) moved from `review.rs` to `analysis.rs`, used by both command modules.
+
+The sessions cards' two menus are one component, `ChangesMenu` (was
+`ReviewMenu`), given the label, the title and the page function to link to
+(`reviewShowUrl` or `traceShowUrl`). Its choices were renamed on the way:
+"Recent changes" is now "Uncommitted changes" and "All changes" is
+"Committed changes", since the old names did not say which is which.
+
+Options considered: one show page with a view switch (Review / Trace)
+instead of a feature of its own. The two take different inputs (a review
+has rules and groups, a trace has a test), show different things and are
+linked to separately from a session card, so separate pages keep each
+page's query the request, as decision 14 wants.
 
 ## 17. Verification
 
@@ -424,3 +493,13 @@ warnings from Tauri's dependency tree):
 - Not exercised: creating a session and opening one in the terminal app
   (both would open windows on the Mac the tests ran on). The code paths are
   the Starter Pack's, unchanged apart from where the settings come from.
+- After decision 19: `bin/check` passing. The trace pages were driven in
+  headless Chrome with `invoke` bridged to the real core: the new form
+  submitting to the show page; this repository's 154 Rust tests listed and
+  one walked (101 frames, 152 with system calls shown); a two-commit Elixir
+  repository where the walked test reached a modified function, shown as a
+  card with its diff, with Prev and Next change stepping to it and Close
+  children and Close code folding the stack; the picked test kept in the
+  URL across a reload and Edit trace filling the form. The sessions page
+  was driven with a canned `invoke`: both cards show Review and Trace menus
+  with the renamed choices linking to the two show pages.

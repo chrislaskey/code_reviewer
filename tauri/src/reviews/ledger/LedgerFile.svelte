@@ -5,7 +5,7 @@
      Hover any line to highlight the function it belongs to; the rest fades. -->
 <script>
   import Icon from "../../lib/components/Icon.svelte";
-  import { CHANGE_STYLES, plural } from "../change_styles.js";
+  import { CHANGE_STYLES, plural } from "../../lib/change_styles.js";
   import LinesLabel from "../LinesLabel.svelte";
   import { findFileByPath, shortPath } from "../view_model.js";
   import CodeFooter from "./CodeFooter.svelte";

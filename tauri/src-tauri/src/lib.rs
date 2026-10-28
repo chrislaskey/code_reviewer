@@ -1,8 +1,11 @@
-//! The Code Reviewer desktop app: a Tauri shell with two features.
+//! The Code Reviewer desktop app: a Tauri shell with three features.
 //!
 //!   * Reviews (`review`): what a git comparison changed in an Elixir or
 //!     Rust repository, function by function, file by file and group by group,
 //!     computed by the `code_reviewer_core` crate.
+//!   * Traces (`trace`): the tests in the head of a comparison, and the
+//!     calls below one test walked top to bottom like a stack trace, each
+//!     function marked against the base. Also computed by the core crate.
 //!   * Sessions (`sessions`): the tmux sessions the app started, named
 //!     `cr-<name>`, with the Claude Code status in each, and its git
 //!     worktrees (named the same) without a session. A new session is a
@@ -13,6 +16,7 @@
 //! The pages are in `../src`, one HTML entry per page. They call the
 //! commands below through `src/lib/backend.js` and nothing else.
 
+mod analysis;
 mod claude_code;
 mod git;
 mod git_worktree;
@@ -21,6 +25,7 @@ mod review;
 mod sessions;
 mod terminal_app;
 mod tmux;
+mod trace;
 
 use std::sync::Arc;
 
@@ -67,6 +72,8 @@ pub fn run() {
             review::analyze_file_changes,
             review::get_function_diffs,
             review::get_file_diffs,
+            trace::list_tests,
+            trace::get_test_call_stack,
             get_session_settings,
             list_sessions,
             create_session,

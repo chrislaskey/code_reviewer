@@ -6,6 +6,8 @@ fn main() {
         "analyze_file_changes",
         "get_function_diffs",
         "get_file_diffs",
+        "list_tests",
+        "get_test_call_stack",
         "get_session_settings",
         "list_sessions",
         "create_session",

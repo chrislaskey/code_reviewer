@@ -46,6 +46,8 @@ export default defineConfig({
         home: resolve(import.meta.dirname, "src/index.html"),
         reviews_new: resolve(import.meta.dirname, "src/reviews/new.html"),
         reviews_show: resolve(import.meta.dirname, "src/reviews/show.html"),
+        traces_new: resolve(import.meta.dirname, "src/traces/new.html"),
+        traces_show: resolve(import.meta.dirname, "src/traces/show.html"),
         sessions_index: resolve(import.meta.dirname, "src/sessions/index.html"),
         sessions_new: resolve(import.meta.dirname, "src/sessions/new.html"),
       },

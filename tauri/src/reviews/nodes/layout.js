@@ -4,7 +4,7 @@
 // right, with an edge from each chip to the card or from the card to the chip.
 
 import { MarkerType } from "@xyflow/svelte";
-import { EDGE_COLORS } from "../change_styles.js";
+import { EDGE_COLORS } from "../../lib/change_styles.js";
 
 export const SIZES = {
   chipWidth: 264,

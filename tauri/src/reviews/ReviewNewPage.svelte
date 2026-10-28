@@ -5,76 +5,22 @@
 <script>
   import AppNav from "../lib/components/AppNav.svelte";
   import Button from "../lib/components/Button.svelte";
+  import ComparisonFields, { FIELD_CLASS } from "../lib/components/ComparisonFields.svelte";
   import Header from "../lib/components/Header.svelte";
-  import { listBranchesAndRecentCommits } from "../lib/backend.js";
+  import { describeComparison } from "../lib/comparison_form.js";
   import { reviewRequestFromSearch, reviewShowUrl } from "../lib/routes.js";
-  import SegmentedControl from "./SegmentedControl.svelte";
-  import {
-    COMPARE_MODE_OPTIONS,
-    buildRequest,
-    describeComparison,
-    formFromRequest,
-    loadForm,
-    saveForm,
-    withValidChoices,
-  } from "./review_form.js";
-
-  const FIELD_CLASS =
-    "rounded-lg border border-base-300 bg-base-100 px-2.5 py-1.5 font-mono text-xs text-base-content placeholder:text-base-content/30";
+  import { buildRequest, formFromRequest, loadForm, saveForm } from "./review_form.js";
 
   const linkedRequest = reviewRequestFromSearch(window.location.search);
 
   let form = $state(linkedRequest ? formFromRequest(linkedRequest) : loadForm());
-  let refs = $state(null);
   let refsError = $state(null);
 
   let request = $derived(buildRequest(form));
-  let branchOptions = $derived((refs?.branches ?? []).map((branch) => ({ value: branch, label: branch })));
-  let commitOptions = $derived(
-    (refs?.recent_commits ?? []).map((commit) => ({
-      value: commit.sha,
-      label: `${commit.short_sha}  ${commit.subject}  (${commit.committed_on})`,
-    })),
-  );
   let hasRules = $derived(form.includeRules.trim() !== "" || form.ignoreRules.trim() !== "");
   let hasGroups = $derived(
     form.groupConfigPath.trim() !== "" || form.groupIncludes.trim() !== "" || form.groupExcludes.trim() !== "",
   );
-
-  // Until the repository has been read, a select shows the remembered choice.
-  function withRemembered(value, options) {
-    if (value === "" || options.some((option) => option.value === value)) return options;
-    const label = /^[0-9a-f]{40}$/.test(value) ? value.slice(0, 8) : value;
-    return [{ value, label }, ...options];
-  }
-
-  // Read the branches and commits once the path stops changing.
-  $effect(() => {
-    const repoPath = form.repoPath.trim();
-    if (repoPath === "") {
-      refs = null;
-      refsError = null;
-      return;
-    }
-    let outdated = false;
-    const timer = window.setTimeout(async () => {
-      try {
-        const response = await listBranchesAndRecentCommits({ repo_path: repoPath });
-        if (outdated) return;
-        refs = response;
-        refsError = null;
-        form = withValidChoices(form, response);
-      } catch (error) {
-        if (outdated) return;
-        refs = null;
-        refsError = String(error);
-      }
-    }, 400);
-    return () => {
-      outdated = true;
-      window.clearTimeout(timer);
-    };
-  });
 
   function submit(event) {
     event.preventDefault();
@@ -95,50 +41,7 @@
   </Header>
 
   <form onsubmit={submit} class="space-y-4 rounded-xl border border-base-300 bg-base-100 px-4 py-4">
-    <div class="flex flex-wrap items-end gap-3">
-      <label class="flex min-w-72 flex-1 flex-col gap-1 text-[11px] text-base-content/60">
-        Repository path
-        <input bind:value={form.repoPath} placeholder="/path/to/project" spellcheck="false" class={FIELD_CLASS} />
-      </label>
-      <SegmentedControl value={form.mode} options={COMPARE_MODE_OPTIONS} onchange={(mode) => (form.mode = mode)} />
-    </div>
-
-    {#if form.mode === "commit"}
-      <label class="flex flex-col gap-1 text-[11px] text-base-content/60">
-        Commit
-        <select bind:value={form.commitSha} class={FIELD_CLASS}>
-          {#each withRemembered(form.commitSha, commitOptions) as option (option.value)}
-            <option value={option.value}>{option.label}</option>
-          {:else}
-            <option value="">None found</option>
-          {/each}
-        </select>
-      </label>
-    {/if}
-    {#if form.mode === "branch"}
-      <div class="flex flex-wrap items-end gap-3">
-        <label class="flex min-w-48 flex-col gap-1 text-[11px] text-base-content/60">
-          Review this branch
-          <select bind:value={form.headBranch} class={FIELD_CLASS}>
-            {#each withRemembered(form.headBranch, branchOptions) as option (option.value)}
-              <option value={option.value}>{option.label}</option>
-            {:else}
-              <option value="">None found</option>
-            {/each}
-          </select>
-        </label>
-        <label class="flex min-w-48 flex-col gap-1 text-[11px] text-base-content/60">
-          Against
-          <select bind:value={form.baseBranch} class={FIELD_CLASS}>
-            {#each withRemembered(form.baseBranch, branchOptions) as option (option.value)}
-              <option value={option.value}>{option.label}</option>
-            {:else}
-              <option value="">None found</option>
-            {/each}
-          </select>
-        </label>
-      </div>
-    {/if}
+    <ComparisonFields bind:form onRefsError={(message) => (refsError = message)} />
 
     <details open={hasRules}>
       <summary class="cursor-pointer text-[11px] text-base-content/60">Highlight or ignore modules</summary>

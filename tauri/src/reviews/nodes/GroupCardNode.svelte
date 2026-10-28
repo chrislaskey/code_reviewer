@@ -6,7 +6,7 @@
   import { getContext } from "svelte";
   import { Handle, Position } from "@xyflow/svelte";
   import Icon from "../../lib/components/Icon.svelte";
-  import { CHANGE_STYLES, plural } from "../change_styles.js";
+  import { CHANGE_STYLES, plural } from "../../lib/change_styles.js";
   import LinesLabel from "../LinesLabel.svelte";
   import StaleIcon from "../StaleIcon.svelte";
   import StartEllipsis from "../StartEllipsis.svelte";

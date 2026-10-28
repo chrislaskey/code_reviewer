@@ -5,10 +5,10 @@
 <script>
   import { getContext } from "svelte";
   import Icon from "../../lib/components/Icon.svelte";
-  import { plural } from "../change_styles.js";
-  import CodeLines from "./CodeLines.svelte";
+  import { plural } from "../../lib/change_styles.js";
+  import CodeLines from "../../lib/components/CodeLines.svelte";
   import { followOpenAllCommand } from "./open_all.svelte.js";
-  import { languageForPath } from "./syntax_highlight.js";
+  import { languageForPath } from "../../lib/syntax_highlight.js";
 
   /** @type {{ path: string, functions: any[], hoveredKey: string | null }} */
   let { path, functions, hoveredKey } = $props();

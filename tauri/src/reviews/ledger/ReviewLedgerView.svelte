@@ -1,7 +1,7 @@
 <!-- The Ledger view: the files of one group, each as a ledger with its code,
      under a line with the group's stats. -->
 <script>
-  import { plural } from "../change_styles.js";
+  import { plural } from "../../lib/change_styles.js";
   import LinesLabel from "../LinesLabel.svelte";
   import StaleIcon from "../StaleIcon.svelte";
   import { filesInGroup } from "../view_model.js";

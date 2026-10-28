@@ -10,9 +10,6 @@ Ideas and prototype features not in the rewrite. None are planned.
   one "+N in dependencies and stdlib" line instead of dimming or hiding them.
 - The "Ledger" code layout with one closed block per function, next to the
   one-block layout the MVP has.
-- The test call stack: list the tests of the head and walk the calls below
-  one test, as a page and on a canvas (`core` still has
-  `list_tests` and `get_test_call_stack`).
 - Call traces above or below a function (`core` still has `get_call_trace`).
 - Highlighting the tree item of the section on screen as the page scrolls.
 

@@ -1,12 +1,16 @@
 # Code Reviewer
 
-A macOS desktop app with two features:
+A macOS desktop app with three features:
 
 * **Reviews**: what a change did in an Elixir or Rust repository, function by
   function, file by file and group by group. Pick a repository and what to
   compare (uncommitted changes, one commit, or a branch against another), then
   read it on a canvas of groups and files, or as ledgers of functions, calls,
   callers and code.
+* **Traces**: a test of the same comparison, with every call below it walked
+  top to bottom like a stack trace. Changed functions show their diff,
+  unchanged ones their name, calls outside the project a slim row, to read
+  what a change does on the path a test takes.
 * **Sessions**: the tmux sessions this app started, named `cr-<name>`, with
   the Claude Code status (busy, idle) in each, and a form to start a new one:
   a git worktree of a repository and a tmux session, both named `cr-<name>`,
@@ -15,9 +19,9 @@ A macOS desktop app with two features:
   session can be continued in one. Each shows its git status, and is
   finished from its Complete menu: Merge into `main` (fast-forward `main`,
   remove the worktree, delete the branch) or Turn into branch (remove the
-  worktree, keep the branch), as `bin/worktree` does. Its Review menu opens
-  the worktree's uncommitted changes, or everything its branch changed
-  against `main`, in Reviews.
+  worktree, keep the branch), as `bin/worktree` does. Its Review and Trace menus open
+  the worktree's uncommitted changes, or everything its branch committed
+  against `main`, in Reviews or Traces.
 
 It is built on the [Starter Pack](../existing/) template's Tauri app, with
 the analysis from the earlier prototypes in `../existing/`. The decisions

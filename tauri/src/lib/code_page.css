@@ -1,0 +1,123 @@
+/* What the pages that show code share: a layout that fills the window,
+   the dotted background and syntax colours. Imported into each such
+   page's app.css in the base layer. */
+
+@theme {
+  /* Syntax colours, from GitHub's light and dark themes. light-dark() picks
+     by the daisyUI theme's color-scheme, so every theme gets one. */
+  --syntax-keyword: light-dark(#cf222e, #ff7b72);
+  --syntax-entity: light-dark(#8250df, #d2a8ff);
+  --syntax-constant: light-dark(#0550ae, #79c0ff);
+  --syntax-string: light-dark(#0a3069, #a5d6ff);
+  --syntax-variable: light-dark(#953800, #ffa657);
+  --syntax-comment: light-dark(#6e7781, #8b949e);
+  --syntax-tag: light-dark(#116329, #7ee787);
+  --syntax-heading: light-dark(#0550ae, #1f6feb);
+  --syntax-list: light-dark(#735c0f, #f2cc60);
+}
+
+/* The page fills the window: the nav and toolbars stay, the tree and the
+   content beside it scroll on their own. */
+.full-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.full-page .full-page-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+.full-page .full-page-content {
+  min-width: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.full-page .full-page-canvas {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* A dotted grid behind code, the same as the Node view's canvas. */
+.dot-grid {
+  background-image: radial-gradient(circle, color-mix(in oklab, var(--color-base-content) 40%, transparent) 0.5px, transparent 0.5px);
+  background-size: 18px 18px;
+}
+
+/* Syntax highlighting for code. The classes come from highlight.js. */
+.code-syntax .hljs-doctag,
+.code-syntax .hljs-keyword,
+.code-syntax .hljs-template-tag,
+.code-syntax .hljs-template-variable,
+.code-syntax .hljs-type,
+.code-syntax .hljs-variable.language_ {
+  color: var(--syntax-keyword);
+}
+
+.code-syntax .hljs-title {
+  color: var(--syntax-entity);
+}
+
+.code-syntax .hljs-attr,
+.code-syntax .hljs-attribute,
+.code-syntax .hljs-literal,
+.code-syntax .hljs-meta,
+.code-syntax .hljs-number,
+.code-syntax .hljs-operator,
+.code-syntax .hljs-variable,
+.code-syntax .hljs-selector-attr,
+.code-syntax .hljs-selector-class,
+.code-syntax .hljs-selector-id {
+  color: var(--syntax-constant);
+}
+
+.code-syntax .hljs-regexp,
+.code-syntax .hljs-string,
+.code-syntax .hljs-meta .hljs-string {
+  color: var(--syntax-string);
+}
+
+.code-syntax .hljs-built_in,
+.code-syntax .hljs-symbol {
+  color: var(--syntax-variable);
+}
+
+.code-syntax .hljs-comment,
+.code-syntax .hljs-code,
+.code-syntax .hljs-formula {
+  color: var(--syntax-comment);
+}
+
+.code-syntax .hljs-name,
+.code-syntax .hljs-quote,
+.code-syntax .hljs-selector-tag,
+.code-syntax .hljs-selector-pseudo {
+  color: var(--syntax-tag);
+}
+
+.code-syntax .hljs-subst,
+.code-syntax .hljs-emphasis,
+.code-syntax .hljs-strong {
+  color: inherit;
+}
+
+.code-syntax .hljs-section {
+  color: var(--syntax-heading);
+  font-weight: bold;
+}
+
+.code-syntax .hljs-bullet {
+  color: var(--syntax-list);
+}
+
+.code-syntax .hljs-emphasis {
+  font-style: italic;
+}
+
+.code-syntax .hljs-strong {
+  font-weight: bold;
+}

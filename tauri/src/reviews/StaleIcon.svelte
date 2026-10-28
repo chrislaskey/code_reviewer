@@ -1,7 +1,7 @@
 <!-- A warning sign when callers still call something removed or renamed. -->
 <script>
   import Icon from "../lib/components/Icon.svelte";
-  import { plural } from "./change_styles.js";
+  import { plural } from "../lib/change_styles.js";
 
   /** @type {{ count: number }} */
   let { count } = $props();
