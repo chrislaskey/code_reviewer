@@ -3,10 +3,13 @@
   import AppNav from "./lib/components/AppNav.svelte";
   import Header from "./lib/components/Header.svelte";
   import StillWaves from "./lib/components/StillWaves.svelte";
-  import { reviewNewUrl, sessionsIndexUrl, traceNewUrl } from "./lib/routes.js";
+  import TopBackgroundPattern from "./lib/components/TopBackgroundPattern.svelte";
+  import { backgroundPatternsUrl, reviewNewUrl, sessionsIndexUrl, traceNewUrl } from "./lib/routes.js";
 </script>
 
 <StillWaves rippleOnLoad />
+
+<TopBackgroundPattern />
 
 <AppNav current="home" />
 
@@ -34,5 +37,11 @@
     <h2>Sessions</h2>
     <p><a href={sessionsIndexUrl()}>The Claude Code sessions started here →</a></p>
     <p class="muted">See whether Claude Code is busy or idle in each tmux session this app started, open one in your terminal app, or start a new one.</p>
+  </section>
+
+  <section>
+    <h2>Experiments</h2>
+    <p><a href={backgroundPatternsUrl()}>Background patterns →</a></p>
+    <p class="muted">Ideas for a pattern at the top of each page, to click through and tune.</p>
   </section>
 </main>

@@ -12,6 +12,7 @@
   import Icon from "../lib/components/Icon.svelte";
   import InfoPopover from "../lib/components/InfoPopover.svelte";
   import StillWaves from "../lib/components/StillWaves.svelte";
+  import TopBackgroundPattern from "../lib/components/TopBackgroundPattern.svelte";
   import {
     closeSession,
     continueSession,
@@ -190,9 +191,11 @@
 
 <StillWaves bind:this={waves} rippleOnLoad />
 
+<TopBackgroundPattern />
+
 <AppNav current="sessions" />
 
-<main class="page wide with-waves">
+<main class="page with-waves">
   <Header>
     Sessions
     {#snippet subtitle()}

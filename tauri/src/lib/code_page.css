@@ -24,7 +24,18 @@
   height: 100vh;
 }
 
+/* The nav spans the window here, like the bars below it. */
+.full-page .app-nav-band {
+  margin-bottom: 0.75rem;
+}
+
+.full-page .app-nav {
+  max-width: none;
+}
+
+/* Opaque, so the background pattern shows only behind the bars above. */
 .full-page .full-page-body {
+  background: var(--color-base-100);
   display: flex;
   min-height: 0;
   flex: 1;

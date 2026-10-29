@@ -8,6 +8,7 @@
   import AppNav from "../lib/components/AppNav.svelte";
   import Button from "../lib/components/Button.svelte";
   import Header from "../lib/components/Header.svelte";
+  import TopBackgroundPattern from "../lib/components/TopBackgroundPattern.svelte";
   import { createSession, getDefaultSessionPort, getSessionSettings } from "../lib/backend.js";
   import { log } from "../lib/log.svelte.js";
   import LogList from "../lib/LogList.svelte";
@@ -49,9 +50,11 @@
   });
 </script>
 
+<TopBackgroundPattern />
+
 <AppNav current="sessions" />
 
-<main class="page wide">
+<main class="page">
   <p><a href={sessionsIndexUrl()}>← Sessions</a></p>
   <Header>
     New session

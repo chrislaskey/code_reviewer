@@ -56,13 +56,13 @@
 </script>
 
 <nav class="py-2">
-  <div class="mb-1 px-3 pb-2 text-[10px] uppercase tracking-wide text-base-content/50">Groups</div>
+  <div class="mb-1 px-6 pb-2 text-[10px] uppercase tracking-wide text-base-content/50">Groups</div>
   {#each items as item (item.id)}
     <button
       type="button"
       onclick={item.onclick}
       title={item.title ?? item.label}
-      style="padding-left: {12 + item.depth * INDENT}px"
+      style="padding-left: calc(var(--page-gutter) + {item.depth * INDENT}px)"
       class={[
         "flex w-full items-center gap-1.5 py-1 pr-3 text-left",
         item.selected ? "bg-primary/10 font-semibold" : "hover:bg-base-content/5",

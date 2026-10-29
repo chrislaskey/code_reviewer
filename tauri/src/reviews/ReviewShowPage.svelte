@@ -17,6 +17,7 @@
   import ReviewTree from "./ReviewTree.svelte";
   import SegmentedControl from "../lib/components/SegmentedControl.svelte";
   import Toolbar from "../lib/components/Toolbar.svelte";
+  import TopBackgroundPattern from "../lib/components/TopBackgroundPattern.svelte";
   import OpenAllButtons from "./ledger/OpenAllButtons.svelte";
   import ReviewLedgerView from "./ledger/ReviewLedgerView.svelte";
   import { createOpenAllCommand } from "./ledger/open_all.svelte.js";
@@ -111,10 +112,12 @@
   });
 </script>
 
+<TopBackgroundPattern />
+
 <div class="full-page">
   <AppNav current="reviews" />
 
-  <div class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-base-300 bg-base-100 px-4 py-2 font-mono text-[11px] text-base-content/70">
+  <div class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-base-300 px-6 py-2 font-mono text-[11px] text-base-content/70">
     {#if request}
       <span class="text-base-content">{request.repo_path}</span>
       <span>{describeRequest(request)}</span>
@@ -194,7 +197,7 @@
           />
         </div>
       {:else}
-        <div class="full-page-content">
+        <div class="full-page-content flex flex-col">
           <ReviewLedgerView
             bind:this={ledgerView}
             group={selectedGroup}

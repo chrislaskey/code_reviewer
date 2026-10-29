@@ -5,6 +5,7 @@
 <script>
   import { onMount } from "svelte";
   import AppNav from "../lib/components/AppNav.svelte";
+  import TopBackgroundPattern from "../lib/components/TopBackgroundPattern.svelte";
   import { getTestCallStack, listTests } from "../lib/backend.js";
   import { describeRequest } from "../lib/comparison_form.js";
   import { traceNewUrl, traceRequestFromSearch, traceShowUrl } from "../lib/routes.js";
@@ -54,10 +55,12 @@
   });
 </script>
 
+<TopBackgroundPattern />
+
 <div class="full-page">
   <AppNav current="traces" />
 
-  <div class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-base-300 bg-base-100 px-4 py-2 font-mono text-[11px] text-base-content/70">
+  <div class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-base-300 px-6 py-2 font-mono text-[11px] text-base-content/70">
     {#if request}
       <span class="text-base-content">{request.repo_path}</span>
       <span>{describeRequest(request)}</span>

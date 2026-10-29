@@ -32,7 +32,7 @@
   });
 </script>
 
-<div class="space-y-2 border-b border-base-300 p-3">
+<div class="space-y-2 border-b border-base-300 px-6 py-3">
   <input bind:value={search} placeholder="Find a test" spellcheck="false" class="w-full rounded-lg border border-base-300 bg-base-100 px-2.5 py-1.5 font-mono text-xs text-base-content placeholder:text-base-content/30" />
   {#if hasLiveViewTests}
     <label class="flex items-center gap-2 text-[11px] text-base-content/60">
@@ -45,7 +45,7 @@
 <div class="min-h-0 flex-1 overflow-auto">
   {#each byFile as group (group.filePath)}
     <div class="border-b border-base-300 py-1">
-      <p class="truncate px-3 py-1 font-mono text-[10px] text-base-content/50" style="direction: rtl" title={group.filePath}>
+      <p class="truncate px-6 py-1 font-mono text-[10px] text-base-content/50" style="direction: rtl" title={group.filePath}>
         {group.filePath}
       </p>
       {#each group.tests as test (`${test.function.module}:${test.function.name}/${test.function.arity}`)}
@@ -55,7 +55,7 @@
           type="button"
           onclick={() => onSelect(test)}
           class={[
-            "flex w-full items-center gap-2 px-3 py-1 text-left font-mono text-[11px]",
+            "flex w-full items-center gap-2 px-6 py-1 text-left font-mono text-[11px]",
             isSelected ? "bg-base-content/10 text-base-content" : "text-base-content/80 hover:bg-base-content/5",
           ]}
         >
@@ -68,6 +68,6 @@
       {/each}
     </div>
   {:else}
-    <p class="px-3 py-4 text-[11px] text-base-content/50">No tests match.</p>
+    <p class="px-6 py-4 text-[11px] text-base-content/50">No tests match.</p>
   {/each}
 </div>

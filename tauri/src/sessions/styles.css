@@ -6,9 +6,6 @@
   --git-unstaged: var(--color-error);
 }
 
-.page.wide {
-  max-width: 980px;
-}
 
 .section-header {
   display: flex;

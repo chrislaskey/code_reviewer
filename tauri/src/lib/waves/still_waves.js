@@ -2,15 +2,15 @@ import { select } from "d3-selection";
 import { area, curveBasis } from "d3-shape";
 import { createNoise2D } from "simplex-noise";
 import { frameLoop } from "./frame_loop.js";
-import { starterPackColors } from "./palette.js";
+import { waveLayers } from "./palette.js";
 
 const STEPS = 80;
 
 export function mountStillWaves(stage) {
   const svg = select(stage).append("svg").attr("width", "100%").attr("height", "100%");
   const noise = createNoise2D();
-  const layers = starterPackColors.map((color, i) => ({
-    path: svg.append("path").style("fill", color).attr("fill-opacity", 0.22),
+  const layers = waveLayers.map(({ color, opacity }, i) => ({
+    path: svg.append("path").style("fill", color).style("fill-opacity", opacity),
     height: 70 + i * 28,
     amplitude: 14 + i * 4,
     speed: 0.25 + i * 0.08,

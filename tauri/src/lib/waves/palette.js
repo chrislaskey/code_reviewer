@@ -1,4 +1,5 @@
-export const starterPackColors = ["#e935c1", "#8b5cf6", "#3b82f6"];
+/** The StillWaves layers, back to front. The colours and opacities are set per theme in styles.css. */
+export const waveLayers = [1, 2, 3].map((n) => ({ color: `var(--wave-color-${n})`, opacity: `var(--wave-opacity-${n})` }));
 
 export const themeColors = ["var(--color-primary)", "var(--color-secondary)", "var(--color-accent)"];
 

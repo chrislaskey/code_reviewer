@@ -8,6 +8,7 @@
   import ComparisonFields, { FIELD_CLASS } from "../lib/components/ComparisonFields.svelte";
   import Header from "../lib/components/Header.svelte";
   import StillWaves from "../lib/components/StillWaves.svelte";
+  import TopBackgroundPattern from "../lib/components/TopBackgroundPattern.svelte";
   import { describeComparison } from "../lib/comparison_form.js";
   import { reviewRequestFromSearch, reviewShowUrl } from "../lib/routes.js";
   import { buildRequest, formFromRequest, loadForm, saveForm } from "./review_form.js";
@@ -33,9 +34,11 @@
 
 <StillWaves rippleOnLoad />
 
+<TopBackgroundPattern />
+
 <AppNav current="reviews" />
 
-<main class="with-waves mx-auto max-w-3xl px-6 pt-8">
+<main class="page with-waves">
   <Header>
     New review
     {#snippet subtitle()}

@@ -29,7 +29,7 @@
   }
 </script>
 
-<div class="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-base-300 px-4 py-2 text-[11px]">
+<div class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-base-300 px-6 py-2 text-[11px]">
   <span class="text-xs font-semibold">{group.label}</span>
   {#if row}
     <span class="font-mono text-[11px] text-base-content/70">{plural(row.stats.file_count, "file")}</span>
@@ -37,7 +37,7 @@
     <StaleIcon count={row.stats.stale_caller_count} />
   {/if}
 </div>
-<div class="dot-grid">
+<div class="dot-grid grow">
   <div class="mx-auto w-max space-y-4 p-8">
     {#each groupFiles as file (file.id)}
       <LedgerFile {file} {files} {outside} {onJumpToFile} />

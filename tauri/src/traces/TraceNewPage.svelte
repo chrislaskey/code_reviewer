@@ -8,6 +8,7 @@
   import ComparisonFields from "../lib/components/ComparisonFields.svelte";
   import Header from "../lib/components/Header.svelte";
   import StillWaves from "../lib/components/StillWaves.svelte";
+  import TopBackgroundPattern from "../lib/components/TopBackgroundPattern.svelte";
   import {
     EMPTY_COMPARISON_FORM,
     buildComparison,
@@ -37,9 +38,11 @@
 
 <StillWaves rippleOnLoad />
 
+<TopBackgroundPattern />
+
 <AppNav current="traces" />
 
-<main class="with-waves mx-auto max-w-3xl px-6 pt-8">
+<main class="page with-waves">
   <Header>
     New trace
     {#snippet subtitle()}

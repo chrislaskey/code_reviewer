@@ -17,6 +17,11 @@ export function sessionNewUrl() {
   return "/sessions/new.html";
 }
 
+/** The experiments page for background patterns. */
+export function backgroundPatternsUrl() {
+  return "/experiments/backgrounds.html";
+}
+
 /** The new review page, with its form filled in from a request when given one. */
 export function reviewNewUrl(request = null) {
   return withQuery("/reviews/new.html", request ? reviewRequestToParams(request) : null);
