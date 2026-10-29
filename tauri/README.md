@@ -26,19 +26,27 @@ Logs go to stderr. Set `RUST_LOG=code_reviewer_lib=debug` for more.
 
 ## Pages
 
-| Page | Mounts | Does |
-| --- | --- | --- |
-| `src/index.html` | `HomePage.svelte` | Links to the two features |
-| `src/reviews/new.html` | `reviews/ReviewNewPage.svelte` | The form: repository, what to compare, rules, groups |
-| `src/reviews/show.html` | `reviews/ReviewShowPage.svelte` | Runs the comparison in the URL and shows the Node and Ledger views |
-| `src/sessions/index.html` | `sessions/SessionsIndexPage.svelte` | The tmux sessions the app started, with the Claude Code and git status in each, then its worktrees without a session; the Review menu opens one's changes in Reviews and the Complete menu finishes one. Refreshed every 5 seconds |
-| `src/sessions/new.html` | `sessions/SessionNewPage.svelte` | Creates a worktree of a repository and a session in it, both named `cr-<name>`, and opens it in the terminal app |
+One HTML entry, `src/index.html`, and a router (`src/lib/router.js`,
+`sv-router`) that shows the page at the path, swapped in place without a
+page load:
 
-Pages link to each other by path (`/reviews/new.html`), which works on the
-dev server and in the bundled app alike, and only through `src/lib/routes.js`,
-which knows every page's path and query parameters. A page's input is its
+| Path | Shows | Does |
+| --- | --- | --- |
+| `/` | `HomePage.svelte` | Links to the three features |
+| `/reviews/new` | `reviews/ReviewNewPage.svelte` | The form: repository, what to compare, rules, groups |
+| `/reviews/show?repo_path=…` | `reviews/ReviewShowPage.svelte` | Runs the comparison in the URL and shows the Node and Ledger views |
+| `/traces/new` | `traces/TraceNewPage.svelte` | The form: repository, what to compare |
+| `/traces/show?repo_path=…` | `traces/TraceShowPage.svelte` | Lists the tests of the comparison and walks the calls below the picked one |
+| `/sessions` | `sessions/SessionsIndexPage.svelte` | The tmux sessions the app started, with the Claude Code and git status in each, then its worktrees without a session; the Review menu opens one's changes in Reviews and the Complete menu finishes one. Refreshed every 5 seconds |
+| `/sessions/new` | `sessions/SessionNewPage.svelte` | Creates a worktree of a repository and a session in it, both named `cr-<name>`, and opens it in the terminal app |
+
+Pages link to each other by path with plain `<a href>` links, which the
+router intercepts, and only through `src/lib/routes.js`, which knows every
+page's path and query parameters; code that navigates calls `navigateToUrl`
+in `src/lib/router.js`. Every path is reloadable: the dev server and the
+bundled app both answer any path with `index.html`. A page's input is its
 query, flat and named after the core crate's request fields
-(`/reviews/show.html?repo_path=…&base_ref=main&head_ref=cr-fix&compare_from_merge_base=true`,
+(`/reviews/show?repo_path=…&base_ref=main&head_ref=cr-fix&compare_from_merge_base=true`,
 a list as a repeated key), so a review is a link, from the form, from a
 session card, or from a bookmark.
 
@@ -79,28 +87,31 @@ the theme menu dispatches, keeping the choice in `localStorage`;
 
 ```
 src/
-  index.html, main.js, HomePage.svelte   the home page
-  app.css, styles.css                    Tailwind with the theme, and the app's own styles
+  index.html, main.js                    the one document, mounting the router
+  HomePage.svelte                        the home page
+  app.css, styles.css                    Tailwind with the theme, and the app's and every page's styles
   public/fonts/                          Plus Jakarta Sans, served from /fonts
   lib/
     backend.js                           every call to the Rust side
-    routes.js                            every page's URL and query parameters
-    components/                          Button, Header, Icon, ThemeMenu, ChoiceMenu, MenuChoice and the AppNav strip
+    routes.js                            every page's path and query parameters
+    router.js                            the router: the page at each path, and navigateToUrl
+    components/                          Button, Header, Icon, ThemeMenu, ChoiceMenu, MenuChoice, the AppNav gutter and
+                                         RemountPageOnNavigation around every page
     theme.css, theme_script.js           daisyUI themes and the script that applies them
     log.svelte.js, LogList.svelte        the log the sessions pages show
   reviews/
-    new.html, new.js, ReviewNewPage.svelte
-    show.html, show.js, ReviewShowPage.svelte
+    ReviewNewPage.svelte, ReviewShowPage.svelte
+    styles.css                           the review pages' styles
     review_form.js                       the form, its storage, the request it builds and back
     view_model.js                        the backend's files and group rows as the views draw them
     change_styles.js                     colours and markers: what changed, what is risky
     nodes/                               the Node view: SvelteFlow canvas, group card and link chip nodes, layout
     ledger/                              the Ledger view: ledgers, lines, code footers, syntax colours
   sessions/
-    index.html, index.js, SessionsIndexPage.svelte
-    new.html, new.js, SessionNewPage.svelte
+    SessionsIndexPage.svelte, SessionNewPage.svelte
+    styles.css                           the sessions pages' styles
     TmuxSession.svelte, GitWorktree.svelte, ReviewMenu.svelte, CompleteMenu.svelte, GitStatus.svelte, ClaudeCodePill.svelte, ...
-vite.config.js                           the pages, Tailwind, the theme script and the dev server port
+vite.config.js                           Tailwind, the theme script and the dev server port
 vendor/heroicons.js                      the Tailwind plugin making the hero-* icon classes
 src-tauri/
   src/lib.rs                             the app: state, the sessions commands

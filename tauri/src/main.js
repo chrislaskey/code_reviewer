@@ -1,4 +1,6 @@
 import { mount } from "svelte";
-import HomePage from "./HomePage.svelte";
+import { Router } from "sv-router";
+// Registers the pages with the router before it mounts.
+import "./lib/router.js";
 
-mount(HomePage, { target: document.getElementById("app") });
+mount(Router, { target: document.getElementById("app") });

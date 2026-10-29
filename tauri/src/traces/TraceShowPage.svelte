@@ -34,7 +34,8 @@
 
   async function selectTest(test) {
     selected = test;
-    window.history.replaceState(null, "", traceShowUrl({ ...comparison, test }));
+    // The page's own address, not a navigation: the router's history entry stays.
+    window.history.replaceState(window.history.state, "", traceShowUrl({ ...comparison, test }));
     stack = { state: "loading" };
     try {
       stack = { state: "ready", value: await getTestCallStack({ ...comparison, test }) };

@@ -3,6 +3,7 @@
      PORT and a command typed in, opens it in the terminal app and returns to
      the list. -->
 <script>
+  import { navigateToUrl } from "../lib/router.js";
   import { sessionsIndexUrl } from "../lib/routes.js";
   import { onMount } from "svelte";
   import AppNav from "../lib/components/AppNav.svelte";
@@ -28,7 +29,7 @@
         command: newSession.command,
         port: Number(newSession.port),
       });
-      window.location.href = sessionsIndexUrl();
+      navigateToUrl(sessionsIndexUrl());
     } catch (error) {
       log(`Creating ${name} failed: ${error}`);
       creating = false;

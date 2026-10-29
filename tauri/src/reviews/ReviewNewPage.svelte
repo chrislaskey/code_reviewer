@@ -10,6 +10,7 @@
   import StillWaves from "../lib/components/StillWaves.svelte";
   import TopBackgroundPattern from "../lib/components/TopBackgroundPattern.svelte";
   import { describeComparison } from "../lib/comparison_form.js";
+  import { navigateToUrl } from "../lib/router.js";
   import { reviewRequestFromSearch, reviewShowUrl } from "../lib/routes.js";
   import { buildRequest, formFromRequest, loadForm, saveForm } from "./review_form.js";
 
@@ -28,7 +29,7 @@
     event.preventDefault();
     if (request === null) return;
     saveForm(form);
-    window.location.href = reviewShowUrl(request);
+    navigateToUrl(reviewShowUrl(request));
   }
 </script>
 

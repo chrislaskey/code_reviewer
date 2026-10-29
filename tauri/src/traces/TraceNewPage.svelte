@@ -17,6 +17,7 @@
     loadForm,
     saveForm,
   } from "../lib/comparison_form.js";
+  import { navigateToUrl } from "../lib/router.js";
   import { traceRequestFromSearch, traceShowUrl } from "../lib/routes.js";
 
   const STORAGE_KEY = "code_reviewer.trace_form.v1";
@@ -32,7 +33,7 @@
     event.preventDefault();
     if (request === null) return;
     saveForm(STORAGE_KEY, form);
-    window.location.href = traceShowUrl(request);
+    navigateToUrl(traceShowUrl(request));
   }
 </script>
 

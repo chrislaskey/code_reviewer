@@ -4,10 +4,9 @@ import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import tailwindcss from "@tailwindcss/vite";
 
-// The theme script sets `data-theme` on <html> before the first paint. Each
-// page's `<!-- theme-script -->` marker becomes an inline classic script with
-// the file's contents, in dev and in builds. A page without the marker is
-// left alone.
+// The theme script sets `data-theme` on <html> before the first paint. The
+// `<!-- theme-script -->` marker in index.html becomes an inline classic
+// script with the file's contents, in dev and in builds.
 const THEME_SCRIPT = resolve(import.meta.dirname, "src/lib/theme_script.js");
 const THEME_SCRIPT_MARKER = "<!-- theme-script -->";
 
@@ -30,7 +29,10 @@ function themeScript() {
 // worktree, and bin/dev points Tauri at it), else on 1420.
 const PORT = Number(process.env.PORT) || 1420;
 
-// One HTML entry per page. `cargo tauri dev` loads the dev server (see
+// One HTML entry, src/index.html, for every page: the router in
+// src/lib/router.js shows the page at the address. The dev server answers
+// any path with it, and so does the bundled app (Tauri's asset protocol
+// falls back to index.html). `cargo tauri dev` loads the dev server (see
 // `build.devUrl` in src-tauri/tauri.conf.json, overridden by bin/dev), and
 // `cargo tauri build` bundles `dist/`.
 export default defineConfig({
@@ -45,16 +47,5 @@ export default defineConfig({
   build: {
     outDir: "../dist",
     emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        home: resolve(import.meta.dirname, "src/index.html"),
-        reviews_new: resolve(import.meta.dirname, "src/reviews/new.html"),
-        reviews_show: resolve(import.meta.dirname, "src/reviews/show.html"),
-        traces_new: resolve(import.meta.dirname, "src/traces/new.html"),
-        traces_show: resolve(import.meta.dirname, "src/traces/show.html"),
-        sessions_index: resolve(import.meta.dirname, "src/sessions/index.html"),
-        sessions_new: resolve(import.meta.dirname, "src/sessions/new.html"),
-      },
-    },
   },
 });

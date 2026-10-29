@@ -607,3 +607,58 @@ curved tabs from the window edge over a straight junction and a
 square-edged band. The tree beside the Review and Trace content shares the
 page's background rather than a darker one, so the gutter is the only
 darker surface in the window.
+
+## 22. One document and a router: no blank window between pages
+
+Switching pages flashed white. Each page was an HTML file of its own
+(decision 4), so every link was a page load: an empty document until its
+script mounted the page. **Decision:** one HTML entry, `src/index.html`,
+and a client-side router, `sv-router`, set up in `src/lib/router.js`: the
+path names the page, and a link swaps the page in place, with no page
+load. The addresses stay paths and queries as decision 14 wants, without
+the `.html`: `/`, `/sessions`, `/sessions/new`, `/reviews/new`,
+`/reviews/show?repo_path=…`, `/traces/new`, `/traces/show?repo_path=…`.
+`routes.js` still spells out every path and query, and now exports the
+paths, which the router's table uses, so a path is named once. The pages
+still read their query when they mount, and every link is still a plain
+`<a href>`: the router intercepts same-origin clicks. The three places that
+navigated from code (the two forms' submit, the new session's return to
+the list) call `navigateToUrl` in `router.js`. A page is still reloadable
+and linkable: the dev server answers every path with `index.html`, and so
+does the bundled app, whose asset protocol falls back to `index.html`
+(`get_asset` in tauri 2.12.5). A review has no id yet, so its page stays
+`/reviews/show?…`; once reviews persist, `/reviews/:id` fits the same
+table.
+
+Chosen over SvelteKit in SPA mode (the official way, file-based routes and
+layouts, but it replaces the Vite setup, moves the theme script to
+`app.html` and brings the `$app` modules: an overhaul where a routing
+layer was wanted) and over a hand-rolled router (a small matcher and
+`pushState`; the project prefers a common library). `sv-router` is
+Svelte 5 native, about 5kB, history-based by default, and pre-1.0
+(0.19); its source was read before use. Hash routing was not considered:
+the addresses are to stay real paths.
+
+Two consequences. The pages are loaded lazily (`() => import(…)`), so
+each page's code stays a chunk of its own, as the HTML entries were, and
+`router.js` does not import the pages statically, which keeps it out of a
+cycle with the pages that import `navigateToUrl`. And the router keeps the
+page instance when only the query changes, so a layout around every page,
+`RemountPageOnNavigation.svelte`, keys the page on the query string: a new
+instance for every address, so a page reads its query once, at mount, as
+before (the Review tab from a filled-in new review page gets a fresh form).
+The trace page keeps its picked test in the URL with
+`history.replaceState`, outside the router, so it does not remount; it
+passes the router's history state through.
+
+The stylesheets became one: `src/app.css` imports the pages' styles
+(`reviews/styles.css`, `sessions/styles.css`, `lib/code_page.css`) in the
+base layer, and the per-page `app.css` files are gone. No class names
+collided.
+
+The one flash left is the launch, and the window now opens in the theme's
+colour. The webview's `backgroundColor` in `tauri.conf.json` is white, the
+light theme's page; and the theme script keeps the page colour the
+stylesheet gives the theme (under `phx:theme-background`) and paints it on
+`<html>` before the stylesheet arrives, clearing it once the page has
+loaded, so a dark theme opens dark.

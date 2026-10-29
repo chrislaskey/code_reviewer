@@ -1,5 +1,7 @@
-/* Tailwind and daisyUI with the app's light and dark themes. The app's own
-   styles go in the base layer, so utility classes in markup win over them. */
+/* Tailwind and daisyUI with the app's light and dark themes, then every
+   page's styles: the pages share one document, so one stylesheet. The
+   app's own styles go in the base layer, so utility classes in markup win
+   over them. */
 
 @import "tailwindcss" source(none);
 @import "./lib/theme.css";
@@ -9,3 +11,6 @@
 @plugin "../vendor/heroicons.js";
 
 @import "./styles.css" layer(base);
+@import "./lib/code_page.css" layer(base);
+@import "./reviews/styles.css" layer(base);
+@import "./sessions/styles.css" layer(base);

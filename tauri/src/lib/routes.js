@@ -1,40 +1,49 @@
 // Every page's address, so pages link to each other through here and never
-// spell out a path or a query parameter themselves. A page takes what it
-// shows from its query, flat and named, the way a web server would read it:
-// `/reviews/show.html?repo_path=…&base_ref=main&head_ref=cr-fix&compare_from_merge_base=true`,
+// spell out a path or a query parameter themselves. The paths are the
+// router's too (router.js), so they are named once, here. A page takes what
+// it shows from its query, flat and named, the way a web server would read it:
+// `/reviews/show?repo_path=…&base_ref=main&head_ref=cr-fix&compare_from_merge_base=true`,
 // with a list as a repeated key. So a page with its input is a plain link,
 // from another page, from a bookmark, or later from a web server.
 
+export const HOME_PATH = "/";
+export const SESSIONS_INDEX_PATH = "/sessions";
+export const SESSION_NEW_PATH = "/sessions/new";
+export const REVIEW_NEW_PATH = "/reviews/new";
+export const REVIEW_SHOW_PATH = "/reviews/show";
+export const TRACE_NEW_PATH = "/traces/new";
+export const TRACE_SHOW_PATH = "/traces/show";
+
 export function homeUrl() {
-  return "/index.html";
+  return HOME_PATH;
 }
 
 export function sessionsIndexUrl() {
-  return "/sessions/index.html";
+  return SESSIONS_INDEX_PATH;
 }
 
 export function sessionNewUrl() {
-  return "/sessions/new.html";
+  return SESSION_NEW_PATH;
 }
 
 /** The new review page, with its form filled in from a request when given one. */
 export function reviewNewUrl(request = null) {
-  return withQuery("/reviews/new.html", request ? reviewRequestToParams(request) : null);
+  return withQuery(REVIEW_NEW_PATH, request ? reviewRequestToParams(request) : null);
 }
 
 /** The show page, running a request (the core crate's `analyze_file_changes` request). */
 export function reviewShowUrl(request) {
-  return withQuery("/reviews/show.html", reviewRequestToParams(request));
+  return withQuery(REVIEW_SHOW_PATH, reviewRequestToParams(request));
 }
 
 /** The new trace page, with its form filled in from a request when given one. */
 export function traceNewUrl(request = null) {
-  return withQuery("/traces/new.html", request ? traceRequestToParams(request) : null);
+  return withQuery(TRACE_NEW_PATH, request ? traceRequestToParams(request) : null);
 }
 
 /** The trace page: the tests of a comparison, and the call stack of the test in the request if it names one. */
 export function traceShowUrl(request) {
-  return withQuery("/traces/show.html", traceRequestToParams(request));
+  return withQuery(TRACE_SHOW_PATH, traceRequestToParams(request));
 }
 
 function withQuery(path, params) {
