@@ -57,24 +57,27 @@
 
 <TopBackgroundPattern />
 
-<div class="full-page">
-  <AppNav current="traces" />
+<AppNav current="traces" />
 
-  <div class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-base-300 px-6 py-2 font-mono text-[11px] text-base-content/70">
+<div class="full-page">
+  <div class="full-page-title">
+    <h1>Trace</h1>
     {#if request}
-      <span class="text-base-content">{request.repo_path}</span>
-      <span>{describeRequest(request)}</span>
-      {#if tests.state === "ready"}
-        <span>
-          {tests.value.tests.length} tests ·
-          {shortCommit(tests.value.base_commit)} → {tests.value.head_commit ? shortCommit(tests.value.head_commit) : "working tree"}
-        </span>
-      {/if}
-      {#if selected}
-        <span class="text-base-content">{selected.module} · {testLabel(selected)}</span>
-      {/if}
+      <span class="comparison font-mono text-[11px] text-base-content/70">
+        <span class="text-base-content">{request.repo_path}</span>
+        <span>{describeRequest(request)}</span>
+        {#if tests.state === "ready"}
+          <span>
+            {tests.value.tests.length} tests ·
+            {shortCommit(tests.value.base_commit)} → {tests.value.head_commit ? shortCommit(tests.value.head_commit) : "working tree"}
+          </span>
+        {/if}
+        {#if selected}
+          <span class="text-base-content">{selected.module} · {testLabel(selected)}</span>
+        {/if}
+      </span>
     {/if}
-    <a href={traceNewUrl(request)} class="ml-auto text-primary">Edit trace</a>
+    <a href={traceNewUrl(request)} class="ml-auto text-sm text-primary">Edit trace</a>
   </div>
 
   {#if request === null}
@@ -87,7 +90,7 @@
     <p class="border-b border-base-300 bg-error/10 px-4 py-3 font-mono text-xs text-error">{tests.message}</p>
   {:else if tests.state === "ready"}
     <div class="full-page-body">
-      <aside class="flex w-80 shrink-0 flex-col border-r border-base-300 bg-base-200">
+      <aside class="flex w-80 shrink-0 flex-col border-r border-base-300">
         <TestPicker tests={tests.value.tests} {selected} onSelect={(test) => selectTest(test.function)} />
       </aside>
       <div class="full-page-content flex flex-col">

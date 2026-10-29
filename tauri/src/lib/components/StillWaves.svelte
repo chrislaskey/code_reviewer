@@ -35,11 +35,12 @@
 <div class="still-waves" bind:this={stage} aria-hidden="true"></div>
 
 <style>
-  /* A background, so WebKit repaints it on a theme change. */
+  /* A background, so WebKit repaints it on a theme change. Starts where
+     the page does, clear of the gutter. */
   .still-waves {
     background: var(--root-bg);
     position: fixed;
-    inset: auto 0 0 0;
+    inset: auto 0 0 var(--gutter-width);
     height: 220px;
     z-index: -1;
     pointer-events: none;

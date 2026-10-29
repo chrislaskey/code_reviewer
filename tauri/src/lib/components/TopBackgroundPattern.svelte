@@ -18,11 +18,12 @@
 </div>
 
 <style>
-  /* Fixed, like the waves, so it stays put while the page scrolls. */
+  /* Fixed, like the waves, so it stays put while the page scrolls; starts
+     where the page does, clear of the gutter. */
   .top-background-pattern {
     position: fixed;
-    inset: 0 0 auto 0;
-    height: 150px;
+    inset: 0 0 auto var(--gutter-width);
+    height: calc(150px + var(--title-bar-height));
     z-index: -1;
   }
 
@@ -31,7 +32,13 @@
     inset: 0;
     overflow: hidden;
     pointer-events: none;
-    mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 0.6) 35%, transparent 100%);
+    /* Faded out before the content, and in from the left, so the open tab
+       in the gutter meets the lines softly. */
+    mask-image:
+      linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 0.6) 35%, transparent 100%),
+      linear-gradient(to right, transparent, #000 110px);
+    mask-composite: intersect;
+    -webkit-mask-composite: source-in;
   }
 
   .flow-lines {

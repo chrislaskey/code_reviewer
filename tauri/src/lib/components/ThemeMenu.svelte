@@ -1,6 +1,8 @@
 <!-- A dropdown of every daisyUI theme, plus "System" to follow the OS light
-     or dark setting. A choice dispatches the `phx:set-theme` event the theme
-     script in each page's <head> listens for (src/lib/theme_script.js). -->
+     or dark setting, behind a tile at the bottom of the navigation gutter;
+     the list opens up and to the right of it. A choice dispatches the
+     `phx:set-theme` event the theme script in each page's <head> listens
+     for (src/lib/theme_script.js). -->
 <script>
   import Icon from "./Icon.svelte";
 
@@ -38,13 +40,12 @@
 
 <svelte:window onclick={closeWhenClickedOutside} onkeydown={closeOnEscape} />
 
-<details class="dropdown dropdown-end" bind:open bind:this={element}>
-  <summary class="btn btn-ghost btn-sm rounded-full" title="Theme">
-    <Icon name="hero-swatch-micro" class="size-4" />
-    <span class="capitalize">{current}</span>
-    <Icon name="hero-chevron-down-micro" class="size-4" />
+<details class="dropdown dropdown-right dropdown-end block" bind:open bind:this={element}>
+  <summary class="tile" title="Theme: {current}">
+    <Icon name="hero-swatch" class="tile-icon" />
+    Theme
   </summary>
-  <ul class="dropdown-content menu z-10 mt-1 max-h-[70vh] w-52 flex-nowrap overflow-y-auto rounded-box bg-base-100 shadow-sm">
+  <ul class="dropdown-content menu z-10 ml-1 max-h-[70vh] w-52 flex-nowrap overflow-y-auto rounded-box bg-base-100 shadow-sm">
     <li>
       <button type="button" class:menu-active={current === "system"} onclick={setTheme} data-phx-theme="system">
         <Icon name="hero-computer-desktop-micro" class="size-4" />

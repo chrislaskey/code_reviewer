@@ -549,3 +549,61 @@ instead of a feature of its own. The two take different inputs (a review
 has rules and groups, a trace has a test), show different things and are
 linked to separately from a session card, so separate pages keep each
 page's query the request, as decision 14 wants.
+
+## 21. Layout: a navigation gutter instead of a nav pill
+
+The pages read as a website in a webview: a rounded nav pill across the
+top, content centred under it. **Decision:** the navigation is a gutter
+down the window's left edge (`AppNav.svelte`), with one square-ish tab per
+page, an icon over one word: Home, Sessions, Review, Trace. The open tab is
+joined to the page like a file folder's tab, and the page sits on top of the
+gutter: the gutter is half a shade darker than the page, and the page's
+edge with the open tab is one shape carrying the raised surfaces' ring and
+shadow. The theme menu is a tile at the bottom of the gutter, whose list
+opens up and to the right. Every page keeps its header (Sessions, New
+review, …), set against the gutter rather than centred, and the two pages
+that fill the window got a title row (Review, Trace) of the same size and
+at the same top and left margins, with the comparison beside the title,
+where the info bar was. The waves and the flow lines stay, starting where
+the page does; the flow lines fade in from the left so the open tab meets
+them softly.
+
+The app name is gone from the chrome, and so is the title bar: the window
+uses macOS's overlay title bar (`titleBarStyle: "Overlay"`, `hiddenTitle`
+in `tauri.conf.json`), so the page and the gutter run to the top of the
+window and the traffic lights sit in the gutter, as in Finder's or Mail's
+sidebar. The native bar had been the OS's white or grey above a gutter
+half a shade darker, with no edge between them, and it followed the OS
+appearance rather than the app's theme. The gutter leaves 44px above its
+first tab for the lights (`trafficLightPosition` puts them at 16, 16), and
+the pages keep the bar's height clear above their titles (`--page-top`).
+Since nothing native remains to drag the window by, the bar's strip over
+the page, the room around the lights and the empty part of the gutter are
+`data-tauri-drag-region`, which needs `core:window:allow-start-dragging`
+in the capabilities; double-clicking them zooms the window as the title
+bar did. Considered instead: ringing and shadowing the gutter's top edge
+under the native bar, one CSS rule that reads the bar as part of the raised
+page surface, which stays the fallback if the overlay misbehaves. The Home
+tab may go later, once the home page has a purpose beyond linking to the
+other three.
+
+How the shape is drawn: the page's edge, top to bottom, bulging left around
+the open tab with concave curves where they meet, is an SVG path
+(`src/lib/folder_tab.js`) computed from the open tile's position and
+redrawn when the gutter resizes, with a `drop-shadow` filter so one shadow
+follows the whole outline, curves included. The shape is clipped at the
+page's edge, so the 2px overlap that hides any seam never covers the page,
+while the theme list can still open out of the gutter. Pure CSS was tried
+first: a straight junction works with box shadows, and a curved one with
+the inverted-corner trick, but the curve then carries no ring or shadow.
+
+The gutter is `position: fixed`, like the waves and the pattern, and the
+body leaves its width free with `padding-left`, so landing pages scroll as
+before. Picked from static mockups served by the dev server for the
+purpose and removed once decided (fourteen wide concepts, then icon rail,
+inset sheet, unified toolbar, folder tab and title bar deep dives): the
+user ruled out the inset sheet and an app mark in the rail, and chose the
+curved tabs from the window edge over a straight junction and a
+square-edged band. The tree beside the Review and Trace content shares the
+page's background rather than a darker one, so the gutter is the only
+darker surface in the window.

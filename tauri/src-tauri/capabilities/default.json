@@ -5,6 +5,7 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-start-dragging",
     "allow-list-branches-and-recent-commits",
     "allow-analyze-file-changes",
     "allow-get-function-diffs",

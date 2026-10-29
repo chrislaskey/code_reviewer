@@ -114,31 +114,34 @@
 
 <TopBackgroundPattern />
 
-<div class="full-page">
-  <AppNav current="reviews" />
+<AppNav current="reviews" />
 
-  <div class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-base-300 px-6 py-2 font-mono text-[11px] text-base-content/70">
+<div class="full-page">
+  <div class="full-page-title">
+    <h1>Review</h1>
     {#if request}
-      <span class="text-base-content">{request.repo_path}</span>
-      <span>{describeRequest(request)}</span>
-      {#if result}
-        <span>
-          {plural(result.files.length, "changed file")}, {plural(functionCount, "changed function")} ·
-          {shortCommit(result.base_commit)} → {result.head_commit ? shortCommit(result.head_commit) : "working tree"}
-        </span>
-        {#if result.skipped_files.length > 0}
-          <details class="relative">
-            <summary class="cursor-pointer">{plural(result.skipped_files.length, "skipped file")}</summary>
-            <ul class="absolute z-10 mt-1 max-h-64 overflow-auto rounded-lg border border-base-300 bg-base-100 p-2 shadow">
-              {#each result.skipped_files as skipped (skipped.path)}
-                <li>{skipped.path} · {skipped.reason}</li>
-              {/each}
-            </ul>
-          </details>
+      <span class="comparison font-mono text-[11px] text-base-content/70">
+        <span class="text-base-content">{request.repo_path}</span>
+        <span>{describeRequest(request)}</span>
+        {#if result}
+          <span>
+            {plural(result.files.length, "changed file")}, {plural(functionCount, "changed function")} ·
+            {shortCommit(result.base_commit)} → {result.head_commit ? shortCommit(result.head_commit) : "working tree"}
+          </span>
+          {#if result.skipped_files.length > 0}
+            <details class="relative">
+              <summary class="cursor-pointer">{plural(result.skipped_files.length, "skipped file")}</summary>
+              <ul class="absolute z-10 mt-1 max-h-64 overflow-auto rounded-lg border border-base-300 bg-base-100 p-2 shadow">
+                {#each result.skipped_files as skipped (skipped.path)}
+                  <li>{skipped.path} · {skipped.reason}</li>
+                {/each}
+              </ul>
+            </details>
+          {/if}
         {/if}
-      {/if}
+      </span>
     {/if}
-    <a href={reviewNewUrl(request)} class="ml-auto text-primary">Edit review</a>
+    <a href={reviewNewUrl(request)} class="ml-auto text-sm text-primary">Edit review</a>
   </div>
 
   {#if request === null}
@@ -176,7 +179,7 @@
       </ul>
     </Toolbar>
     <div class="full-page-body">
-      <aside class="w-60 shrink-0 overflow-y-auto border-r border-base-300 bg-base-200">
+      <aside class="w-60 shrink-0 overflow-y-auto border-r border-base-300">
         <ReviewTree
           {allChangesRow}
           groups={result.groups}

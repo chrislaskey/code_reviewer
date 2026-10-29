@@ -3,13 +3,27 @@
    variables here are shorthands the sessions pages' styles use. */
 
 :root {
-  /* The space around the nav pill, and the inset of full-width bars. */
+  /* The macOS title bar is an overlay (tauri.conf.json): the page runs
+     under it, the window controls sit in the gutter. This is the bar's
+     height, which the page's title and the gutter's tabs keep clear of. */
+  --title-bar-height: 28px;
+  /* The inset of a page's content and of full-width bars, and the room
+     above a page's title: just past the title bar, whose strip over the
+     page holds only the background art. */
   --page-gutter: 1.5rem;
-  /* The column of the landing pages, and of the nav pill above it. */
+  --page-top: 2rem;
+  /* The column of the landing pages. */
   --page-width: 980px;
-  /* Raised surfaces, the nav pill and panels: a faint 1px ring and a soft
-     shadow instead of a border. Dark themes need a lighter ring, a darker
-     shadow and a faint top highlight. */
+  /* The navigation gutter down the window's left edge (AppNav): half a
+     shade darker than the page, which sits on top of it with the open tab,
+     ringed and shadowed like the raised surfaces below. */
+  --gutter-width: 84px;
+  --gutter-bg: color-mix(in oklab, var(--color-base-100) 55%, var(--color-base-200));
+  --gutter-ring: light-dark(rgb(0 0 0 / 0.06), rgb(255 255 255 / 0.08));
+  --gutter-shadow: light-dark(rgb(0 0 0 / 0.1), rgb(0 0 0 / 0.55));
+  /* Raised surfaces, the panels: a faint 1px ring and a soft shadow instead
+     of a border. Dark themes need a lighter ring, a darker shadow and a
+     faint top highlight. */
   --raised-shadow:
     0 0 0 1px light-dark(rgb(0 0 0 / 0.04), rgb(255 255 255 / 0.06)),
     0 4px 14px -2px light-dark(rgb(0 0 0 / 0.08), rgb(0 0 0 / 0.5)),
@@ -107,60 +121,120 @@
 /* The body paints the background and fills the window: WebKit leaves the
    old colour on the root background below short pages after a theme
    change. Isolated, so the z-index -1 waves and pattern show above it, and
-   a flow root, so the nav's top margin stays inside it. */
+   a flow root, so a page's top margin stays inside it. The gutter is fixed
+   down the left edge, so the page keeps clear of it. */
 body {
   display: flow-root;
   margin: 0;
+  padding-left: var(--gutter-width);
   min-height: 100vh;
   background: var(--root-bg);
   isolation: isolate;
   color: var(--color-base-content);
 }
 
-/* The pill across the top of every page. */
-.app-nav-band {
-  position: relative;
-  flex-shrink: 0;
-  margin-top: var(--page-gutter);
-  padding: 0 var(--page-gutter);
+/* The navigation gutter down the window's left edge (AppNav): fixed, like
+   the waves and the pattern, so it stays put while the page scrolls; the
+   body leaves its width free. */
+.app-gutter {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: var(--gutter-width);
+  padding-bottom: 10px;
+  background: var(--gutter-bg);
 }
 
-.app-nav {
+/* The room at the top of the gutter for the window controls, which macOS
+   draws over it; dragging it moves the window, like the rest of the
+   gutter's empty space. */
+.app-gutter .window-controls {
+  flex-shrink: 0;
+  height: 44px;
+}
+
+/* The title bar's strip over the page: nothing of ours, so it drags the window. */
+.title-bar-drag {
+  position: fixed;
+  inset: 0 0 auto var(--gutter-width);
+  z-index: 20;
+  height: var(--title-bar-height);
+}
+
+/* The page's edge and the open tab as one shape, so one shadow follows the
+   whole outline, curves included; the page's colour, behind the tiles. The
+   ring and the shadow are the raised surfaces'. */
+.app-gutter .tab-shape {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  overflow: visible;
+  pointer-events: none;
+  fill: var(--color-base-100);
+  filter: drop-shadow(-1px 0 0 var(--gutter-ring)) drop-shadow(0 -1px 0 var(--gutter-ring))
+    drop-shadow(0 1px 0 var(--gutter-ring)) drop-shadow(-3px 1px 7px var(--gutter-shadow));
+}
+
+/* A tab: an icon over one word. */
+.app-gutter .tile {
   position: relative;
   z-index: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 1.25rem;
-  min-height: 52px;
-  max-width: calc(var(--page-width) - 2 * var(--page-gutter));
-  margin: 0 auto;
-  padding: 0.375rem 0.5rem 0.375rem 1.5rem;
-  background: color-mix(in oklab, var(--color-base-100) 85%, transparent);
-  border-radius: 9999px;
-  box-shadow: var(--raised-shadow);
-  font-size: 0.95rem;
-}
-
-.app-nav a {
-  color: var(--muted);
-  text-decoration: none;
-}
-
-.app-nav a.current,
-.app-nav a:hover {
-  color: var(--fg);
-}
-
-.app-nav .app-name {
+  justify-content: center;
+  gap: 0.3rem;
+  height: 62px;
+  color: color-mix(in oklab, var(--color-base-content) 62%, transparent);
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.app-gutter .tile-icon {
+  width: 22px;
+  height: 22px;
+}
+
+/* A tab that is not open lights up as an inset rounded square, while
+   hovered or while its menu is open. */
+.app-gutter .tile:not(.current):hover,
+.app-gutter details[open] > .tile {
   color: var(--fg);
 }
 
-/* A landing page: a column of sections, as wide as the nav pill above it. */
+.app-gutter .tile:not(.current):hover::before,
+.app-gutter details[open] > .tile::before {
+  content: "";
+  position: absolute;
+  inset: 4px 7px;
+  z-index: -1;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--color-base-content) 7%, transparent);
+}
+
+.app-gutter .tile.current {
+  color: var(--fg);
+}
+
+.app-gutter .tile.current .tile-icon {
+  color: var(--color-primary);
+}
+
+.app-gutter .spacer {
+  flex: 1;
+}
+
+/* A landing page: a column of sections, against the gutter. */
 .page {
   max-width: var(--page-width);
-  margin: 0 auto;
-  padding: 2.5rem var(--page-gutter) var(--page-gutter);
+  margin: 0;
+  padding: var(--page-top) var(--page-gutter) var(--page-gutter);
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
