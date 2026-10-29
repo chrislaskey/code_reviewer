@@ -54,7 +54,6 @@ export default defineConfig({
         traces_show: resolve(import.meta.dirname, "src/traces/show.html"),
         sessions_index: resolve(import.meta.dirname, "src/sessions/index.html"),
         sessions_new: resolve(import.meta.dirname, "src/sessions/new.html"),
-        experiments_backgrounds: resolve(import.meta.dirname, "src/experiments/backgrounds.html"),
       },
     },
   },

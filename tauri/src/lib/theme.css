@@ -49,3 +49,17 @@
 @theme {
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
+
+/* daisyUI shades a button's shadow with its own colour, which reads as a haze
+   below primary buttons. A neutral soft lift instead, like the nav and panels.
+   In daisyUI's base button layer, so its variants (ghost, link, soft, outline)
+   and states (pressed, disabled) still turn the shadow off. */
+@layer utilities {
+  @layer daisyui.l1.l2.l3 {
+    .btn {
+      --btn-shadow: 0 1px 2px light-dark(rgb(0 0 0 / 0.1), rgb(0 0 0 / 0.4)),
+        0 4px 10px -3px light-dark(rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.6));
+      text-shadow: none;
+    }
+  }
+}
