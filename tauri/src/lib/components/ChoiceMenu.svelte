@@ -40,7 +40,7 @@
     {label}
     <Icon name="hero-chevron-down-micro" class="size-4" />
   </summary>
-  <ul class="dropdown-content menu choice-menu w-[24rem] bg-base-100 rounded-box shadow-sm">
+  <ul class="dropdown-content menu choice-menu panel w-[24rem]">
     {@render children({ close })}
   </ul>
 </details>
