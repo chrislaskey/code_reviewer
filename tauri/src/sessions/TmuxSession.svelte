@@ -2,7 +2,7 @@
   import { reviewShowUrl, traceShowUrl } from "../lib/routes.js";
   import Badge from "./Badge.svelte";
   import ChangesMenu from "./ChangesMenu.svelte";
-  import ClaudeCodeBadge from "./ClaudeCodeBadge.svelte";
+  import AgentBadge from "./AgentBadge.svelte";
   import GitMenu from "./GitMenu.svelte";
   import OpenMenu from "./OpenMenu.svelte";
   import RepositoryName from "./RepositoryName.svelte";
@@ -10,7 +10,7 @@
   let { session, mainBranch, onOpen, onOpenInBrowser, onCopy, onMerge, onClose } = $props();
 
   let attached = $derived(session.attached_clients > 0);
-  let working = $derived(session.claude_code?.status === "busy");
+  let working = $derived(session.agent?.status === "busy");
 </script>
 
 <div class="panel" class:working>
@@ -19,10 +19,10 @@
       <span class="name">{session.name}</span>
       <RepositoryName path={session.directory ?? ""} git={session.git} />
     </span>
-    {#if session.claude_code}
-      <ClaudeCodeBadge session={session.claude_code} />
+    {#if session.agent}
+      <AgentBadge session={session.agent} />
     {:else}
-      <Badge text="no claude" title="No Claude Code is running in the session" />
+      <Badge text="no agent" title="No agent is running in the session" />
     {/if}
     {#if !attached}
       <Badge text="detached" title="No terminal window is attached to the session, so Open starts a new one" />

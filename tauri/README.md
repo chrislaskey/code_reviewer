@@ -37,7 +37,7 @@ page load:
 | `/reviews/show?repo_path=…` | `reviews/ReviewShowPage.svelte` | Runs the comparison in the URL and shows the Node and Ledger views |
 | `/traces/new` | `traces/TraceNewPage.svelte` | The form: repository, what to compare |
 | `/traces/show?repo_path=…` | `traces/TraceShowPage.svelte` | Lists the tests of the comparison and walks the calls below the picked one |
-| `/sessions` | `sessions/SessionsIndexPage.svelte` | The tmux sessions the app started, with the Claude Code and git status in each, then its worktrees without a session; the Review menu opens one's changes in Reviews and the Complete menu finishes one. Refreshed every 5 seconds |
+| `/sessions` | `sessions/SessionsIndexPage.svelte` | The tmux sessions the app started, with the agent and git status in each, then its worktrees without a session; the Review menu opens one's changes in Reviews and the Complete menu finishes one. Refreshed every 5 seconds |
 | `/sessions/new` | `sessions/SessionNewPage.svelte` | Creates a worktree of a repository and a session in it, both named `cr-<name>`, and opens it in the terminal app |
 
 Pages link to each other by path with plain `<a href>` links, which the
@@ -110,7 +110,7 @@ src/
   sessions/
     SessionsIndexPage.svelte, SessionNewPage.svelte
     styles.css                           the sessions pages' styles
-    TmuxSession.svelte, GitWorktree.svelte, ReviewMenu.svelte, CompleteMenu.svelte, GitStatus.svelte, ClaudeCodePill.svelte, ...
+    TmuxSession.svelte, GitWorktree.svelte, ReviewMenu.svelte, CompleteMenu.svelte, GitStatus.svelte, AgentBadge.svelte, ...
 vite.config.js                           Tailwind, the theme script and the dev server port
 vendor/heroicons.js                      the Tailwind plugin making the hero-* icon classes
 src-tauri/
@@ -118,10 +118,11 @@ src-tauri/
   src/review.rs                          the review commands around the core crate
   src/sessions.rs                        detects the settings, names sessions with the prefix, lists,
                                          creates and shows them
-  src/tmux.rs, git_worktree.rs, git.rs, terminal_app.rs, process.rs, claude_code.rs
+  src/tmux.rs, git_worktree.rs, git.rs, terminal_app.rs, process.rs, agent.rs, claude_code.rs,
+                                         cursor_agent.rs
                                          runs tmux, adds, lists, merges and closes git worktrees, reads a
                                          directory's git status, controls terminal apps, lists processes
-                                         and reads Claude Code's session statuses
+                                         and reads the statuses of Claude Code and Cursor's agent
   Info.plist                             merged into the app bundle's Info.plist
   capabilities/                          which window may call which command
   tauri.conf.json                        the Tauri configuration

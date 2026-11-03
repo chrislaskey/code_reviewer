@@ -1,6 +1,6 @@
 //! Lists the processes on the machine with `ps`, to tell whether Claude
-//! Code runs in a tmux pane and whether a Claude Code session's process is
-//! still alive.
+//! Code or Cursor's `agent` runs in a tmux pane and whether a Claude Code
+//! session's process is still alive.
 
 use serde::Serialize;
 use tokio::process::Command;
@@ -45,6 +45,11 @@ pub enum ProcessState {
 impl Process {
     pub fn is_claude_code(&self) -> bool {
         self.name == "claude"
+    }
+
+    /// Cursor's agent CLI, installed as `agent` and `cursor-agent`.
+    pub fn is_cursor_agent(&self) -> bool {
+        self.name == "agent" || self.name == "cursor-agent"
     }
 }
 
@@ -140,12 +145,20 @@ mod tests {
             .expect("the line parses");
         assert_eq!(shell.name, "zsh");
         assert!(!shell.is_claude_code());
+        assert!(!shell.is_cursor_agent());
         assert!(!shell.in_foreground);
 
         let daemon = parse_process("  1     0     1     0 ??       Ss     0.3 /sbin/launchd")
             .expect("the line parses");
         assert_eq!(daemon.tty, None);
         assert_eq!(daemon.name, "launchd");
+
+        let agent =
+            parse_process("55812 48795 55812 55812 ttys000 S+ 2.5 /Users/me/.local/bin/agent")
+                .expect("the line parses");
+        assert_eq!(agent.name, "agent");
+        assert!(agent.is_cursor_agent());
+        assert!(!agent.is_claude_code());
     }
 
     #[test]

@@ -7,7 +7,7 @@
 //!     calls below one test walked top to bottom like a stack trace, each
 //!     function marked against the base. Also computed by the core crate.
 //!   * Sessions (`sessions`): the tmux sessions the app started, named
-//!     `cr-<name>`, with the Claude Code status in each, and its git
+//!     `cr-<name>`, with the agent (Claude Code or Cursor) status in each, and its git
 //!     worktrees (named the same) without a session. A new session is a
 //!     worktree of a repository with a tmux session in it, opened in the
 //!     user's terminal app; a worktree's session can be continued, and
@@ -16,8 +16,10 @@
 //! The pages are in `../src`, one HTML entry per page. They call the
 //! commands below through `src/lib/backend.js` and nothing else.
 
+mod agent;
 mod analysis;
 mod claude_code;
+mod cursor_agent;
 mod git;
 mod git_worktree;
 mod process;
@@ -102,7 +104,7 @@ async fn get_default_session_port(state: State<'_, AppState>) -> Result<u16, Str
     sessions::get_default_session_port(&settings.settings).await
 }
 
-/// The tmux sessions the app started, each with its Claude Code status, and
+/// The tmux sessions the app started, each with its agent status, and
 /// its worktrees without a session.
 #[tauri::command]
 async fn list_sessions(state: State<'_, AppState>) -> Result<SessionList, String> {

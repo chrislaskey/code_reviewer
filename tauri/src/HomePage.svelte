@@ -17,7 +17,7 @@
   <Header>
     Code Reviewer
     {#snippet subtitle()}
-      Review what a change did, trace a test through it, and run Claude Code sessions in tmux.
+      Review what a change did, trace a test through it, and run Claude Code or Cursor agent sessions in tmux.
     {/snippet}
   </Header>
 
@@ -35,7 +35,7 @@
 
   <section>
     <h2>Sessions</h2>
-    <p><a href={sessionsIndexUrl()}>The Claude Code sessions started here →</a></p>
-    <p class="muted">See whether Claude Code is busy or idle in each tmux session this app started, open one in your terminal app, or start a new one.</p>
+    <p><a href={sessionsIndexUrl()}>The agent sessions started here →</a></p>
+    <p class="muted">See whether the agent is busy or idle in each tmux session this app started, open one in your terminal app, or start a new one.</p>
   </section>
 </main>

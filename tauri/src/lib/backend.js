@@ -53,7 +53,7 @@ export function getDefaultSessionPort() {
 }
 
 /**
- * The tmux sessions this app started (named with its prefix), each with its Claude Code status, and its git worktrees
+ * The tmux sessions this app started (named with its prefix), each with its agent status, and its git worktrees
  * with no session running.
  */
 export function listSessions() {

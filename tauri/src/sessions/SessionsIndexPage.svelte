@@ -1,5 +1,5 @@
 <!-- The sessions page: the tmux sessions this app started, named with the
-     app's prefix, with the Claude Code status in each, then its git worktrees
+     app's prefix, with the agent status in each, then its git worktrees
      with no session running, to continue. The Rust side detects the shell,
      terminal app and tmux once and does the work (see
      src-tauri/src/sessions.rs). -->
@@ -86,7 +86,7 @@
   }
 
   function showSessionChanges(changes) {
-    for (const { name, from, to } of changes.statusChanged) log(`${name}: Claude Code ${from} → ${to}`);
+    for (const { name, from, to } of changes.statusChanged) log(`${name}: agent ${from} → ${to}`);
     for (const [change, entries] of Object.entries(changes)) {
       for (let i = 0; i < entries.length; i++) waves.ripple(RIPPLE_STRENGTHS[change]);
     }
@@ -199,7 +199,7 @@
   <Header>
     Sessions
     {#snippet subtitle()}
-      The tmux sessions started here, with the Claude Code status in each, then the worktrees with no session running.
+      The tmux sessions started here, with the agent status in each, then the worktrees with no session running.
       Refreshes every 5 seconds.
     {/snippet}
     {#snippet actions()}
@@ -217,8 +217,9 @@
           <code>claude --continue</code>. The Git menu finishes one: Merge into {mainBranch} fast-forwards {mainBranch} with the
           branch, removes the worktree, deletes the branch and closes the session; Turn into branch removes the worktree and
           keeps the branch. Both need a clean worktree. The
-          Claude Code status is read from <code>~/.claude/sessions</code>, which Claude Code doesn't document, so it may
-          change.
+          agent is Claude Code or Cursor's <code>agent</code>. Claude Code's status is read from
+          <code>~/.claude/sessions</code>, which it doesn't document, so it may change. <code>agent</code> reports none, so
+          it's busy when its chat was written to in the last few seconds, else idle.
         </InfoPopover>
         <InfoPopover icon="hero-cog-6-tooth" title="The settings detected on this Mac">
           {#if detectError}

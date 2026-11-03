@@ -10,7 +10,7 @@ A macOS desktop app with three features:
   unchanged ones their name, calls outside the project a slim row, to read
   what a change does on the path a test takes.
 * **Sessions**: the tmux sessions this app started, named `cr-<name>`, with
-  the Claude Code status (busy, idle) in each, and a form to start a new one:
+  the agent (Claude Code or Cursor) status (busy, idle) in each, and a form to start a new one:
   a git worktree of a repository and a tmux session, both named `cr-<name>`,
   running Claude Code, opened in your terminal app. After a restart the
   worktrees are found again in the repositories under `~/code`, and a

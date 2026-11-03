@@ -179,10 +179,14 @@ in `Settings.session_name_prefix` so the pages read it and a settings form
 could edit it), and the list shows only sessions named so. The new session
 form shows the prefix in front of the name.
 
-For each listed session the Rust side finds the Claude Code session running
-in one of its panes: the one whose status file in `~/.claude/sessions` names
-the pane, else a `claude` process on one of the panes' ttys, which has no
-status (shown as "unknown"). The card shows that status, the directory of
+For each listed session the Rust side finds the agent running in one of its
+panes. For Claude Code that is the session whose status file in
+`~/.claude/sessions` names the pane, else a `claude` process on one of the
+panes' ttys, which has no status (shown as "unknown"). Failing that, a
+Cursor `agent` process on one of the panes' ttys: it writes no status file,
+so its status is a guess (`cursor_agent.rs`): busy when the chat database
+the process has open (found with `lsof`) was written to in the last 10
+seconds, else idle. The pages call either one just "agent". The card shows that status, the directory of
 the current pane, and the Copy and Open buttons. The pane rows, process
 lists, git statuses and the separate Claude Code list were dropped (see
 `docs/suggestions/sessions.md`), and with them the app's `git.rs` module.
