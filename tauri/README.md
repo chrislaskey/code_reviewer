@@ -9,7 +9,7 @@ one HTML entry per page. What it does and why it is built this way is in
 
 Prerequisites: Rust (stable), the Tauri CLI
 (`cargo install tauri-cli --version '^2' --locked`), Xcode command line
-tools, and Node and pnpm (see `.tool-versions`). Install the packages once
+tools, and Node and pnpm (see `../.tool-versions`). Install the packages once
 with `pnpm install`.
 
 ```sh

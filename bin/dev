@@ -18,8 +18,28 @@ case "$PORT" in
 esac
 export PORT
 
-if [ ! -d node_modules ]; then
-  pnpm install
+if command -v asdf >/dev/null 2>&1; then
+  while read -r tool versions; do
+    case "$tool" in ''|'#'*) continue ;; esac
+    if ! asdf plugin list | grep -qx "$tool"; then
+      asdf plugin add "$tool"
+    fi
+    for version in $versions; do
+      asdf install "$tool" "$version"
+    done
+  done < "$ROOT/.tool-versions"
 fi
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "bin/dev: cargo not found; install Rust (https://rustup.rs) or asdf" >&2
+  exit 1
+fi
+
+if ! cargo tauri --version >/dev/null 2>&1; then
+  echo "bin/dev: Installing tauri-cli..."
+  cargo install tauri-cli --version '^2' --locked
+fi
+
+pnpm install
 echo "bin/dev: Vite and the Tauri window on http://localhost:$PORT"
 cargo tauri dev --config "{\"build\":{\"devUrl\":\"http://localhost:$PORT\"}}" "$@"

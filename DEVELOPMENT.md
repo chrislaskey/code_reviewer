@@ -34,14 +34,14 @@ tauri/           the desktop app
   src-tauri/     the Tauri crate: the commands the pages call
 docs/            decisions.md, and suggestions/ for what was left out
 bin/check        every check: fmt, clippy, tests, svelte-check, build, audit
-bin/dev          cargo tauri dev, with Vite and Tauri on $PORT when set (the sessions set one per worktree)
+bin/dev          installs Rust (asdf), tauri-cli and node packages if missing, then cargo tauri dev, with Vite and Tauri on $PORT when set (the sessions set one per worktree)
 ```
 
 ## Running
 
 Prerequisites: Rust (stable), the Tauri CLI
 (`cargo install tauri-cli --version '^2' --locked`), Xcode command line
-tools, Node and pnpm (see `tauri/.tool-versions`), and tmux for the sessions
+tools, Node and pnpm (see `.tool-versions`), and tmux for the sessions
 pages.
 
 ```sh
