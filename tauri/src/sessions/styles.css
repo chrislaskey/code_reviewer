@@ -200,6 +200,145 @@
   margin: 0;
 }
 
+/* A session's chat history. */
+
+.chat-history {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.chat-message {
+  padding: 0.85rem 1.1rem;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.chat-message-user {
+  background: var(--card);
+  box-shadow: var(--raised-shadow);
+}
+
+/* Opaque, so the text reads over the waves. */
+.chat-message-assistant {
+  background: var(--card);
+  border: 1px solid color-mix(in oklab, var(--color-base-content) 10%, transparent);
+}
+
+.chat-message-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+}
+
+.chat-role {
+  font-weight: 600;
+}
+
+.markdown-html.chat-text {
+  padding-left: 0;
+}
+
+.chat-fold {
+  font-size: 0.85rem;
+}
+
+.chat-fold > summary {
+  cursor: pointer;
+  display: flex;
+  gap: 0.4rem;
+  min-width: 0;
+  list-style: none;
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+}
+
+.chat-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The flex summary loses its marker, so it draws one. */
+.chat-fold > summary::before {
+  content: "▸";
+  flex: none;
+  width: 0.7rem;
+}
+
+.chat-fold[open] > summary::before {
+  content: "▾";
+}
+
+.chat-tool-name {
+  font-weight: 600;
+  flex: none;
+}
+
+.chat-tool-summary {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.chat-fold-label {
+  margin-top: 0.5rem;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.chat-thinking {
+  margin-top: 0.4rem;
+  white-space: pre-wrap;
+  font-style: italic;
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+}
+
+.chat-tool-text {
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  max-height: 24rem;
+  overflow: auto;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--color-base-content) 5%, transparent);
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-tool-status {
+  flex: none;
+}
+
+.chat-tool-error {
+  color: var(--color-error);
+}
+
+.prompt-form {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.prompt-input {
+  resize: vertical;
+}
+
+.prompt-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.chat-path {
+  overflow-wrap: anywhere;
+}
+
 /* Forms. */
 
 .new-session {

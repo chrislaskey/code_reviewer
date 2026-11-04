@@ -30,8 +30,9 @@ use futures_util::future::join_all;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
-use crate::agent::AgentSession;
+use crate::agent::{AgentKind, AgentSession};
 use crate::claude_code::{self, ClaudeCodeSession};
+use crate::claude_code_chat::{self, ChatHistory};
 use crate::cursor_agent;
 use crate::git::{self, GitStatus};
 use crate::git_worktree::{self, Worktree};
@@ -192,6 +193,79 @@ pub async fn list_sessions(settings: &Settings) -> Result<SessionList, String> {
         sessions,
         worktrees,
     })
+}
+
+/// One of the app's running tmux sessions, with its agent and git status,
+/// as `list_sessions` gives it. `name` is the full session name, prefix
+/// included.
+pub async fn get_session(settings: &Settings, name: &str) -> Result<SessionStatus, String> {
+    validate_app_session_name(settings, name)?;
+    let tmux = Tmux::new(&settings.tmux_path);
+    let session = list_app_sessions(&tmux, settings)
+        .await?
+        .into_iter()
+        .find(|session| session.name == name)
+        .ok_or_else(|| format!("There is no session named {name}"))?;
+    let mut statuses = get_session_statuses(&tmux, vec![session]).await?;
+    let mut status = statuses
+        .pop()
+        .ok_or_else(|| format!("There is no session named {name}"))?;
+    if let Some(directory) = &status.directory {
+        status.git = git::get_status(directory).await;
+    }
+    Ok(status)
+}
+
+/// The chat of the agent running in one of the app's sessions. Only Claude
+/// Code's is read so far.
+pub async fn get_agent_chat_history(
+    settings: &Settings,
+    name: &str,
+) -> Result<ChatHistory, String> {
+    let session = get_session(settings, name).await?;
+    let agent = session
+        .agent
+        .ok_or_else(|| format!("No agent is running in {name}"))?;
+    match agent.kind {
+        AgentKind::ClaudeCode => {
+            let session_id = agent
+                .session_id
+                .ok_or_else(|| format!("Claude Code in {name} hasn't reported its session yet"))?;
+            tokio::task::spawn_blocking(move || claude_code_chat::read_chat_history(&session_id))
+                .await
+                .map_err(|error| format!("Reading the chat failed: {error}"))?
+        }
+        AgentKind::CursorAgent => Err("Cursor's agent chat history isn't shown yet".to_string()),
+    }
+}
+
+/// Types `prompt` into the pane the agent of one of the app's sessions runs
+/// in, and presses Enter.
+pub async fn send_prompt_to_session(
+    settings: &Settings,
+    name: &str,
+    prompt: &str,
+) -> Result<(), String> {
+    let prompt = prompt.trim();
+    if prompt.is_empty() {
+        return Err("The prompt is empty".to_string());
+    }
+    let session = get_session(settings, name).await?;
+    let pane_id = session
+        .agent
+        .and_then(|agent| agent.tmux_pane_id)
+        .ok_or_else(|| format!("No agent pane found in {name}"))?;
+    Tmux::new(&settings.tmux_path)
+        .send_prompt_to_pane(&pane_id, prompt)
+        .await
+}
+
+fn validate_app_session_name(settings: &Settings, name: &str) -> Result<(), String> {
+    tmux::validate_session_name(name)?;
+    if !has_session_name_prefix(&settings.session_name_prefix, name) {
+        return Err(format!("{name} is not a session this app started"));
+    }
+    Ok(())
 }
 
 /// The running tmux sessions the app started (see `has_session_name_prefix`).
@@ -356,19 +430,16 @@ fn find_claude_code(
         return Some(session.clone());
     }
 
-    processes
-        .iter()
-        .filter(|process| process.is_claude_code())
-        .find(|process| {
-            session_panes
-                .iter()
-                .any(|pane| process.tty.as_deref() == Some(pane.tty.as_str()))
-        })
-        .map(|process| ClaudeCodeSession::without_status_file(process.pid))
+    let (process, pane) = find_process_in_panes(session_panes, processes, Process::is_claude_code)?;
+    Some(ClaudeCodeSession {
+        tmux_pane_id: Some(pane.id.clone()),
+        ..ClaudeCodeSession::without_status_file(process.pid)
+    })
 }
 
 /// The agent running in one of the session's panes: Claude Code (see
-/// `find_claude_code`), else Cursor's `agent` (see `find_cursor_agent_process`).
+/// `find_claude_code`), else a Cursor `agent` process on a pane's tty, with
+/// the pane it runs in.
 async fn find_agent(
     session_panes: &[&Pane],
     processes: &[Process],
@@ -377,22 +448,29 @@ async fn find_agent(
     if let Some(session) = find_claude_code(session_panes, processes, claude_code_sessions) {
         return Some(AgentSession::from(session));
     }
-    let process = find_cursor_agent_process(session_panes, processes)?;
-    Some(cursor_agent::get_session(process.pid).await)
+    let (process, pane) =
+        find_process_in_panes(session_panes, processes, Process::is_cursor_agent)?;
+    Some(AgentSession {
+        tmux_pane_id: Some(pane.id.clone()),
+        ..cursor_agent::get_session(process.pid).await
+    })
 }
 
-/// A Cursor `agent` process on one of the session's panes' ttys.
-fn find_cursor_agent_process<'a>(
-    session_panes: &[&Pane],
+/// A process `is_agent` accepts on one of the session's panes' ttys, with
+/// that pane.
+fn find_process_in_panes<'a, 'p>(
+    session_panes: &[&'p Pane],
     processes: &'a [Process],
-) -> Option<&'a Process> {
+    is_agent: impl Fn(&Process) -> bool,
+) -> Option<(&'a Process, &'p Pane)> {
     processes
         .iter()
-        .filter(|process| process.is_cursor_agent())
-        .find(|process| {
-            session_panes
+        .filter(|process| is_agent(process))
+        .find_map(|process| {
+            let pane = session_panes
                 .iter()
-                .any(|pane| process.tty.as_deref() == Some(pane.tty.as_str()))
+                .find(|pane| process.tty.as_deref() == Some(pane.tty.as_str()))?;
+            Some((process, *pane))
         })
 }
 
@@ -575,10 +653,7 @@ pub async fn show_session_in_terminal_app(
     settings: &Settings,
     name: &str,
 ) -> Result<ShowOutcome, String> {
-    tmux::validate_session_name(name)?;
-    if !has_session_name_prefix(&settings.session_name_prefix, name) {
-        return Err(format!("{name} is not a session this app started"));
-    }
+    validate_app_session_name(settings, name)?;
     let tmux = Tmux::new(&settings.tmux_path);
     if !tmux.has_session(name).await? {
         return Err(format!("There is no session named {name}"));
@@ -598,10 +673,7 @@ pub async fn show_session_in_terminal_app(
 /// Opens `http://localhost:<PORT>` of one of the app's sessions in the
 /// browser. Returns the URL.
 pub async fn open_session_in_browser(settings: &Settings, name: &str) -> Result<String, String> {
-    tmux::validate_session_name(name)?;
-    if !has_session_name_prefix(&settings.session_name_prefix, name) {
-        return Err(format!("{name} is not a session this app started"));
-    }
+    validate_app_session_name(settings, name)?;
     let tmux = Tmux::new(&settings.tmux_path);
     let port: u16 = tmux
         .get_environment_variable(name, PORT_VARIABLE)
@@ -792,6 +864,7 @@ mod tests {
             .expect("the claude process on the pane's tty is found");
         assert_eq!(in_review.pid, 10);
         assert_eq!(in_review.status, None);
+        assert_eq!(in_review.tmux_pane_id.as_deref(), Some("%2"));
 
         let in_other = find_claude_code(&other_panes, &processes, &reported)
             .expect("the reported session is found");
@@ -818,10 +891,15 @@ mod tests {
             claude_process(30, "ttys001"),
         ];
 
-        let found = find_cursor_agent_process(&review_panes, &processes)
-            .expect("the agent process on the pane's tty is found");
-        assert_eq!(found.pid, 10);
-        assert_eq!(find_cursor_agent_process(&[], &processes), None);
+        let (process, pane) =
+            find_process_in_panes(&review_panes, &processes, Process::is_cursor_agent)
+                .expect("the agent process on the pane's tty is found");
+        assert_eq!(process.pid, 10);
+        assert_eq!(pane.id, "%1");
+        assert_eq!(
+            find_process_in_panes(&[], &processes, Process::is_cursor_agent),
+            None
+        );
     }
 
     #[tokio::test]

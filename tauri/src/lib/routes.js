@@ -9,6 +9,7 @@
 export const HOME_PATH = "/";
 export const SESSIONS_INDEX_PATH = "/sessions";
 export const SESSION_NEW_PATH = "/sessions/new";
+export const SESSION_SHOW_PATH = "/sessions/:name";
 export const REVIEW_NEW_PATH = "/reviews/new";
 export const REVIEW_SHOW_PATH = "/reviews/show";
 export const TRACE_NEW_PATH = "/traces/new";
@@ -24,6 +25,19 @@ export function sessionsIndexUrl() {
 
 export function sessionNewUrl() {
   return SESSION_NEW_PATH;
+}
+
+/** The page of one tmux session: its status and actions, and its agent's chat history. `name` includes the prefix. */
+export function sessionShowUrl(name) {
+  return `${SESSIONS_INDEX_PATH}/${encodeURIComponent(name)}`;
+}
+
+/** The session name in a session page's path (`location.pathname`), or null when it names none. */
+export function sessionNameFromPath(pathname) {
+  const prefix = `${SESSIONS_INDEX_PATH}/`;
+  if (!pathname.startsWith(prefix)) return null;
+  const name = decodeURIComponent(pathname.slice(prefix.length));
+  return name === "" ? null : name;
 }
 
 /** The new review page, with its form filled in from a request when given one. */

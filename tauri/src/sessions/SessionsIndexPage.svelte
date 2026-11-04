@@ -13,30 +13,18 @@
   import InfoPopover from "../lib/components/InfoPopover.svelte";
   import StillWaves from "../lib/components/StillWaves.svelte";
   import TopBackgroundPattern from "../lib/components/TopBackgroundPattern.svelte";
-  import {
-    closeSession,
-    continueSession,
-    getSessionSettings,
-    listSessions,
-    mergeSession,
-    openSessionInBrowser,
-    showSessionInTerminalApp,
-  } from "../lib/backend.js";
+  import { continueSession, getSessionSettings, listSessions } from "../lib/backend.js";
   import { log } from "../lib/log.svelte.js";
   import LogList from "../lib/LogList.svelte";
   import GitWorktree from "./GitWorktree.svelte";
   import { countOf } from "./formatting.js";
+  import { createSessionActions, SHOW_OUTCOMES } from "./session_actions.js";
   import { listSessionChanges } from "./session_changes.js";
   import TmuxSession from "./TmuxSession.svelte";
 
   const REFRESH_INTERVAL_MS = 5000;
 
   const RIPPLE_STRENGTHS = { added: 40, removed: 25, statusChanged: 30, refreshed: 20, action: 25 };
-
-  const OUTCOMES = {
-    focused: "Brought its window to the front",
-    opened: "Opened a new window",
-  };
 
   let detected = $state();
   let detectError = $state();
@@ -116,64 +104,16 @@
     return () => element.removeEventListener("click", rippleOnAction);
   }
 
-  async function showSession(name) {
-    try {
-      const outcome = await showSessionInTerminalApp(name);
-      log(`${name}: ${OUTCOMES[outcome] ?? outcome}`);
-    } catch (error) {
-      log(`Opening ${name} failed: ${error}`);
-    }
-    await refresh();
-  }
-
-  async function openInBrowser(name) {
-    try {
-      log(`${name}: Opened ${await openSessionInBrowser(name)}`);
-    } catch (error) {
-      log(`Opening ${name} in the browser failed: ${error}`);
-    }
-  }
+  const actions = createSessionActions({ refresh });
 
   async function continueInWorktree(name) {
     try {
       const outcome = await continueSession(name);
-      log(`${name}: ${OUTCOMES[outcome] ?? outcome}`);
+      log(`${name}: ${SHOW_OUTCOMES[outcome] ?? outcome}`);
     } catch (error) {
       log(`Continuing ${name} failed: ${error}`);
     }
     await refresh();
-  }
-
-  async function merge(name) {
-    try {
-      log(await mergeSession(name));
-    } catch (error) {
-      log(`Merging ${name} failed: ${error}`);
-    }
-    await refresh();
-  }
-
-  async function close(name) {
-    try {
-      log(await closeSession(name));
-    } catch (error) {
-      log(`Closing ${name} failed: ${error}`);
-    }
-    await refresh();
-  }
-
-  // The clipboard API can be unavailable in the webview, so fall back to
-  // selecting the text for the user to copy. Returns whether it copied.
-  async function copyText(text, element) {
-    try {
-      await navigator.clipboard.writeText(text);
-      log(`Copied: ${text}`);
-      return true;
-    } catch {
-      window.getSelection().selectAllChildren(element);
-      log("Could not copy, the command is selected instead");
-      return false;
-    }
   }
 
   onMount(() => {
@@ -214,7 +154,8 @@
         <InfoPopover title="Which sessions are listed, and what the actions do">
           Only tmux sessions named {prefix}-… are listed, and the worktrees named {prefix}-… of the repositories in
           {watchedDirectories} that have no session, as after a restart. Open new tmux session starts a session in the worktree and types
-          <code>claude --continue</code>. The Git menu finishes one: Merge into {mainBranch} fast-forwards {mainBranch} with the
+          <code>claude --continue</code>. Open details, shown when a terminal is attached and an agent runs, opens the
+          session's page with the agent's chat history. The Git menu finishes one: Merge into {mainBranch} fast-forwards {mainBranch} with the
           branch, removes the worktree, deletes the branch and closes the session; Turn into branch removes the worktree and
           keeps the branch. Both need a clean worktree. The
           agent is Claude Code or Cursor's <code>agent</code>. Claude Code's status is read from
@@ -251,23 +192,15 @@
         <div class="panel empty muted">No sessions or worktrees. New session starts one, named {prefix}-…</div>
       {/if}
       {#each sessionList?.sessions ?? [] as session (session.name)}
-        <TmuxSession
-          {session}
-          {mainBranch}
-          onOpen={showSession}
-          onOpenInBrowser={openInBrowser}
-          onCopy={copyText}
-          onMerge={merge}
-          onClose={close}
-        />
+        <TmuxSession {session} {mainBranch} {actions} />
       {/each}
       {#each sessionList?.worktrees ?? [] as worktree (worktree.path)}
         <GitWorktree
           {worktree}
           {mainBranch}
           onContinue={continueInWorktree}
-          onMerge={merge}
-          onClose={close}
+          onMerge={actions.merge}
+          onClose={actions.close}
         />
       {/each}
     </div>

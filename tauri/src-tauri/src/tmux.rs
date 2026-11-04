@@ -83,6 +83,9 @@ pub struct Pane {
     pub current_path: String,
 }
 
+/// How long to wait between pasting a prompt and pressing Enter.
+const PASTE_SETTLE_TIME: std::time::Duration = std::time::Duration::from_millis(150);
+
 #[derive(Clone, Debug)]
 pub struct Tmux {
     program: String,
@@ -252,6 +255,22 @@ impl Tmux {
             .await
     }
 
+    /// Pastes `prompt` into the pane `pane_id` (like `%60`) and presses
+    /// Enter. A bracketed paste, so an agent reads a prompt of several lines
+    /// as one, rather than each newline as Enter.
+    pub async fn send_prompt_to_pane(&self, pane_id: &str, prompt: &str) -> Result<(), String> {
+        validate_pane_id(pane_id)?;
+        let buffer = format!("code-reviewer-prompt-{}", pane_id.trim_start_matches('%'));
+        self.run_checked(&["set-buffer", "-b", &buffer, "--", prompt])
+            .await?;
+        self.run_checked(&["paste-buffer", "-p", "-d", "-b", &buffer, "-t", pane_id])
+            .await?;
+        // An agent can read an Enter that comes with the paste as part of it.
+        tokio::time::sleep(PASTE_SETTLE_TIME).await;
+        self.run_checked(&["send-keys", "-t", pane_id, "Enter"])
+            .await
+    }
+
     async fn run_checked(&self, args: &[&str]) -> Result<(), String> {
         let output = self.run(args).await?;
         if output.status.success() {
@@ -274,6 +293,18 @@ impl Tmux {
             .output()
             .await
             .map_err(|error| format!("Could not run {}: {error}", self.program))
+    }
+}
+
+/// Pane ids are `%` and a number, like `%60`.
+fn validate_pane_id(pane_id: &str) -> Result<(), String> {
+    let is_valid = pane_id
+        .strip_prefix('%')
+        .is_some_and(|number| !number.is_empty() && number.chars().all(|c| c.is_ascii_digit()));
+    if is_valid {
+        Ok(())
+    } else {
+        Err(format!("{pane_id} is not a tmux pane id"))
     }
 }
 
@@ -435,6 +466,41 @@ mod tests {
         assert_eq!(pane.tty, "ttys035");
         assert!(pane.active && pane.window_active && !pane.dead);
         assert_eq!(parse_pane("too\tfew"), None);
+    }
+
+    #[test]
+    fn validates_pane_ids() {
+        assert!(validate_pane_id("%60").is_ok());
+        assert!(validate_pane_id("%").is_err());
+        assert!(validate_pane_id("=session:").is_err());
+    }
+
+    #[tokio::test]
+    async fn sends_a_prompt_to_a_pane() {
+        if !tmux_installed().await {
+            return;
+        }
+        let server = TestServer::start("prompt");
+        let tmux = &server.tmux;
+        let name = "example";
+        tmux.create_session(name, "/bin/sh", "/tmp", &[])
+            .await
+            .expect("session is created");
+        let panes = tmux.list_panes().await.expect("panes are listed");
+
+        tmux.send_prompt_to_pane(&panes[0].id, "echo prompt-$((40 + 2))")
+            .await
+            .expect("prompt is sent");
+
+        let mut screen = String::new();
+        for _ in 0..50 {
+            screen = tmux.capture_pane(name).await;
+            if screen.contains("prompt-42") {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        assert!(screen.contains("prompt-42"), "screen was: {screen}");
     }
 
     #[tokio::test]

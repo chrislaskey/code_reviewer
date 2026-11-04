@@ -2,7 +2,7 @@
   import ChoiceMenu from "../lib/components/ChoiceMenu.svelte";
   import MenuChoice from "../lib/components/MenuChoice.svelte";
 
-  let { name, port, onOpen, onOpenInBrowser, onCopy } = $props();
+  let { name, port, detailsUrl = null, onOpen, onOpenInBrowser, onCopy } = $props();
 
   let attachCommand = $derived(`tmux attach -t ${name}`);
   let attachCommandElement;
@@ -10,6 +10,14 @@
 
 <ChoiceMenu label="Open" title="Get to the session">
   {#snippet children({ close })}
+    {#if detailsUrl}
+      <MenuChoice
+        label="Open details"
+        explanation="Shows the session's page: its status and actions, and the agent's chat history, with its messages and tool calls."
+        href={detailsUrl}
+        onclick={close}
+      />
+    {/if}
     {#if port}
       <MenuChoice
         label="Open in browser"

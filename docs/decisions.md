@@ -63,6 +63,7 @@ multi-page), and name the pages by what they do:
 | Show trace | `src/traces/show.html?repo_path=…&test_name=…` | Lists the tests and walks the calls below the picked one |
 | Sessions | `src/sessions/index.html` | The tmux and Claude Code sessions |
 | New session | `src/sessions/new.html` | Creates a session and opens it |
+| Show session | `/sessions/<name>` (decision 23) | A session's status bar and its agent's chat history |
 
 The review request travels from the form to the show page in the query
 (at first as JSON in one parameter, since decision 14 as named parameters).
@@ -88,6 +89,9 @@ already has a function, and list/get/create/show otherwise:
 | `list_sessions` | `sessions::list_sessions` |
 | `create_session` | `sessions::create_session` |
 | `show_session_in_terminal_app` | `sessions::show_session_in_terminal_app` |
+| `get_session` | `sessions::get_session` (decision 23) |
+| `get_agent_chat_history` | `sessions::get_agent_chat_history` (decision 23) |
+| `send_prompt_to_session` | `sessions::send_prompt_to_session` (decision 23) |
 
 `analyze_file_changes` was kept over something like `get_review` because
 nothing is stored: "analyze" says what happens when it is called. The
@@ -666,3 +670,43 @@ light theme's page; and the theme script keeps the page colour the
 stylesheet gives the theme (under `phx:theme-background`) and paints it on
 `<html>` before the stylesheet arrives, clearing it once the page has
 loaded, so a dark theme opens dark.
+
+## 23. Sessions: a session's page, with the agent's chat history
+
+The list says whether an agent is busy, not what it is doing. **Decision:**
+a page per session, `/sessions/<name>` (the full tmux name), opened from
+the Open menu's "Open details". The choice shows only while a terminal is
+attached and an agent runs, since that is when there is a chat to follow.
+The page has the same status bar as the card: the name, badges and the
+Open, Review, Trace and Git menus, all in `SessionStatusBar.svelte` with
+the actions in `session_actions.js`, so both pages share one copy.
+Merging or closing from the page goes back to the list, since the
+session is gone. Under the bar is the chat, refreshed every 5 seconds as
+the list is.
+
+The chat is read in Rust (`claude_code_chat.rs`) from the transcript
+Claude Code writes to `~/.claude/projects/<directory>/<session id>.jsonl`.
+The session id comes from Claude Code's status file, which is now carried
+on `AgentSession`. The file is found by its name in every project
+directory, because the directory's name encoding isn't documented. Only
+the user's and the assistant's messages are kept: sidechains (subagents),
+meta lines (injected context) and bookkeeping lines are skipped. Each
+tool call is paired with its result, and the content blocks of one
+assistant message, written one per line, are joined. Text is rendered as
+Markdown by the core crate's `render_markdown_html`, which drops raw HTML,
+so the page can show it with `{@html}`. Tool inputs and results longer
+than 20,000 characters are cut. Like the status file, the transcript is
+undocumented, so lines that don't parse are skipped.
+
+Under the chat is a box to write back to the agent. Nothing is sent while
+typing; Enter or Send sends it, and Shift+Enter starts a new line. The
+prompt goes to the pane the agent runs in, which is now carried on
+`AgentSession` as `tmux_pane_id`: from Claude Code's status file, otherwise
+the pane whose tty the agent's process is on. It is pasted with `tmux
+paste-buffer -p`, a bracketed paste, and Enter is sent 150 ms later. With
+`send-keys -l`, each newline in a prompt would reach the agent as Enter and
+send the first line alone. A prompt that fails to send stays in the box.
+
+Cursor's `agent` keeps its chats in SQLite (`~/.cursor/chats/`), so its
+chat history is not shown yet and the page says so. See
+`docs/suggestions/sessions.md`.

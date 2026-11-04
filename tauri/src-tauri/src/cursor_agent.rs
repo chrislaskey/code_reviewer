@@ -28,6 +28,8 @@ pub async fn get_session(pid: u32) -> AgentSession {
     AgentSession {
         kind: AgentKind::CursorAgent,
         pid,
+        session_id: None,
+        tmux_pane_id: None,
         status: modified.map(|modified| status_of(modified, SystemTime::now()).to_string()),
         status_updated_at: modified.and_then(milliseconds_since_epoch),
     }

@@ -60,6 +60,24 @@ export function listSessions() {
   return invoke("list_sessions");
 }
 
+/** One of the app's tmux sessions, with its agent and git status, as `listSessions` gives it. `name` includes the prefix. */
+export function getSession(name) {
+  return invoke("get_session", { name });
+}
+
+/**
+ * The chat history of the agent in one of the app's sessions: `{ path, messages }`, each message with its role and
+ * parts (text as HTML, thinking, and tool calls with their results). Only Claude Code's is read so far.
+ */
+export function getAgentChatHistory(name) {
+  return invoke("get_agent_chat_history", { name });
+}
+
+/** Types `prompt` into the pane the agent of one of the app's sessions runs in, and presses Enter. */
+export function sendPromptToSession(name, prompt) {
+  return invoke("send_prompt_to_session", { name, prompt });
+}
+
 /**
  * Creates a git worktree of `repository` and a tmux session in it, both named `<prefix>-<name>`, with `PORT` set to
  * `port` and `command` typed in, and opens it in the terminal app.

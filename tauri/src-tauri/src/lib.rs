@@ -19,6 +19,7 @@
 mod agent;
 mod analysis;
 mod claude_code;
+mod claude_code_chat;
 mod cursor_agent;
 mod git;
 mod git_worktree;
@@ -35,7 +36,8 @@ use code_reviewer_core::analysis::service::AnalysisService;
 use tauri::{Manager, State};
 use tokio::sync::OnceCell;
 
-use sessions::{DetectedSettings, SessionList};
+use claude_code_chat::ChatHistory;
+use sessions::{DetectedSettings, SessionList, SessionStatus};
 use terminal_app::ShowOutcome;
 
 /// What the commands share, managed by Tauri.
@@ -79,6 +81,9 @@ pub fn run() {
             get_session_settings,
             get_default_session_port,
             list_sessions,
+            get_session,
+            get_agent_chat_history,
+            send_prompt_to_session,
             create_session,
             continue_session,
             merge_session,
@@ -110,6 +115,37 @@ async fn get_default_session_port(state: State<'_, AppState>) -> Result<u16, Str
 async fn list_sessions(state: State<'_, AppState>) -> Result<SessionList, String> {
     let settings = state.session_settings().await;
     sessions::list_sessions(&settings.settings).await
+}
+
+/// One of the app's tmux sessions, with its agent and git status. `name` is
+/// the full session name, prefix included.
+#[tauri::command]
+async fn get_session(state: State<'_, AppState>, name: String) -> Result<SessionStatus, String> {
+    let settings = state.session_settings().await;
+    sessions::get_session(&settings.settings, &name).await
+}
+
+/// The chat history of the agent in one of the app's sessions: its messages
+/// and tool calls, read from the transcript the agent writes.
+#[tauri::command]
+async fn get_agent_chat_history(
+    state: State<'_, AppState>,
+    name: String,
+) -> Result<ChatHistory, String> {
+    let settings = state.session_settings().await;
+    sessions::get_agent_chat_history(&settings.settings, &name).await
+}
+
+/// Types `prompt` into the agent's pane in one of the app's sessions and
+/// presses Enter, as if the user typed it there.
+#[tauri::command]
+async fn send_prompt_to_session(
+    state: State<'_, AppState>,
+    name: String,
+    prompt: String,
+) -> Result<(), String> {
+    let settings = state.session_settings().await;
+    sessions::send_prompt_to_session(&settings.settings, &name, &prompt).await
 }
 
 /// Creates a git worktree of `repository` on a branch named `name` and a
