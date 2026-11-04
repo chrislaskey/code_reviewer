@@ -35,6 +35,32 @@ pub struct ChatHistory {
     /// The transcript the chat was read from.
     pub path: String,
     pub messages: Vec<ChatMessage>,
+    pub summary: ChatSummary,
+}
+
+/// Counts over the whole chat, whatever the page filters.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatSummary {
+    /// The messages the user typed (see `ChatMessage::is_prompt`).
+    pub prompts: usize,
+    pub assistant_messages: usize,
+    pub thinking_blocks: usize,
+    pub tool_calls: usize,
+    pub failed_tool_calls: usize,
+    /// Tool calls whose result isn't written yet, like one still running.
+    pub tool_calls_without_result: usize,
+    /// Each tool's name with how many times it was called, most called first.
+    pub tool_calls_by_name: Vec<ToolCallCount>,
+    /// The first message's timestamp.
+    pub started_at: Option<String>,
+    /// The last message's timestamp.
+    pub last_message_at: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ToolCallCount {
+    pub name: String,
+    pub count: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -126,10 +152,70 @@ pub fn read_chat_history(session_id: &str) -> Result<ChatHistory, String> {
         .ok_or_else(|| format!("No transcript for Claude Code session {session_id}"))?;
     let contents = std::fs::read_to_string(&path)
         .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+    let messages = parse_transcript(&contents);
     Ok(ChatHistory {
         path: path.display().to_string(),
-        messages: parse_transcript(&contents),
+        summary: summarize_chat(&messages),
+        messages,
     })
+}
+
+impl ChatMessage {
+    /// A message the user typed, not only tool results passed back.
+    pub fn is_prompt(&self) -> bool {
+        self.role == ChatRole::User
+            && self
+                .parts
+                .iter()
+                .any(|part| matches!(part, ChatPart::Text { .. }))
+    }
+}
+
+fn summarize_chat(messages: &[ChatMessage]) -> ChatSummary {
+    let mut summary = ChatSummary {
+        prompts: messages
+            .iter()
+            .filter(|message| message.is_prompt())
+            .count(),
+        assistant_messages: messages
+            .iter()
+            .filter(|message| message.role == ChatRole::Assistant)
+            .count(),
+        started_at: messages
+            .first()
+            .and_then(|message| message.timestamp.clone()),
+        last_message_at: messages
+            .last()
+            .and_then(|message| message.timestamp.clone()),
+        ..ChatSummary::default()
+    };
+    let mut counts: HashMap<&str, usize> = HashMap::new();
+    for part in messages.iter().flat_map(|message| &message.parts) {
+        match part {
+            ChatPart::Thinking { .. } => summary.thinking_blocks += 1,
+            ChatPart::ToolUse { name, result, .. } => {
+                summary.tool_calls += 1;
+                *counts.entry(name).or_default() += 1;
+                match result {
+                    Some(result) if result.is_error => summary.failed_tool_calls += 1,
+                    Some(_) => {}
+                    None => summary.tool_calls_without_result += 1,
+                }
+            }
+            _ => {}
+        }
+    }
+    summary.tool_calls_by_name = counts
+        .into_iter()
+        .map(|(name, count)| ToolCallCount {
+            name: name.to_string(),
+            count,
+        })
+        .collect();
+    summary
+        .tool_calls_by_name
+        .sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.name.cmp(&b.name)));
+    summary
 }
 
 /// Session ids are UUIDs; anything else could reach outside the directory.
@@ -399,6 +485,28 @@ mod tests {
         let result = result.as_ref().expect("the result is paired");
         assert_eq!(result.output.text, "Cargo.toml");
         assert!(!result.is_error);
+    }
+
+    #[test]
+    fn summarizes_the_chat() {
+        let summary = summarize_chat(&parse_transcript(TRANSCRIPT));
+
+        assert_eq!(summary.prompts, 1);
+        assert_eq!(summary.assistant_messages, 1);
+        assert_eq!(summary.tool_calls, 1);
+        assert_eq!(summary.failed_tool_calls, 0);
+        assert_eq!(summary.tool_calls_without_result, 0);
+        assert_eq!(
+            summary.tool_calls_by_name,
+            vec![ToolCallCount {
+                name: "Bash".into(),
+                count: 1
+            }]
+        );
+        assert_eq!(
+            summary.started_at.as_deref(),
+            Some("2026-11-04T19:50:08.854Z")
+        );
     }
 
     #[test]

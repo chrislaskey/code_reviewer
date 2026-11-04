@@ -1,8 +1,12 @@
 /* The sessions pages. Shared styles are in ../styles.css. */
 
+/* The colours of the user's zsh prompt: green clean and staged, yellow
+   dirty, red unstaged, magenta untracked. */
 :root {
-  --git-staged: var(--color-info);
-  --git-untracked: var(--color-warning);
+  --git-clean: var(--color-success);
+  --git-dirty: var(--color-warning);
+  --git-staged: var(--color-success);
+  --git-untracked: oklch(0.6 0.22 330);
   --git-unstaged: var(--color-error);
 }
 
@@ -172,6 +176,34 @@
   margin-top: 0.4rem;
 }
 
+.git-status-line {
+  min-width: 0;
+  display: flex;
+  gap: 0.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+
+.git-repository {
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+}
+
+.git-branch {
+  color: var(--git-clean);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.git-branch.dirty {
+  color: var(--git-dirty);
+}
+
+.git-sync {
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+}
+
 .git-staged {
   color: var(--git-staged);
 }
@@ -238,8 +270,10 @@
   font-weight: 600;
 }
 
+/* The page's own size, not the review page's smaller Markdown. */
 .markdown-html.chat-text {
   padding-left: 0;
+  font-size: 1rem;
 }
 
 .chat-fold {
@@ -317,7 +351,7 @@
 }
 
 .prompt-form {
-  margin-top: 1rem;
+  margin-bottom: 1rem;
   padding: 0.85rem 1rem;
   display: flex;
   flex-direction: column;
@@ -331,8 +365,16 @@
 .prompt-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 1rem;
+}
+
+.prompt-hint {
+  margin-left: auto;
+}
+
+.chat-count {
+  margin-left: 0.35rem;
+  font-size: 0.9rem;
 }
 
 .chat-path {

@@ -3,10 +3,11 @@
      transcript the agent writes (only Claude Code's so far). The session is
      named in the path, `/sessions/<name>`. Refreshes like the sessions page. -->
 <script>
-  import { onMount, tick } from "svelte";
+  import { onMount } from "svelte";
   import AppNav from "../lib/components/AppNav.svelte";
   import Button from "../lib/components/Button.svelte";
   import Header from "../lib/components/Header.svelte";
+  import InfoPopover from "../lib/components/InfoPopover.svelte";
   import StillWaves from "../lib/components/StillWaves.svelte";
   import TopBackgroundPattern from "../lib/components/TopBackgroundPattern.svelte";
   import { getAgentChatHistory, getSession, getSessionSettings, sendPromptToSession } from "../lib/backend.js";
@@ -14,7 +15,11 @@
   import LogList from "../lib/LogList.svelte";
   import { navigateToUrl } from "../lib/router.js";
   import { sessionNameFromPath, sessionsIndexUrl } from "../lib/routes.js";
+  import SegmentedControl from "../lib/components/SegmentedControl.svelte";
+  import { CHAT_FILTERS, filterChatMessages } from "./chat_filters.js";
   import ChatMessage from "./ChatMessage.svelte";
+  import ChatSummary from "./ChatSummary.svelte";
+  import GitStatus from "./GitStatus.svelte";
   import PromptForm from "./PromptForm.svelte";
   import { createSessionActions } from "./session_actions.js";
   import SessionStatusBar from "./SessionStatusBar.svelte";
@@ -28,7 +33,12 @@
   let sessionError = $state();
   let chat = $state();
   let chatError = $state();
-  let chatHistoryElement = $state();
+  let chatFilter = $state("all");
+  let shownMessages = $derived(chat ? filterChatMessages(chat.messages, chatFilter) : []);
+  // Newest first, each with the one shown before it in time, for "16 seconds later".
+  let newestFirst = $derived(
+    shownMessages.map((message, index) => ({ message, previous: shownMessages[index - 1] })).reverse(),
+  );
 
   let working = $derived(session?.agent?.status === "busy");
   let promptDisabledReason = $derived(
@@ -60,10 +70,6 @@
     refreshing = false;
   }
 
-  function scrollToLatestMessage() {
-    chatHistoryElement?.lastElementChild?.scrollIntoView({ block: "end" });
-  }
-
   async function sendPrompt(prompt) {
     try {
       await sendPromptToSession(name, prompt);
@@ -74,8 +80,6 @@
     }
     // The agent writes the prompt to its transcript as it reads it.
     await refresh();
-    await tick();
-    scrollToLatestMessage();
     return true;
   }
 
@@ -90,16 +94,20 @@
       .then((detected) => (mainBranch = detected.settings.main_branch))
       .catch((error) => log(`Detecting the settings failed: ${error}`))
       .then(refresh)
-      .then(async () => {
-        await tick();
-        scrollToLatestMessage();
-        interval = setInterval(refresh, REFRESH_INTERVAL_MS);
-      });
+      .then(() => (interval = setInterval(refresh, REFRESH_INTERVAL_MS)));
     return () => clearInterval(interval);
   });
 </script>
 
 <svelte:window onfocus={refresh} />
+
+{#snippet gitStatusLine()}
+  {#if session?.git}<GitStatus git={session.git} />{/if}
+{/snippet}
+
+{#snippet chatFilterControl()}
+  <SegmentedControl value={chatFilter} options={CHAT_FILTERS} onchange={(value) => (chatFilter = value)} label="Show" />
+{/snippet}
 
 <StillWaves rippleOnLoad />
 
@@ -136,16 +144,36 @@
   </section>
 
   <section class="mt-8">
-    <div class="section-title">
-      <h2>Chat history</h2>
+    <div class="section-header">
+      <div class="section-title">
+        <h2>Chat</h2>
+        {#if chat}
+          <span class="chat-count muted">
+            {chatFilter === "all" ? "" : `${shownMessages.length} of `}{chat.messages.length} messages
+          </span>
+        {/if}
+        <InfoPopover title="What the chat holds, and where it is read from">
+          {#if chat}
+            <ChatSummary {chat} />
+          {:else}
+            Read from the transcript the agent writes as it works, once it has one.
+          {/if}
+        </InfoPopover>
+      </div>
+      {@render chatFilterControl()}
     </div>
+    {#if name !== null}
+      <PromptForm
+        disabled={promptDisabledReason !== ""}
+        disabledReason={promptDisabledReason}
+        onSend={sendPrompt}
+        controls={gitStatusLine}
+      />
+    {/if}
     {#if chat}
-      <p class="hint muted mb-3">
-        {chat.messages.length} messages, read from <code class="chat-path">{chat.path}</code>
-      </p>
-      <div class="chat-history" bind:this={chatHistoryElement}>
-        {#each chat.messages as message, index (message.id)}
-          <ChatMessage {message} previousTimestamp={chat.messages[index - 1]?.timestamp} />
+      <div class="chat-history">
+        {#each newestFirst as { message, previous } (message.id)}
+          <ChatMessage {message} previousTimestamp={previous?.timestamp} />
         {/each}
       </div>
     {:else if chatError}
@@ -156,9 +184,6 @@
       <div class="panel empty muted">No agent is running in the session.</div>
     {:else}
       <div class="panel empty muted">Loading…</div>
-    {/if}
-    {#if name !== null}
-      <PromptForm {working} disabled={promptDisabledReason !== ""} disabledReason={promptDisabledReason} onSend={sendPrompt} />
     {/if}
   </section>
 

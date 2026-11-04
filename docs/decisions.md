@@ -695,7 +695,9 @@ tool call is paired with its result, and the content blocks of one
 assistant message, written one per line, are joined. Text is rendered as
 Markdown by the core crate's `render_markdown_html`, which drops raw HTML,
 so the page can show it with `{@html}`. Tool inputs and results longer
-than 20,000 characters are cut. Like the status file, the transcript is
+than 20,000 characters are cut. The Rust side also counts what the chat holds
+(`ChatSummary`: prompts, agent messages, tool calls by tool, failures,
+when it started), shown in the info popover beside the heading. Like the status file, the transcript is
 undocumented, so lines that don't parse are skipped.
 
 Under the chat is a box to write back to the agent. Nothing is sent while

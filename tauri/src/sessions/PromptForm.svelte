@@ -3,10 +3,11 @@
      resolves to whether it was sent, and the text is kept when it wasn't. -->
 <script>
   import Button from "../lib/components/Button.svelte";
+  import InfoPopover from "../lib/components/InfoPopover.svelte";
 
-  /** `working`: the agent is busy, so the box glows as the status bar does. */
-  /** @type {{ disabled?: boolean, disabledReason?: string, working?: boolean, onSend: (prompt: string) => Promise<boolean> }} */
-  let { disabled = false, disabledReason = "", working = false, onSend } = $props();
+  /** `controls`: shown on the left of the Send row, like the git status. */
+  /** @type {{ disabled?: boolean, disabledReason?: string, onSend: (prompt: string) => Promise<boolean>, controls?: import("svelte").Snippet<[]> }} */
+  let { disabled = false, disabledReason = "", onSend, controls } = $props();
 
   let prompt = $state("");
   let sending = $state(false);
@@ -30,7 +31,7 @@
   }
 </script>
 
-<form class="prompt-form panel" class:working onsubmit={send}>
+<form class="prompt-form panel" onsubmit={send}>
   <textarea
     class="textarea prompt-input w-full"
     rows="3"
@@ -40,7 +41,11 @@
     {disabled}
   ></textarea>
   <div class="prompt-actions">
-    <span class="muted text-sm">Typed into the agent's tmux pane, then Enter.</span>
+    {@render controls?.()}
+    <InfoPopover title="How the prompt is sent" class="prompt-hint dropdown-top dropdown-end">
+      Typed into the agent's tmux pane, then Enter, as if you typed it there. Nothing is sent until you press Enter or
+      Send, and Shift+Enter starts a new line.
+    </InfoPopover>
     <Button type="submit" variant="primary" disabled={!canSend}>{sending ? "Sending…" : "Send"}</Button>
   </div>
 </form>
