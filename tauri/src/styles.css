@@ -11,7 +11,7 @@
      above a page's title: just past the title bar, whose strip over the
      page holds only the background art. */
   --page-gutter: 1.5rem;
-  --page-top: 2rem;
+  --page-top: 2.5rem;
   /* The column of the landing pages. */
   --page-width: 980px;
   /* The navigation gutter down the window's left edge (AppNav): half a

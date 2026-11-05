@@ -732,3 +732,21 @@ and orders the chat through a tree of hashed blobs, so it isn't read (see
 `docs/suggestions/sessions.md`). The types both readers fill are in
 `agent_chat.rs`. When both agents run in a session, Claude Code is the one
 found, and new sessions start `claude` unless the form says otherwise.
+
+## 24. Back and forward buttons
+
+The router (decision 22) pushes every page onto the webview's history, but
+nothing showed it. **Decision:** a browser's back and forward buttons, two
+small carets at the window's top edge beside the gutter
+(`NavigationHistoryButtons.svelte`), a direction with nowhere to go dimmed
+rather than hidden. They are mounted once from `main.js`, outside the router,
+so they outlive the pages that swap under them (`AppNav` is remounted with
+each page). The history is the webview's own, a line as in a browser: going
+back and then to a new page drops the pages that were ahead. Whether there
+is somewhere to go comes from the Navigation API (`navigation.canGoBack`,
+`canGoForward`, in `navigation_history.svelte.js`), which WebKit has had
+since Safari 26.2; the buttons call `history.back()` and `history.forward()`,
+which the router already follows. Considered instead: counting the entries
+in JS from the router's `_routerIndex`, which would lean on the router's
+internals and miss pushes made elsewhere. Without the Navigation API both
+buttons stay dim, and the page links work as before.
