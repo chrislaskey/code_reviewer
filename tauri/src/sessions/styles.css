@@ -420,7 +420,7 @@
   padding: 1.25rem;
 }
 
-.new-session label,
+.new-session .field,
 .settings-fields label {
   display: flex;
   flex-direction: column;
@@ -428,6 +428,16 @@
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--muted);
+}
+
+.new-session .field-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.new-session .info-popover {
+  font-weight: normal;
 }
 
 .new-session .directory-field {
@@ -461,27 +471,6 @@
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 0.2rem 0.75rem;
-  margin: 0;
-}
-
-.field-help {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  margin: 0;
-}
-
-.field-help dt {
-  margin-top: 0.5rem;
-  font-weight: 600;
-  color: var(--color-base-content);
-}
-
-.field-help dt:first-child {
-  margin-top: 0;
-}
-
-.field-help dd {
   margin: 0;
 }
 
