@@ -1,18 +1,19 @@
 <!-- The new session page: creates a git worktree of a repository and a tmux
      session named with the app's prefix in it, with a port of its own in
-     PORT and a command typed in, opens it in the terminal app and returns to
-     the list. -->
+     PORT and a command typed in, opens it in the terminal app and goes to the
+     session's page. -->
 <script>
   import { navigateToUrl } from "../lib/router.js";
-  import { sessionsIndexUrl } from "../lib/routes.js";
+  import { sessionShowUrl, sessionsIndexUrl } from "../lib/routes.js";
   import { onMount } from "svelte";
   import AppNav from "../lib/components/AppNav.svelte";
   import Button from "../lib/components/Button.svelte";
   import Header from "../lib/components/Header.svelte";
+  import InfoPopover from "../lib/components/InfoPopover.svelte";
+  import StillWaves from "../lib/components/StillWaves.svelte";
   import TopBackgroundPattern from "../lib/components/TopBackgroundPattern.svelte";
   import { createSession, getDefaultSessionPort, getSessionSettings } from "../lib/backend.js";
   import { log } from "../lib/log.svelte.js";
-  import LogList from "../lib/LogList.svelte";
 
   let newSession = $state({ name: "", repository: "", command: "claude", port: "" });
   let creating = $state(false);
@@ -23,13 +24,13 @@
     const name = newSession.name.trim();
     creating = true;
     try {
-      await createSession({
+      const sessionName = await createSession({
         name,
         repository: newSession.repository,
         command: newSession.command,
         port: Number(newSession.port),
       });
-      navigateToUrl(sessionsIndexUrl());
+      navigateToUrl(sessionShowUrl(sessionName));
     } catch (error) {
       log(`Creating ${name} failed: ${error}`);
       creating = false;
@@ -51,18 +52,43 @@
   });
 </script>
 
+<StillWaves rippleOnLoad />
+
 <TopBackgroundPattern />
 
 <AppNav current="sessions" />
 
-<main class="page">
+<main class="page with-waves">
   <p><a href={sessionsIndexUrl()}>← Sessions</a></p>
   <Header>
-    New session
-    {#snippet subtitle()}
-      A git worktree of a repository and a tmux session, both named {prefix}-…, running your shell in the worktree
-      with a command typed in, opened in your terminal app.
-    {/snippet}
+    <span class="inline-flex items-center gap-2">
+      New session
+      <InfoPopover title="What a new session creates, and what each field does">
+        <dl class="field-help">
+          <dt>What it does</dt>
+          <dd>
+            Creates a git worktree of a repository and a tmux session, both named {prefix}-…, running your shell in
+            the worktree with a command typed in, and opens it in your terminal app.
+          </dd>
+          <dt>Name</dt>
+          <dd>
+            The worktree goes in the repository's <code>.worktrees/{prefix}-&lt;name&gt;</code> directory, on a new
+            branch of that name from the repository's current commit, or on the existing branch. The prefix tells the
+            sessions list which tmux sessions and worktrees were made here.
+          </dd>
+          <dt>Repository</dt>
+          <dd>The repository to make the worktree of. A leading <code>~</code> is your home directory.</dd>
+          <dt>Command</dt>
+          <dd>The command typed into the shell. Leave it empty for a shell at a prompt.</dd>
+          <dt>Port</dt>
+          <dd>
+            Set in the session's <code>PORT</code> variable, for the servers started in the worktree to listen on, so
+            each session's app runs on a port of its own. The suggested one is the lowest from 4001 up that no
+            session started here holds.
+          </dd>
+        </dl>
+      </InfoPopover>
+    </span>
   </Header>
 
   <form class="panel new-session" onsubmit={submit}>
@@ -87,14 +113,4 @@
     </label>
     <Button variant="primary" type="submit" disabled={creating}>{creating ? "Creating…" : "Create and open"}</Button>
   </form>
-  <p class="muted hint">
-    The worktree goes in the repository's <code>.worktrees/{prefix}-&lt;name&gt;</code> directory, on a new branch of
-    that name from the repository's current commit, or on the existing branch. The prefix tells the sessions list which
-    tmux sessions and worktrees were made here. A leading <code>~</code> is your home directory. Leave the command empty
-    for a shell at a prompt. The port is set in the session's <code>PORT</code> variable, for the servers started in
-    the worktree to listen on, so each session's app runs on a port of its own; the suggested one is the lowest from
-    4001 up that no session started here holds.
-  </p>
-
-  <LogList />
 </main>

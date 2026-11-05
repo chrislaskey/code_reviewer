@@ -464,6 +464,27 @@
   margin: 0;
 }
 
+.field-help {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0;
+}
+
+.field-help dt {
+  margin-top: 0.5rem;
+  font-weight: 600;
+  color: var(--color-base-content);
+}
+
+.field-help dt:first-child {
+  margin-top: 0;
+}
+
+.field-help dd {
+  margin: 0;
+}
+
 .detected-settings dt {
   font-weight: 600;
 }

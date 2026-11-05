@@ -80,7 +80,7 @@ export function sendPromptToSession(name, prompt) {
 
 /**
  * Creates a git worktree of `repository` and a tmux session in it, both named `<prefix>-<name>`, with `PORT` set to
- * `port` and `command` typed in, and opens it in the terminal app.
+ * `port` and `command` typed in, and opens it in the terminal app. Returns the session's full name, prefix included.
  */
 export function createSession({ name, repository, command, port }) {
   return invoke("create_session", { name, repository, command, port });

@@ -491,14 +491,14 @@ fn runs_in_pane(session: &ClaudeCodeSession, pane: &Pane) -> bool {
 /// `repository` on a branch of that same name (see
 /// `git_worktree::add_worktree`) and a tmux session running the user's
 /// shell in it with `PORT` set to `port`, with `command` typed in, opened
-/// in the terminal app.
+/// in the terminal app. Returns the session's full name, prefix included.
 pub async fn create_session(
     settings: &Settings,
     name: &str,
     repository: &str,
     command: &str,
     port: u16,
-) -> Result<ShowOutcome, String> {
+) -> Result<String, String> {
     let name = name.trim();
     tmux::validate_session_name(name)?;
     let session_name = add_session_name_prefix(&settings.session_name_prefix, name);
@@ -544,7 +544,8 @@ pub async fn create_session(
         },
         worktree.branch
     );
-    start_session_in_directory(settings, &session_name, &worktree.path, command, port).await
+    start_session_in_directory(settings, &session_name, &worktree.path, command, port).await?;
+    Ok(session_name)
 }
 
 /// Starts a session again in one of the app's worktrees (see

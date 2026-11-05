@@ -152,7 +152,8 @@ async fn send_prompt_to_session(
 
 /// Creates a git worktree of `repository` on a branch named `name` and a
 /// tmux session named `<prefix>-<name>` in it with `PORT` set to `port`,
-/// types `command` into it and opens it in the terminal app.
+/// types `command` into it and opens it in the terminal app. Returns the
+/// session's full name, prefix included.
 #[tauri::command]
 async fn create_session(
     state: State<'_, AppState>,
@@ -160,7 +161,7 @@ async fn create_session(
     repository: String,
     command: String,
     port: u16,
-) -> Result<ShowOutcome, String> {
+) -> Result<String, String> {
     let settings = state.session_settings().await;
     sessions::create_session(&settings.settings, &name, &repository, &command, port).await
 }

@@ -28,10 +28,10 @@ pub enum TerminalApp {
 /// The order apps are picked in when several are installed. Terminal comes
 /// with macOS, so it's the guess when none of the others is installed.
 pub const DETECTION_ORDER: [TerminalApp; 5] = [
-    TerminalApp::Iterm2,
     TerminalApp::Ghostty,
     TerminalApp::Kitty,
     TerminalApp::Wezterm,
+    TerminalApp::Iterm2,
     TerminalApp::Terminal,
 ];
 
