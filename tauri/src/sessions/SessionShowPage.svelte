@@ -1,6 +1,6 @@
 <!-- A tmux session's page: the status bar of the sessions page, with the same
      actions, and the chat history of the agent running in it, read from the
-     transcript the agent writes (only Claude Code's so far). The session is
+     transcript the agent writes, Claude Code's or Cursor's. The session is
      named in the path, `/sessions/<name>`. Refreshes like the sessions page. -->
 <script>
   import { onMount } from "svelte";
@@ -173,7 +173,12 @@
     {#if chat}
       <div class="chat-history">
         {#each newestFirst as { message, previous } (message.id)}
-          <ChatMessage {message} previousTimestamp={previous?.timestamp} />
+          <ChatMessage
+            {message}
+            previousTimestamp={previous?.timestamp}
+            agent={chat.agent}
+            hasToolResults={chat.has_tool_results}
+          />
         {/each}
       </div>
     {:else if chatError}

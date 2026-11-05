@@ -4,122 +4,23 @@
 //!
 //! The transcript is undocumented and may change between Claude Code
 //! versions, so lines that don't parse, and kinds of lines or content the
-//! chat doesn't show, are skipped. Only the user's and the assistant's
-//! messages are kept, with each tool call paired with its result.
+//! chat doesn't show, are skipped. The user's and the assistant's messages
+//! are kept, with each tool call paired with its result, and so are the
+//! lines Claude Code writes as the user's, as notes saying what they are.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use code_reviewer_core::analysis::markdown_html::render_markdown_html;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
 
-/// Longer tool inputs and results are cut to this many characters, so a
-/// large file read doesn't fill the page.
-const MAX_TOOL_TEXT_CHARS: usize = 20_000;
-/// The input fields that best say what a tool call does, in order.
-const TOOL_SUMMARY_FIELDS: [&str; 8] = [
-    "description",
-    "command",
-    "file_path",
-    "pattern",
-    "path",
-    "url",
-    "query",
-    "prompt",
-];
-const MAX_TOOL_SUMMARY_CHARS: usize = 160;
-
-#[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct ChatHistory {
-    /// The transcript the chat was read from.
-    pub path: String,
-    pub messages: Vec<ChatMessage>,
-    pub summary: ChatSummary,
-}
-
-/// Counts over the whole chat, whatever the page filters.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
-pub struct ChatSummary {
-    /// The messages the user typed (see `ChatMessage::is_prompt`).
-    pub prompts: usize,
-    pub assistant_messages: usize,
-    pub thinking_blocks: usize,
-    pub tool_calls: usize,
-    pub failed_tool_calls: usize,
-    /// Tool calls whose result isn't written yet, like one still running.
-    pub tool_calls_without_result: usize,
-    /// Each tool's name with how many times it was called, most called first.
-    pub tool_calls_by_name: Vec<ToolCallCount>,
-    /// The first message's timestamp.
-    pub started_at: Option<String>,
-    /// The last message's timestamp.
-    pub last_message_at: Option<String>,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct ToolCallCount {
-    pub name: String,
-    pub count: usize,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct ChatMessage {
-    /// The transcript line's `uuid`, or the API message id when an assistant
-    /// message spans several lines.
-    pub id: String,
-    pub role: ChatRole,
-    /// Like `2026-11-04T19:50:08.854Z`.
-    pub timestamp: Option<String>,
-    pub parts: Vec<ChatPart>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ChatRole {
-    User,
-    Assistant,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum ChatPart {
-    /// Markdown, rendered as HTML with raw HTML left out.
-    Text {
-        html: String,
-    },
-    Thinking {
-        text: String,
-    },
-    ToolUse {
-        id: String,
-        name: String,
-        /// One line from the input saying what the call does, like the
-        /// command it runs or the file it reads. Empty when none says.
-        summary: String,
-        /// The input as pretty-printed JSON.
-        input: ToolText,
-        result: Option<ToolResult>,
-    },
-    /// A result whose tool call isn't in the transcript.
-    ToolResult {
-        tool_use_id: Option<String>,
-        result: ToolResult,
-    },
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct ToolResult {
-    pub output: ToolText,
-    pub is_error: bool,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct ToolText {
-    pub text: String,
-    /// Whether `text` was cut to `MAX_TOOL_TEXT_CHARS`.
-    pub truncated: bool,
-}
+use crate::agent::AgentKind;
+use crate::agent_chat::{
+    ChatHistory, ChatMessage, ChatNote, ChatNoteKind, ChatPart, ChatRole, MAX_TOOL_SUMMARY_CHARS,
+    ToolResult, content_text, find_in_subdirectories, home_directory_path, shorten, strip_tags,
+    summarize_chat, tag_contents, text_part, tool_summary, tool_text, validate_chat_id,
+};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -135,6 +36,15 @@ struct TranscriptLine {
     /// Context Claude Code adds, not typed by the user.
     #[serde(default)]
     is_meta: bool,
+    #[serde(default)]
+    is_compact_summary: bool,
+    /// Who wrote a user line: `human` when the user typed it.
+    origin: Option<TranscriptOrigin>,
+}
+
+#[derive(Deserialize)]
+struct TranscriptOrigin {
+    kind: String,
 }
 
 #[derive(Deserialize)]
@@ -146,105 +56,20 @@ struct TranscriptMessage {
 /// The chat of the Claude Code session `session_id`. Reads the whole
 /// transcript, so call it from a blocking task.
 pub fn read_chat_history(session_id: &str) -> Result<ChatHistory, String> {
-    validate_session_id(session_id)?;
-    let projects = projects_directory().ok_or("HOME is not set")?;
-    let path = find_transcript(&projects, session_id)
+    validate_chat_id(session_id)?;
+    let projects = home_directory_path(".claude/projects").ok_or("HOME is not set")?;
+    let path = find_in_subdirectories(&projects, Path::new(&format!("{session_id}.jsonl")))
         .ok_or_else(|| format!("No transcript for Claude Code session {session_id}"))?;
     let contents = std::fs::read_to_string(&path)
         .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
     let messages = parse_transcript(&contents);
     Ok(ChatHistory {
+        agent: AgentKind::ClaudeCode,
         path: path.display().to_string(),
+        has_tool_results: true,
         summary: summarize_chat(&messages),
         messages,
     })
-}
-
-impl ChatMessage {
-    /// A message the user typed, not only tool results passed back.
-    pub fn is_prompt(&self) -> bool {
-        self.role == ChatRole::User
-            && self
-                .parts
-                .iter()
-                .any(|part| matches!(part, ChatPart::Text { .. }))
-    }
-}
-
-fn summarize_chat(messages: &[ChatMessage]) -> ChatSummary {
-    let mut summary = ChatSummary {
-        prompts: messages
-            .iter()
-            .filter(|message| message.is_prompt())
-            .count(),
-        assistant_messages: messages
-            .iter()
-            .filter(|message| message.role == ChatRole::Assistant)
-            .count(),
-        started_at: messages
-            .first()
-            .and_then(|message| message.timestamp.clone()),
-        last_message_at: messages
-            .last()
-            .and_then(|message| message.timestamp.clone()),
-        ..ChatSummary::default()
-    };
-    let mut counts: HashMap<&str, usize> = HashMap::new();
-    for part in messages.iter().flat_map(|message| &message.parts) {
-        match part {
-            ChatPart::Thinking { .. } => summary.thinking_blocks += 1,
-            ChatPart::ToolUse { name, result, .. } => {
-                summary.tool_calls += 1;
-                *counts.entry(name).or_default() += 1;
-                match result {
-                    Some(result) if result.is_error => summary.failed_tool_calls += 1,
-                    Some(_) => {}
-                    None => summary.tool_calls_without_result += 1,
-                }
-            }
-            _ => {}
-        }
-    }
-    summary.tool_calls_by_name = counts
-        .into_iter()
-        .map(|(name, count)| ToolCallCount {
-            name: name.to_string(),
-            count,
-        })
-        .collect();
-    summary
-        .tool_calls_by_name
-        .sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.name.cmp(&b.name)));
-    summary
-}
-
-/// Session ids are UUIDs; anything else could reach outside the directory.
-fn validate_session_id(session_id: &str) -> Result<(), String> {
-    let is_valid = !session_id.is_empty()
-        && session_id
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || character == '-');
-    if is_valid {
-        Ok(())
-    } else {
-        Err(format!("{session_id} is not a Claude Code session id"))
-    }
-}
-
-fn projects_directory() -> Option<PathBuf> {
-    let home = std::env::var("HOME").ok()?;
-    Some(PathBuf::from(home).join(".claude/projects"))
-}
-
-/// Looks in every project directory rather than spelling out the
-/// directory's name from the session's, which Claude Code doesn't document.
-fn find_transcript(projects: &Path, session_id: &str) -> Option<PathBuf> {
-    let file_name = format!("{session_id}.jsonl");
-    std::fs::read_dir(projects)
-        .ok()?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path().join(&file_name))
-        .find(|path| path.is_file())
 }
 
 fn parse_transcript(contents: &str) -> Vec<ChatMessage> {
@@ -257,17 +82,28 @@ fn parse_transcript(contents: &str) -> Vec<ChatMessage> {
         let Ok(line) = serde_json::from_str::<TranscriptLine>(line) else {
             continue;
         };
-        if line.is_sidechain || line.is_meta {
+        if line.is_sidechain {
             continue;
         }
         let role = match line.kind.as_str() {
             "user" => ChatRole::User,
-            "assistant" => ChatRole::Assistant,
+            "assistant" if !line.is_meta => ChatRole::Assistant,
             _ => continue,
         };
-        let Some(message) = line.message else {
+        let Some(message) = &line.message else {
             continue;
         };
+        if role == ChatRole::User {
+            let text = content_text(&message.content);
+            if let Some(kind) = note_kind(&line, &text) {
+                let id = line
+                    .uuid
+                    .clone()
+                    .unwrap_or_else(|| format!("line-{}", messages.len()));
+                messages.extend(note_message(id, line.timestamp.clone(), kind, &text));
+                continue;
+            }
+        }
 
         let mut parts = Vec::new();
         for part in read_parts(&message.content) {
@@ -305,13 +141,14 @@ fn parse_transcript(contents: &str) -> Vec<ChatMessage> {
                 .is_some_and(|last| last.role == role && Some(&last.id) == message.id.as_ref());
         if !continues_last {
             let id = match role {
-                ChatRole::Assistant => message.id.or(line.uuid),
-                ChatRole::User => line.uuid,
+                ChatRole::Assistant => message.id.clone().or(line.uuid),
+                _ => line.uuid,
             };
             messages.push(ChatMessage {
                 id: id.unwrap_or_else(|| format!("line-{}", messages.len())),
                 role,
                 timestamp: line.timestamp,
+                note: None,
                 parts: Vec::new(),
             });
         }
@@ -327,6 +164,112 @@ fn parse_transcript(contents: &str) -> Vec<ChatMessage> {
         }
     }
     messages
+}
+
+/// Whether a user line is a note Claude Code wrote, and which kind. `None`
+/// for a prompt the user typed and for tool results. Lines from older
+/// versions, written without `origin`, are told apart by how they start.
+fn note_kind(line: &TranscriptLine, text: &str) -> Option<ChatNoteKind> {
+    if line.is_compact_summary {
+        return Some(ChatNoteKind::CompactSummary);
+    }
+    if line.is_meta {
+        return Some(ChatNoteKind::Context);
+    }
+    match line.origin.as_ref().map(|origin| origin.kind.as_str()) {
+        Some("human") => return None,
+        Some("task-notification") => return Some(ChatNoteKind::TaskNotification),
+        Some(_) => return Some(ChatNoteKind::Other),
+        None => {}
+    }
+    let text = text.trim_start();
+    if text.is_empty() {
+        return None;
+    }
+    let kind = if text.starts_with("<command-name>") || text.starts_with('/') {
+        ChatNoteKind::Command
+    } else if text.starts_with("<local-command-") {
+        ChatNoteKind::CommandOutput
+    } else if text.starts_with("<task-notification>") {
+        ChatNoteKind::TaskNotification
+    } else if text.starts_with("[Request interrupted") {
+        ChatNoteKind::Interrupted
+    } else {
+        ChatNoteKind::Other
+    };
+    Some(kind)
+}
+
+fn note_message(
+    id: String,
+    timestamp: Option<String>,
+    kind: ChatNoteKind,
+    text: &str,
+) -> Option<ChatMessage> {
+    let text = strip_terminal_styles(text.trim());
+    if text.is_empty() {
+        return None;
+    }
+    let part = match kind {
+        ChatNoteKind::CompactSummary => ChatPart::Text {
+            html: render_markdown_html(&text),
+        },
+        _ => ChatPart::PlainText {
+            text: tool_text(text.clone()),
+        },
+    };
+    Some(ChatMessage {
+        id,
+        role: ChatRole::Note,
+        timestamp,
+        note: Some(ChatNote {
+            kind,
+            summary: note_summary(kind, &text),
+        }),
+        parts: vec![part],
+    })
+}
+
+/// One line saying what a note holds: a command with its arguments, a task's
+/// outcome, or else its first line without tags.
+fn note_summary(kind: ChatNoteKind, text: &str) -> String {
+    let summary = match kind {
+        ChatNoteKind::Command => tag_contents(text, "command-name").map(|name| {
+            let arguments = tag_contents(text, "command-args").unwrap_or_default();
+            format!("{name} {arguments}")
+        }),
+        ChatNoteKind::TaskNotification => {
+            tag_contents(text, "summary").or_else(|| tag_contents(text, "status"))
+        }
+        _ => None,
+    };
+    let summary = summary.unwrap_or_else(|| strip_tags(text));
+    let first_line = summary
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or_default();
+    shorten(first_line, MAX_TOOL_SUMMARY_CHARS)
+}
+
+/// Takes out terminal colour and style codes, like `\x1b[2m`, that command
+/// output keeps.
+fn strip_terminal_styles(text: &str) -> String {
+    let mut stripped = String::with_capacity(text.len());
+    let mut characters = text.chars().peekable();
+    while let Some(character) = characters.next() {
+        if character == '\u{1b}' && characters.peek() == Some(&'[') {
+            characters.next();
+            for code in characters.by_ref() {
+                if code.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        } else {
+            stripped.push(character);
+        }
+    }
+    stripped
 }
 
 /// The parts of a message's `content`: a string, or a list of blocks.
@@ -375,25 +318,6 @@ fn read_block(block: &Value) -> Option<ChatPart> {
     }
 }
 
-fn tool_summary(input: &Value) -> String {
-    let first_line = TOOL_SUMMARY_FIELDS
-        .iter()
-        .filter_map(|field| input.get(field)?.as_str())
-        .find_map(|value| value.lines().map(str::trim).find(|line| !line.is_empty()))
-        .unwrap_or_default();
-    match first_line.char_indices().nth(MAX_TOOL_SUMMARY_CHARS) {
-        Some((cut, _)) => format!("{}…", &first_line[..cut]),
-        None => first_line.to_string(),
-    }
-}
-
-fn text_part(text: &str) -> Option<ChatPart> {
-    let text = text.trim();
-    (!text.is_empty()).then(|| ChatPart::Text {
-        html: render_markdown_html(text),
-    })
-}
-
 /// A result's content is a string, or a list of text and image blocks.
 fn tool_result_text(content: Option<&Value>) -> String {
     match content {
@@ -415,25 +339,13 @@ fn tool_result_text(content: Option<&Value>) -> String {
     }
 }
 
-fn tool_text(text: String) -> ToolText {
-    match text.char_indices().nth(MAX_TOOL_TEXT_CHARS) {
-        Some((cut, _)) => ToolText {
-            text: text[..cut].to_string(),
-            truncated: true,
-        },
-        None => ToolText {
-            text,
-            truncated: false,
-        },
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::agent_chat::ToolCallCount;
 
     const TRANSCRIPT: &str = r#"{"type":"mode","mode":"normal","sessionId":"s1"}
-{"type":"user","uuid":"u1","timestamp":"2026-11-04T19:50:08.854Z","isSidechain":false,"message":{"role":"user","content":"Fix the **bug**"}}
+{"type":"user","uuid":"u1","timestamp":"2026-11-04T19:50:08.854Z","isSidechain":false,"origin":{"kind":"human"},"message":{"role":"user","content":"Fix the **bug**"}}
 {"type":"user","uuid":"u0","isMeta":true,"message":{"role":"user","content":"<system-reminder>context</system-reminder>"}}
 {"type":"assistant","uuid":"a1","message":{"id":"msg_1","role":"assistant","content":[{"type":"thinking","thinking":"","signature":"x"}]}}
 {"type":"assistant","uuid":"a2","message":{"id":"msg_1","role":"assistant","content":[{"type":"text","text":"Looking."}]}}
@@ -446,7 +358,7 @@ mod tests {
     fn reads_the_users_and_the_assistants_messages() {
         let messages = parse_transcript(TRANSCRIPT);
 
-        assert_eq!(messages.len(), 2);
+        assert_eq!(messages.len(), 3);
         assert_eq!(messages[0].role, ChatRole::User);
         assert_eq!(messages[0].id, "u1");
         assert_eq!(
@@ -455,8 +367,49 @@ mod tests {
                 html: render_markdown_html("Fix the **bug**")
             }]
         );
-        assert_eq!(messages[1].role, ChatRole::Assistant);
-        assert_eq!(messages[1].id, "msg_1");
+        assert_eq!(messages[1].role, ChatRole::Note);
+        assert_eq!(messages[2].role, ChatRole::Assistant);
+        assert_eq!(messages[2].id, "msg_1");
+    }
+
+    const NOTES: &str = r#"{"type":"user","uuid":"n1","isMeta":true,"message":{"role":"user","content":"<system-reminder>\nRead AGENTS.md\n</system-reminder>"}}
+{"type":"user","uuid":"n2","isCompactSummary":true,"isVisibleInTranscriptOnly":true,"message":{"role":"user","content":"This session is being **continued**."}}
+{"type":"user","uuid":"n3","message":{"role":"user","content":"<command-name>/model</command-name>\n<command-message>model</command-message>\n<command-args>opus</command-args>"}}
+{"type":"user","uuid":"n4","message":{"role":"user","content":"<local-command-stdout>\u001b[2mCompacted\u001b[22m</local-command-stdout>"}}
+{"type":"user","uuid":"n5","origin":{"kind":"task-notification"},"message":{"role":"user","content":"<task-notification>\n<status>completed</status>\n<summary>Background command finished</summary>\n</task-notification>"}}
+{"type":"user","uuid":"n6","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]}}
+{"type":"user","uuid":"n7","origin":{"kind":"human"},"promptSource":"typed","message":{"role":"user","content":"<pasted>a prompt</pasted>"}}"#;
+
+    #[test]
+    fn keeps_the_lines_claude_code_writes_as_notes() {
+        let messages = parse_transcript(NOTES);
+
+        let notes: Vec<_> = messages
+            .iter()
+            .filter_map(|message| message.note.as_ref())
+            .map(|note| (note.kind, note.summary.as_str()))
+            .collect();
+        assert_eq!(
+            notes,
+            vec![
+                (ChatNoteKind::Context, "Read AGENTS.md"),
+                (
+                    ChatNoteKind::CompactSummary,
+                    "This session is being **continued**."
+                ),
+                (ChatNoteKind::Command, "/model opus"),
+                (ChatNoteKind::CommandOutput, "Compacted"),
+                (
+                    ChatNoteKind::TaskNotification,
+                    "Background command finished"
+                ),
+                (ChatNoteKind::Interrupted, "[Request interrupted by user]"),
+            ]
+        );
+        assert_eq!(messages[6].role, ChatRole::User);
+        assert!(messages[6].is_prompt());
+        assert_eq!(summarize_chat(&messages).prompts, 1);
+        assert_eq!(summarize_chat(&messages).notes, 6);
     }
 
     #[test]
@@ -472,11 +425,11 @@ mod tests {
                 result,
                 ..
             },
-        ] = messages[1].parts.as_slice()
+        ] = messages[2].parts.as_slice()
         else {
             panic!(
                 "expected a text and a tool call, got {:?}",
-                messages[1].parts
+                messages[2].parts
             );
         };
         assert_eq!(name, "Bash");
@@ -507,19 +460,5 @@ mod tests {
             summary.started_at.as_deref(),
             Some("2026-11-04T19:50:08.854Z")
         );
-    }
-
-    #[test]
-    fn cuts_long_tool_text() {
-        let text = tool_text("é".repeat(MAX_TOOL_TEXT_CHARS + 5));
-        assert!(text.truncated);
-        assert_eq!(text.text.chars().count(), MAX_TOOL_TEXT_CHARS);
-    }
-
-    #[test]
-    fn refuses_session_ids_that_are_paths() {
-        assert!(validate_session_id("03d0ee05-e0c2-403a-8b99-c7ce5d5623b1").is_ok());
-        assert!(validate_session_id("../secrets").is_err());
-        assert!(validate_session_id("").is_err());
     }
 }

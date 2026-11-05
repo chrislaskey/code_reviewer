@@ -688,9 +688,15 @@ The chat is read in Rust (`claude_code_chat.rs`) from the transcript
 Claude Code writes to `~/.claude/projects/<directory>/<session id>.jsonl`.
 The session id comes from Claude Code's status file, which is now carried
 on `AgentSession`. The file is found by its name in every project
-directory, because the directory's name encoding isn't documented. Only
-the user's and the assistant's messages are kept: sidechains (subagents),
-meta lines (injected context) and bookkeeping lines are skipped. Each
+directory, because the directory's name encoding isn't documented.
+Sidechains (subagents) and bookkeeping lines are skipped. A user line is the
+user's prompt only when its `origin.kind` is `human`; the other user lines
+are ones Claude Code wrote (context with `isMeta`, the summary after a
+compaction with `isCompactSummary`, slash commands and their output,
+background task notices, interruptions) and become `claude_code` messages
+with a `ChatNote` saying which kind and one line of what they hold. The All
+filter shows them folded to one row; Last only and Yours only leave them
+out, so a note never counts as a prompt. Each
 tool call is paired with its result, and the content blocks of one
 assistant message, written one per line, are joined. Text is rendered as
 Markdown by the core crate's `render_markdown_html`, which drops raw HTML,
@@ -709,6 +715,20 @@ paste-buffer -p`, a bracketed paste, and Enter is sent 150 ms later. With
 `send-keys -l`, each newline in a prompt would reach the agent as Enter and
 send the first line alone. A prompt that fails to send stays in the box.
 
-Cursor's `agent` keeps its chats in SQLite (`~/.cursor/chats/`), so its
-chat history is not shown yet and the page says so. See
-`docs/suggestions/sessions.md`.
+Cursor's `agent` chat is read by `cursor_agent_chat.rs` from the JSONL
+transcript it writes to
+`~/.cursor/projects/<directory>/agent-transcripts/<chat id>/<chat id>.jsonl`.
+The chat id is the name of the directory of the chat database the process
+has open (`~/.cursor/chats/<workspace hash>/<chat id>/store.db-wal`, found
+with `lsof` as for its status), carried as `AgentSession::session_id`. Its
+transcript holds less than Claude Code's: tool calls without results or
+ids, and no times except the one written into each prompt's text
+(`<timestamp>Thursday, Nov 5, 2026, 4:12 PM (UTC-5)</timestamp>`, parsed
+with `chrono`); the prompt itself is in `<user_query>`. So `ChatHistory`
+says which agent wrote it and whether it `has_tool_results`, and the page
+leaves out "no result yet" and the result counts when it doesn't. The
+chat database has the results, but holds the replies in a binary format
+and orders the chat through a tree of hashed blobs, so it isn't read (see
+`docs/suggestions/sessions.md`). The types both readers fill are in
+`agent_chat.rs`. When both agents run in a session, Claude Code is the one
+found, and new sessions start `claude` unless the form says otherwise.

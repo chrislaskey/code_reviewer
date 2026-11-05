@@ -44,9 +44,11 @@ Ideas and template features not in the rewrite. None are planned.
 - The other direction: a session from a review (start or continue the
   worktree of the repository being reviewed), through `sessionsIndexUrl`
   or a `sessionNewUrl({ repository })` with the form filled in.
-- Show Cursor's `agent` chat history on a session's page, read from its
-  SQLite chat database under `~/.cursor/chats/` (the one `cursor_agent.rs`
-  already finds with `lsof`), as `claude_code_chat.rs` reads Claude Code's.
+- Show Cursor's tool results and reply times, which its JSONL transcript
+  leaves out, from its chat database (`~/.cursor/chats/…/store.db`). Its
+  `blobs` table holds the tool results as JSON (`{"role":"tool", …}` with
+  `toolCallId` and `toolName`), but the replies and the chat's order are in
+  binary blobs reached from `meta`'s `latestRootBlobId`.
 - On a session's page, read only the new lines of the transcript on each
   refresh instead of all of it, and keep the scroll at the bottom while
   the agent writes, as a chat app does.

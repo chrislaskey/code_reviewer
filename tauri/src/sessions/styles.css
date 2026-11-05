@@ -317,6 +317,35 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/* A line Claude Code wrote, folded to one row so it doesn't crowd the chat. */
+.chat-note {
+  padding: 0.4rem 1.1rem;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px dashed color-mix(in oklab, var(--color-base-content) 18%, transparent);
+}
+
+.chat-note > summary {
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.chat-note > summary > :not(.chat-tool-summary) {
+  flex: none;
+}
+
+.chat-note-kind {
+  font-weight: 600;
+}
+
+.chat-note[open] > summary {
+  margin-bottom: 0.4rem;
+}
+
+.chat-note .markdown-html.chat-text {
+  font-size: 0.9rem;
+}
+
 .chat-fold-label {
   margin-top: 0.5rem;
   font-weight: 600;

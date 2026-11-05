@@ -12,15 +12,16 @@ function isPrompt(message) {
 }
 
 /**
- * The messages a filter keeps: `all`; `last_only`, each prompt with the agent's last message before the next
- * prompt (its final reply); `yours_only`, the prompts.
+ * The messages a filter keeps: `all`, with the notes the agent's CLI writes; `last_only`, each prompt with the agent's
+ * last message before the next prompt (its final reply); `yours_only`, the prompts.
  */
 export function filterChatMessages(messages, filter) {
   if (filter === "yours_only") return messages.filter(isPrompt);
   if (filter !== "last_only") return messages;
-  return messages.filter((message, index) => {
+  const chat = messages.filter((message) => message.role !== "note");
+  return chat.filter((message, index) => {
     if (isPrompt(message)) return true;
-    const next = messages[index + 1];
+    const next = chat[index + 1];
     return message.role === "assistant" && (next === undefined || isPrompt(next));
   });
 }

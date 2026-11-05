@@ -21,3 +21,6 @@ export function timeLater(earlier, later) {
   if (seconds < 86400) return `${countOf(Math.round(seconds / 3600), "hour")} later`;
   return `${countOf(Math.round(seconds / 86400), "day")} later`;
 }
+
+/** The agents' names, by `AgentKind`. */
+export const AGENT_NAMES = { claude_code: "Claude Code", cursor_agent: "Cursor" };

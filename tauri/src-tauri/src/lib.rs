@@ -17,10 +17,12 @@
 //! commands below through `src/lib/backend.js` and nothing else.
 
 mod agent;
+mod agent_chat;
 mod analysis;
 mod claude_code;
 mod claude_code_chat;
 mod cursor_agent;
+mod cursor_agent_chat;
 mod git;
 mod git_worktree;
 mod process;
@@ -36,7 +38,7 @@ use code_reviewer_core::analysis::service::AnalysisService;
 use tauri::{Manager, State};
 use tokio::sync::OnceCell;
 
-use claude_code_chat::ChatHistory;
+use agent_chat::ChatHistory;
 use sessions::{DetectedSettings, SessionList, SessionStatus};
 use terminal_app::ShowOutcome;
 

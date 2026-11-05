@@ -1,14 +1,16 @@
-<!-- What a chat holds (ChatSummary in claude_code_chat.rs), laid out like the
+<!-- What a chat holds (ChatSummary in agent_chat.rs), laid out like the
      Git menu's breakdown, and where it was read from. -->
 <script>
-  import { countOf, timeAgo } from "./formatting.js";
+  import { AGENT_NAMES, countOf, timeAgo } from "./formatting.js";
 
   let { chat } = $props();
 
   let summary = $derived(chat.summary);
+  let agentName = $derived(AGENT_NAMES[chat.agent] ?? "The agent");
   let counts = $derived([
     ["Your prompts", summary.prompts],
     ["Agent messages", summary.assistant_messages],
+    [`${agentName} notes`, summary.notes],
     ["Thinking", summary.thinking_blocks],
     ["Tool calls", summary.tool_calls],
   ]);
@@ -25,10 +27,12 @@
     <dt>{label}</dt>
     <dd>{count}</dd>
   {/each}
-  <dt class={{ "chat-tool-error": summary.failed_tool_calls > 0 }}>Failed tool calls</dt>
-  <dd>{summary.failed_tool_calls}</dd>
-  <dt>Without a result yet</dt>
-  <dd>{summary.tool_calls_without_result}</dd>
+  {#if chat.has_tool_results}
+    <dt class={{ "chat-tool-error": summary.failed_tool_calls > 0 }}>Failed tool calls</dt>
+    <dd>{summary.failed_tool_calls}</dd>
+    <dt>Without a result yet</dt>
+    <dd>{summary.tool_calls_without_result}</dd>
+  {/if}
   <dt>Started</dt>
   <dd>{timeOf(summary.started_at)}</dd>
   <dt>Last message</dt>
@@ -44,6 +48,14 @@
   </dl>
 {/if}
 <p class="git-hint">
-  Read from <code class="chat-path">{chat.path}</code>, the transcript Claude Code writes as it works. It isn't documented,
+  {agentName} notes are lines it writes as yours, like context it adds and commands you run. All shows them folded.
+</p>
+{#if !chat.has_tool_results}
+  <p class="git-hint">
+    {agentName}'s transcript leaves out tool results, and only your prompts have a time.
+  </p>
+{/if}
+<p class="git-hint">
+  Read from <code class="chat-path">{chat.path}</code>, the transcript {agentName} writes as it works. It isn't documented,
   so lines it can't read are left out, and long tool inputs and results are cut short.
 </p>

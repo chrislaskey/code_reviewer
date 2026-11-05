@@ -31,9 +31,11 @@ use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
 use crate::agent::{AgentKind, AgentSession};
+use crate::agent_chat::ChatHistory;
 use crate::claude_code::{self, ClaudeCodeSession};
-use crate::claude_code_chat::{self, ChatHistory};
+use crate::claude_code_chat;
 use crate::cursor_agent;
+use crate::cursor_agent_chat;
 use crate::git::{self, GitStatus};
 use crate::git_worktree::{self, Worktree};
 use crate::process::{self, Process};
@@ -216,8 +218,7 @@ pub async fn get_session(settings: &Settings, name: &str) -> Result<SessionStatu
     Ok(status)
 }
 
-/// The chat of the agent running in one of the app's sessions. Only Claude
-/// Code's is read so far.
+/// The chat of the agent running in one of the app's sessions.
 pub async fn get_agent_chat_history(
     settings: &Settings,
     name: &str,
@@ -235,7 +236,14 @@ pub async fn get_agent_chat_history(
                 .await
                 .map_err(|error| format!("Reading the chat failed: {error}"))?
         }
-        AgentKind::CursorAgent => Err("Cursor's agent chat history isn't shown yet".to_string()),
+        AgentKind::CursorAgent => {
+            let chat_id = agent
+                .session_id
+                .ok_or_else(|| format!("Cursor's agent in {name} hasn't opened a chat yet"))?;
+            tokio::task::spawn_blocking(move || cursor_agent_chat::read_chat_history(&chat_id))
+                .await
+                .map_err(|error| format!("Reading the chat failed: {error}"))?
+        }
     }
 }
 
