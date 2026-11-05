@@ -68,6 +68,12 @@
   font-weight: 600;
 }
 
+.session-header a.name {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
 .session-header .name.no-session {
   color: color-mix(in oklab, var(--color-base-content) 40%, transparent);
 }

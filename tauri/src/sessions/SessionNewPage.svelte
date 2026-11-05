@@ -4,7 +4,7 @@
      session's page. -->
 <script>
   import { navigateToUrl } from "../lib/router.js";
-  import { sessionShowUrl, sessionsIndexUrl } from "../lib/routes.js";
+  import { sessionShowUrl } from "../lib/routes.js";
   import { onMount } from "svelte";
   import AppNav from "../lib/components/AppNav.svelte";
   import Button from "../lib/components/Button.svelte";
@@ -59,7 +59,6 @@
 <AppNav current="sessions" />
 
 <main class="page with-waves">
-  <p><a href={sessionsIndexUrl()}>← Sessions</a></p>
   <Header>
     New session
     {#snippet subtitle()}

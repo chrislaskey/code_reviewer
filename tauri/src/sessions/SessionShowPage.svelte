@@ -5,7 +5,6 @@
 <script>
   import { onMount } from "svelte";
   import AppNav from "../lib/components/AppNav.svelte";
-  import Button from "../lib/components/Button.svelte";
   import Header from "../lib/components/Header.svelte";
   import InfoPopover from "../lib/components/InfoPopover.svelte";
   import StillWaves from "../lib/components/StillWaves.svelte";
@@ -121,9 +120,6 @@
     {#snippet subtitle()}
       The session's status and actions, and the agent's chat history. Refreshes every 5 seconds.
     {/snippet}
-    {#snippet actions()}
-      <Button class="btn btn-ghost" href={sessionsIndexUrl()}>All sessions</Button>
-    {/snippet}
   </Header>
 
   <section>
@@ -164,6 +160,7 @@
     </div>
     {#if name !== null}
       <PromptForm
+        draftKey={name}
         disabled={promptDisabledReason !== ""}
         disabledReason={promptDisabledReason}
         onSend={sendPrompt}

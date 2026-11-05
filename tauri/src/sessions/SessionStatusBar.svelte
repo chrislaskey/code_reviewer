@@ -19,7 +19,11 @@
 
 <div class="session-header">
   <span class="session-title">
-    <span class="name">{session.name}</span>
+    {#if detailsUrl}
+      <a class="name" href={detailsUrl}>{session.name}</a>
+    {:else}
+      <span class="name">{session.name}</span>
+    {/if}
     <RepositoryName path={session.directory ?? ""} git={session.git} />
   </span>
   {#if session.agent}
