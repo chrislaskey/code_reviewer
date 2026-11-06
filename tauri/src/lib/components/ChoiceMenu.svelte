@@ -2,7 +2,9 @@
      each a title with a sentence saying what it does. The menu closes on a
      click outside it and on Escape; `children` gets `close` to call after a
      choice. A details element rather than daisyUI's focus-based dropdown,
-     since WebKit doesn't focus a clicked button. -->
+     since WebKit doesn't focus a clicked button. On small windows the menu
+     spans the window between the page's margins, just below the button,
+     since it is wider than a phone. -->
 <script>
   import Icon from "./Icon.svelte";
 
@@ -40,7 +42,7 @@
     {label}
     <Icon name="hero-chevron-down-micro" class="size-4" />
   </summary>
-  <ul class="dropdown-content menu choice-menu panel w-[24rem]">
+  <ul class="dropdown-content menu choice-menu panel w-[24rem] max-sm:fixed! max-sm:inset-x-(--page-gutter) max-sm:w-auto">
     {@render children({ close })}
   </ul>
 </details>

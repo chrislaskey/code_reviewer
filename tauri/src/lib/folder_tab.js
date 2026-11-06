@@ -17,16 +17,17 @@ export function folderTabPath({ width, height, edge, tab, cornerRadius, feetRadi
   const { left, top, bottom } = tab;
   const r = cornerRadius;
   const f = feetRadius;
-  // A tab flush with the top edge keeps a square top corner.
+  // A tab flush with the top or bottom edge keeps a square corner there.
   const rt = top <= 0 ? 0 : r;
+  const rb = bottom >= height ? 0 : r;
   return [
     `M ${width} 0`,
     `L ${width} ${height}`,
     `L ${edge} ${height}`,
     `L ${edge} ${bottom + f}`,
     `A ${f} ${f} 0 0 0 ${edge - f} ${bottom}`,
-    `L ${left + r} ${bottom}`,
-    `A ${r} ${r} 0 0 1 ${left} ${bottom - r}`,
+    `L ${left + rb} ${bottom}`,
+    `A ${rb} ${rb} 0 0 1 ${left} ${bottom - rb}`,
     `L ${left} ${top + rt}`,
     `A ${rt} ${rt} 0 0 1 ${left + rt} ${top}`,
     `L ${edge - f} ${top}`,

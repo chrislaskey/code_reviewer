@@ -14,9 +14,10 @@
    *   git: any,
    *   mainBranch: string,
    *   urlFor: (request: object) => string,
+   *   class?: any,
    * }}
    */
-  let { label, title, directory, git, mainBranch, urlFor } = $props();
+  let { label, title, directory, git, mainBranch, urlFor, class: class_ } = $props();
 
   let uncommittedChangesUrl = $derived(urlFor({ repo_path: directory }));
   let committedChangesUrl = $derived(
@@ -29,7 +30,7 @@
   );
 </script>
 
-<ChoiceMenu {label} {title}>
+<ChoiceMenu {label} {title} class={class_}>
   {#snippet children({ close })}
     <MenuChoice
       label="Uncommitted changes"

@@ -17,11 +17,11 @@
 }
 
 /* The page fills the window: the title row and toolbars stay, the tree and
-   the content beside it scroll on their own. */
+   the content beside it scroll on their own, above the bottom bar. */
 .full-page {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: calc(100vh - var(--bottom-bar-height));
 }
 
 /* The title row: the page's name, as the landing pages' headers set it,

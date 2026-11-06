@@ -2,13 +2,13 @@
   import ChoiceMenu from "../lib/components/ChoiceMenu.svelte";
   import MenuChoice from "../lib/components/MenuChoice.svelte";
 
-  let { name, port, detailsUrl = null, onOpen, onOpenInBrowser, onCopy } = $props();
+  let { name, port, detailsUrl = null, onOpen, onOpenInBrowser, onCopy, class: class_ = undefined } = $props();
 
   let attachCommand = $derived(`tmux attach -t ${name}`);
   let attachCommandElement;
 </script>
 
-<ChoiceMenu label="Open" title="Get to the session">
+<ChoiceMenu label="Open" title="Get to the session" class={class_}>
   {#snippet children({ close })}
     {#if detailsUrl}
       <MenuChoice

@@ -18,6 +18,9 @@
      shade darker than the page, which sits on top of it with the open tab,
      ringed and shadowed like the raised surfaces below. */
   --gutter-width: 84px;
+  /* The navigation bar along the window's bottom edge on small windows
+     (BottomBar), in place of the gutter; none otherwise. */
+  --bottom-bar-height: 0px;
   --gutter-bg: color-mix(in oklab, var(--color-base-100) 55%, var(--color-base-200));
   --gutter-ring: light-dark(rgb(0 0 0 / 0.06), rgb(255 255 255 / 0.08));
   --gutter-shadow: light-dark(rgb(0 0 0 / 0.1), rgb(0 0 0 / 0.55));
@@ -122,11 +125,13 @@
    old colour on the root background below short pages after a theme
    change. Isolated, so the z-index -1 waves and pattern show above it, and
    a flow root, so a page's top margin stays inside it. The gutter is fixed
-   down the left edge, so the page keeps clear of it. */
+   down the left edge and the bottom bar along the bottom, so the page
+   keeps clear of them. */
 body {
   display: flow-root;
   margin: 0;
   padding-left: var(--gutter-width);
+  padding-bottom: var(--bottom-bar-height);
   min-height: 100vh;
   background: var(--root-bg);
   isolation: isolate;
@@ -145,6 +150,20 @@ body {
   width: var(--gutter-width);
   padding-bottom: 10px;
   background: var(--gutter-bg);
+}
+
+/* Small windows (below Tailwind's sm) have no gutter: BottomBar, along
+   the bottom, takes its place, and the page runs to the window's left edge. */
+@media (width < 40rem) {
+  :root {
+    --gutter-width: 0px;
+    --bottom-bar-height: 56px;
+    --page-top: calc(env(safe-area-inset-top, 0px) + 44px + 0.5rem);
+  }
+
+  .app-gutter {
+    display: none;
+  }
 }
 
 /* The room at the top of the gutter for the window controls, which macOS

@@ -1,5 +1,6 @@
 <!-- A tmux session's status bar: its name and repository, the agent's
-     status, and the Open, Review, Trace and Git menus. On the sessions page
+     status, and the Open, Review, Trace and Git menus, which move to a
+     second line of smaller buttons on small windows. On the sessions page
      and on a session's own page, which passes `showDetailsLink={false}`.
      `actions` comes from createSessionActions (session_actions.js). -->
 <script>
@@ -12,6 +13,8 @@
   import RepositoryName from "./RepositoryName.svelte";
 
   let { session, mainBranch, actions, showDetailsLink = true } = $props();
+
+  const ACTION_BUTTON_CLASS = "btn btn-ghost max-sm:btn-sm";
 
   let attached = $derived(session.attached_clients > 0);
   let detailsUrl = $derived(showDetailsLink && attached && session.agent ? sessionShowUrl(session.name) : null);
@@ -42,11 +45,12 @@
       onOpen={actions.showInTerminalApp}
       onOpenInBrowser={actions.openInBrowser}
       onCopy={actions.copyText}
+      class={ACTION_BUTTON_CLASS}
     />
     {#if session.directory}
-      <ChangesMenu label="Review" title="Open the changes in Reviews" directory={session.directory} git={session.git} {mainBranch} urlFor={reviewShowUrl} />
-      <ChangesMenu label="Trace" title="Trace a test through the changes in Traces" directory={session.directory} git={session.git} {mainBranch} urlFor={traceShowUrl} />
+      <ChangesMenu label="Review" title="Open the changes in Reviews" directory={session.directory} git={session.git} {mainBranch} urlFor={reviewShowUrl} class={ACTION_BUTTON_CLASS} />
+      <ChangesMenu label="Trace" title="Trace a test through the changes in Traces" directory={session.directory} git={session.git} {mainBranch} urlFor={traceShowUrl} class={ACTION_BUTTON_CLASS} />
     {/if}
-    <GitMenu name={session.name} git={session.git} {mainBranch} onMerge={actions.merge} onClose={actions.close} />
+    <GitMenu name={session.name} git={session.git} {mainBranch} onMerge={actions.merge} onClose={actions.close} class={ACTION_BUTTON_CLASS} />
   </div>
 </div>

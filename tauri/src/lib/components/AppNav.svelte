@@ -3,9 +3,11 @@
      the theme menu as a tile at the bottom. The macOS window controls sit
      at its top, over the room left for them, and the empty parts of the
      gutter and the title bar's strip over the page drag the window.
+     On small windows the gutter is hidden and BottomBar takes its place.
      `current` names the tab the page belongs to. -->
 <script>
   import Icon from "./Icon.svelte";
+  import BottomBar from "./BottomBar.svelte";
   import ThemeMenu from "./ThemeMenu.svelte";
   import { folderTabPath } from "../folder_tab.js";
   import { homeUrl, reviewNewUrl, sessionsIndexUrl, traceNewUrl } from "../routes.js";
@@ -63,3 +65,5 @@
 </nav>
 
 <div class="title-bar-drag" data-tauri-drag-region></div>
+
+<BottomBar links={LINKS} {current} />

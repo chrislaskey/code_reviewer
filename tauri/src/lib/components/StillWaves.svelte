@@ -36,11 +36,11 @@
 
 <style>
   /* A background, so WebKit repaints it on a theme change. Starts where
-     the page does, clear of the gutter. */
+     the page does, clear of the gutter and the bottom bar. */
   .still-waves {
     background: var(--root-bg);
     position: fixed;
-    inset: auto 0 0 var(--gutter-width);
+    inset: auto 0 var(--bottom-bar-height) var(--gutter-width);
     height: 220px;
     z-index: -1;
     pointer-events: none;

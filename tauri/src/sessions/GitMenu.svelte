@@ -3,7 +3,7 @@
   import MenuChoice from "../lib/components/MenuChoice.svelte";
   import { countOf } from "./formatting.js";
 
-  let { name, git, mainBranch, onMerge, onClose } = $props();
+  let { name, git, mainBranch, onMerge, onClose, class: class_ = undefined } = $props();
 
   const CHANGES = [
     ["conflicted", "conflicted file", "Conflicted"],
@@ -22,7 +22,7 @@
   let branch = $derived(git?.branch ?? (git?.commit ? `detached at ${git.commit}` : name));
 </script>
 
-<ChoiceMenu label="Git" title="Git: {summary}">
+<ChoiceMenu label="Git" title="Git: {summary}" class={class_}>
   {#snippet children({ close })}
     {#if dirty}
       <li class="menu-title whitespace-normal font-normal text-base-content/70">

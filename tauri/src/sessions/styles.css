@@ -85,6 +85,20 @@
   gap: 0.4rem;
 }
 
+/* Small windows: the name, repository and badges on the first line, the
+   menus on a line of their own below. */
+@media (width < 40rem) {
+  .session-header {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+  }
+
+  .session-actions {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}
+
 .attach-command {
   user-select: all;
   -webkit-user-select: all;
