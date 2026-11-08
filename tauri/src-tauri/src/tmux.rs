@@ -285,6 +285,11 @@ impl Tmux {
 
     async fn run(&self, args: &[&str]) -> Result<Output, String> {
         let mut command = Command::new(&self.program);
+        for (name, _) in std::env::vars_os() {
+            if name.to_str().is_some_and(is_app_build_variable) {
+                command.env_remove(name);
+            }
+        }
         if let Some(socket_path) = &self.socket_path {
             command.arg("-S").arg(socket_path);
         }
@@ -294,6 +299,20 @@ impl Tmux {
             .await
             .map_err(|error| format!("Could not run {}: {error}", self.program))
     }
+}
+
+/// Whether `name` is one of the variables `cargo tauri dev` sets for the
+/// app's own build and run, like `CARGO_PKG_NAME`, `TAURI_CONFIG` and the
+/// app's `PORT`. A tmux command that starts the server copies its
+/// environment into every session, so these are kept from tmux; a session's
+/// login shell sets the user's own again.
+fn is_app_build_variable(name: &str) -> bool {
+    name == "CARGO"
+        || name.starts_with("CARGO_")
+        || name.starts_with("TAURI_")
+        || name == "OUT_DIR"
+        || name == "DYLD_FALLBACK_LIBRARY_PATH"
+        || name == "PORT"
 }
 
 /// Pane ids are `%` and a number, like `%60`.
@@ -511,6 +530,39 @@ mod tests {
         let server = TestServer::start("empty");
         let tmux = &server.tmux;
         assert_eq!(tmux.list_sessions().await, Ok(Vec::new()));
+    }
+
+    #[test]
+    fn app_build_variables_are_the_cargo_and_tauri_ones() {
+        for name in ["CARGO", "CARGO_PKG_NAME", "TAURI_CONFIG", "OUT_DIR", "PORT"] {
+            assert!(is_app_build_variable(name), "{name}");
+        }
+        for name in ["HOME", "PATH", "CARGOX", "EXAMPLE_PORT", "SHELL"] {
+            assert!(!is_app_build_variable(name), "{name}");
+        }
+    }
+
+    #[tokio::test]
+    async fn keeps_the_app_build_variables_out_of_a_new_server() {
+        if !tmux_installed().await {
+            return;
+        }
+        let server = TestServer::start("build-variables");
+        let tmux = &server.tmux;
+        tmux.create_session("example", "/bin/sh", "/tmp", &[])
+            .await
+            .expect("session is created");
+
+        // `cargo test` sets CARGO_PKG_NAME for this process, as `cargo tauri dev` does for the app.
+        let global = tmux
+            .run(&["show-environment", "-g"])
+            .await
+            .expect("show-environment runs");
+        let global = String::from_utf8_lossy(&global.stdout);
+
+        assert!(std::env::var_os("CARGO_PKG_NAME").is_some());
+        assert!(!global.contains("CARGO_PKG_NAME="), "global was: {global}");
+        assert!(global.contains("HOME="), "global was: {global}");
     }
 
     #[tokio::test]
