@@ -24,6 +24,10 @@
   import SessionStatusBar from "./SessionStatusBar.svelte";
 
   const REFRESH_INTERVAL_MS = 5000;
+  const PIN_CHAT_OPTIONS = [
+    { value: "on", label: "On" },
+    { value: "off", label: "Off" },
+  ];
 
   const name = sessionNameFromPath(window.location.pathname);
 
@@ -33,6 +37,8 @@
   let chat = $state();
   let chatError = $state();
   let chatFilter = $state("all");
+  // Keeps the chat's header and prompt in view while the chat scrolls.
+  let pinChat = $state(false);
   let shownMessages = $derived(chat ? filterChatMessages(chat.messages, chatFilter) : []);
   // Newest first, each with the one shown before it in time, for "16 seconds later".
   let newestFirst = $derived(
@@ -104,8 +110,16 @@
   {#if session?.git}<GitStatus git={session.git} />{/if}
 {/snippet}
 
-{#snippet chatFilterControl()}
-  <SegmentedControl value={chatFilter} options={CHAT_FILTERS} onchange={(value) => (chatFilter = value)} label="Show" />
+{#snippet chatControls()}
+  <div class="chat-controls">
+    <SegmentedControl
+      value={pinChat ? "on" : "off"}
+      options={PIN_CHAT_OPTIONS}
+      onchange={(value) => (pinChat = value === "on")}
+      label="Pin chat"
+    />
+    <SegmentedControl value={chatFilter} options={CHAT_FILTERS} onchange={(value) => (chatFilter = value)} label="Show" />
+  </div>
 {/snippet}
 
 <StillWaves rippleOnLoad />
@@ -140,33 +154,35 @@
   </section>
 
   <section class="mt-8">
-    <div class="section-header">
-      <div class="section-title">
-        <h2>Chat</h2>
-        {#if chat}
-          <span class="chat-count muted">
-            {chatFilter === "all" ? "" : `${shownMessages.length} of `}{chat.messages.length} messages
-          </span>
-        {/if}
-        <InfoPopover title="What the chat holds, and where it is read from">
+    <div class={["chat-top", { pinned: pinChat }]}>
+      <div class="section-header">
+        <div class="section-title">
+          <h2>Chat</h2>
           {#if chat}
-            <ChatSummary {chat} />
-          {:else}
-            Read from the transcript the agent writes as it works, once it has one.
+            <span class="chat-count muted">
+              {chatFilter === "all" ? "" : `${shownMessages.length} of `}{chat.messages.length} messages
+            </span>
           {/if}
-        </InfoPopover>
+          <InfoPopover title="What the chat holds, and where it is read from">
+            {#if chat}
+              <ChatSummary {chat} />
+            {:else}
+              Read from the transcript the agent writes as it works, once it has one.
+            {/if}
+          </InfoPopover>
+        </div>
+        {@render chatControls()}
       </div>
-      {@render chatFilterControl()}
+      {#if name !== null}
+        <PromptForm
+          draftKey={name}
+          disabled={promptDisabledReason !== ""}
+          disabledReason={promptDisabledReason}
+          onSend={sendPrompt}
+          controls={gitStatusLine}
+        />
+      {/if}
     </div>
-    {#if name !== null}
-      <PromptForm
-        draftKey={name}
-        disabled={promptDisabledReason !== ""}
-        disabledReason={promptDisabledReason}
-        onSend={sendPrompt}
-        controls={gitStatusLine}
-      />
-    {/if}
     {#if chat}
       <div class="chat-history">
         {#each newestFirst as { message, previous } (message.id)}

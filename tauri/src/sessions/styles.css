@@ -399,6 +399,34 @@
   color: var(--color-error);
 }
 
+/* The chat's header and prompt. Laid out the same pinned or not, so
+   toggling it doesn't shift the page. */
+.chat-top {
+  display: flex;
+  flex-direction: column;
+  margin-inline: -0.75rem;
+  padding-inline: 0.75rem;
+}
+
+.chat-top > .section-header {
+  padding-top: 0.5rem;
+}
+
+/* Stays in view, just below the title bar, while the chat scrolls under
+   it. Only the prompt's panel is opaque. */
+.chat-top.pinned {
+  position: sticky;
+  top: var(--title-bar-height);
+  z-index: 5;
+}
+
+.chat-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 1.25rem;
+}
+
 .prompt-form {
   margin-bottom: 1rem;
   padding: 0.85rem 1rem;
