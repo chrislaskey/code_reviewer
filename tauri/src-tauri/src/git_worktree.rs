@@ -126,13 +126,20 @@ pub async fn merge_worktree(worktree: &Worktree, main_branch: &str) -> Result<()
         ));
     }
 
+    let main_is_ancestor = run_git(
+        repository,
+        &["merge-base", "--is-ancestor", main_branch, &branch],
+    )
+    .await?
+    .is_ok();
+    if !main_is_ancestor {
+        return Err(format!(
+            "{branch} cannot fast-forward {main_branch}, run `git rebase {main_branch}` in the worktree first"
+        ));
+    }
     run_git(repository, &["merge", "--ff-only", "--", &branch])
         .await?
-        .map_err(|_| {
-            format!(
-                "{branch} cannot fast-forward {main_branch}, run `git rebase {main_branch}` in the worktree first"
-            )
-        })?;
+        .map_err(|stderr| format!("Merging {branch} into {main_branch} failed: {stderr}"))?;
     remove_worktree(worktree).await?;
     run_git(repository, &["branch", "-d", "--", &branch])
         .await?
@@ -529,6 +536,28 @@ mod tests {
         assert_eq!(close_clean, Ok(()));
         assert!(!added.path.exists());
         assert!(branches.contains("cr-dirty"), "the branch is kept");
+    }
+
+    #[tokio::test]
+    async fn merge_reports_gits_error_when_the_main_checkout_has_changes_in_the_way() {
+        let directory = TestDirectory::create("blocked");
+        let repository = directory.init_repository("repo").await;
+        let added = add_worktree(&repository, "cr-blocked")
+            .await
+            .expect("the worktree is added");
+        std::fs::write(added.path.join("README.md"), "from the branch")
+            .expect("the file is written");
+        git(&added.path, &["commit", "-q", "-am", "Work"]).await;
+        std::fs::write(repository.join("README.md"), "uncommitted in main")
+            .expect("the file is written");
+        let worktree = worktree_named(&directory.path, "cr-blocked").await;
+
+        let merge_blocked = merge_worktree(&worktree, "main").await;
+
+        let error = merge_blocked.expect_err("the merge is refused");
+        assert!(!error.contains("cannot fast-forward"), "{error}");
+        assert!(error.contains("README.md"), "{error}");
+        assert!(added.path.exists(), "the worktree is kept");
     }
 
     #[test]

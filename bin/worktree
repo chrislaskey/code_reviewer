@@ -118,9 +118,12 @@ merge() {
   [[ "$(git -C "$main_checkout" branch --show-current)" == "$main_branch" ]] ||
     fail "$main_checkout must have $main_branch checked out"
 
+  git -C "$main_checkout" merge-base --is-ancestor "$main_branch" "$branch" ||
+    fail "$branch cannot fast-forward $main_branch, run \`git rebase $main_branch\` here first"
+
   echo "Merging $branch into $main_branch in $main_checkout"
   git -C "$main_checkout" merge --ff-only "$branch" ||
-    fail "$branch cannot fast-forward $main_branch, run \`git rebase $main_branch\` here first"
+    fail "merging $branch into $main_branch failed, see git's message above"
 
   remove_worktree
 
