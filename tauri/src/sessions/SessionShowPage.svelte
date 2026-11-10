@@ -37,7 +37,7 @@
   let chat = $state();
   let chatError = $state();
   let chatFilter = $state("all");
-  // Keeps the chat's header and prompt in view while the chat scrolls.
+  // Keeps the prompt in view while the chat scrolls.
   let pinChat = $state(false);
   let shownMessages = $derived(chat ? filterChatMessages(chat.messages, chatFilter) : []);
   // Newest first, each with the one shown before it in time, for "16 seconds later".
@@ -154,35 +154,35 @@
   </section>
 
   <section class="mt-8">
-    <div class={["chat-top", { pinned: pinChat }]}>
-      <div class="section-header">
-        <div class="section-title">
-          <h2>Chat</h2>
+    <div class="section-header">
+      <div class="section-title">
+        <h2>Chat</h2>
+        {#if chat}
+          <span class="chat-count muted">
+            {chatFilter === "all" ? "" : `${shownMessages.length} of `}{chat.messages.length} messages
+          </span>
+        {/if}
+        <InfoPopover title="What the chat holds, and where it is read from">
           {#if chat}
-            <span class="chat-count muted">
-              {chatFilter === "all" ? "" : `${shownMessages.length} of `}{chat.messages.length} messages
-            </span>
+            <ChatSummary {chat} />
+          {:else}
+            Read from the transcript the agent writes as it works, once it has one.
           {/if}
-          <InfoPopover title="What the chat holds, and where it is read from">
-            {#if chat}
-              <ChatSummary {chat} />
-            {:else}
-              Read from the transcript the agent writes as it works, once it has one.
-            {/if}
-          </InfoPopover>
-        </div>
-        {@render chatControls()}
+        </InfoPopover>
       </div>
-      {#if name !== null}
+      {@render gitStatusLine()}
+    </div>
+    {#if name !== null}
+      <div class={["chat-prompt", { pinned: pinChat }]}>
         <PromptForm
           draftKey={name}
           disabled={promptDisabledReason !== ""}
           disabledReason={promptDisabledReason}
           onSend={sendPrompt}
-          controls={gitStatusLine}
+          controls={chatControls}
         />
-      {/if}
-    </div>
+      </div>
+    {/if}
     {#if chat}
       <div class="chat-history">
         {#each newestFirst as { message, previous } (message.id)}

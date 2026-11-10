@@ -7,7 +7,7 @@
   import InfoPopover from "../lib/components/InfoPopover.svelte";
   import { loadPromptDraft, savePromptDraft } from "./prompt_draft.js";
 
-  /** `controls`: shown on the left of the Send row, like the git status. */
+  /** `controls`: shown on the left of the Send row, like the chat's toggles. */
   /** @type {{ draftKey?: string, disabled?: boolean, disabledReason?: string, onSend: (prompt: string) => Promise<boolean>, controls?: import("svelte").Snippet<[]> }} */
   let { draftKey, disabled = false, disabledReason = "", onSend, controls } = $props();
 

@@ -294,6 +294,14 @@
 .markdown-html.chat-text {
   padding-left: 0;
   font-size: 1rem;
+  line-height: 1.7;
+}
+
+/* Paragraphs and lists at a readable width (max-w-2xl); tables and code keep the full width. */
+.markdown-html.chat-text > p,
+.markdown-html.chat-text > ul,
+.markdown-html.chat-text > ol {
+  max-width: 42rem;
 }
 
 .chat-fold {
@@ -399,31 +407,16 @@
   color: var(--color-error);
 }
 
-/* The chat's header and prompt. Laid out the same pinned or not, so
-   toggling it doesn't shift the page. */
-.chat-top {
-  display: flex;
-  flex-direction: column;
-  margin-inline: -0.75rem;
-  padding-inline: 0.75rem;
-}
-
-.chat-top > .section-header {
-  padding-top: 0.5rem;
-}
-
-/* Stays in view, just below the title bar, while the chat scrolls under
-   it. Only the prompt's panel is opaque. */
-.chat-top.pinned {
+/* Stays in view at the top of the window while the chat scrolls under it. */
+.chat-prompt.pinned {
   position: sticky;
-  top: var(--title-bar-height);
+  top: 0.5rem;
   z-index: 5;
 }
 
 .chat-controls {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
   gap: 1.25rem;
 }
 

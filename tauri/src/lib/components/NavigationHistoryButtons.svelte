@@ -38,9 +38,10 @@
 <style>
   /* In line with the window controls, and the first caret's shape in line
      with the page's content (a button's icon sits 8px in from its edge);
-     above the title bar's drag strip. */
+     above the title bar's drag strip. At the top of the document, so they
+     scroll away with the page. */
   .history-buttons {
-    position: fixed;
+    position: absolute;
     top: 5px;
     left: calc(var(--gutter-width) + var(--page-gutter) - 8px);
     z-index: 30;
