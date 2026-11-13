@@ -1,14 +1,14 @@
 <!-- The app's navigation on small windows, where the gutter is hidden: a
-     bar along the window's bottom edge with a tile per page, as many as
-     fit beside a last tile that drops up a menu of the theme choices: Theme
-     while every page fits, else More, with the pages that don't above them. Drawn like the gutter: the open tab joined to the page
-     above it, the gutter's shape turned a quarter so the page's edge runs
-     along the top. The last tile is a details element, like ChoiceMenu, closing on
-     a click outside it and on Escape. `links` and `current` are AppNav's. -->
+     bar along the window's bottom edge with four buttons, Home, Back,
+     Forward and More. More slides up a sheet over most of the window with
+     the other pages and the theme choices. The sheet closes on More, a tap
+     above it, a choice and Escape. `links` and `current` are AppNav's;
+     `current` marks the open page in the sheet. -->
 <script>
+  import { fade, fly } from "svelte/transition";
   import Icon from "./Icon.svelte";
   import ThemeChoices from "./ThemeChoices.svelte";
-  import { folderTabPath } from "../folder_tab.js";
+  import { goBackInHistory, goForwardInHistory, navigationHistory } from "../navigation_history.svelte.js";
 
   /**
    * @typedef {Object} Props
@@ -19,52 +19,13 @@
   /** @type {Props} */
   let { links, current } = $props();
 
-  // Five tiles fit the narrowest window (320px); the last is Theme or More.
-  const TILES_IN_BAR = 5;
-
-  let linksInBar = $derived(links.slice(0, TILES_IN_BAR - 1));
-  let linksInMore = $derived(links.slice(TILES_IN_BAR - 1));
-  let currentIsInMore = $derived(linksInMore.some((link) => link.id === current));
-  let hasMore = $derived(linksInMore.length > 0);
-
-  // The gutter's (AppNav).
-  const OVERLAP = 2;
-  const CORNER_RADIUS = 10;
-  const FEET_RADIUS = 10;
+  let homeLink = $derived(links.find((link) => link.id === "home"));
+  let linksInMore = $derived(links.filter((link) => link.id !== "home"));
 
   let open = $state(false);
-  let element = $state();
-  let width = $state(0);
-  let height = $state(0);
-  /** @type {Record<string, HTMLElement>} */
-  let tiles = $state({});
-
-  /* The gutter's shape, measured across the bar from its bottom edge and
-     along it from its left, then turned into place (turnIntoBar). More's
-     tile is measured by its details element, the bar's child. */
-  let shape = $derived.by(() => {
-    if (height === 0) return "";
-    const tile = currentIsInMore ? element : tiles[current];
-    const tab = tile ? { left: 0, top: tile.offsetLeft, bottom: tile.offsetLeft + tile.offsetWidth } : null;
-    return folderTabPath({
-      width: height + OVERLAP,
-      height: width,
-      edge: height,
-      tab,
-      cornerRadius: CORNER_RADIUS,
-      feetRadius: FEET_RADIUS,
-    });
-  });
-
-  // A quarter turn: the gutter's x, from the bar's bottom, runs up the bar.
-  let turnIntoBar = $derived(`matrix(0 -1 1 0 0 ${height + OVERLAP})`);
 
   function close() {
     open = false;
-  }
-
-  function closeWhenClickedOutside(event) {
-    if (open && element && !element.contains(event.target)) open = false;
   }
 
   function closeOnEscape(event) {
@@ -72,53 +33,60 @@
   }
 </script>
 
-<svelte:window onclick={closeWhenClickedOutside} onkeydown={closeOnEscape} />
+<svelte:window onkeydown={closeOnEscape} />
 
-<nav class="bottom-bar" bind:clientWidth={width} bind:clientHeight={height}>
-  <svg
-    class="tab-shape"
-    {width}
-    height={height + OVERLAP}
-    style="top: -{OVERLAP}px; clip-path: inset({OVERLAP}px 0 0 0)"
-    aria-hidden="true"
-  >
-    <path d={shape} transform={turnIntoBar} />
-  </svg>
-  {#each linksInBar as link (link.id)}
-    <a href={link.href} class="tile" class:current={current === link.id} bind:this={tiles[link.id]}>
-      <Icon name={link.icon} class="tile-icon" />
-      {link.label}
-    </a>
-  {/each}
-  <details class="dropdown dropdown-top dropdown-end h-full flex-1" bind:open bind:this={element}>
-    <summary class="tile" class:current={currentIsInMore}>
-      <Icon name={hasMore ? "hero-ellipsis-horizontal" : "hero-swatch"} class="tile-icon" />
-      {hasMore ? "More" : "Theme"}
-    </summary>
-    <ul class="dropdown-content menu panel mb-1 max-h-[70vh] w-52 flex-nowrap overflow-y-auto">
+{#if open}
+  <button type="button" class="sheet-backdrop" aria-label="Close menu" onclick={close} transition:fade={{ duration: 150 }}
+  ></button>
+  <div class="sheet" role="dialog" aria-label="More" transition:fly={{ y: 40, duration: 200 }}>
+    <ul class="page-links">
       {#each linksInMore as link (link.id)}
         <li>
-          <a href={link.href} class="text-base-content no-underline" class:menu-active={current === link.id} onclick={close}>
-            <Icon name={link.icon} class="size-4" />
+          <a href={link.href} class="page-link" class:current={current === link.id} onclick={close}>
+            <Icon name={link.icon} class="size-6" />
             {link.label}
           </a>
         </li>
       {/each}
-      {#if hasMore}<li class="menu-title">Theme</li>{/if}
+    </ul>
+    <h2 class="sheet-heading">Theme</h2>
+    <ul class="menu w-full p-0">
       <ThemeChoices onchoose={close} />
     </ul>
-  </details>
+  </div>
+{/if}
+
+<nav class="bottom-bar">
+  <a href={homeLink?.href} class="bar-button" onclick={close}>
+    <Icon name={homeLink?.icon ?? "hero-home"} class="bar-icon" />
+    Home
+  </a>
+  <button type="button" class="bar-button" disabled={!navigationHistory.canGoBack} onclick={goBackInHistory}>
+    <Icon name="hero-chevron-left" class="bar-icon" />
+    Back
+  </button>
+  <button type="button" class="bar-button" disabled={!navigationHistory.canGoForward} onclick={goForwardInHistory}>
+    <Icon name="hero-chevron-right" class="bar-icon" />
+    Forward
+  </button>
+  <button type="button" class="bar-button" class:open aria-expanded={open} onclick={() => (open = !open)}>
+    <Icon name={open ? "hero-x-mark" : "hero-bars-3"} class="bar-icon" />
+    More
+  </button>
 </nav>
 
 <style>
-  /* Fixed along the bottom, like the gutter down the left, in its colour. */
+  /* Fixed along the bottom in the gutter's colour, a hairline above it. */
   .bottom-bar {
     position: fixed;
     inset: auto 0 0 0;
     z-index: 20;
     display: none;
+    gap: 6px;
     height: var(--bottom-bar-height);
+    padding: 6px 8px;
     background: var(--gutter-bg);
+    box-shadow: 0 -1px 0 var(--gutter-ring);
   }
 
   @media (width < 40rem) {
@@ -127,71 +95,109 @@
     }
   }
 
-  /* The gutter's tab shape (styles.css), its ring and shadow turned with
-     it: they fall below the page's edge instead of left of it. */
-  .tab-shape {
-    position: absolute;
-    left: 0;
-    z-index: 0;
-    overflow: visible;
-    pointer-events: none;
-    fill: var(--color-base-100);
-    filter: drop-shadow(0 1px 0 var(--gutter-ring)) drop-shadow(-1px 0 0 var(--gutter-ring))
-      drop-shadow(1px 0 0 var(--gutter-ring)) drop-shadow(1px 3px 7px var(--gutter-shadow));
-  }
-
-  /* A tile: the gutter's, an icon over one word, sharing the bar evenly. */
-  .tile {
-    position: relative;
-    z-index: 1;
+  /* A button: a raised rounded square, an icon over one word, sharing the
+     bar evenly; it sinks while pressed. */
+  .bar-button {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.25rem;
-    height: 100%;
-    list-style: none;
-    color: color-mix(in oklab, var(--color-base-content) 62%, transparent);
+    gap: 2px;
+    border-radius: 10px;
+    background: var(--color-base-100);
+    box-shadow: var(--raised-shadow);
+    color: var(--fg);
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.01em;
     text-decoration: none;
     cursor: pointer;
+    transition:
+      transform 80ms,
+      background-color 80ms;
   }
 
-  summary.tile {
-    width: 100%;
+  .bar-button:not(:disabled):active {
+    transform: scale(0.96);
+    background: color-mix(in oklab, var(--color-base-content) 8%, var(--color-base-100));
   }
 
-  summary.tile::-webkit-details-marker {
-    display: none;
+  .bar-button:disabled {
+    box-shadow: none;
+    background: transparent;
+    color: color-mix(in oklab, var(--color-base-content) 30%, transparent);
+    cursor: default;
   }
 
-  .tile :global(.tile-icon) {
-    width: 22px;
-    height: 22px;
+  .bar-button.open {
+    background: color-mix(in oklab, var(--color-primary) 14%, var(--color-base-100));
   }
 
-  /* As in the gutter, a tab that is not open lights up as an inset
-     rounded square, while hovered or while its menu is open. */
-  .tile:not(.current):hover,
-  details[open] > .tile:not(.current),
-  .tile.current {
-    color: var(--fg);
-  }
-
-  .tile:not(.current):hover::before,
-  details[open] > .tile:not(.current)::before {
-    content: "";
-    position: absolute;
-    inset: 4px 7px;
-    z-index: -1;
-    border-radius: 10px;
-    background: color-mix(in oklab, var(--color-base-content) 7%, transparent);
-  }
-
-  .tile.current :global(.tile-icon) {
+  .bar-button.open :global(.bar-icon) {
     color: var(--color-primary);
+  }
+
+  .bar-button :global(.bar-icon) {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* The page above the sheet, dimmed; a tap on it closes the sheet. */
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0 0 var(--bottom-bar-height) 0;
+    z-index: 18;
+    background: rgb(0 0 0 / 0.35);
+  }
+
+  /* Rises from the bar over most of the window, below the status bar on a
+     phone (the safe area); scrolls when the theme list runs long. */
+  .sheet {
+    position: fixed;
+    inset: auto 0 var(--bottom-bar-height) 0;
+    z-index: 19;
+    max-height: calc(100% - var(--bottom-bar-height) - env(safe-area-inset-top, 0px) - 3rem);
+    overflow-y: auto;
+    padding: 1.25rem var(--page-gutter) 1rem;
+    border-radius: 16px 16px 0 0;
+    background: var(--color-base-100);
+    box-shadow: var(--raised-shadow);
+  }
+
+  .page-links {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+
+  /* A page: an icon over its name, a large touch target. */
+  .page-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 1rem 0.5rem;
+    border-radius: 12px;
+    background: var(--gutter-bg);
+    color: var(--fg);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .page-link.current {
+    outline: 2px solid var(--color-primary);
+  }
+
+  .page-link.current :global(.size-6) {
+    color: var(--color-primary);
+  }
+
+  .sheet-heading {
+    margin: 1.25rem 0 0.25rem;
+    padding: 0 0.75rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 600;
   }
 </style>

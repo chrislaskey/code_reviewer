@@ -1,5 +1,6 @@
 <!-- A browser's back and forward buttons, small carets at the window's top
-     edge, beside the macOS window controls' gutter. A direction with nowhere
+     edge, beside the macOS window controls' gutter; on small windows, hidden
+     for the bottom bar's. A direction with nowhere
      to go stays in place, dimmed. Mounted once (main.js), so it outlives
      every page. -->
 <script>
@@ -69,29 +70,11 @@
     color: var(--color-base-content);
   }
 
-  /* Small windows, phones among them: Apple's 44pt touch targets, the
-     hover shade a smaller square inside. Below the status bar on a phone
-     (the safe area), and with no gutter, just past the window controls
-     (three 12px circles 8px apart, from 16px in); the page's title keeps
-     clear of the taller row (styles.css). */
+  /* Small windows, phones among them: Back and Forward are in the
+     bottom bar (BottomBar), which reads the history this keeps current. */
   @media (width < 40rem) {
     .history-buttons {
-      top: env(safe-area-inset-top, 0px);
-      left: calc(68px + env(safe-area-inset-left, 0px));
-      gap: 0;
-    }
-
-    button {
-      width: 44px;
-      height: 44px;
-      padding: 6px;
-      border-radius: 12px;
-      background-clip: content-box;
-    }
-
-    button :global(.size-4) {
-      width: 20px;
-      height: 20px;
+      display: none;
     }
   }
 </style>
