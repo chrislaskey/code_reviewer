@@ -414,6 +414,11 @@
   z-index: 5;
 }
 
+/* Room to write a long prompt; the chat is below it. */
+.chat-prompt.large .prompt-input {
+  height: 55dvh;
+}
+
 .chat-controls {
   display: flex;
   flex-wrap: wrap;

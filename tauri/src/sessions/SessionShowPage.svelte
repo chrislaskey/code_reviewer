@@ -24,9 +24,10 @@
   import SessionStatusBar from "./SessionStatusBar.svelte";
 
   const REFRESH_INTERVAL_MS = 5000;
-  const PIN_CHAT_OPTIONS = [
-    { value: "on", label: "On" },
-    { value: "off", label: "Off" },
+  const CHAT_LAYOUTS = [
+    { value: "regular", label: "Regular" },
+    { value: "pinned", label: "Pinned" },
+    { value: "large", label: "Large" },
   ];
 
   const name = sessionNameFromPath(window.location.pathname);
@@ -37,8 +38,8 @@
   let chat = $state();
   let chatError = $state();
   let chatFilter = $state("all");
-  // Keeps the prompt in view while the chat scrolls.
-  let pinChat = $state(false);
+  // `pinned` keeps the prompt in view while the chat scrolls; `large` makes it taller.
+  let chatLayout = $state("regular");
   let shownMessages = $derived(chat ? filterChatMessages(chat.messages, chatFilter) : []);
   // Newest first, each with the one shown before it in time, for "16 seconds later".
   let newestFirst = $derived(
@@ -112,12 +113,7 @@
 
 {#snippet chatControls()}
   <div class="chat-controls">
-    <SegmentedControl
-      value={pinChat ? "on" : "off"}
-      options={PIN_CHAT_OPTIONS}
-      onchange={(value) => (pinChat = value === "on")}
-      label="Pin chat"
-    />
+    <SegmentedControl value={chatLayout} options={CHAT_LAYOUTS} onchange={(value) => (chatLayout = value)} label="Chat" />
     <SegmentedControl value={chatFilter} options={CHAT_FILTERS} onchange={(value) => (chatFilter = value)} label="Show" />
   </div>
 {/snippet}
@@ -173,7 +169,7 @@
       {@render gitStatusLine()}
     </div>
     {#if name !== null}
-      <div class={["chat-prompt", { pinned: pinChat }]}>
+      <div class={["chat-prompt", chatLayout]}>
         <PromptForm
           draftKey={name}
           disabled={promptDisabledReason !== ""}
