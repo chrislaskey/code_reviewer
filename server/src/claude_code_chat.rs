@@ -163,7 +163,22 @@ fn parse_transcript(contents: &str) -> Vec<ChatMessage> {
             last.parts.push(part);
         }
     }
+    make_ids_unique(&mut messages);
     messages
+}
+
+/// Suffixes repeated ids with `-2`, `-3`, and so on. A note Claude Code
+/// writes between two lines of one assistant message, like an image's size
+/// after a `Read`, splits it into two messages with the message's id.
+fn make_ids_unique(messages: &mut [ChatMessage]) {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for message in messages {
+        let count = counts.entry(message.id.clone()).or_default();
+        *count += 1;
+        if *count > 1 {
+            message.id = format!("{}-{count}", message.id);
+        }
+    }
 }
 
 /// Whether a user line is a note Claude Code wrote, and which kind. `None`
@@ -410,6 +425,21 @@ mod tests {
         assert!(messages[6].is_prompt());
         assert_eq!(summarize_chat(&messages).prompts, 1);
         assert_eq!(summarize_chat(&messages).notes, 6);
+    }
+
+    const SPLIT_BY_A_NOTE: &str = r#"{"type":"assistant","uuid":"a1","message":{"id":"msg_1","role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"Read","input":{"file_path":"a.png"}}]}}
+{"type":"user","uuid":"u1","message":{"role":"user","content":[{"tool_use_id":"toolu_1","type":"tool_result","content":"image"}]}}
+{"type":"user","uuid":"n1","isMeta":true,"message":{"role":"user","content":"[Image: original 1170x2532]"}}
+{"type":"assistant","uuid":"a2","message":{"id":"msg_1","role":"assistant","content":[{"type":"tool_use","id":"toolu_2","name":"Read","input":{"file_path":"b.png"}}]}}
+{"type":"assistant","uuid":"a3","message":{"id":"msg_1","role":"assistant","content":[{"type":"text","text":"Both look right."}]}}"#;
+
+    #[test]
+    fn gives_an_assistant_message_split_by_a_note_unique_ids() {
+        let messages = parse_transcript(SPLIT_BY_A_NOTE);
+
+        let ids: Vec<_> = messages.iter().map(|message| message.id.as_str()).collect();
+        assert_eq!(ids, vec!["msg_1", "n1", "msg_1-2"]);
+        assert_eq!(messages[2].parts.len(), 2);
     }
 
     #[test]
