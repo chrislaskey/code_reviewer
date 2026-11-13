@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
+    "core:webview:allow-set-webview-background-color",
     "allow-list-branches-and-recent-commits",
     "allow-analyze-file-changes",
     "allow-get-function-diffs",

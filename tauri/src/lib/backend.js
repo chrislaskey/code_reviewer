@@ -5,6 +5,7 @@
 // the core crate's, with snake_case fields.
 
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 
 /* -- Reviews ------------------------------------------------------------------- */
 
@@ -159,4 +160,11 @@ export function pairWithComputer(code) {
 /** Mobile: forgets the computer this phone is paired with. */
 export function unpairFromComputer() {
   return invoke("unpair_from_computer");
+}
+
+/* -- Window -------------------------------------------------------------------- */
+
+/** Sets the colour the webview shows wherever the page doesn't paint, as `[red, green, blue, alpha]`. */
+export function setWebviewBackgroundColor(color) {
+  return getCurrentWebview().setBackgroundColor(color);
 }

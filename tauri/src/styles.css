@@ -159,11 +159,12 @@ body {
 }
 
 /* Small windows (below Tailwind's sm) have no gutter: BottomBar, along
-   the bottom, takes its place, and the page runs to the window's left edge. */
+   the bottom, takes its place, and the page runs to the window's left edge.
+   The bar runs under the phone's home indicator, so its height takes it in. */
 @media (width < 40rem) {
   :root {
     --gutter-width: 0px;
-    --bottom-bar-height: 56px;
+    --bottom-bar-height: calc(56px + env(safe-area-inset-bottom, 0px));
     --page-top: calc(env(safe-area-inset-top, 0px) + 2.5rem);
   }
 
