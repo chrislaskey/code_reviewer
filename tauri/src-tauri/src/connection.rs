@@ -8,6 +8,7 @@ use std::sync::{Arc, RwLock};
 use code_reviewer_client::BackendClient;
 use code_reviewer_server::PairingCode;
 use serde::Serialize;
+use url::Url;
 
 /// Whether this app runs the backend itself or reaches one remotely.
 #[derive(Clone, Copy, Debug, Serialize)]
@@ -60,6 +61,26 @@ impl BackendConnection {
         self.read()
             .clone()
             .ok_or_else(|| "This device isn't paired with a computer yet.".to_string())
+    }
+
+    /// A URL the server gave for its own computer, `http://localhost:<port>/…`,
+    /// as this device reaches it: the same on the desktop; on a phone, at
+    /// the paired computer's tailnet name.
+    pub fn url_on_this_device(&self, url_on_server: &str) -> Result<String, String> {
+        if self.pairing_code_path.is_none() {
+            return Ok(url_on_server.to_string());
+        }
+        let client = self.client()?;
+        let computer = Url::parse(client.base_url())
+            .map_err(|error| format!("The paired computer's URL is not valid: {error}"))?;
+        let host = computer
+            .host_str()
+            .ok_or_else(|| "The paired computer's URL has no host".to_string())?;
+        let mut url = Url::parse(url_on_server)
+            .map_err(|error| format!("{url_on_server} is not a valid URL: {error}"))?;
+        url.set_host(Some(host))
+            .map_err(|error| format!("Could not point {url_on_server} at {host}: {error}"))?;
+        Ok(url.into())
     }
 
     /// The URL of the computer this phone is paired with.
@@ -199,6 +220,40 @@ mod tests {
 
         assert!(error.contains("pairing code"), "{error}");
         assert!(connection.client().is_err());
+    }
+
+    #[test]
+    fn a_phone_reaches_the_computers_urls_at_its_tailnet_name() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("pairing_code");
+        let code = PairingCode {
+            url: "https://my-mac.tail1234.ts.net:7443".to_string(),
+            token: SecretString::from("abc"),
+        };
+        write_private_file(&path, &code.encode()).unwrap();
+        let connection = BackendConnection::from_saved_pairing_code(path);
+
+        assert_eq!(
+            connection
+                .url_on_this_device("http://localhost:1420/artifacts/code_reviewer/cr-x/")
+                .unwrap(),
+            "http://my-mac.tail1234.ts.net:1420/artifacts/code_reviewer/cr-x/"
+        );
+    }
+
+    #[test]
+    fn the_desktop_reaches_the_computers_urls_as_they_are() {
+        let connection = BackendConnection::to_local_server(BackendClient::new(
+            "http://127.0.0.1:1".to_string(),
+            SecretString::from("abc"),
+        ));
+
+        assert_eq!(
+            connection
+                .url_on_this_device("http://localhost:4001")
+                .unwrap(),
+            "http://localhost:4001"
+        );
     }
 
     #[tokio::test]

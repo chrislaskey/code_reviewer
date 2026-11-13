@@ -6,7 +6,8 @@ use code_reviewer_server::requests::CreateSessionRequest;
 use code_reviewer_server::{
     ChatHistory, DetectedSettings, SessionList, SessionStatus, ShowOutcome,
 };
-use tauri::State;
+use tauri::{AppHandle, State};
+use tauri_plugin_opener::OpenerExt;
 
 use crate::connection::BackendConnection;
 
@@ -175,15 +176,46 @@ pub async fn show_session_in_terminal_app(
         .map_err(|error| error.to_string())
 }
 
-/// Opens a session's `http://localhost:<port>` in the browser. Returns the URL.
+/// Opens a session's `http://localhost:<port>` in this device's browser:
+/// on a phone, at the paired computer's tailnet name. Returns the URL.
 #[tauri::command]
 pub async fn open_session_in_browser(
+    app: AppHandle,
     connection: State<'_, BackendConnection>,
     name: String,
 ) -> Result<String, String> {
-    connection
+    let url = connection
         .client()?
-        .open_session_in_browser(&name)
+        .get_session_browser_url(&name)
         .await
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    open_url_on_this_device(&app, &connection, &url)
+}
+
+/// Opens the artifacts of a session's checkout in this device's browser:
+/// on a phone, at the paired computer's tailnet name. Returns the URL.
+#[tauri::command]
+pub async fn open_session_artifacts_in_browser(
+    app: AppHandle,
+    connection: State<'_, BackendConnection>,
+    name: String,
+) -> Result<String, String> {
+    let url = connection
+        .client()?
+        .get_session_artifacts_url(&name)
+        .await
+        .map_err(|error| error.to_string())?;
+    open_url_on_this_device(&app, &connection, &url)
+}
+
+fn open_url_on_this_device(
+    app: &AppHandle,
+    connection: &BackendConnection,
+    url_on_server: &str,
+) -> Result<String, String> {
+    let url = connection.url_on_this_device(url_on_server)?;
+    app.opener()
+        .open_url(&url, None::<&str>)
+        .map_err(|error| format!("Could not open {url}: {error}"))?;
+    Ok(url)
 }

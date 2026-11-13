@@ -78,18 +78,21 @@ fn routes_for_every_client() -> Router<Arc<Backend>> {
         .route("/api/continue_session", post(continue_session))
         .route("/api/merge_session", post(merge_session))
         .route("/api/close_session", post(close_session))
+        .route(
+            "/api/get_session_browser_url",
+            post(get_session_browser_url),
+        )
+        .route(
+            "/api/get_session_artifacts_url",
+            post(get_session_artifacts_url),
+        )
 }
 
 fn routes_for_this_computer() -> Router<Arc<Backend>> {
-    Router::new()
-        .route(
-            "/api/show_session_in_terminal_app",
-            post(show_session_in_terminal_app),
-        )
-        .route(
-            "/api/open_session_in_browser",
-            post(open_session_in_browser),
-        )
+    Router::new().route(
+        "/api/show_session_in_terminal_app",
+        post(show_session_in_terminal_app),
+    )
 }
 
 fn routes_for_remote_access() -> Router<Arc<RemoteAccess>> {
@@ -307,11 +310,20 @@ async fn show_session_in_terminal_app(
     ))
 }
 
-async fn open_session_in_browser(
+async fn get_session_browser_url(
     State(backend): BackendState,
     JsonBody(request): JsonBody<SessionNameRequest>,
 ) -> ApiResult<String> {
-    Ok(Json(backend.open_session_in_browser(&request.name).await?))
+    Ok(Json(backend.get_session_browser_url(&request.name).await?))
+}
+
+async fn get_session_artifacts_url(
+    State(backend): BackendState,
+    JsonBody(request): JsonBody<SessionNameRequest>,
+) -> ApiResult<String> {
+    Ok(Json(
+        backend.get_session_artifacts_url(&request.name).await?,
+    ))
 }
 
 /* -- Remote access (localhost only) --------------------------------------- */
@@ -483,7 +495,6 @@ mod tests {
 
         for path in [
             "/api/show_session_in_terminal_app",
-            "/api/open_session_in_browser",
             "/api/get_remote_access_status",
             "/api/set_remote_access_enabled",
             "/api/create_paired_device",

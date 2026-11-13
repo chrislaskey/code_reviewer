@@ -1,0 +1,5 @@
+# A worktree's artifacts stay in the worktree: only the index is committed.
+*
+!.gitignore
+!README.md
+!index.html

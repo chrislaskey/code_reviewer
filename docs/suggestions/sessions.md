@@ -54,3 +54,11 @@ Ideas and template features not in the rewrite. None are planned.
   the agent writes, as a chat app does.
 - Show a subagent's messages (Claude Code's sidechains) folded under the
   tool call that started it.
+- Artifacts for other projects (`artifacts/README.md`): sessions in
+  repositories other than this app's write to their own main checkout,
+  which nothing serves. They could write to this app's
+  `artifacts/<project>/<worktree>/` instead, with `bin/artifacts` (or the
+  app) telling them where, and the cleanup on Merge and Close already
+  names the project.
+- Serving artifacts from the app's backend instead of bin/dev's dev
+  server, so they show without bin/dev running in the main checkout.

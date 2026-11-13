@@ -44,6 +44,7 @@
       {detailsUrl}
       onOpen={actions.showInTerminalApp}
       onOpenInBrowser={actions.openInBrowser}
+      onOpenArtifacts={actions.openArtifactsInBrowser}
       onCopy={actions.copyText}
       class={ACTION_BUTTON_CLASS}
     />

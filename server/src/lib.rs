@@ -20,6 +20,7 @@ mod access;
 mod agent;
 mod agent_chat;
 mod analysis;
+mod artifacts;
 mod backend;
 mod claude_code;
 mod claude_code_chat;

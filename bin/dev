@@ -49,6 +49,18 @@ Ports:
                app's sessions set a distinct PORT in each worktree's tmux
                environment, so each worktree's apps run on a port of their own.
 
+Artifacts:
+  The dev server serves the checkout's artifacts/ at /artifacts/
+  (artifacts/README.md). Run in the main checkout, where every worktree's
+  artifacts are kept, it also tells the desktop app where they are, for
+  each session's Open artifacts; run in a worktree, it doesn't.
+
+Tailscale:
+  When the tailscale CLI is installed and connected, the dev server also
+  answers to this machine's names on the tailnet, read at each start and
+  never stored, and the addresses a phone on the tailnet opens are
+  printed: the pages, and the worktree's artifacts (artifacts/README.md).
+
 Examples:
   bin/dev                               # the desktop app, its pages on 1420
   bin/dev desktop ios "iPhone 16"       # both apps, side by side
@@ -119,8 +131,54 @@ case "${PORT:-}" in
     ;;
 esac
 
+# This machine's names on the tailnet, short and full, comma separated, when
+# Tailscale is installed and connected; nothing otherwise.
+list_tailnet_host_names() {
+  command -v tailscale >/dev/null 2>&1 || return 0
+  { tailscale status --json 2>/dev/null || true; } | python3 -c '
+import json, sys
+try:
+    status = json.load(sys.stdin)
+except ValueError:
+    sys.exit()
+if status.get("BackendState") != "Running":
+    sys.exit()
+own = status.get("Self", {})
+names = [own.get("HostName", ""), own.get("DNSName", "").rstrip(".")]
+print(",".join(name for name in names if name))'
+}
+
+# Whether this runs in the repository's main checkout, not a linked worktree.
+is_main_checkout() {
+  [ "$(git -C "$ROOT" rev-parse --path-format=absolute --git-dir)" = \
+    "$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir)" ]
+}
+
+artifacts_environment=()
+if is_main_checkout; then
+  artifacts_environment=(
+    "CODE_REVIEWER_ARTIFACTS_DIRECTORY=$ROOT/artifacts"
+    "CODE_REVIEWER_ARTIFACTS_PORT=$vite_port"
+  )
+fi
+
+tailnet_host_names=$(list_tailnet_host_names)
+tailnet_host=${tailnet_host_names%%,*}
+
+print_addresses() {
+  echo "Vite dev   http://localhost:$vite_port"
+  echo "Artifacts  http://localhost:$vite_port/artifacts/"
+  if [ -n "$tailnet_host" ]; then
+    echo "Tailnet    http://$tailnet_host:$vite_port"
+    echo "           http://$tailnet_host:$vite_port/artifacts/"
+  fi
+  if ! is_main_checkout; then
+    echo "           (a worktree: its sessions' artifacts are served by bin/dev in the main checkout)"
+  fi
+}
+
 if [ "$only_print_ports" = true ]; then
-  echo "Vite dev  http://localhost:$vite_port"
+  print_addresses
   exit 0
 fi
 
@@ -192,9 +250,9 @@ stop_all() {
 trap stop_all EXIT INT TERM
 
 # The Vite dev server, listening on every address so a simulator or a
-# phone on the network reaches it too.
-echo "bin/dev: the pages on http://localhost:$vite_port"
-(cd "$ROOT/tauri" && exec pnpm dev --port "$vite_port" --strictPort --host) &
+# phone on the network or the tailnet reaches it too.
+print_addresses | sed 's/^/bin\/dev: /'
+(cd "$ROOT/tauri" && DEV_SERVER_ALLOWED_HOSTS="$tailnet_host_names" exec pnpm dev --port "$vite_port" --strictPort --host) &
 pids+=($!)
 
 # The Tauri CLI's config override: the pages from the dev server above, and
@@ -205,7 +263,7 @@ for target in "${targets[@]}"; do
   case "$target" in
     desktop)
       echo "bin/dev: the desktop app"
-      (cd "$ROOT/tauri" && exec cargo tauri dev --config "$tauri_config") &
+      (cd "$ROOT/tauri" && exec env ${artifacts_environment[@]+"${artifacts_environment[@]}"} cargo tauri dev --config "$tauri_config") &
       pids+=($!)
       ;;
     ios|android)

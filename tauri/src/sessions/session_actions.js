@@ -5,6 +5,7 @@
 import {
   closeSession,
   mergeSession,
+  openSessionArtifactsInBrowser,
   openSessionInBrowser,
   showSessionInTerminalApp,
 } from "../lib/backend.js";
@@ -47,6 +48,14 @@ export function createSessionActions({ refresh, onFinished }) {
         log(`${name}: Opened ${await openSessionInBrowser(name)}`);
       } catch (error) {
         log(`Opening ${name} in the browser failed: ${error}`);
+      }
+    },
+
+    async openArtifactsInBrowser(name) {
+      try {
+        log(`${name}: Opened ${await openSessionArtifactsInBrowser(name)}`);
+      } catch (error) {
+        log(`Opening the artifacts of ${name} failed: ${error}`);
       }
     },
 

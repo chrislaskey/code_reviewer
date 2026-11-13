@@ -19,6 +19,8 @@ AI Agents MUST run these commands to test, lint, and verify code before declarin
 * **Frontend:** `cd tauri && pnpm check && pnpm build`
 * **All of them:** `bin/check`
 
+**Artifacts:** Save screenshots, page previews and other files made for the user to look at in the folder `bin/artifacts` prints: `<main checkout>/artifacts/<project>/<worktree>/`, kept outside the worktree so the app run from the main checkout sees them (see `artifacts/README.md`). Git ignores them, and `bin/dev` in the main checkout serves them at `/artifacts/<project>/<worktree>/<file>` (its port is 1420 unless PORT is set; the user can also reach it from a phone over Tailscale). Give the user the file's URL.
+
 ## 3. Strict Architectural Rules
 * **Naming** Always use concrete naming instead of jargon. Better to have an explicit name that tells what happens when it is called instead of a shorter name with jargon and ambiguity. Prefer concrete terms like list/get/create/update/upsert/delete on Backend and index/show/new/edit/delete for UI/UX.
 * **Scope** Better to build through many small, well-defined iterative steps than try to build everything at once. Do not add product features or functionality that hasn't been discussed and planned first - instead write suggestions for additional functionality in `docs/suggestions/*.md` files.

@@ -32,6 +32,7 @@ use tokio::process::Command;
 
 use crate::agent::{AgentKind, AgentSession};
 use crate::agent_chat::ChatHistory;
+use crate::artifacts::{ArtifactsFolder, ArtifactsServer};
 use crate::claude_code::{self, ClaudeCodeSession};
 use crate::claude_code_chat;
 use crate::cursor_agent;
@@ -578,12 +579,17 @@ pub async fn continue_session(settings: &Settings, name: &str) -> Result<ShowOut
 /// worktree, deleting the branch and closing its tmux session, like
 /// `bin/worktree merge`. `name` is the worktree's name, prefix included.
 /// Returns what was done, for the log.
-pub async fn merge_session(settings: &Settings, name: &str) -> Result<String, String> {
+pub async fn merge_session(
+    settings: &Settings,
+    artifacts: Option<&ArtifactsServer>,
+    name: &str,
+) -> Result<String, String> {
     let worktree = find_worktree(settings, name).await?;
     git_worktree::merge_worktree(&worktree, &settings.main_branch).await?;
     let session_closed = close_tmux_session_if_running(settings, name).await?;
+    let artifacts_deleted = delete_worktree_artifacts(artifacts, &worktree).await;
     Ok(format!(
-        "Merged {name} into {}, removed the worktree and deleted the branch{session_closed}",
+        "Merged {name} into {}, removed the worktree and deleted the branch{session_closed}{artifacts_deleted}",
         settings.main_branch
     ))
 }
@@ -591,13 +597,40 @@ pub async fn merge_session(settings: &Settings, name: &str) -> Result<String, St
 /// Finishes a session by removing its worktree, keeping the branch, and
 /// closing its tmux session, like `bin/worktree close`. `name` is the
 /// worktree's name, prefix included. Returns what was done, for the log.
-pub async fn close_session(settings: &Settings, name: &str) -> Result<String, String> {
+pub async fn close_session(
+    settings: &Settings,
+    artifacts: Option<&ArtifactsServer>,
+    name: &str,
+) -> Result<String, String> {
     let worktree = find_worktree(settings, name).await?;
     git_worktree::close_worktree(&worktree, &settings.main_branch).await?;
     let session_closed = close_tmux_session_if_running(settings, name).await?;
+    let artifacts_deleted = delete_worktree_artifacts(artifacts, &worktree).await;
     Ok(format!(
-        "Removed the worktree of {name}, keeping its branch{session_closed}"
+        "Removed the worktree of {name}, keeping its branch{session_closed}{artifacts_deleted}"
     ))
+}
+
+/// Deletes the artifacts of a worktree that is gone. Returns a phrase for
+/// the log: the worktree is gone either way, so a failure is only reported.
+async fn delete_worktree_artifacts(
+    artifacts: Option<&ArtifactsServer>,
+    worktree: &Worktree,
+) -> String {
+    let Some(artifacts) = artifacts else {
+        return String::new();
+    };
+    let deleted = match ArtifactsFolder::new(Path::new(&worktree.repository), &worktree.name) {
+        Ok(folder) => artifacts.delete_folder(&folder).await,
+        Err(error) => Err(error),
+    };
+    match deleted {
+        Ok(()) => ", and deleted its artifacts".to_string(),
+        Err(error) => {
+            log::warn!("{error}");
+            format!(", but kept its artifacts: {error}")
+        }
+    }
 }
 
 /// One of the app's worktrees, by name.
@@ -679,9 +712,9 @@ pub async fn show_session_in_terminal_app(
     .await
 }
 
-/// Opens `http://localhost:<PORT>` of one of the app's sessions in the
-/// browser. Returns the URL.
-pub async fn open_session_in_browser(settings: &Settings, name: &str) -> Result<String, String> {
+/// The `http://localhost:<PORT>` of one of the app's sessions, to open in
+/// a browser.
+pub async fn get_session_browser_url(settings: &Settings, name: &str) -> Result<String, String> {
     validate_app_session_name(settings, name)?;
     let tmux = Tmux::new(&settings.tmux_path);
     let port: u16 = tmux
@@ -689,20 +722,25 @@ pub async fn open_session_in_browser(settings: &Settings, name: &str) -> Result<
         .await?
         .and_then(|value| value.parse().ok())
         .ok_or_else(|| format!("{name} has no {PORT_VARIABLE} to open"))?;
+    Ok(localhost_url(port))
+}
 
-    let url = localhost_url(port);
-    let output = Command::new("open")
-        .arg(&url)
-        .output()
-        .await
-        .map_err(|error| format!("Could not run open: {error}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "Opening {url} failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    Ok(url)
+/// The URL on this computer of the artifacts of the checkout one of the
+/// app's sessions is in, to open in a browser.
+pub async fn get_session_artifacts_url(
+    settings: &Settings,
+    artifacts: Option<&ArtifactsServer>,
+    name: &str,
+) -> Result<String, String> {
+    let artifacts = artifacts.ok_or_else(|| {
+        "Artifacts are served by bin/dev in the main checkout; it didn't start this app".to_string()
+    })?;
+    let directory = get_session(settings, name)
+        .await?
+        .directory
+        .ok_or_else(|| format!("{name} has no directory to find artifacts for"))?;
+    let folder = ArtifactsFolder::of_directory(Path::new(&directory)).await?;
+    Ok(artifacts.localhost_url(&folder))
 }
 
 fn localhost_url(port: u16) -> String {
@@ -912,7 +950,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn opens_only_the_apps_sessions_in_the_browser() {
+    async fn gives_browser_urls_only_for_the_apps_sessions() {
         let settings = Settings {
             shell: "/bin/zsh".into(),
             terminal_app: TerminalApp::Terminal,
@@ -921,7 +959,7 @@ mod tests {
             watched_directories: vec![],
             main_branch: "main".into(),
         };
-        let refused = open_session_in_browser(&settings, "other-session").await;
+        let refused = get_session_browser_url(&settings, "other-session").await;
         assert_eq!(
             refused,
             Err("other-session is not a session this app started".into())

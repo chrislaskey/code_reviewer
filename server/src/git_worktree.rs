@@ -49,6 +49,43 @@ pub async fn find_repository_root(directory: &Path) -> Result<PathBuf, String> {
     }
 }
 
+/// The checkout `directory` is in and its repository's main checkout, the
+/// same directory when `directory` isn't in a linked worktree.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Checkout {
+    pub path: PathBuf,
+    pub main_checkout: PathBuf,
+}
+
+/// The checkout `directory` is in, and its repository's main checkout.
+pub async fn find_checkout(directory: &Path) -> Result<Checkout, String> {
+    let output = run_git(
+        directory,
+        &[
+            "rev-parse",
+            "--path-format=absolute",
+            "--show-toplevel",
+            "--git-common-dir",
+        ],
+    )
+    .await?
+    .map_err(|_| format!("{} is not in a git repository", directory.display()))?;
+    let mut lines = output.lines();
+    let (Some(path), Some(common_directory)) = (lines.next(), lines.next()) else {
+        return Err(format!(
+            "git didn't say which checkout {} is in",
+            directory.display()
+        ));
+    };
+    let main_checkout = Path::new(common_directory)
+        .parent()
+        .ok_or_else(|| format!("{common_directory} has no main checkout"))?;
+    Ok(Checkout {
+        path: PathBuf::from(path),
+        main_checkout: main_checkout.to_path_buf(),
+    })
+}
+
 /// Where `add_worktree` puts the worktree named `name` of the repository at
 /// `root`.
 pub fn worktree_path(root: &Path, name: &str) -> PathBuf {

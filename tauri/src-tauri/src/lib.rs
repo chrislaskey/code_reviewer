@@ -38,6 +38,7 @@ pub fn run() {
     .init();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let connection = connect_to_backend(app)?;
             app.manage(connection);
@@ -62,6 +63,7 @@ pub fn run() {
             sessions::close_session,
             sessions::show_session_in_terminal_app,
             sessions::open_session_in_browser,
+            sessions::open_session_artifacts_in_browser,
             remote_access::get_app_platform,
             remote_access::get_remote_access_status,
             remote_access::set_remote_access_enabled,

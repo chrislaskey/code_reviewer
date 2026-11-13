@@ -32,6 +32,8 @@ Both commands:
   - refuse when the worktree has uncommitted changes, which would be lost.
     Ignored files in the worktree, such as _build and deps, are deleted
     with it.
+  - delete the worktree's artifacts, in the main checkout's
+    artifacts/<project>/<worktree>/ (artifacts/README.md).
   - close the tmux session they run in when that session was started in
     the worktree. Any other session stays open, whatever its name. Outside tmux
     there is nothing to close.
@@ -82,6 +84,17 @@ remove_worktree() {
   git worktree remove "$worktree"
 }
 
+# The worktree's artifacts are in the main checkout, ignored by git, so they
+# outlive the worktree unless deleted with it (artifacts/README.md).
+delete_artifacts() {
+  local artifacts
+  artifacts="$main_checkout/artifacts/$(basename "$main_checkout")/$(basename "$worktree")"
+  [[ -d "$artifacts" ]] || return 0
+
+  echo "Deleting the artifacts in $artifacts"
+  rm -rf -- "$artifacts"
+}
+
 # Sets session to the tmux session this runs in when it was started in the
 # worktree or a folder inside it, whatever made it, and to nothing otherwise.
 # Read before the worktree is removed, while its folder can still be resolved.
@@ -126,6 +139,7 @@ merge() {
     fail "merging $branch into $main_branch failed, see git's message above"
 
   remove_worktree
+  delete_artifacts
 
   echo "Deleting the branch $branch"
   git branch -d "$branch"
@@ -136,6 +150,7 @@ merge() {
 close() {
   read_worktree
   remove_worktree
+  delete_artifacts
   echo "Keeping the branch $branch, \`git switch $branch\` in $main_checkout to carry on"
   close_tmux_session
 }

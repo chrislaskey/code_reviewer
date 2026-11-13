@@ -109,9 +109,14 @@ export function showSessionInTerminalApp(name) {
   return invoke("show_session_in_terminal_app", { name });
 }
 
-/** Opens a session's `http://localhost:<port>` in the browser. Returns the URL. */
+/** Opens a session's `http://localhost:<port>` in this device's browser, at the computer's tailnet name on a phone. Returns the URL. */
 export function openSessionInBrowser(name) {
   return invoke("open_session_in_browser", { name });
+}
+
+/** Opens the artifacts of a session's checkout in this device's browser, as openSessionInBrowser does. Returns the URL. */
+export function openSessionArtifactsInBrowser(name) {
+  return invoke("open_session_artifacts_in_browser", { name });
 }
 
 /* -- Remote access ------------------------------------------------------------- */

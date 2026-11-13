@@ -1,0 +1,194 @@
+<!doctype html>
+<!-- The index of the artifacts (README.md) below the folder at the page's
+     address, from /artifacts/files.json: a section per project, then per
+     worktree, each worktree's files newest first; images show inline. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Artifacts</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fafafa;
+        --card: #fff;
+        --fg: #1f2328;
+        --muted: #656d76;
+        --ring: rgb(0 0 0 / 0.08);
+        font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #16181c;
+          --card: #1f2227;
+          --fg: #e6e8eb;
+          --muted: #9198a1;
+          --ring: rgb(255 255 255 / 0.08);
+        }
+      }
+
+      body {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 1.5rem 16px 3rem;
+        background: var(--bg);
+        color: var(--fg);
+      }
+
+      h1 {
+        margin: 0 0 1rem;
+        font-size: 1.5rem;
+        overflow-wrap: anywhere;
+      }
+
+      h1 a {
+        color: inherit;
+      }
+
+      h2 {
+        margin: 2rem 0 0.25rem;
+        font-size: 1.2rem;
+      }
+
+      h3 {
+        margin: 1rem 0 0.5rem;
+        color: var(--muted);
+        font-size: 1rem;
+      }
+
+      h2 a,
+      h3 a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .artifacts {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+        gap: 12px;
+        padding: 0;
+        list-style: none;
+      }
+
+      .artifact a {
+        display: block;
+        overflow: hidden;
+        border-radius: 12px;
+        background: var(--card);
+        box-shadow: 0 0 0 1px var(--ring);
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .artifact img {
+        display: block;
+        width: 100%;
+        max-height: 320px;
+        object-fit: contain;
+        background: var(--bg);
+      }
+
+      .details {
+        padding: 0.6rem 0.75rem;
+      }
+
+      .path {
+        font-weight: 600;
+        overflow-wrap: anywhere;
+      }
+
+      .meta,
+      .empty {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 id="title">Artifacts</h1>
+    <main id="sections"></main>
+    <p class="empty" id="empty" hidden>No artifacts here yet.</p>
+    <script type="module">
+      const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg)$/i;
+
+      // The folder at the page's address, like ["code_reviewer", "cr-x"], or [] for all.
+      const folder = decodeURIComponent(location.pathname)
+        .replace(/^\/artifacts\/?/, "")
+        .split("/")
+        .filter(Boolean);
+
+      function artifactsUrl(segments) {
+        return "/artifacts/" + segments.map(encodeURIComponent).join("/");
+      }
+
+      function element(tag, properties = {}, children = []) {
+        const node = Object.assign(document.createElement(tag), properties);
+        node.append(...children);
+        return node;
+      }
+
+      function showTitle() {
+        const title = document.getElementById("title");
+        if (folder.length === 0) return;
+        title.replaceChildren(element("a", { href: "/artifacts/", textContent: "Artifacts" }));
+        folder.forEach((segment, index) => {
+          title.append(" / ");
+          const last = index === folder.length - 1;
+          title.append(last ? segment : element("a", { href: artifactsUrl(folder.slice(0, index + 1)) + "/", textContent: segment }));
+        });
+        document.title = `${folder.join(" / ")} · Artifacts`;
+      }
+
+      function artifactCard(artifact, name) {
+        const href = artifactsUrl(artifact.path.split("/"));
+        const link = element("a", { href });
+        if (IMAGE_EXTENSIONS.test(artifact.path)) {
+          link.append(element("img", { src: href, alt: name, loading: "lazy" }));
+        }
+        const meta = `${new Date(artifact.modified).toLocaleString()} · ${(artifact.size / 1024).toFixed(1)} KB`;
+        link.append(
+          element("div", { className: "details" }, [
+            element("div", { className: "path", textContent: name }),
+            element("div", { className: "meta", textContent: meta }),
+          ]),
+        );
+        return element("li", { className: "artifact" }, [link]);
+      }
+
+      // { project: { worktree: [artifact, ...] } }, in the order of each one's newest file.
+      function groupByProjectAndWorktree(artifacts) {
+        const projects = new Map();
+        for (const artifact of artifacts) {
+          const [project, worktree = "", ...rest] = artifact.path.split("/");
+          if (rest.length === 0) continue;
+          if (!projects.has(project)) projects.set(project, new Map());
+          const worktrees = projects.get(project);
+          if (!worktrees.has(worktree)) worktrees.set(worktree, []);
+          worktrees.get(worktree).push({ artifact, name: rest.join("/") });
+        }
+        return projects;
+      }
+
+      showTitle();
+      const response = await fetch("/artifacts/files.json");
+      const prefix = folder.length > 0 ? folder.join("/") + "/" : "";
+      const artifacts = (await response.json()).filter((artifact) => artifact.path.startsWith(prefix));
+      const projects = groupByProjectAndWorktree(artifacts);
+      document.getElementById("empty").hidden = projects.size > 0;
+
+      const sections = document.getElementById("sections");
+      for (const [project, worktrees] of projects) {
+        if (folder.length === 0) {
+          sections.append(element("h2", {}, [element("a", { href: artifactsUrl([project]) + "/", textContent: project })]));
+        }
+        for (const [worktree, files] of worktrees) {
+          if (folder.length < 2) {
+            sections.append(element("h3", {}, [element("a", { href: artifactsUrl([project, worktree]) + "/", textContent: worktree })]));
+          }
+          sections.append(element("ul", { className: "artifacts" }, files.map(({ artifact, name }) => artifactCard(artifact, name))));
+        }
+      }
+    </script>
+  </body>
+</html>

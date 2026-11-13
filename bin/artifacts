@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#
+# Prints the folder for the current checkout's artifacts, creating it:
+# <main checkout>/artifacts/<project>/<worktree>, or .../main in the main
+# checkout itself. See artifacts/README.md.
+
+set -euo pipefail
+
+case "${1:-}" in
+  help|-h|--help)
+    cat <<USAGE
+Prints the folder for the current checkout's artifacts, creating it:
+<main checkout>/artifacts/<project>/<worktree>, with <worktree> \`main\` in
+the main checkout itself. Save screenshots, previews and other files to
+show the user there; bin/dev in the main checkout serves them at
+/artifacts/<project>/<worktree>/.
+
+Usage: $0
+USAGE
+    exit 0
+    ;;
+  '') ;;
+  *) echo "$0: takes no arguments; run \`$0 --help\`" >&2; exit 1 ;;
+esac
+
+checkout=$(cd "$(git rev-parse --show-toplevel)" && pwd -P)
+main_checkout=$(cd "$(git rev-parse --path-format=absolute --git-common-dir)/.." && pwd -P)
+
+if [[ "$checkout" == "$main_checkout" ]]; then
+  worktree=main
+else
+  worktree=$(basename "$checkout")
+fi
+
+folder="$main_checkout/artifacts/$(basename "$main_checkout")/$worktree"
+mkdir -p "$folder"
+echo "$folder"

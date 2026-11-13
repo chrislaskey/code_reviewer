@@ -16,6 +16,7 @@ use tokio::sync::OnceCell;
 
 use crate::agent_chat::ChatHistory;
 use crate::analysis::run_analysis;
+use crate::artifacts::ArtifactsServer;
 use crate::sessions::{self, DetectedSettings, SessionList, SessionStatus, Settings};
 use crate::terminal_app::ShowOutcome;
 
@@ -25,6 +26,8 @@ pub struct Backend {
     analysis: Arc<AnalysisService>,
     /// The shell, terminal app and tmux, detected on first use.
     session_settings: OnceCell<DetectedSettings>,
+    /// Where bin/dev keeps and serves artifacts; `None` when it didn't start the app.
+    artifacts: Option<ArtifactsServer>,
 }
 
 impl Default for Backend {
@@ -34,11 +37,13 @@ impl Default for Backend {
 }
 
 impl Backend {
-    /// A backend with an empty analysis cache and session settings not yet detected.
+    /// A backend with an empty analysis cache, session settings not yet
+    /// detected, and the artifacts bin/dev set up, if it started the app.
     pub fn new() -> Self {
         Self {
             analysis: Arc::new(AnalysisService::new()),
             session_settings: OnceCell::new(),
+            artifacts: ArtifactsServer::from_environment(),
         }
     }
 
@@ -179,14 +184,14 @@ impl Backend {
     /// removes its worktree, deletes the branch and closes its tmux session.
     /// `name` is the worktree's name, prefix included. Returns what was done.
     pub async fn merge_session(&self, name: &str) -> Result<String, String> {
-        sessions::merge_session(self.settings().await, name).await
+        sessions::merge_session(self.settings().await, self.artifacts.as_ref(), name).await
     }
 
     /// Removes a session's worktree, keeping its branch, and closes its tmux
     /// session. `name` is the worktree's name, prefix included. Returns what
     /// was done.
     pub async fn close_session(&self, name: &str) -> Result<String, String> {
-        sessions::close_session(self.settings().await, name).await
+        sessions::close_session(self.settings().await, self.artifacts.as_ref(), name).await
     }
 
     /// Brings the terminal window of one of the app's sessions to the front,
@@ -195,8 +200,15 @@ impl Backend {
         sessions::show_session_in_terminal_app(self.settings().await, name).await
     }
 
-    /// Opens a session's `http://localhost:<port>` in the browser. Returns the URL.
-    pub async fn open_session_in_browser(&self, name: &str) -> Result<String, String> {
-        sessions::open_session_in_browser(self.settings().await, name).await
+    /// A session's `http://localhost:<port>`, to open in a browser.
+    pub async fn get_session_browser_url(&self, name: &str) -> Result<String, String> {
+        sessions::get_session_browser_url(self.settings().await, name).await
+    }
+
+    /// The URL on this computer of the artifacts of a session's checkout,
+    /// to open in a browser. An error when bin/dev didn't start the app.
+    pub async fn get_session_artifacts_url(&self, name: &str) -> Result<String, String> {
+        sessions::get_session_artifacts_url(self.settings().await, self.artifacts.as_ref(), name)
+            .await
     }
 }

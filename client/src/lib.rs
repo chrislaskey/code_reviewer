@@ -246,9 +246,16 @@ impl BackendClient {
             .await
     }
 
-    /// Opens a session's `http://localhost:<port>` in the browser. Returns the URL.
-    pub async fn open_session_in_browser(&self, name: &str) -> Result<String, ClientError> {
-        self.post_session_name("open_session_in_browser", name)
+    /// A session's `http://localhost:<port>`, to open in a browser.
+    pub async fn get_session_browser_url(&self, name: &str) -> Result<String, ClientError> {
+        self.post_session_name("get_session_browser_url", name)
+            .await
+    }
+
+    /// The URL on the server's computer of the artifacts of a session's
+    /// checkout, to open in a browser.
+    pub async fn get_session_artifacts_url(&self, name: &str) -> Result<String, ClientError> {
+        self.post_session_name("get_session_artifacts_url", name)
             .await
     }
 
