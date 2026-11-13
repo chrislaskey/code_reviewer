@@ -68,6 +68,9 @@ remove_team_from_xcode_project() {
 }
 trap remove_team_from_xcode_project EXIT
 
+echo "=== Installing the node packages ==="
+(cd "$ROOT/tauri" && pnpm install --frozen-lockfile)
+
 echo "=== Building the iOS app ==="
 (cd "$ROOT/tauri" && cargo tauri ios build --debug)
 

@@ -182,7 +182,8 @@ if [ "$only_print_ports" = true ]; then
   exit 0
 fi
 
-# The tools in .tool-versions, the Tauri CLI and the node packages, when missing.
+# The tools in .tool-versions and the Tauri CLI, when missing, and the node
+# packages.
 if command -v asdf >/dev/null 2>&1; then
   while read -r tool versions; do
     case "$tool" in ''|'#'*) continue ;; esac
@@ -202,9 +203,9 @@ if ! cargo tauri --version >/dev/null 2>&1; then
   cargo install tauri-cli --version '^2' --locked
 fi
 
-if [ ! -d "$ROOT/tauri/node_modules" ]; then
-  (cd "$ROOT/tauri" && pnpm install)
-fi
+# Every start, so node_modules follows the lockfile after a merge or a pull;
+# a second or so when nothing changed.
+(cd "$ROOT/tauri" && pnpm install --frozen-lockfile)
 
 # The Tauri CLI opens the Simulator app on the device and installs the
 # app at once, without waiting for the device to boot, so a run from a
