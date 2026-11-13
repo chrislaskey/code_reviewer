@@ -20,6 +20,14 @@ fn main() {
         "close_session",
         "show_session_in_terminal_app",
         "open_session_in_browser",
+        "get_app_platform",
+        "get_remote_access_status",
+        "set_remote_access_enabled",
+        "create_paired_device",
+        "revoke_paired_device",
+        "get_pairing_status",
+        "pair_with_computer",
+        "unpair_from_computer",
     ]);
 
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(manifest))

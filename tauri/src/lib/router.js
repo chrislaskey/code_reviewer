@@ -7,6 +7,7 @@ import { createRouter } from "sv-router";
 import RemountPageOnNavigation from "./components/RemountPageOnNavigation.svelte";
 import {
   HOME_PATH,
+  REMOTE_ACCESS_PATH,
   REVIEW_NEW_PATH,
   REVIEW_SHOW_PATH,
   SESSION_NEW_PATH,
@@ -26,6 +27,7 @@ const { navigate } = createRouter({
   [REVIEW_SHOW_PATH]: () => import("../reviews/ReviewShowPage.svelte"),
   [TRACE_NEW_PATH]: () => import("../traces/TraceNewPage.svelte"),
   [TRACE_SHOW_PATH]: () => import("../traces/TraceShowPage.svelte"),
+  [REMOTE_ACCESS_PATH]: () => import("../remote_access/RemoteAccessPage.svelte"),
 });
 
 // The router types its paths; ours come from routes.js, so any path goes.

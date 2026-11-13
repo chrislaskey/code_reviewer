@@ -2,10 +2,10 @@
 //! Code or Cursor's `agent` runs in a tmux pane and whether a Claude Code
 //! session's process is still alive.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Process {
     pub pid: u32,
     pub parent_pid: u32,
@@ -28,7 +28,7 @@ pub struct Process {
 }
 
 /// The first letter of the `ps` state code.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ProcessState {
     Running,

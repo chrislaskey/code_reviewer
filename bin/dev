@@ -1,23 +1,130 @@
-#!/bin/bash
-# Starts the desktop app in dev mode: Vite, then the Tauri window loading it.
+#!/usr/bin/env bash
 #
-# Vite listens on $PORT when set, else on 1420, and Tauri is pointed at it. The
-# app's sessions set PORT in each worktree's tmux session (see
-# tauri/src-tauri/src/sessions.rs), so every worktree's app runs on a port of
-# its own. A repository with several servers would spread them from PORT, say
-# PORT for the first and PORT + 1000 for the next, which keeps consecutive
-# session ports apart.
-set -e
+# Starts one or more of the apps in dev mode against one Vite dev server,
+# on a port taken from PORT so several worktrees can run at the same time.
+#
+# Run `bin/dev --help` for the targets.
+
+set -eo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT/tauri"
 
-PORT="${PORT:-1420}"
-case "$PORT" in
-  ''|*[!0-9]*) echo "bin/dev: PORT must be a number, got '$PORT'" >&2; exit 1 ;;
+help() {
+  cat <<USAGE
+Starts one or more of the apps in dev mode against one Vite dev server,
+on a port taken from PORT so several worktrees can run at the same time.
+
+Usage: $0 [TARGET...] [ARGS...]
+
+Targets, any number of them, \`desktop\` when none:
+  desktop   The desktop app (\`cargo tauri dev\`), which starts the backend
+            server on localhost (decision 25).
+  ios       The iOS app in a simulator (\`cargo tauri ios dev\`), after
+            \`cargo tauri ios init\` the first time. Needs Xcode. It starts no
+            server: pair it with a desktop app on its Remote page.
+  android   The Android app in an emulator (\`cargo tauri android dev\`),
+            after \`cargo tauri android init\` the first time. Needs Android
+            Studio. Not tried yet.
+  ports     Print the port the targets would use, without starting anything.
+  help      Show this help. Also -h and --help.
+
+There is no \`web\` target: the backend runs inside the desktop app and the
+pages don't run in a plain browser (decision 25).
+
+ARGS, whatever follows the targets, go to the mobile app's dev command:
+\`bin/dev ios "iPhone 16"\` picks that simulator, booted first so the
+install does not race its start. Closing any target, or Ctrl-C, stops
+every target and the dev server.
+
+The Vite dev server is started once, here, and every target loads its
+pages from it, so the desktop and the iOS app can run side by side on one
+server. A Tauri target then builds with an empty \`beforeDevCommand\`, which
+the Tauri CLI skips. Two Tauri targets compile in turn: Cargo locks the
+workspace's target/ while it builds, so the second waits for the first.
+
+Ports:
+  PORT unset   The Vite dev server on 1420. When another program holds it,
+               a warning, then 2420; an error when that is taken too.
+  PORT set     The Vite dev server on PORT; an error when it is taken. The
+               app's sessions set a distinct PORT in each worktree's tmux
+               environment, so each worktree's apps run on a port of their own.
+
+Examples:
+  bin/dev                               # the desktop app, its pages on 1420
+  bin/dev desktop ios "iPhone 16"       # both apps, side by side
+  PORT=4003 bin/dev desktop             # the desktop app, its pages on 4003
+USAGE
+}
+
+fail() {
+  echo "$0: $*" >&2
+  exit 1
+}
+
+DEFAULT_VITE_PORT=1420
+FALLBACK_VITE_PORT=2420
+
+# The targets are the leading arguments; the rest go to the mobile dev command.
+targets=()
+only_print_ports=false
+while [ $# -gt 0 ]; do
+  case "$1" in
+    desktop|ios|android) targets+=("$1"); shift ;;
+    ports) only_print_ports=true; shift ;;
+    web) fail "there is no web target: the backend runs inside the desktop app (decision 25); run \`$0 --help\`" ;;
+    help|-h|--help) help; exit 0 ;;
+    -*) fail "unknown option '$1'; run \`$0 --help\`" ;;
+    *) break ;;
+  esac
+done
+if [ ${#targets[@]} -eq 0 ]; then
+  if [ $# -gt 0 ]; then
+    fail "unknown target '$1'; run \`$0 --help\`"
+  fi
+  targets=(desktop)
+fi
+
+# The programs listening on a port, by name, or nothing when it is free.
+# lsof exits 1 when nothing listens, which pipefail would turn into a failure.
+list_port_listeners() {
+  { lsof -nP -iTCP:"$1" -sTCP:LISTEN -Fc 2>/dev/null || true; } | sed -n 's/^c//p' | sort -u | tr '\n' ' '
+}
+
+case "${PORT:-}" in
+  '')
+    vite_port=$DEFAULT_VITE_PORT
+    listeners=$(list_port_listeners "$vite_port")
+    if [ -n "$listeners" ]; then
+      echo "bin/dev: warning: port $vite_port is held by ${listeners% }" >&2
+      vite_port=$FALLBACK_VITE_PORT
+      echo "bin/dev: trying $vite_port; set PORT to pick, like \`PORT=4020 $0 ...\`" >&2
+      listeners=$(list_port_listeners "$vite_port")
+      if [ -n "$listeners" ]; then
+        fail "port $vite_port is held too, by ${listeners% }; set PORT to a free one, like \`PORT=4020 $0 ...\`"
+      fi
+    fi
+    ;;
+  *[!0-9]*)
+    fail "PORT must be a number, got '$PORT'"
+    ;;
+  *)
+    vite_port="$PORT"
+    if [ "$vite_port" -lt 1024 ] || [ "$vite_port" -gt 65535 ]; then
+      fail "PORT must be between 1024 and 65535, got '$vite_port'"
+    fi
+    listeners=$(list_port_listeners "$vite_port")
+    if [ -n "$listeners" ]; then
+      fail "port $vite_port from PORT is held by ${listeners% }; set PORT to a free one"
+    fi
+    ;;
 esac
-export PORT
 
+if [ "$only_print_ports" = true ]; then
+  echo "Vite dev  http://localhost:$vite_port"
+  exit 0
+fi
+
+# The tools in .tool-versions, the Tauri CLI and the node packages, when missing.
 if command -v asdf >/dev/null 2>&1; then
   while read -r tool versions; do
     case "$tool" in ''|'#'*) continue ;; esac
@@ -30,16 +137,100 @@ if command -v asdf >/dev/null 2>&1; then
   done < "$ROOT/.tool-versions"
 fi
 
-if ! command -v cargo >/dev/null 2>&1; then
-  echo "bin/dev: cargo not found; install Rust (https://rustup.rs) or asdf" >&2
-  exit 1
-fi
+command -v cargo >/dev/null 2>&1 || fail "cargo not found; install Rust (https://rustup.rs) or asdf"
 
 if ! cargo tauri --version >/dev/null 2>&1; then
-  echo "bin/dev: Installing tauri-cli..."
+  echo "bin/dev: installing tauri-cli..."
   cargo install tauri-cli --version '^2' --locked
 fi
 
-pnpm install
-echo "bin/dev: Vite and the Tauri window on http://localhost:$PORT"
-cargo tauri dev --config "{\"build\":{\"devUrl\":\"http://localhost:$PORT\"}}" "$@"
+if [ ! -d "$ROOT/tauri/node_modules" ]; then
+  (cd "$ROOT/tauri" && pnpm install)
+fi
+
+# The Tauri CLI opens the Simulator app on the device and installs the
+# app at once, without waiting for the device to boot, so a run from a
+# simulator that was shut down fails at the install with "Unable to
+# lookup in current state: Shutdown". Booting the named simulator first,
+# and waiting for it, is what makes `bin/dev ios "iPhone 16"` work cold;
+# with no name the CLI picks or prompts, and nothing is booted here. Of
+# several simulators with the name, the one on the newest iOS.
+boot_simulator() {
+  local name="$1" udid
+  [ -n "$name" ] || return 0
+  udid=$(xcrun simctl list devices available -j 2>/dev/null | python3 -c '
+import json, sys
+name = sys.argv[1]
+found = []
+for runtime, devices in json.load(sys.stdin)["devices"].items():
+    for device in devices:
+        if device["name"] == name:
+            found.append((runtime, device["udid"]))
+print(sorted(found)[-1][1] if found else "")' "$name")
+  if [ -z "$udid" ]; then
+    echo "bin/dev: no simulator named '$name'; the Tauri CLI lists the ones there are" >&2
+    return 0
+  fi
+  echo "bin/dev: booting the simulator $name ($udid)"
+  xcrun simctl bootstatus "$udid" -b > /dev/null
+}
+
+pids=()
+# Stops every target and the dev server when one of them is closed, or this
+# script is interrupted, and waits for them, so a run started right after
+# finds the port free.
+stop_all() {
+  trap - EXIT INT TERM
+  for pid in ${pids[@]+"${pids[@]}"}; do
+    pkill -P "$pid" 2>/dev/null || true
+    kill "$pid" 2>/dev/null || true
+  done
+  for pid in ${pids[@]+"${pids[@]}"}; do
+    wait "$pid" 2>/dev/null || true
+  done
+}
+trap stop_all EXIT INT TERM
+
+# The Vite dev server, listening on every address so a simulator or a
+# phone on the network reaches it too.
+echo "bin/dev: the pages on http://localhost:$vite_port"
+(cd "$ROOT/tauri" && exec pnpm dev --port "$vite_port" --strictPort --host) &
+pids+=($!)
+
+# The Tauri CLI's config override: the pages from the dev server above, and
+# no dev server of the CLI's own.
+tauri_config="{\"build\":{\"devUrl\":\"http://localhost:$vite_port\",\"beforeDevCommand\":\"\"}}"
+
+for target in "${targets[@]}"; do
+  case "$target" in
+    desktop)
+      echo "bin/dev: the desktop app"
+      (cd "$ROOT/tauri" && exec cargo tauri dev --config "$tauri_config") &
+      pids+=($!)
+      ;;
+    ios|android)
+      echo "bin/dev: the $target app"
+      (
+        cd "$ROOT/tauri"
+        case "$target" in
+          ios)
+            [ -d src-tauri/gen/apple ] || cargo tauri ios init
+            boot_simulator "${1:-}"
+            ;;
+          android) [ -d src-tauri/gen/android ] || cargo tauri android init ;;
+        esac
+        exec cargo tauri "$target" dev --config "$tauri_config" ${1+"$@"}
+      ) &
+      pids+=($!)
+      ;;
+  esac
+done
+
+# Over when the first target or the dev server stops. The bash macOS ships,
+# 3.2, has no `wait -n`, so this looks in on them.
+while true; do
+  for pid in "${pids[@]}"; do
+    kill -0 "$pid" 2>/dev/null || exit 0
+  done
+  sleep 1
+done

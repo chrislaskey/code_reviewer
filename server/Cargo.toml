@@ -1,0 +1,27 @@
+[package]
+name = "code_reviewer_server"
+version = "0.1.0"
+description = "Code Reviewer's backend: reviews, traces and sessions, for the desktop and mobile apps"
+edition = "2024"
+
+[dependencies]
+axum = { version = "0.8", features = ["macros"] }
+code_reviewer_core = { path = "../core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "process", "fs", "net"] }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+log = "0.4"
+chrono = { version = "0.4.45", default-features = false, features = ["std", "clock"] }
+secrecy = "0.10.3"
+getrandom = "0.4.3"
+subtle = "2.6.1"
+thiserror = "2.0.21"
+tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12", "logging"] }
+rustls-pki-types = { version = "1.16.0", features = ["std"] }
+sha2 = "0.11.1"
+base64 = "0.23.1"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+tower = { version = "0.5", features = ["util"] }

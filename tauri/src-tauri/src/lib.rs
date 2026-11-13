@@ -14,63 +14,33 @@
 //!     finished by merging its branch or closing its worktree.
 //!
 //! The pages are in `../src`, one HTML entry per page. They call the
-//! commands below through `src/lib/backend.js` and nothing else.
+//! commands below through `src/lib/backend.js` and nothing else. Each
+//! command is one call over HTTP to the backend server the app is connected
+//! to (`connection.rs`, decision 25): on the desktop, the server it starts at
+//! launch on localhost; on a phone, the computer it was paired with.
 
-mod agent;
-mod agent_chat;
-mod analysis;
-mod claude_code;
-mod claude_code_chat;
-mod cursor_agent;
-mod cursor_agent_chat;
-mod git;
-mod git_worktree;
-mod process;
+mod connection;
+mod remote_access;
 mod review;
 mod sessions;
-mod terminal_app;
-mod tmux;
 mod trace;
 
-use std::sync::Arc;
+use tauri::{App, Manager};
 
-use code_reviewer_core::analysis::service::AnalysisService;
-use tauri::{Manager, State};
-use tokio::sync::OnceCell;
-
-use agent_chat::ChatHistory;
-use sessions::{DetectedSettings, SessionList, SessionStatus};
-use terminal_app::ShowOutcome;
-
-/// What the commands share, managed by Tauri.
-pub struct AppState {
-    /// Holds the project index cache, so one instance lives for the whole app.
-    pub(crate) analysis: Arc<AnalysisService>,
-    /// The shell, terminal app and tmux, detected on first use.
-    pub(crate) session_settings: OnceCell<DetectedSettings>,
-}
-
-impl AppState {
-    async fn session_settings(&self) -> &DetectedSettings {
-        self.session_settings
-            .get_or_init(sessions::detect_settings)
-            .await
-    }
-}
+use connection::BackendConnection;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("code_reviewer_lib=info"),
+        env_logger::Env::default()
+            .default_filter_or("code_reviewer_lib=info,code_reviewer_server=info"),
     )
     .init();
 
     tauri::Builder::default()
         .setup(|app| {
-            app.manage(AppState {
-                analysis: Arc::new(AnalysisService::new()),
-                session_settings: OnceCell::new(),
-            });
+            let connection = connect_to_backend(app)?;
+            app.manage(connection);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -80,136 +50,50 @@ pub fn run() {
             review::get_file_diffs,
             trace::list_tests,
             trace::get_test_call_stack,
-            get_session_settings,
-            get_default_session_port,
-            list_sessions,
-            get_session,
-            get_agent_chat_history,
-            send_prompt_to_session,
-            create_session,
-            continue_session,
-            merge_session,
-            close_session,
-            show_session_in_terminal_app,
-            open_session_in_browser,
+            sessions::get_session_settings,
+            sessions::get_default_session_port,
+            sessions::list_sessions,
+            sessions::get_session,
+            sessions::get_agent_chat_history,
+            sessions::send_prompt_to_session,
+            sessions::create_session,
+            sessions::continue_session,
+            sessions::merge_session,
+            sessions::close_session,
+            sessions::show_session_in_terminal_app,
+            sessions::open_session_in_browser,
+            remote_access::get_app_platform,
+            remote_access::get_remote_access_status,
+            remote_access::set_remote_access_enabled,
+            remote_access::create_paired_device,
+            remote_access::revoke_paired_device,
+            remote_access::get_pairing_status,
+            remote_access::pair_with_computer,
+            remote_access::unpair_from_computer,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
-/// The detected shell, terminal app and tmux, and where new sessions start.
-#[tauri::command]
-async fn get_session_settings(state: State<'_, AppState>) -> Result<DetectedSettings, String> {
-    Ok(state.session_settings().await.clone())
+/// On the desktop: starts the backend server on localhost and connects to
+/// it. The server is managed too, so it lives as long as the app.
+#[cfg(desktop)]
+fn connect_to_backend(app: &mut App) -> Result<BackendConnection, Box<dyn std::error::Error>> {
+    use code_reviewer_client::BackendClient;
+    use code_reviewer_server::ServerConfig;
+
+    let config = ServerConfig::new(app.path().app_data_dir()?);
+    let server = tauri::async_runtime::block_on(code_reviewer_server::start(config))?;
+    let client = BackendClient::new(server.localhost_url(), server.desktop_token().clone());
+    app.manage(server);
+    Ok(BackendConnection::to_local_server(client))
 }
 
-/// The port a new session gets unless the user picks one: the lowest free
-/// one among the app's running sessions.
-#[tauri::command]
-async fn get_default_session_port(state: State<'_, AppState>) -> Result<u16, String> {
-    let settings = state.session_settings().await;
-    sessions::get_default_session_port(&settings.settings).await
-}
-
-/// The tmux sessions the app started, each with its agent status, and
-/// its worktrees without a session.
-#[tauri::command]
-async fn list_sessions(state: State<'_, AppState>) -> Result<SessionList, String> {
-    let settings = state.session_settings().await;
-    sessions::list_sessions(&settings.settings).await
-}
-
-/// One of the app's tmux sessions, with its agent and git status. `name` is
-/// the full session name, prefix included.
-#[tauri::command]
-async fn get_session(state: State<'_, AppState>, name: String) -> Result<SessionStatus, String> {
-    let settings = state.session_settings().await;
-    sessions::get_session(&settings.settings, &name).await
-}
-
-/// The chat history of the agent in one of the app's sessions: its messages
-/// and tool calls, read from the transcript the agent writes.
-#[tauri::command]
-async fn get_agent_chat_history(
-    state: State<'_, AppState>,
-    name: String,
-) -> Result<ChatHistory, String> {
-    let settings = state.session_settings().await;
-    sessions::get_agent_chat_history(&settings.settings, &name).await
-}
-
-/// Types `prompt` into the agent's pane in one of the app's sessions and
-/// presses Enter, as if the user typed it there.
-#[tauri::command]
-async fn send_prompt_to_session(
-    state: State<'_, AppState>,
-    name: String,
-    prompt: String,
-) -> Result<(), String> {
-    let settings = state.session_settings().await;
-    sessions::send_prompt_to_session(&settings.settings, &name, &prompt).await
-}
-
-/// Creates a git worktree of `repository` on a branch named `name` and a
-/// tmux session named `<prefix>-<name>` in it with `PORT` set to `port`,
-/// types `command` into it and opens it in the terminal app. Returns the
-/// session's full name, prefix included.
-#[tauri::command]
-async fn create_session(
-    state: State<'_, AppState>,
-    name: String,
-    repository: String,
-    command: String,
-    port: u16,
-) -> Result<String, String> {
-    let settings = state.session_settings().await;
-    sessions::create_session(&settings.settings, &name, &repository, &command, port).await
-}
-
-/// Starts a tmux session again in one of the app's worktrees, named after
-/// it, and opens it in the terminal app. `name` is the worktree's name,
-/// prefix included.
-#[tauri::command]
-async fn continue_session(state: State<'_, AppState>, name: String) -> Result<ShowOutcome, String> {
-    let settings = state.session_settings().await;
-    sessions::continue_session(&settings.settings, &name).await
-}
-
-/// Merges a session's branch into the main branch (fast-forward only),
-/// removes its worktree, deletes the branch and closes its tmux session.
-/// `name` is the worktree's name, prefix included. Returns what was done.
-#[tauri::command]
-async fn merge_session(state: State<'_, AppState>, name: String) -> Result<String, String> {
-    let settings = state.session_settings().await;
-    sessions::merge_session(&settings.settings, &name).await
-}
-
-/// Removes a session's worktree, keeping its branch, and closes its tmux
-/// session. `name` is the worktree's name, prefix included. Returns what was
-/// done.
-#[tauri::command]
-async fn close_session(state: State<'_, AppState>, name: String) -> Result<String, String> {
-    let settings = state.session_settings().await;
-    sessions::close_session(&settings.settings, &name).await
-}
-
-/// Brings the terminal window of one of the app's sessions to the front, or
-/// opens one. `name` is the full session name, prefix included.
-#[tauri::command]
-async fn show_session_in_terminal_app(
-    state: State<'_, AppState>,
-    name: String,
-) -> Result<ShowOutcome, String> {
-    let settings = state.session_settings().await;
-    sessions::show_session_in_terminal_app(&settings.settings, &name).await
-}
-
-/// Opens a session's `http://localhost:<port>` in the browser. Returns the URL.
-#[tauri::command]
-async fn open_session_in_browser(
-    state: State<'_, AppState>,
-    name: String,
-) -> Result<String, String> {
-    let settings = state.session_settings().await;
-    sessions::open_session_in_browser(&settings.settings, &name).await
+/// On a phone: connects to the computer it was paired with, if it was.
+#[cfg(mobile)]
+fn connect_to_backend(app: &mut App) -> Result<BackendConnection, Box<dyn std::error::Error>> {
+    let pairing_code_path = app.path().app_data_dir()?.join("pairing_code");
+    Ok(BackendConnection::from_saved_pairing_code(
+        pairing_code_path,
+    ))
 }

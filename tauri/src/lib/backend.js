@@ -113,3 +113,45 @@ export function showSessionInTerminalApp(name) {
 export function openSessionInBrowser(name) {
   return invoke("open_session_in_browser", { name });
 }
+
+/* -- Remote access ------------------------------------------------------------- */
+
+/** "desktop" when this app runs the backend itself, "mobile" when it reaches a paired computer. */
+export function getAppPlatform() {
+  return invoke("get_app_platform");
+}
+
+/** Desktop: whether remote access is on, the URL paired devices use, why it isn't reachable, and the paired devices. */
+export function getRemoteAccessStatus() {
+  return invoke("get_remote_access_status");
+}
+
+/** Desktop: turns remote access on or off. Resolves to the new status. */
+export function setRemoteAccessEnabled(enabled) {
+  return invoke("set_remote_access_enabled", { enabled });
+}
+
+/** Desktop: pairs a device named `name`. Resolves to `{ device, pairing_code }`; the code is shown this once. */
+export function createPairedDevice(name) {
+  return invoke("create_paired_device", { name });
+}
+
+/** Desktop: unpairs a device; its code stops working at once. Resolves to the new status. */
+export function revokePairedDevice(id) {
+  return invoke("revoke_paired_device", { id });
+}
+
+/** Mobile: `{ url }`, the computer this phone is paired with, or a null url. */
+export function getPairingStatus() {
+  return invoke("get_pairing_status");
+}
+
+/** Mobile: pairs this phone with the computer in a pairing code, after checking the computer accepts it. */
+export function pairWithComputer(code) {
+  return invoke("pair_with_computer", { code });
+}
+
+/** Mobile: forgets the computer this phone is paired with. */
+export function unpairFromComputer() {
+  return invoke("unpair_from_computer");
+}

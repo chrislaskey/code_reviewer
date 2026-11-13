@@ -14,9 +14,15 @@ export const REVIEW_NEW_PATH = "/reviews/new";
 export const REVIEW_SHOW_PATH = "/reviews/show";
 export const TRACE_NEW_PATH = "/traces/new";
 export const TRACE_SHOW_PATH = "/traces/show";
+export const REMOTE_ACCESS_PATH = "/remote-access";
 
 export function homeUrl() {
   return HOME_PATH;
+}
+
+/** On the desktop, remote access and the paired devices; on a phone, pairing with a computer. */
+export function remoteAccessUrl() {
+  return REMOTE_ACCESS_PATH;
 }
 
 export function sessionsIndexUrl() {

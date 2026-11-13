@@ -1,0 +1,18 @@
+[package]
+name = "code_reviewer_client"
+version = "0.1.0"
+description = "Code Reviewer's typed HTTP client for the backend server"
+edition = "2024"
+
+[dependencies]
+code_reviewer_core = { path = "../core" }
+code_reviewer_server = { path = "../server" }
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "native-tls"] }
+secrecy = "0.10.3"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+thiserror = "2.0.21"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "time"] }

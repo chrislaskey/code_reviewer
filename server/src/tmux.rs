@@ -6,7 +6,7 @@
 
 use std::process::Output;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
 /// Separates the fields of tmux's list output. tmux prints other control
@@ -50,7 +50,7 @@ pub fn validate_session_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Session {
     pub name: String,
     pub window_count: u32,
@@ -60,7 +60,7 @@ pub struct Session {
     pub current_command: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Pane {
     pub session_name: String,
     pub window_index: u32,

@@ -2,18 +2,18 @@
 //! `agent`, with the status the pages show. How each one's status is found
 //! is in `claude_code.rs` and `cursor_agent.rs`.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::claude_code::ClaudeCodeSession;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AgentKind {
     ClaudeCode,
     CursorAgent,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct AgentSession {
     pub kind: AgentKind,
     pub pid: u32,

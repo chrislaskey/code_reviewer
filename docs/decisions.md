@@ -35,6 +35,9 @@ over HTTP or a websocket instead.
 because it is already a clean library with its own tests and no Tauri
 dependency, and splitting it out again later would cost more than keeping it.
 
+Decision 25 plans the server's return, for an iOS app as well as the
+desktop.
+
 ## 3. Decoupling the Starter Pack from Phoenix
 
 The Starter Pack's desktop app imports Svelte components Phoenix generates
@@ -399,7 +402,8 @@ is in `docs/suggestions/sessions.md`.
 Each of these existed in a prototype or the template and was dropped from
 the MVP. See `docs/suggestions/` for the list to bring back from.
 
-- The Axum server, the shared React frontend and `BackendAdapter`.
+- The Axum server, the shared React frontend and `BackendAdapter`. The
+  server is planned to come back in decision 25.
 - The explorations pages and the ReactFlow file-level views. The test call
   stack page came back as Traces in decision 20; its canvas version did not.
 - The "Folded" choice for calls into dependencies (a "+N in dependencies and
@@ -750,3 +754,146 @@ which the router already follows. Considered instead: counting the entries
 in JS from the router's `_routerIndex`, which would lean on the router's
 internals and miss pushes made elsewhere. Without the Navigation API both
 buttons stay dim, and the page links work as before.
+
+## 25. A backend server for desktop and mobile: HTTP on localhost and the tailnet
+
+Built as planned, apart from what "As built" at the end lists. An iOS app is to drive the same backend as the
+desktop app, and the backend runs arbitrary commands on the host
+(`create_session` types a command into tmux), so whatever reaches it can
+run code as the user. **Decision:** the Rust side becomes an Axum server
+that every client talks to over HTTP, the desktop app included. It
+listens on two addresses, with the same router and the same
+authentication on both:
+
+- `127.0.0.1`, for the desktop app. Never `0.0.0.0`.
+- The Mac's Tailscale address (`100.x.y.z`), for the phone. Only devices
+  the tailnet's access rules allow can reach it.
+
+Every request carries a token in `Authorization`. The desktop's token is
+made at first launch and kept in a file only the user can read (`0600`,
+or the Keychain); each phone gets its own when it is paired, so one can
+be revoked alone. The token is what stops web pages: a page in any
+browser on the Mac or on a tailnet device can send requests to either
+address, but cannot know the token, and the header forces a CORS
+preflight, which the server denies (it sends no CORS headers). The server
+also rejects an unexpected `Host` (DNS rebinding). The tailnet listener
+adds a check per connection: the peer address must be a tailnet one, and
+Tailscale's local API (`whois`, the `tailscale-localapi` crate) must name
+one of the user's devices. The listening address alone is not trusted to
+keep other networks out.
+
+The shape, so the server can later leave the desktop app for a background
+program (launchd) without a rewrite:
+
+- `server/`: no Tauri dependency. `router(state) -> axum::Router`, one
+  start function per listener, `server::start(config)` returning a handle
+  to shut it down, and the Tauri-free modules moved out of `src-tauri`
+  (`sessions`, `tmux`, `git_worktree`, `terminal_app`, `process`, `git`,
+  the agent modules). It owns the state `AppState` holds today.
+- Routes are `POST /api/<command_name>` with a JSON body: the Tauri
+  commands' names and request and response shapes, as decision 2 planned.
+  Errors are a status code and `{ "error": "..." }`.
+- `client/`: `BackendClient`, typed methods over `reqwest`, sharing the
+  request and response types with the server.
+- The desktop app calls `server::start` at launch and nothing else of the
+  server: every call goes through `BackendClient` over localhost, even in
+  the same process. Its Tauri commands become one-line client calls, and
+  `backend.js` keeps calling `invoke`.
+- The iOS app is a Tauri mobile app on the same Svelte pages, whose Rust
+  side uses `BackendClient` over the tailnet. Mobile first, not a web view.
+- Moving the server out later: a small binary calling `server::start`, and
+  the desktop connecting to the running server instead of starting one.
+
+The tailnet listener serves TLS (`tailscale cert`, `rustls`), though
+WireGuard already encrypts the traffic, so a token never travels in plain
+HTTP if the server ever runs outside Tailscale. Tests call the router
+directly with `tower::ServiceExt::oneshot`, without a listener.
+
+Considered:
+
+- **A Unix socket for the desktop, `tailscale serve unix:<socket>` for the
+  phone.** No TCP port on the Mac; `serve` gives HTTPS and identity
+  headers. Dropped: once `serve` is on, port 443 of the tailnet address
+  takes HTTP from browsers on tailnet devices anyway, so the phone's path
+  needs the token all the same, and Windows has no Unix socket in Tokio
+  (named pipes instead, which `serve` cannot target). The socket's one
+  advantage, the OS checking the caller, the token file's permissions
+  match: other users of the Mac cannot read it, and the user's own
+  processes could open the socket too.
+- **Only the tailnet listener**, the desktop connecting to its own
+  `100.x` address. One listener, but the desktop app would stop working
+  whenever Tailscale is off, logged out or starting.
+- **The desktop calling the router in process** (`oneshot`), with no
+  listener for it. Simpler now, but moving the server out would then need
+  a local listener added.
+- **Axum on `127.0.0.1` behind `tailscale serve`** without a token: web
+  pages on the Mac could reach the backend, bypassing Tailscale, and the
+  identity headers could be forged by anything local.
+- **Embedding Tailscale (`tailscale-rs`)**, the server its own tailnet
+  device: still a preview that refuses to run without an "unstable"
+  environment variable. Worth another look later.
+- **A protocol other than HTTP** (newline-delimited JSON, `tarpc`):
+  browsers could not speak it, but HTTP keeps one protocol from desktop to
+  a future public server, and the token covers browsers.
+- **Without Tailscale:** a relay both sides connect out to, peer-to-peer
+  with NAT traversal (iroh), or pairing on the same Wi-Fi. For a product
+  shipped to others, where installing a VPN is friction; not needed for
+  personal use.
+- **A web view or PWA served by Axum** instead of an iOS app: the user
+  wants the iOS app first.
+
+A public server later would add TCP with TLS and user authentication as
+another listener, with the router unchanged. It cannot run tmux and git
+on the Mac, though: it would be a relay, the Mac keeping an outbound
+connection to it and answering the HTTP requests passed through.
+
+Steps, each small: create `server/` and move the Tauri-free modules into
+it, with no change in behaviour; `router()` with the read-only routes
+(reviews, traces, `list_sessions`) and `oneshot` tests; the localhost
+listener with the token and `BackendClient`, the desktop's commands
+switched to it; the remaining routes, `show_session_in_terminal_app` and
+`open_session_in_browser` left off the tailnet listener since they act on
+the Mac's screen; the tailnet listener with TLS, `whois` and pairing; the
+iOS app.
+
+As built (2026-11-12):
+
+- **Crates.** `server/` holds `Backend` (`backend.rs`, one method per
+  command), the two routers (`http_api.rs`: `localhost_router` with every
+  route, `tailnet_router` without `show_session_in_terminal_app`,
+  `open_session_in_browser` and the remote access routes, so a device can't
+  pair others), the listeners and their access check (`access.rs`), and
+  `start`. `client/` is `BackendClient`. The Tauri commands go through
+  `BackendConnection` (`src-tauri/src/connection.rs`), the client of the
+  server the app is connected to.
+- **Tailscale through its command, not `tailscale-localapi`.** On macOS the
+  app's local API is a TCP port with a password only the `tailscale`
+  command knows how to find, so the server runs `tailscale status --json`,
+  `whois --json` and `cert` (`tailscale.rs`), from `PATH` or the macOS
+  app's bundle. The App Store build is sandboxed, so `cert` writes the
+  certificate and key to standard output, not to files.
+- **Remote access is a switch, off by default** (`remote_access.rs`,
+  `remote_access.json`), on the new Remote page. While it is on, the
+  tailnet listener runs on port 7443 of the Mac's Tailscale IPv4 address;
+  when it can't start (Tailscale stopped, HTTPS certificates off in the
+  tailnet), the page says why, and asking for the status tries again.
+- **Pairing is copy and paste.** Pairing a device on the desktop's Remote
+  page shows, once, a code holding the URL and a new token
+  (`cr1-<base64url of JSON>`, `pairing_code.rs`); the phone's Remote page
+  takes it, checks the computer accepts it, and keeps it in the app's data
+  directory. `paired_devices.json` holds each device's name and a SHA-256
+  of its token, never the token, and Unpair revokes it at once.
+- **The tailnet listener** (`tailnet_listener.rs`) checks each connection
+  before its TLS handshake: a Tailscale address, and `whois` naming a
+  device of the Mac's owner (approvals kept for five minutes).
+- **The client speaks TLS with `native-tls`**, Apple's on macOS and iOS,
+  which trusts Tailscale's Let's Encrypt certificates.
+- **iOS.** `cargo tauri ios init` generated `src-tauri/gen/apple`. On a phone
+  the app starts no server; `get_app_platform` tells the pages which side
+  they run on. A debug build installs and launches in the simulator.
+
+Not verified yet: the tailnet listener end to end, since Tailscale was
+stopped on the Mac it was built on; the desktop window itself (the client
+tests run a real server, but the Tauri app wasn't launched); the iOS app
+on a phone, which needs a signing team (`bundle > iOS > developmentTeam`).
+Follow-ups are in `docs/suggestions/remote_access.md`.

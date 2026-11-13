@@ -13,7 +13,7 @@ tools, and Node and pnpm (see `../.tool-versions`). Install the packages once
 with `pnpm install`.
 
 ```sh
-cargo tauri dev        # or ../bin/dev
+../bin/dev             # or cargo tauri dev; ../bin/dev --help for iOS
 ```
 
 `cargo tauri dev` starts the Vite dev server on port 1420 (`pnpm dev`) and
@@ -54,8 +54,10 @@ session card, or from a bookmark.
 
 Every call goes through `src/lib/backend.js`, one function per Tauri
 command, with the request and response shapes of the `core` crate. Nothing
-else imports `@tauri-apps/api`. The commands are in `src-tauri/src/lib.rs`
-(sessions) and `src-tauri/src/review.rs` (reviews), listed in
+else imports `@tauri-apps/api`. The commands are in `src-tauri/src/review.rs`,
+`trace.rs` and `sessions.rs`, each one call to the backend server
+(`../server`), which the app starts on localhost at launch, through
+`BackendClient` (`../client`). They are listed in
 `src-tauri/build.rs` so each gets an `allow-*` permission, which
 `src-tauri/capabilities/default.json` grants to the main window.
 

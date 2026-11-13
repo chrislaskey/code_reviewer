@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["core", "tauri/src-tauri"]
+members = ["core", "server", "client", "tauri/src-tauri"]
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

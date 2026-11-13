@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "The main window: reviews a repository's changes, traces its tests, and lists, creates and opens Claude Code sessions in tmux",
+  "description": "The main window: reviews a repository's changes, traces its tests, lists, creates and opens Claude Code sessions in tmux, and manages remote access",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -23,6 +23,14 @@
     "allow-merge-session",
     "allow-close-session",
     "allow-show-session-in-terminal-app",
-    "allow-open-session-in-browser"
+    "allow-open-session-in-browser",
+    "allow-get-app-platform",
+    "allow-get-remote-access-status",
+    "allow-set-remote-access-enabled",
+    "allow-create-paired-device",
+    "allow-revoke-paired-device",
+    "allow-get-pairing-status",
+    "allow-pair-with-computer",
+    "allow-unpair-from-computer"
   ]
 }

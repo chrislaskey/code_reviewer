@@ -7,7 +7,7 @@
 use std::path::{Path, PathBuf};
 
 use futures_util::future::join_all;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
 /// Where the worktrees go, under the repository's root. Added to the
@@ -25,7 +25,7 @@ pub struct AddedWorktree {
 
 /// A worktree as `git worktree list` reports it, other than the main
 /// checkout.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Worktree {
     /// The directory's name, which for the app's worktrees is the tmux
     /// session's name too.

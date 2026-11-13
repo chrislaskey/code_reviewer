@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use code_reviewer_core::analysis::markdown_html::render_markdown_html;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::agent::AgentKind;
@@ -28,7 +28,7 @@ pub(crate) const TOOL_SUMMARY_FIELDS: [&str; 9] = [
 ];
 pub(crate) const MAX_TOOL_SUMMARY_CHARS: usize = 160;
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ChatHistory {
     /// The agent that wrote the chat.
     pub agent: AgentKind,
@@ -42,7 +42,7 @@ pub struct ChatHistory {
 }
 
 /// Counts over the whole chat, whatever the page filters.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct ChatSummary {
     /// The messages the user typed (see `ChatMessage::is_prompt`).
     pub prompts: usize,
@@ -62,13 +62,13 @@ pub struct ChatSummary {
     pub last_message_at: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ToolCallCount {
     pub name: String,
     pub count: usize,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ChatMessage {
     /// The transcript line's `uuid`, or the API message id when an assistant
     /// message spans several lines.
@@ -81,7 +81,7 @@ pub struct ChatMessage {
     pub parts: Vec<ChatPart>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ChatRole {
     User,
@@ -91,14 +91,14 @@ pub enum ChatRole {
 }
 
 /// What a line the agent's CLI wrote is, with one line saying what it holds.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ChatNote {
     pub kind: ChatNoteKind,
     /// Like the command run or the background task's outcome.
     pub summary: String,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ChatNoteKind {
     /// Context added for the agent, like system reminders and skills.
@@ -116,7 +116,7 @@ pub enum ChatNoteKind {
     Other,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ChatPart {
     /// Markdown, rendered as HTML with raw HTML left out.
@@ -147,13 +147,13 @@ pub enum ChatPart {
     },
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ToolResult {
     pub output: ToolText,
     pub is_error: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ToolText {
     pub text: String,
     /// Whether `text` was cut to `MAX_TOOL_TEXT_CHARS`.

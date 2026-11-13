@@ -35,7 +35,7 @@ pub const DETECTION_ORDER: [TerminalApp; 5] = [
     TerminalApp::Terminal,
 ];
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ShowOutcome {
     /// An attached window was brought to the front.
@@ -44,10 +44,10 @@ pub enum ShowOutcome {
     Opened,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct InstalledTerminalApp {
     pub id: TerminalApp,
-    pub name: &'static str,
+    pub name: String,
     /// Where the app is, or `None` when it isn't installed.
     pub path: Option<String>,
 }
@@ -89,7 +89,7 @@ pub async fn list_terminal_apps() -> Vec<InstalledTerminalApp> {
     for app in DETECTION_ORDER {
         apps.push(InstalledTerminalApp {
             id: app,
-            name: app.name(),
+            name: app.name().to_string(),
             path: find_app_path(app)
                 .await
                 .map(|path| path.display().to_string()),

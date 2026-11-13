@@ -26,7 +26,7 @@ struct SessionFile {
     status_updated_at: Option<u64>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ClaudeCodeSession {
     pub pid: u32,
     pub session_id: Option<String>,

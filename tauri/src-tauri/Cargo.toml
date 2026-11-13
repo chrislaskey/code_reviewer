@@ -14,11 +14,13 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 code_reviewer_core = { path = "../../core" }
+code_reviewer_server = { path = "../../server" }
+code_reviewer_client = { path = "../../client" }
 tauri = { version = "2", features = [] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "process", "fs"] }
-futures-util = { version = "0.3", default-features = false, features = ["std"] }
-log = "0.4"
 env_logger = "0.11"
-chrono = { version = "0.4.45", default-features = false, features = ["std"] }
+secrecy = "0.10.3"
+serde = { version = "1.0.229", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros"] }

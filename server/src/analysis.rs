@@ -1,4 +1,4 @@
-//! Running the `code_reviewer_core` analysis from a Tauri command. The core
+//! Running the `code_reviewer_core` analysis for the backend. The core
 //! reads files and runs git, so each call runs on a blocking thread.
 
 use std::sync::Arc;
@@ -13,7 +13,7 @@ where
     F: FnOnce(&AnalysisService) -> Result<T, AnalysisError> + Send + 'static,
 {
     let service = Arc::clone(service);
-    tauri::async_runtime::spawn_blocking(move || work(&service))
+    tokio::task::spawn_blocking(move || work(&service))
         .await
         .map_err(|error| error.to_string())?
         .map_err(|error| error.to_string())

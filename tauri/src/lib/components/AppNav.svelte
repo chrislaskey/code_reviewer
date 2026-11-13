@@ -10,9 +10,9 @@
   import BottomBar from "./BottomBar.svelte";
   import ThemeMenu from "./ThemeMenu.svelte";
   import { folderTabPath } from "../folder_tab.js";
-  import { homeUrl, reviewNewUrl, sessionsIndexUrl, traceNewUrl } from "../routes.js";
+  import { homeUrl, remoteAccessUrl, reviewNewUrl, sessionsIndexUrl, traceNewUrl } from "../routes.js";
 
-  /** @type {{ current?: "home" | "reviews" | "traces" | "sessions" }} */
+  /** @type {{ current?: "home" | "reviews" | "traces" | "sessions" | "remote" }} */
   let { current = "home" } = $props();
 
   const LINKS = [
@@ -20,6 +20,7 @@
     { id: "sessions", label: "Sessions", icon: "hero-command-line", href: sessionsIndexUrl() },
     { id: "reviews", label: "Review", icon: "hero-document-magnifying-glass", href: reviewNewUrl() },
     { id: "traces", label: "Trace", icon: "hero-beaker", href: traceNewUrl() },
+    { id: "remote", label: "Remote", icon: "hero-device-phone-mobile", href: remoteAccessUrl() },
   ];
 
   /* The shape spills this far under the page, so the two never show a seam;

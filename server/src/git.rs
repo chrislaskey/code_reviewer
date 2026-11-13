@@ -5,14 +5,14 @@
 use std::path::Path;
 use std::time::Duration;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
 /// How long `git status` may take, so a huge repository can't hold up the
 /// status page.
 const GIT_STATUS_TIMEOUT: Duration = Duration::from_secs(3);
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct GitStatus {
     /// The main checkout's name, shared by its worktrees, e.g. `code_reviewer`.
     pub repository_name: Option<String>,
@@ -40,7 +40,7 @@ pub struct GitStatus {
 }
 
 /// A kind of uncommitted change, most in need of attention first.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum GitChange {
     Conflicted,
