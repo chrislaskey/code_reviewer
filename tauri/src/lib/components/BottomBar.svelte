@@ -95,8 +95,9 @@
     }
   }
 
-  /* A button: a raised rounded square, an icon over one word, sharing the
-     bar evenly; it sinks while pressed. */
+  /* A button: flat, an icon over one word, sharing the bar evenly; it
+     shrinks a little while pressed. Raised only under a hovering pointer,
+     so never on a touch screen. */
   .bar-button {
     flex: 1;
     display: flex;
@@ -105,8 +106,7 @@
     justify-content: center;
     gap: 2px;
     border-radius: 10px;
-    background: var(--color-base-100);
-    box-shadow: var(--raised-shadow);
+    background: transparent;
     color: var(--fg);
     font-size: 11px;
     font-weight: 600;
@@ -118,24 +118,20 @@
       background-color 80ms;
   }
 
+  @media (hover: hover) {
+    .bar-button:not(:disabled):hover {
+      background: var(--color-base-100);
+      box-shadow: var(--raised-shadow);
+    }
+  }
+
   .bar-button:not(:disabled):active {
     transform: scale(0.96);
-    background: color-mix(in oklab, var(--color-base-content) 8%, var(--color-base-100));
   }
 
   .bar-button:disabled {
-    box-shadow: none;
-    background: transparent;
     color: color-mix(in oklab, var(--color-base-content) 30%, transparent);
     cursor: default;
-  }
-
-  .bar-button.open {
-    background: color-mix(in oklab, var(--color-primary) 14%, var(--color-base-100));
-  }
-
-  .bar-button.open :global(.bar-icon) {
-    color: var(--color-primary);
   }
 
   .bar-button :global(.bar-icon) {
