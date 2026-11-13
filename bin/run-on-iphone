@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+#
+# Builds the iOS app for a phone, then installs and launches it on a
+# connected iPhone.
+#
+# Run `bin/run-on-iphone --help` for the details.
+
+set -eo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+BUNDLE_IDENTIFIER="com.chrislaskey.codereviewer"
+IPA="$ROOT/tauri/src-tauri/gen/apple/build/arm64/Code Reviewer.ipa"
+XCODE_PROJECT="$ROOT/tauri/src-tauri/gen/apple/code_reviewer.xcodeproj/project.pbxproj"
+
+help() {
+  cat <<USAGE
+Builds the iOS app for a phone, then installs and launches it on a
+connected iPhone.
+
+Usage: $0 [DEVICE]
+
+DEVICE is a name or identifier from \`xcrun devicectl list devices\`. When
+left out, the first connected iPhone.
+
+Why not \`cargo tauri ios run\`: with tauri-cli 2.12.4 it builds and signs
+the app, then fails exporting it ("Couldn't load -exportOptionsPlist").
+\`cargo tauri ios build --debug\` exports without that error, so this runs
+it, takes the app out of the .ipa it writes, and installs that with
+\`devicectl\`.
+
+The signing team is APPLE_DEVELOPMENT_TEAM, from the environment or else
+from .env (copy .env.example), so it stays out of the repository. The
+Tauri CLI writes it into the Xcode project while building; this removes it
+again afterwards. Also needs the phone registered in that team's developer
+account, and Developer Mode on the phone.
+USAGE
+}
+
+fail() {
+  echo "$0: $*" >&2
+  exit 1
+}
+
+case "${1:-}" in
+  help|-h|--help) help; exit 0 ;;
+  -*) fail "unknown option '$1'; run \`$0 --help\`" ;;
+esac
+
+if [ -z "${APPLE_DEVELOPMENT_TEAM:-}" ] && [ -f "$ROOT/.env" ]; then
+  APPLE_DEVELOPMENT_TEAM="$(sed -n 's/^APPLE_DEVELOPMENT_TEAM=//p' "$ROOT/.env" | tail -n 1)"
+fi
+[ -n "${APPLE_DEVELOPMENT_TEAM:-}" ] || fail "set APPLE_DEVELOPMENT_TEAM in .env (copy .env.example) or the environment"
+export APPLE_DEVELOPMENT_TEAM
+
+device="${1:-}"
+if [ -z "$device" ]; then
+  device="$(xcrun devicectl list devices 2>/dev/null \
+    | awk '/connected/ && /iPhone/' \
+    | grep -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}' \
+    | head -n 1 || true)"
+  [ -n "$device" ] || fail "no connected iPhone; plug one in and unlock it, or name one (\`xcrun devicectl list devices\`)"
+fi
+
+unpacked="$(mktemp -d)"
+remove_team_from_xcode_project() {
+  sed -i '' "/DEVELOPMENT_TEAM = \"$APPLE_DEVELOPMENT_TEAM\";/d" "$XCODE_PROJECT"
+  rm -rf "$unpacked"
+}
+trap remove_team_from_xcode_project EXIT
+
+echo "=== Building the iOS app ==="
+(cd "$ROOT/tauri" && cargo tauri ios build --debug)
+
+echo "=== Installing on $device ==="
+unzip -q "$IPA" -d "$unpacked"
+xcrun devicectl device install app --device "$device" "$unpacked/Payload/Code Reviewer.app"
+
+echo "=== Launching ==="
+xcrun devicectl device process launch --device "$device" "$BUNDLE_IDENTIFIER"

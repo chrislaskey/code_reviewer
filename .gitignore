@@ -6,3 +6,6 @@
 
 # The Cargo workspace build output
 /target
+
+# Local settings, such as the Apple signing team (see .env.example)
+/.env

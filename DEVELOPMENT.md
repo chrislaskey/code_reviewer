@@ -85,8 +85,10 @@ xcrun simctl install booted "src-tauri/gen/apple/build/arm64-sim/Code Reviewer.a
 xcrun simctl launch booted com.chrislaskey.codereviewer
 ```
 
-A phone needs a signing team in `bundle > iOS > developmentTeam` of
-`tauri.conf.json` (or `APPLE_DEVELOPMENT_TEAM`). To pair it, turn on remote
+On a phone: copy `.env.example` to `.env` (ignored by git) and set your
+signing team, register the phone in that team's developer account, turn on
+Developer Mode on it, then `bin/run-on-iphone` builds, installs and
+launches it (`bin/run-on-iphone --help`). To pair it, turn on remote
 access on the desktop's Remote page (Tailscale running, HTTPS certificates
 on for the tailnet), pair a device, and paste the code on the phone's
 Remote page.
