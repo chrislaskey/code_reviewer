@@ -121,12 +121,6 @@
   --wave-opacity-3: 0.22;
 }
 
-/* No rubber-band bounce past the ends of the page or any pane that
-   scrolls, and no passing a pane's scroll on to the page, as in a native app. */
-* {
-  overscroll-behavior: none;
-}
-
 /* The body paints the background and fills the window: WebKit leaves the
    old colour on the root background below short pages after a theme
    change. Isolated, so the z-index -1 waves and pattern show above it, and
