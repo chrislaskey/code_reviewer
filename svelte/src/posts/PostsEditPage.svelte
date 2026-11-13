@@ -1,5 +1,6 @@
 <!-- Editing a post, at /posts/:id/edit; done, it shows the post -->
 <script>
+  import { t } from "ttag";
   import AppNav from "../lib/AppNav.svelte";
   import { postsGet, postsUpdate } from "../lib/core/index.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
@@ -41,11 +42,11 @@
 
 <main class="page">
   <AppNav />
-  <h1>Edit post</h1>
+  <h1>{t`Edit post`}</h1>
   {#if loaded}
-    <PostsForm bind:text bind:communityIds submitText="Save" {error} {busy} onsubmit={save} />
+    <PostsForm bind:text bind:communityIds submitText={t`Save`} {error} {busy} onsubmit={save} />
   {:else if error}
     <p class="error">{error}</p>
   {/if}
-  <a href={postsShowUrl(id)}>Back to the post</a>
+  <a href={postsShowUrl(id)}>{t`Back to the post`}</a>
 </main>

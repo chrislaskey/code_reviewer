@@ -3,6 +3,7 @@
      is a member of, bound to `communityIds`, and the error the write came
      back with. -->
 <script>
+  import { t } from "ttag";
   import { communitiesList } from "../lib/core/index.js";
 
   /**
@@ -38,11 +39,11 @@
 </script>
 
 <form onsubmit={submit} class="flex flex-col gap-3">
-  <textarea bind:value={text} rows="4" class="textarea w-full" aria-label="Post" placeholder="What's on your mind?" maxlength="10000"
+  <textarea bind:value={text} rows="4" class="textarea w-full" aria-label={t`Post`} placeholder={t`What's on your mind?`} maxlength="10000"
   ></textarea>
   {#if mine.length > 0}
     <fieldset class="flex flex-wrap gap-3">
-      <legend class="muted">In</legend>
+      <legend class="muted">{t`In`}</legend>
       {#each mine as community (community.id)}
         <label class="flex items-center gap-1">
           <input type="checkbox" class="checkbox checkbox-sm" value={community.id} bind:group={communityIds} />

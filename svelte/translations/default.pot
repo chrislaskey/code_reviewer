@@ -1,0 +1,74 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=utf-8\n"
+"Plural-Forms: nplurals=2; plural=(n!=1);\n"
+
+#: src/posts/PostsForm.svelte:37
+#: src/posts/PostsShowPage.svelte:35
+msgid "Post"
+msgstr ""
+
+#: src/posts/PostsIndexPage.svelte:28
+#: src/posts/PostsShowPage.svelte:39
+#, javascript-format
+msgid "in ${ communityNames }"
+msgstr ""
+
+#: src/posts/PostsShowPage.svelte:42
+msgid "Edit"
+msgstr ""
+
+#: src/posts/PostsShowPage.svelte:44
+msgid "Delete"
+msgstr ""
+
+#: src/posts/PostsNewPage.svelte:30
+#: src/posts/PostsShowPage.svelte:46
+msgid "Back to posts"
+msgstr ""
+
+#: src/posts/PostsShowPage.svelte:23
+msgid "Delete this post?"
+msgstr ""
+
+#: src/posts/PostsIndexPage.svelte:23
+#: src/posts/PostsNewPage.svelte:26
+msgid "New post"
+msgstr ""
+
+#: src/posts/PostsIndexPage.svelte:21
+msgid "Posts"
+msgstr ""
+
+#: src/posts/PostsIndexPage.svelte:25
+msgid "No posts yet."
+msgstr ""
+
+#: src/posts/PostsIndexPage.svelte:31
+msgid "Show"
+msgstr ""
+
+#: src/posts/PostsForm.svelte:38
+msgid "What's on your mind?"
+msgstr ""
+
+#: src/posts/PostsForm.svelte:39
+msgid "In"
+msgstr ""
+
+#: src/posts/PostsEditPage.svelte:41
+msgid "Edit post"
+msgstr ""
+
+#: src/posts/PostsEditPage.svelte:42
+msgid "Save"
+msgstr ""
+
+#: src/posts/PostsEditPage.svelte:46
+msgid "Back to the post"
+msgstr ""
+
+#: src/posts/PostsNewPage.svelte:27
+msgctxt "verb"
+msgid "Post"
+msgstr ""

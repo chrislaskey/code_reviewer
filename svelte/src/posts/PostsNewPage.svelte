@@ -1,5 +1,6 @@
 <!-- Writing a post, at /posts/new; done, it shows the post -->
 <script>
+  import { c, t } from "ttag";
   import AppNav from "../lib/AppNav.svelte";
   import { postsCreate } from "../lib/core/index.js";
   import { navigateToUrl } from "../lib/router.js";
@@ -26,7 +27,7 @@
 
 <main class="page">
   <AppNav />
-  <h1>New post</h1>
-  <PostsForm bind:text bind:communityIds submitText="Post" {error} {busy} onsubmit={save} />
-  <a href={postsIndexUrl()}>Back to posts</a>
+  <h1>{t`New post`}</h1>
+  <PostsForm bind:text bind:communityIds submitText={c("verb").t`Post`} {error} {busy} onsubmit={save} />
+  <a href={postsIndexUrl()}>{t`Back to posts`}</a>
 </main>

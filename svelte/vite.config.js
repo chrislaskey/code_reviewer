@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import tailwindcss from "@tailwindcss/vite";
+import { po } from "gettext-parser";
 
 // The theme script sets `data-theme` on <html> before the first paint. The
 // `<!-- theme-script -->` marker in an HTML entry becomes an inline classic
@@ -69,6 +70,27 @@ function publicPages() {
   };
 }
 
+// A translations file (translations/*.po) imported as the catalog ttag's
+// `addLocale` takes, without the fuzzy entries, whose English has changed
+// since they were translated, so the page shows the English instead.
+function translationFiles() {
+  return {
+    name: "translation-files",
+    transform(source, id) {
+      if (!id.endsWith(".po")) return null;
+      const catalog = po.parse(source);
+      for (const messages of Object.values(catalog.translations)) {
+        for (const [key, message] of Object.entries(messages)) {
+          const isFuzzy = message.comments?.flag?.split(",").some((flag) => flag.trim() === "fuzzy");
+          if (isFuzzy) delete messages[key];
+          else delete message.comments;
+        }
+      }
+      return { code: `export default ${JSON.stringify(catalog)};`, map: null };
+    },
+  };
+}
+
 // Where `pnpm dev` sends `/api` requests: the web server (../axum).
 // Inside the Tauri app the pages call commands instead, see src/lib/core/.
 const WEB_SERVER_URL = process.env.WEB_SERVER_URL ?? "http://localhost:4000";
@@ -94,7 +116,7 @@ export default defineConfig(({ mode }) => ({
   root: "src",
   base: mode === "ops" ? "/ops/" : "/",
   publicDir: "static",
-  plugins: [themeScript(), publicPages(), tailwindcss(), svelte()],
+  plugins: [themeScript(), publicPages(), translationFiles(), tailwindcss(), svelte()],
   clearScreen: false,
   server: {
     port: 1420,
