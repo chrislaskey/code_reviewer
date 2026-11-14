@@ -4,7 +4,8 @@
      choice. A details element rather than daisyUI's focus-based dropdown,
      since WebKit doesn't focus a clicked button. On small windows the menu
      spans the window between the page's margins, just below the button,
-     since it is wider than a phone. -->
+     since it is wider than a phone; it is fixed there, so its top follows the
+     button as the page scrolls. -->
 <script>
   import Icon from "./Icon.svelte";
 
@@ -23,6 +24,17 @@
 
   let open = $state(false);
   let element;
+  /** @type {HTMLElement | undefined} */
+  let button = $state();
+  let menuTop = $state(0);
+
+  $effect(() => {
+    if (open) placeMenuBelowButton();
+  });
+
+  function placeMenuBelowButton() {
+    if (open && button) menuTop = button.getBoundingClientRect().bottom;
+  }
 
   function close() {
     open = false;
@@ -37,14 +49,22 @@
   }
 </script>
 
-<svelte:window onclick={closeWhenClickedOutside} onkeydown={closeOnEscape} />
+<svelte:window
+  onclick={closeWhenClickedOutside}
+  onkeydown={closeOnEscape}
+  onscrollcapture={placeMenuBelowButton}
+  onresize={placeMenuBelowButton}
+/>
 
 <details class={["dropdown", align === "start" ? "dropdown-start" : "dropdown-end"]} bind:open bind:this={element}>
-  <summary class={class_} {title}>
+  <summary class={class_} {title} bind:this={button}>
     {#if buttonContent}{@render buttonContent()}{:else}{label}{/if}
     <Icon name="hero-chevron-down-micro" class="size-4" />
   </summary>
-  <ul class="dropdown-content menu choice-menu panel w-[24rem] max-sm:fixed! max-sm:inset-x-(--page-gutter) max-sm:w-auto">
+  <ul
+    class="dropdown-content menu choice-menu panel w-[24rem] max-sm:fixed! max-sm:inset-x-(--page-gutter) max-sm:top-(--menu-top) max-sm:w-auto"
+    style:--menu-top="{menuTop}px"
+  >
     {@render children({ close })}
   </ul>
 </details>

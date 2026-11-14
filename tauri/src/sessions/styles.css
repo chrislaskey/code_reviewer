@@ -407,10 +407,11 @@
   color: var(--color-error);
 }
 
-/* Stays in view at the top of the window while the chat scrolls under it. */
+/* Stays in view at the top of the window while the chat scrolls under it,
+   below a phone's status bar and camera. */
 .chat-prompt.pinned {
   position: sticky;
-  top: 0.5rem;
+  top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
   z-index: 5;
 }
 

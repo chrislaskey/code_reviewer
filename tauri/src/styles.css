@@ -361,6 +361,18 @@ textarea {
   color: var(--fg);
 }
 
+/* daisyUI grows a field's text to 1rem on iOS only while it has focus, so
+   Safari doesn't zoom; keep that size so it doesn't shrink on blur. */
+@media (pointer: coarse) {
+  @supports (-webkit-touch-callout: none) {
+    .input,
+    .textarea,
+    .select {
+      --font-size: 1rem;
+    }
+  }
+}
+
 /* ChoiceMenu: a choice's label and the sentence under it */
 .choice-menu .choice {
   font-weight: 600;

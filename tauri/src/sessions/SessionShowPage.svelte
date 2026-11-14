@@ -33,7 +33,7 @@
   import SessionStatusBar from "./SessionStatusBar.svelte";
 
   const REFRESH_INTERVAL_MS = 5000;
-  // Toggles for the prompt box's layout; turning one on turns the other off.
+  // Toggles for the prompt box's layout, each on or off by itself.
   const CHAT_LAYOUT_TOGGLES = [
     { value: "pinned", icon: "lucide-pin", title: "Pin the prompt in view while the chat scrolls" },
     { value: "large", icon: "lucide-maximize-2", title: "Make the prompt box taller" },
@@ -48,7 +48,7 @@
   let chatError = $state();
   let chatFilter = $state("all");
   // `pinned` keeps the prompt in view while the chat scrolls; `large` makes it taller.
-  let chatLayout = $state("regular");
+  let chatLayout = $state({ pinned: false, large: false });
   let chatFilterLabel = $derived(CHAT_FILTERS.find((filter) => filter.value === chatFilter)?.label);
   let shownMessages = $derived(chat ? filterChatMessages(chat.messages, chatFilter) : []);
   // Newest first, each with the one shown before it in time, for "16 seconds later".
@@ -111,7 +111,7 @@
   }
 
   function toggleChatLayout(layout) {
-    chatLayout = chatLayout === layout ? "regular" : layout;
+    chatLayout[layout] = !chatLayout[layout];
   }
 
   const actions = createSessionActions({
@@ -137,10 +137,10 @@
     {#each CHAT_LAYOUT_TOGGLES as toggle (toggle.value)}
       <button
         type="button"
-        class={["btn btn-ghost btn-sm btn-square", chatLayout === toggle.value && "btn-active text-primary"]}
+        class={["btn btn-ghost btn-sm btn-square", chatLayout[toggle.value] && "btn-active text-primary"]}
         title={toggle.title}
         aria-label={toggle.title}
-        aria-pressed={chatLayout === toggle.value}
+        aria-pressed={chatLayout[toggle.value]}
         onclick={() => toggleChatLayout(toggle.value)}
       >
         <Icon name={toggle.icon} class="size-4" />
