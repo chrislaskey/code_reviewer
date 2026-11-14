@@ -1,5 +1,5 @@
 //! Lists the processes on the machine with `ps`, to tell whether Claude
-//! Code or Cursor's `agent` runs in a tmux pane and whether a Claude Code
+//! Code, Cursor's `agent` or Codex runs in a tmux pane and whether a Claude Code
 //! session's process is still alive.
 
 use serde::{Deserialize, Serialize};
@@ -50,6 +50,12 @@ impl Process {
     /// Cursor's agent CLI, installed as `agent` and `cursor-agent`.
     pub fn is_cursor_agent(&self) -> bool {
         self.name == "agent" || self.name == "cursor-agent"
+    }
+
+    /// OpenAI's Codex CLI. Installed with npm, it is a `node` process
+    /// running the native `codex` binary, which is the one found.
+    pub fn is_codex(&self) -> bool {
+        self.name == "codex"
     }
 }
 
@@ -159,6 +165,15 @@ mod tests {
         assert_eq!(agent.name, "agent");
         assert!(agent.is_cursor_agent());
         assert!(!agent.is_claude_code());
+
+        let codex = parse_process(
+            "61200 61199 61199 61199 ttys004 S+ 1.0 \
+             /opt/homebrew/lib/node_modules/@openai/codex/vendor/aarch64-apple-darwin/codex/codex",
+        )
+        .expect("the line parses");
+        assert_eq!(codex.name, "codex");
+        assert!(codex.is_codex());
+        assert!(!codex.is_cursor_agent());
     }
 
     #[test]

@@ -158,9 +158,9 @@
           session's page with the agent's chat history. The Git menu finishes one: Merge into {mainBranch} fast-forwards {mainBranch} with the
           branch, removes the worktree, deletes the branch and closes the session; Turn into branch removes the worktree and
           keeps the branch. Both need a clean worktree. The
-          agent is Claude Code or Cursor's <code>agent</code>. Claude Code's status is read from
-          <code>~/.claude/sessions</code>, which it doesn't document, so it may change. <code>agent</code> reports none, so
-          it's busy when its chat was written to in the last few seconds, else idle.
+          agent is Claude Code, Cursor's <code>agent</code> or <code>codex</code>. Claude Code's status is read from
+          <code>~/.claude/sessions</code>, which it doesn't document, so it may change. <code>agent</code> and
+          <code>codex</code> report none, so each is busy when its chat was written to in the last few seconds, else idle.
         </InfoPopover>
         <InfoPopover icon="hero-cog-6-tooth" title="The settings detected on this Mac">
           {#if detectError}

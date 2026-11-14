@@ -1,6 +1,6 @@
 <!-- A tmux session's page: the status bar of the sessions page, with the same
      actions, and the chat history of the agent running in it, read from the
-     transcript the agent writes, Claude Code's or Cursor's. The session is
+     transcript the agent writes, Claude Code's, Cursor's or Codex's. The session is
      named in the path, `/sessions/<name>`. Refreshes like the sessions page. -->
 <script>
   import { onMount } from "svelte";

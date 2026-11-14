@@ -17,7 +17,7 @@
   <Header>
     Code Reviewer
     {#snippet subtitle()}
-      Run Claude Code or Cursor agent sessions in tmux, review what a change did, and trace a test through it.
+      Run Claude Code, Cursor or Codex agent sessions in tmux, review what a change did, and trace a test through it.
     {/snippet}
   </Header>
 

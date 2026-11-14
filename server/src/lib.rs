@@ -6,7 +6,7 @@
 //!   * Traces: the tests in the head of a comparison, and the calls below
 //!     one test walked top to bottom. Also computed by the core crate.
 //!   * Sessions (`sessions`): the tmux sessions the app started, named
-//!     `cr-<name>`, with the agent (Claude Code or Cursor) status and chat in
+//!     `cr-<name>`, with the agent (Claude Code, Cursor or Codex) status and chat in
 //!     each, and its git worktrees without a session.
 //!
 //! [`Backend`] holds the state they share and has one method per command,
@@ -24,6 +24,8 @@ mod artifacts;
 mod backend;
 mod claude_code;
 mod claude_code_chat;
+mod codex;
+mod codex_chat;
 mod cursor_agent;
 mod cursor_agent_chat;
 mod git;
@@ -32,6 +34,7 @@ mod http_api;
 mod paired_devices;
 mod pairing_code;
 mod process;
+mod recent_writes;
 mod remote_access;
 pub mod requests;
 mod sessions;

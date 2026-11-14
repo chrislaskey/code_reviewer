@@ -193,7 +193,8 @@ panes' ttys, which has no status (shown as "unknown"). Failing that, a
 Cursor `agent` process on one of the panes' ttys: it writes no status file,
 so its status is a guess (`cursor_agent.rs`): busy when the chat database
 the process has open (found with `lsof`) was written to in the last 10
-seconds, else idle. The pages call either one just "agent". The card shows that status, the directory of
+seconds, else idle. Failing that, a `codex` process, read the same way (decision
+26). The pages call any of them just "agent". The card shows that status, the directory of
 the current pane, and the Copy and Open buttons. The pane rows, process
 lists, git statuses and the separate Claude Code list were dropped (see
 `docs/suggestions/sessions.md`), and with them the app's `git.rs` module.
@@ -897,3 +898,39 @@ stopped on the Mac it was built on; the desktop window itself (the client
 tests run a real server, but the Tauri app wasn't launched); the iOS app
 on a phone, which needs a signing team (`bundle > iOS > developmentTeam`).
 Follow-ups are in `docs/suggestions/remote_access.md`.
+
+## 26. Sessions: Codex as a third agent
+
+The app found Claude Code and Cursor's `agent` in a session's panes.
+**Decision:** OpenAI's Codex CLI is found the same way, as a third agent
+(`AgentKind::Codex`), written before a Codex could be run here, from its
+source and docs, so the guesses below are what to check first.
+
+* **Process:** a process named `codex` on one of the panes' ttys, looked
+  for after Claude Code and Cursor's `agent`. Installed with npm, Codex is
+  a `node` wrapper around the native `codex` binary; the binary is found.
+* **Status:** Codex writes no status file, so it is guessed as Cursor's is,
+  from the writes to a file the process keeps open: its rollout,
+  `~/.codex/sessions/<year>/<month>/<day>/rollout-<time>-<session id>.jsonl`
+  (`$CODEX_HOME` instead of `~/.codex` when set). The helpers both use moved
+  from `cursor_agent.rs` to `recent_writes.rs`.
+* **Chat:** `codex_chat.rs` reads the rollout, found by the session id that
+  ends its name, newest day first. Its `response_item` lines are Responses
+  API items: `message` (user, assistant, and `developer` instructions shown
+  as a context note), `reasoning` (its summary, as thinking),
+  `function_call`, `custom_tool_call` (like `apply_patch`),
+  `local_shell_call` and `web_search_call`, with outputs paired by
+  `call_id`. Of `event_msg` lines only `turn_aborted` is shown, as the
+  rest repeat the items; `compacted` is a compact summary note. User
+  messages Codex writes itself (`<environment_context>`,
+  `<user_instructions>`, AGENTS.md) are context notes. An output failed
+  when its exit code, as JSON metadata or an `Exit code: N` header, isn't
+  0. Older rollouts, with the items unwrapped, are read too. The agent's
+  reasoning, tool calls and text up to its next text are one message.
+* **Prompts** are pasted into the pane as for the other agents.
+
+To check on a running Codex: that `ps` names it `codex`, that `lsof` shows
+the rollout open (if not, the session has no status or chat), the rollout's
+lines against the reader's tests, and that a pasted prompt is sent by the
+Enter that follows it.
+

@@ -52,6 +52,14 @@ Ideas and template features not in the rewrite. None are planned.
 - On a session's page, read only the new lines of the transcript on each
   refresh instead of all of it, and keep the scroll at the bottom while
   the agent writes, as a chat app does.
+- Codex: tell busy from idle by the rollout's last turn events
+  (`task_started` without a `task_complete`) instead of recent writes, if
+  Codex writes them, so a long command reads as busy, and show when it
+  waits for an approval.
+- Codex: when the process has no rollout open, find the newest rollout
+  whose `session_meta` `cwd` is the pane's directory.
+- Continue a worktree with the agent that last ran in it (`codex resume
+  --last`, `cursor-agent resume`) instead of always `claude --continue`.
 - Show a subagent's messages (Claude Code's sidechains) folded under the
   tool call that started it.
 - Artifacts for other projects (`artifacts/README.md`): sessions in

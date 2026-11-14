@@ -23,4 +23,4 @@ export function timeLater(earlier, later) {
 }
 
 /** The agents' names, by `AgentKind`. */
-export const AGENT_NAMES = { claude_code: "Claude Code", cursor_agent: "Cursor" };
+export const AGENT_NAMES = { claude_code: "Claude Code", cursor_agent: "Cursor", codex: "Codex" };

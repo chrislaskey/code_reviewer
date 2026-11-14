@@ -1,6 +1,6 @@
-//! The coding agent running in a tmux session, Claude Code or Cursor's
-//! `agent`, with the status the pages show. How each one's status is found
-//! is in `claude_code.rs` and `cursor_agent.rs`.
+//! The coding agent running in a tmux session, Claude Code, Cursor's
+//! `agent` or Codex, with the status the pages show. How each one's status
+//! is found is in `claude_code.rs`, `cursor_agent.rs` and `codex.rs`.
 
 use serde::{Deserialize, Serialize};
 
@@ -11,6 +11,7 @@ use crate::claude_code::ClaudeCodeSession;
 pub enum AgentKind {
     ClaudeCode,
     CursorAgent,
+    Codex,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -18,7 +19,8 @@ pub struct AgentSession {
     pub kind: AgentKind,
     pub pid: u32,
     /// The agent's own id for its chat, when it reports one. Claude Code's
-    /// names its transcript (see `claude_code_chat.rs`).
+    /// names its transcript (see `claude_code_chat.rs`), as Codex's names
+    /// its rollout (see `codex_chat.rs`).
     pub session_id: Option<String>,
     /// The tmux pane the agent runs in, like `%60`, to send prompts to.
     pub tmux_pane_id: Option<String>,

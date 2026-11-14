@@ -1,7 +1,7 @@
 //! Coding agent sessions in tmux (`src/sessions/`): guesses which shell,
 //! terminal app and tmux the user has, lists the tmux sessions the app
-//! started with the status of the agent (Claude Code or Cursor's `agent`)
-//! in each, creates sessions (a git
+//! started with the status of the agent (Claude Code, Cursor's `agent` or
+//! Codex) in each, creates sessions (a git
 //! worktree of a repository with a tmux session running a command in it)
 //! and shows them in the terminal app.
 //!
@@ -37,6 +37,8 @@ use crate::agent_chat::ChatHistory;
 use crate::artifacts::{ArtifactsFolder, ArtifactsServer};
 use crate::claude_code::{self, ClaudeCodeSession};
 use crate::claude_code_chat;
+use crate::codex;
+use crate::codex_chat;
 use crate::cursor_agent;
 use crate::cursor_agent_chat;
 use crate::git::{self, GitStatus};
@@ -247,6 +249,14 @@ pub async fn get_agent_chat_history(
                 .await
                 .map_err(|error| format!("Reading the chat failed: {error}"))?
         }
+        AgentKind::Codex => {
+            let session_id = agent
+                .session_id
+                .ok_or_else(|| format!("Codex in {name} hasn't started its rollout yet"))?;
+            tokio::task::spawn_blocking(move || codex_chat::read_chat_history(&session_id))
+                .await
+                .map_err(|error| format!("Reading the chat failed: {error}"))?
+        }
     }
 }
 
@@ -449,8 +459,8 @@ fn find_claude_code(
 }
 
 /// The agent running in one of the session's panes: Claude Code (see
-/// `find_claude_code`), else a Cursor `agent` process on a pane's tty, with
-/// the pane it runs in.
+/// `find_claude_code`), else a Cursor `agent` process on a pane's tty, else
+/// a `codex` process on one, with the pane it runs in.
 async fn find_agent(
     session_panes: &[&Pane],
     processes: &[Process],
@@ -459,11 +469,18 @@ async fn find_agent(
     if let Some(session) = find_claude_code(session_panes, processes, claude_code_sessions) {
         return Some(AgentSession::from(session));
     }
-    let (process, pane) =
-        find_process_in_panes(session_panes, processes, Process::is_cursor_agent)?;
+    if let Some((process, pane)) =
+        find_process_in_panes(session_panes, processes, Process::is_cursor_agent)
+    {
+        return Some(AgentSession {
+            tmux_pane_id: Some(pane.id.clone()),
+            ..cursor_agent::get_session(process.pid).await
+        });
+    }
+    let (process, pane) = find_process_in_panes(session_panes, processes, Process::is_codex)?;
     Some(AgentSession {
         tmux_pane_id: Some(pane.id.clone()),
-        ..cursor_agent::get_session(process.pid).await
+        ..codex::get_session(process.pid).await
     })
 }
 
