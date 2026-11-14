@@ -10,14 +10,16 @@
 
   /**
    * @typedef {Object} Props
-   * @property {string} label
+   * @property {string} [label]
+   * @property {import("svelte").Snippet<[]>} [buttonContent] shown in the button in place of `label`
    * @property {string} [title]
    * @property {any} [class]
+   * @property {"start" | "end"} [align] which edge of the button the menu lines up with
    * @property {import("svelte").Snippet<[{ close: () => void }]>} children
    */
 
   /** @type {Props} */
-  let { label, title, class: class_ = "btn btn-ghost", children } = $props();
+  let { label, buttonContent, title, class: class_ = "btn btn-ghost", align = "end", children } = $props();
 
   let open = $state(false);
   let element;
@@ -37,9 +39,9 @@
 
 <svelte:window onclick={closeWhenClickedOutside} onkeydown={closeOnEscape} />
 
-<details class="dropdown dropdown-end" bind:open bind:this={element}>
+<details class={["dropdown", align === "start" ? "dropdown-start" : "dropdown-end"]} bind:open bind:this={element}>
   <summary class={class_} {title}>
-    {label}
+    {#if buttonContent}{@render buttonContent()}{:else}{label}{/if}
     <Icon name="hero-chevron-down-micro" class="size-4" />
   </summary>
   <ul class="dropdown-content menu choice-menu panel w-[24rem] max-sm:fixed! max-sm:inset-x-(--page-gutter) max-sm:w-auto">

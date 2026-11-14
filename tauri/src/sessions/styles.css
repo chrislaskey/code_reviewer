@@ -421,8 +421,8 @@
 
 .chat-controls {
   display: flex;
-  flex-wrap: wrap;
-  gap: 1.25rem;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .prompt-form {
@@ -443,8 +443,11 @@
   gap: 1rem;
 }
 
-.prompt-hint {
+.prompt-send-group {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .chat-count {

@@ -6,7 +6,6 @@
      their paths put in the prompt where the cursor is. -->
 <script>
   import Button from "../lib/components/Button.svelte";
-  import InfoPopover from "../lib/components/InfoPopover.svelte";
   import Icon from "../lib/components/Icon.svelte";
   import { loadPromptDraft, savePromptDraft } from "./prompt_draft.js";
   import { imageFilesIn, insertIntoPrompt } from "./prompt_images.js";
@@ -102,31 +101,38 @@
   ></textarea>
   <div class="prompt-actions">
     {@render controls?.()}
-    {#if onAttachImage}
-      <input
-        class="hidden"
-        type="file"
-        accept="image/png,image/jpeg,image/gif,image/webp"
-        multiple
-        bind:this={imagePicker}
-        onchange={attachPickedImages}
-      />
+    <div class="prompt-send-group">
+      {#if onAttachImage}
+        <input
+          class="hidden"
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          multiple
+          bind:this={imagePicker}
+          onchange={attachPickedImages}
+        />
+        <Button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          title="Add an image: its path is put in the prompt. You can also paste or drop one."
+          disabled={disabled || sending}
+          onclick={() => imagePicker?.click()}
+        >
+          <Icon name="hero-plus-micro" class="size-4" />
+          {attachingCount > 0 ? "Adding…" : "Add"}
+        </Button>
+      {/if}
+      <!-- An arrow on small windows, to leave the row room for the controls. -->
       <Button
-        type="button"
-        class="btn btn-ghost btn-sm"
-        title="Attach an image: its path is put in the prompt. You can also paste or drop one."
-        disabled={disabled || sending}
-        onclick={() => imagePicker?.click()}
+        type="submit"
+        class="btn btn-primary text-base max-sm:btn-square max-sm:btn-sm"
+        title="Send"
+        aria-label="Send"
+        disabled={!canSend}
       >
-        <Icon name="hero-photo-micro" class="size-4" />
-        {attachingCount > 0 ? "Attaching…" : "Image"}
+        <span class="max-sm:hidden">{sending ? "Sending…" : "Send"}</span>
+        <Icon name="hero-paper-airplane-mini" class="size-5 sm:hidden" />
       </Button>
-    {/if}
-    <InfoPopover title="How the prompt is sent" class="prompt-hint dropdown-top dropdown-end">
-      Typed into the agent's tmux pane, then Enter, as if you typed it there. Nothing is sent until you press Enter or
-      Send, and Shift+Enter starts a new line. A pasted, dropped or attached image is saved in the session's artifacts
-      and its path put in the prompt, for the agent to read.
-    </InfoPopover>
-    <Button type="submit" variant="primary" disabled={!canSend}>{sending ? "Sending…" : "Send"}</Button>
+    </div>
   </div>
 </form>

@@ -1,10 +1,10 @@
 // Which messages of an agent's chat a session's page shows.
 
 export const CHAT_FILTERS = [
-  { value: "all", label: "All" },
-  { value: "last", label: "Last" },
-  { value: "yours", label: "Yours" },
-  { value: "none", label: "None" },
+  { value: "all", label: "All", explanation: "Every message, with the notes the agent's CLI writes." },
+  { value: "last", label: "Last", explanation: "Each of your prompts with the agent's final reply to it." },
+  { value: "yours", label: "Yours", explanation: "Only the prompts you wrote." },
+  { value: "none", label: "None", explanation: "No messages, to bring the logs below into view." },
 ];
 
 /** A message the user typed, not only tool results passed back to the agent. */

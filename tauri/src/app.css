@@ -7,8 +7,9 @@
 @import "./lib/theme.css";
 @source "./";
 
-/* Makes the "hero-#{ICON}" classes the Icon component uses */
+/* Makes the "hero-#{ICON}" and "lucide-#{ICON}" classes the Icon component uses */
 @plugin "../vendor/heroicons.js";
+@plugin "../vendor/lucide.js";
 
 @import "./styles.css" layer(base);
 @import "./lib/code_page.css" layer(base);

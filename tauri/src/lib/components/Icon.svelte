@@ -1,4 +1,5 @@
-<!-- A heroicon by its `hero-*` class, see vendor/heroicons.js. -->
+<!-- A heroicon by its `hero-*` class, or a Lucide icon by its `lucide-*`
+     class, see vendor/heroicons.js and vendor/lucide.js. -->
 <script>
   /**
    * @typedef {Object} Props
