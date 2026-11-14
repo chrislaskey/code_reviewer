@@ -2,7 +2,7 @@
 //! Tauri commands, each one call to the backend server the app
 //! is connected to.
 
-use code_reviewer_server::requests::CreateSessionRequest;
+use code_reviewer_server::requests::{CreateSessionRequest, SavePromptImageForSessionRequest};
 use code_reviewer_server::{
     ChatHistory, DetectedSettings, SessionList, SessionStatus, ShowOutcome,
 };
@@ -88,6 +88,27 @@ pub async fn send_prompt_to_session(
     connection
         .client()?
         .send_prompt_to_session(&name, &prompt)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// Saves an image, sent as base64, in the artifacts of a session's checkout
+/// and returns its path, to put in a prompt for its agent.
+#[tauri::command]
+pub async fn save_prompt_image_for_session(
+    connection: State<'_, BackendConnection>,
+    name: String,
+    media_type: String,
+    data_base64: String,
+) -> Result<String, String> {
+    let request = SavePromptImageForSessionRequest {
+        name,
+        media_type,
+        data_base64,
+    };
+    connection
+        .client()?
+        .save_prompt_image_for_session(&request)
         .await
         .map_err(|error| error.to_string())
 }

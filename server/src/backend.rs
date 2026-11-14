@@ -159,6 +159,24 @@ impl Backend {
         sessions::send_prompt_to_session(self.settings().await, name, prompt).await
     }
 
+    /// Saves an image, sent as base64, in the artifacts of a session's
+    /// checkout and returns its path, to put in a prompt for its agent.
+    pub async fn save_prompt_image_for_session(
+        &self,
+        name: &str,
+        media_type: &str,
+        data_base64: &str,
+    ) -> Result<String, String> {
+        sessions::save_prompt_image_for_session(
+            self.settings().await,
+            self.artifacts.as_ref(),
+            name,
+            media_type,
+            data_base64,
+        )
+        .await
+    }
+
     /// Creates a git worktree of `repository` on a branch named `name` and a
     /// tmux session named `<prefix>-<name>` in it with `PORT` set to `port`,
     /// types `command` into it and opens it in the terminal app. Returns the

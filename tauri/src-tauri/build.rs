@@ -14,6 +14,7 @@ fn main() {
         "get_session",
         "get_agent_chat_history",
         "send_prompt_to_session",
+        "save_prompt_image_for_session",
         "create_session",
         "continue_session",
         "merge_session",

@@ -80,6 +80,14 @@ export function sendPromptToSession(name, prompt) {
 }
 
 /**
+ * Saves an image, `dataBase64` of type `mediaType` like `image/png`, in the artifacts of a session's checkout. Returns
+ * its path, to put in a prompt for the agent.
+ */
+export function savePromptImageForSession(name, mediaType, dataBase64) {
+  return invoke("save_prompt_image_for_session", { name, mediaType, dataBase64 });
+}
+
+/**
  * Creates a git worktree of `repository` and a tmux session in it, both named `<prefix>-<name>`, with `PORT` set to
  * `port` and `command` typed in, and opens it in the terminal app. Returns the session's full name, prefix included.
  */

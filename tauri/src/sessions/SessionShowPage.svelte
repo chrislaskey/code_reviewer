@@ -9,7 +9,13 @@
   import InfoPopover from "../lib/components/InfoPopover.svelte";
   import StillWaves from "../lib/components/StillWaves.svelte";
   import TopBackgroundPattern from "../lib/components/TopBackgroundPattern.svelte";
-  import { getAgentChatHistory, getSession, getSessionSettings, sendPromptToSession } from "../lib/backend.js";
+  import {
+    getAgentChatHistory,
+    getSession,
+    getSessionSettings,
+    savePromptImageForSession,
+    sendPromptToSession,
+  } from "../lib/backend.js";
   import { log } from "../lib/log.svelte.js";
   import LogList from "../lib/LogList.svelte";
   import { navigateToUrl } from "../lib/router.js";
@@ -20,6 +26,7 @@
   import ChatSummary from "./ChatSummary.svelte";
   import GitStatus from "./GitStatus.svelte";
   import PromptForm from "./PromptForm.svelte";
+  import { readFileAsBase64 } from "./prompt_images.js";
   import { createSessionActions } from "./session_actions.js";
   import SessionStatusBar from "./SessionStatusBar.svelte";
 
@@ -87,6 +94,17 @@
     // The agent writes the prompt to its transcript as it reads it.
     await refresh();
     return true;
+  }
+
+  async function attachImage(file) {
+    try {
+      const path = await savePromptImageForSession(name, file.type, await readFileAsBase64(file));
+      log(`${name}: Saved the image at ${path}`);
+      return path;
+    } catch (error) {
+      log(`Saving the image for ${name} failed: ${error}`);
+      return null;
+    }
   }
 
   const actions = createSessionActions({
@@ -175,6 +193,7 @@
           disabled={promptDisabledReason !== ""}
           disabledReason={promptDisabledReason}
           onSend={sendPrompt}
+          onAttachImage={attachImage}
           controls={chatControls}
         />
       </div>

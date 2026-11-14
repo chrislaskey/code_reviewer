@@ -19,6 +19,7 @@
     "allow-get-session",
     "allow-get-agent-chat-history",
     "allow-send-prompt-to-session",
+    "allow-save-prompt-image-for-session",
     "allow-create-session",
     "allow-continue-session",
     "allow-merge-session",

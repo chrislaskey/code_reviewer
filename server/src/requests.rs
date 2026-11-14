@@ -16,6 +16,15 @@ pub struct SendPromptToSessionRequest {
     pub prompt: String,
 }
 
+/// An image to save for a prompt to the agent in one of the app's sessions:
+/// its type, like `image/png`, and its bytes as base64.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SavePromptImageForSessionRequest {
+    pub name: String,
+    pub media_type: String,
+    pub data_base64: String,
+}
+
 /// A new session: a worktree of `repository` on a branch named `name`, with
 /// `command` typed into its tmux session and `PORT` set to `port`.
 #[derive(Debug, Clone, Serialize, Deserialize)]

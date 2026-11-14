@@ -57,6 +57,7 @@ pub fn run() {
             sessions::get_session,
             sessions::get_agent_chat_history,
             sessions::send_prompt_to_session,
+            sessions::save_prompt_image_for_session,
             sessions::create_session,
             sessions::continue_session,
             sessions::merge_session,

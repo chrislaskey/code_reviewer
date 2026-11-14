@@ -26,6 +26,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use base64::Engine;
+use base64::prelude::BASE64_STANDARD;
 use futures_util::future::join_all;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
@@ -732,15 +734,46 @@ pub async fn get_session_artifacts_url(
     artifacts: Option<&ArtifactsServer>,
     name: &str,
 ) -> Result<String, String> {
-    let artifacts = artifacts.ok_or_else(|| {
+    let artifacts = require_artifacts(artifacts)?;
+    let folder = find_session_artifacts_folder(settings, name).await?;
+    Ok(artifacts.localhost_url(&folder))
+}
+
+/// Saves an image, sent as base64, in the artifacts of the checkout one of
+/// the app's sessions is in, and returns its path, for its agent to read.
+pub async fn save_prompt_image_for_session(
+    settings: &Settings,
+    artifacts: Option<&ArtifactsServer>,
+    name: &str,
+    media_type: &str,
+    data_base64: &str,
+) -> Result<String, String> {
+    let artifacts = require_artifacts(artifacts)?;
+    let bytes = BASE64_STANDARD
+        .decode(data_base64)
+        .map_err(|error| format!("The image isn't valid base64: {error}"))?;
+    let folder = find_session_artifacts_folder(settings, name).await?;
+    let path = artifacts
+        .save_prompt_image(&folder, media_type, &bytes)
+        .await?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+fn require_artifacts(artifacts: Option<&ArtifactsServer>) -> Result<&ArtifactsServer, String> {
+    artifacts.ok_or_else(|| {
         "Artifacts are served by bin/dev in the main checkout; it didn't start this app".to_string()
-    })?;
+    })
+}
+
+async fn find_session_artifacts_folder(
+    settings: &Settings,
+    name: &str,
+) -> Result<ArtifactsFolder, String> {
     let directory = get_session(settings, name)
         .await?
         .directory
         .ok_or_else(|| format!("{name} has no directory to find artifacts for"))?;
-    let folder = ArtifactsFolder::of_directory(Path::new(&directory)).await?;
-    Ok(artifacts.localhost_url(&folder))
+    ArtifactsFolder::of_directory(Path::new(&directory)).await
 }
 
 fn localhost_url(port: u16) -> String {

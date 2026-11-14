@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use axum::extract::rejection::JsonRejection;
-use axum::extract::{FromRequest, State};
+use axum::extract::{DefaultBodyLimit, FromRequest, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
@@ -28,10 +28,15 @@ use crate::backend::Backend;
 use crate::remote_access::{CreatedPairedDevice, RemoteAccess, RemoteAccessStatus};
 use crate::requests::{
     CreatePairedDeviceRequest, CreateSessionRequest, PairedDeviceIdRequest,
-    SendPromptToSessionRequest, SessionNameRequest, SetRemoteAccessEnabledRequest,
+    SavePromptImageForSessionRequest, SendPromptToSessionRequest, SessionNameRequest,
+    SetRemoteAccessEnabledRequest,
 };
 use crate::sessions::{DetectedSettings, SessionList, SessionStatus};
 use crate::terminal_app::ShowOutcome;
+
+/// The largest request body, room for big screenshots sent as base64. The
+/// clients are the app's own, so it can be generous.
+const MAX_REQUEST_BODY_BYTES: usize = 256 * 1024 * 1024;
 
 /// Every route, for the desktop app on this computer: the commands any
 /// client may run, the ones that act on this computer's screen, and the
@@ -43,6 +48,7 @@ pub fn localhost_router(backend: Arc<Backend>, remote_access: Arc<RemoteAccess>)
         .merge(routes_for_remote_access().with_state(remote_access))
         .fallback(route_not_found)
         .method_not_allowed_fallback(method_not_allowed)
+        .layer(DefaultBodyLimit::max(MAX_REQUEST_BODY_BYTES))
 }
 
 /// The routes for paired devices: not the ones that act on this computer's
@@ -52,6 +58,7 @@ pub fn tailnet_router(backend: Arc<Backend>) -> Router {
         .merge(routes_for_every_client().with_state(backend))
         .fallback(route_not_found)
         .method_not_allowed_fallback(method_not_allowed)
+        .layer(DefaultBodyLimit::max(MAX_REQUEST_BODY_BYTES))
 }
 
 fn routes_for_every_client() -> Router<Arc<Backend>> {
@@ -74,6 +81,10 @@ fn routes_for_every_client() -> Router<Arc<Backend>> {
         .route("/api/get_session", post(get_session))
         .route("/api/get_agent_chat_history", post(get_agent_chat_history))
         .route("/api/send_prompt_to_session", post(send_prompt_to_session))
+        .route(
+            "/api/save_prompt_image_for_session",
+            post(save_prompt_image_for_session),
+        )
         .route("/api/create_session", post(create_session))
         .route("/api/continue_session", post(continue_session))
         .route("/api/merge_session", post(merge_session))
@@ -259,6 +270,22 @@ async fn send_prompt_to_session(
     Ok(Json(
         backend
             .send_prompt_to_session(&request.name, &request.prompt)
+            .await?,
+    ))
+}
+
+async fn save_prompt_image_for_session(
+    State(backend): BackendState,
+    JsonBody(request): JsonBody<SavePromptImageForSessionRequest>,
+) -> ApiResult<String> {
+    let SavePromptImageForSessionRequest {
+        name,
+        media_type,
+        data_base64,
+    } = request;
+    Ok(Json(
+        backend
+            .save_prompt_image_for_session(&name, &media_type, &data_base64)
             .await?,
     ))
 }
@@ -470,6 +497,16 @@ mod tests {
 
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
         assert!(response["error"].as_str().unwrap().contains("repo_path"));
+    }
+
+    #[tokio::test]
+    async fn a_body_over_axums_default_limit_is_accepted() {
+        let padding = "x".repeat(8 * 1024 * 1024);
+        let body = json!({ "repo_path": "/no/such/repository", "padding": padding }).to_string();
+
+        let (status, _) = send(Method::POST, "/api/list_branches_and_recent_commits", &body).await;
+
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
     }
 
     #[tokio::test]

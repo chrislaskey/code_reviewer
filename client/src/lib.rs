@@ -14,7 +14,8 @@ use code_reviewer_core::git::{
 };
 use code_reviewer_server::requests::{
     CreatePairedDeviceRequest, CreateSessionRequest, PairedDeviceIdRequest,
-    SendPromptToSessionRequest, SessionNameRequest, SetRemoteAccessEnabledRequest,
+    SavePromptImageForSessionRequest, SendPromptToSessionRequest, SessionNameRequest,
+    SetRemoteAccessEnabledRequest,
 };
 use code_reviewer_server::{
     ChatHistory, DetectedSettings, SessionList, SessionStatus, ShowOutcome,
@@ -209,6 +210,15 @@ impl BackendClient {
             prompt: prompt.to_string(),
         };
         self.post("send_prompt_to_session", &body).await
+    }
+
+    /// Saves an image in the artifacts of a session's checkout and returns
+    /// its path on the server's computer, to put in a prompt for its agent.
+    pub async fn save_prompt_image_for_session(
+        &self,
+        request: &SavePromptImageForSessionRequest,
+    ) -> Result<String, ClientError> {
+        self.post("save_prompt_image_for_session", request).await
     }
 
     /// Creates a worktree and a tmux session running `command` in it.

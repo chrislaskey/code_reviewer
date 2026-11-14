@@ -14,6 +14,10 @@ const DIRECTORY_VARIABLE: &str = "CODE_REVIEWER_ARTIFACTS_DIRECTORY";
 const PORT_VARIABLE: &str = "CODE_REVIEWER_ARTIFACTS_PORT";
 /// The folder of the work done in a main checkout, not a linked worktree.
 const MAIN_CHECKOUT_FOLDER: &str = "main";
+/// The folder in a checkout's artifacts that images pasted into a prompt go in.
+const PROMPT_IMAGES_FOLDER: &str = "prompt-images";
+/// How many names a new prompt image tries before giving up.
+const MAX_PROMPT_IMAGE_NAME_ATTEMPTS: u32 = 100;
 
 /// Where the artifacts are kept and served.
 #[derive(Clone, Debug, PartialEq)]
@@ -50,6 +54,68 @@ impl ArtifactsServer {
             Err(error) => Err(format!("Could not delete {}: {error}", path.display())),
         }
     }
+
+    /// Saves an image pasted into a prompt in a folder's `prompt-images/`,
+    /// under a new name, and returns its path.
+    pub async fn save_prompt_image(
+        &self,
+        folder: &ArtifactsFolder,
+        media_type: &str,
+        bytes: &[u8],
+    ) -> Result<PathBuf, String> {
+        let extension = prompt_image_extension(media_type)?;
+        let directory = self
+            .directory
+            .join(&folder.project)
+            .join(&folder.worktree)
+            .join(PROMPT_IMAGES_FOLDER);
+        tokio::fs::create_dir_all(&directory)
+            .await
+            .map_err(|error| format!("Could not create {}: {error}", directory.display()))?;
+        let stem = format!("image-{}", chrono::Local::now().format("%Y%m%d-%H%M%S-%3f"));
+        for attempt in 1..=MAX_PROMPT_IMAGE_NAME_ATTEMPTS {
+            let file_name = match attempt {
+                1 => format!("{stem}.{extension}"),
+                _ => format!("{stem}-{attempt}.{extension}"),
+            };
+            let path = directory.join(file_name);
+            match write_new_file(&path, bytes).await {
+                Ok(()) => return Ok(path),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => {
+                    return Err(format!("Could not save {}: {error}", path.display()));
+                }
+            }
+        }
+        Err(format!(
+            "Could not find a free name for an image in {}",
+            directory.display()
+        ))
+    }
+}
+
+/// The file extension of an image type an agent can read.
+fn prompt_image_extension(media_type: &str) -> Result<&'static str, String> {
+    match media_type {
+        "image/png" => Ok("png"),
+        "image/jpeg" => Ok("jpg"),
+        "image/gif" => Ok("gif"),
+        "image/webp" => Ok("webp"),
+        _ => Err(format!(
+            "Can't attach a {media_type} image: only PNG, JPEG, GIF and WebP are supported"
+        )),
+    }
+}
+
+async fn write_new_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use tokio::io::AsyncWriteExt;
+    let mut file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .await?;
+    file.write_all(bytes).await?;
+    file.flush().await
 }
 
 /// The folder of one checkout's artifacts: its repository's main checkout's
@@ -158,6 +224,40 @@ mod tests {
 
         assert!(!deleted.exists());
         assert!(kept.exists());
+    }
+
+    #[tokio::test]
+    async fn saves_prompt_images_under_new_names() {
+        let directory = tempfile::tempdir().unwrap();
+        let folder = ArtifactsFolder::new(Path::new("/code/code_reviewer"), "cr-x").unwrap();
+
+        let first = server(directory.path())
+            .save_prompt_image(&folder, "image/png", b"one")
+            .await
+            .unwrap();
+        let second = server(directory.path())
+            .save_prompt_image(&folder, "image/png", b"two")
+            .await
+            .unwrap();
+
+        assert_ne!(first, second);
+        assert!(first.starts_with(directory.path().join("code_reviewer/cr-x/prompt-images")));
+        assert_eq!(first.extension().unwrap(), "png");
+        assert_eq!(std::fs::read(&first).unwrap(), b"one");
+        assert_eq!(std::fs::read(&second).unwrap(), b"two");
+    }
+
+    #[tokio::test]
+    async fn refuses_prompt_images_of_other_types() {
+        let directory = tempfile::tempdir().unwrap();
+        let folder = ArtifactsFolder::new(Path::new("/code/code_reviewer"), "cr-x").unwrap();
+
+        let saved = server(directory.path())
+            .save_prompt_image(&folder, "image/svg+xml", b"<svg/>")
+            .await;
+
+        assert!(saved.is_err());
+        assert!(!directory.path().join("code_reviewer").exists());
     }
 
     #[tokio::test]
