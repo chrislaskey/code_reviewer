@@ -304,6 +304,23 @@
   max-width: 42rem;
 }
 
+/* Text the agent's CLI took in as a paste: a faint rule and softer text, since it reads on from the prompt. */
+.markdown-html.chat-text .chat-pasted {
+  padding-left: 0.75rem;
+  border-left: 2px solid color-mix(in oklab, var(--color-base-content) 15%, transparent);
+  color: color-mix(in oklab, var(--color-base-content) 80%, transparent);
+}
+
+.markdown-html .chat-pasted > * + * {
+  margin-top: 0.75rem;
+}
+
+.markdown-html.chat-text .chat-pasted > p,
+.markdown-html.chat-text .chat-pasted > ul,
+.markdown-html.chat-text .chat-pasted > ol {
+  max-width: 42rem;
+}
+
 .chat-fold {
   font-size: 0.85rem;
 }

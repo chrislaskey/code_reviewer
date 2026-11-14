@@ -318,8 +318,42 @@ pub(crate) fn shorten(text: &str, max_chars: usize) -> String {
 pub(crate) fn text_part(text: &str) -> Option<ChatPart> {
     let text = text.trim();
     (!text.is_empty()).then(|| ChatPart::Text {
-        html: render_markdown_html(text),
+        html: render_markdown_html_marking_pasted_content(text),
     })
+}
+
+/// Renders the text as Markdown, with each block the agent's CLI wrapped in
+/// `<pasted_content id="…">` rendered on its own inside a `chat-pasted` div,
+/// instead of the tags showing as text.
+fn render_markdown_html_marking_pasted_content(text: &str) -> String {
+    let mut html = String::new();
+    let mut rest = text;
+    while let Some((before, pasted, after)) = split_at_pasted_content(rest) {
+        html.push_str(&render_markdown_html(before));
+        html.push_str(PASTED_CONTENT_OPENING_HTML);
+        html.push_str(&render_markdown_html(pasted));
+        html.push_str("</div>");
+        rest = after;
+    }
+    html.push_str(&render_markdown_html(rest));
+    html
+}
+
+const PASTED_CONTENT_OPENING_HTML: &str = "<div class=\"chat-pasted\">";
+
+/// The text before the first pasted block, the block's contents and the text
+/// after it. The closing tag repeats the id: `</pasted_content id="…">`.
+fn split_at_pasted_content(text: &str) -> Option<(&str, &str, &str)> {
+    let opening_start = text.find("<pasted_content")?;
+    let contents_start = opening_start + text[opening_start..].find('>')? + 1;
+    let contents_length = text[contents_start..].find("</pasted_content")?;
+    let closing_start = contents_start + contents_length;
+    let after_start = closing_start + text[closing_start..].find('>')? + 1;
+    Some((
+        &text[..opening_start],
+        text[contents_start..closing_start].trim(),
+        &text[after_start..],
+    ))
 }
 
 pub(crate) fn tool_text(text: String) -> ToolText {
@@ -351,6 +385,27 @@ mod tests {
         assert!(validate_chat_id("03d0ee05-e0c2-403a-8b99-c7ce5d5623b1").is_ok());
         assert!(validate_chat_id("../secrets").is_err());
         assert!(validate_chat_id("").is_err());
+    }
+
+    #[test]
+    fn renders_pasted_content_without_its_tags() {
+        let text = "Before\n\n<pasted_content id=\"df8b\">\nPasted *text*\n</pasted_content id=\"df8b\">\nAfter";
+        let Some(ChatPart::Text { html }) = text_part(text) else {
+            panic!("expected a text part");
+        };
+        assert!(!html.contains("pasted_content"));
+        assert_eq!(
+            html,
+            "<p>Before</p>\n<div class=\"chat-pasted\"><p>Pasted <em>text</em></p>\n</div><p>After</p>\n"
+        );
+    }
+
+    #[test]
+    fn leaves_an_unclosed_pasted_content_tag_as_text() {
+        let Some(ChatPart::Text { html }) = text_part("<pasted_content id=\"a\"> no end") else {
+            panic!("expected a text part");
+        };
+        assert!(html.contains("&lt;pasted_content"));
     }
 
     #[test]
