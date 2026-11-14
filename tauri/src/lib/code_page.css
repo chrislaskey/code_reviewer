@@ -68,6 +68,19 @@
   overflow: hidden;
 }
 
+/* The toolbar of a full page, which stays at the top of small windows as
+   the page scrolls, just below the phone's status bar. The shadow paints
+   the status bar strip above it, so the page doesn't show through it. */
+@media (width < 40rem) {
+  .full-page-toolbar {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 10;
+    background: var(--color-base-100);
+    box-shadow: 0 calc(-1 * env(safe-area-inset-top, 0px)) 0 var(--color-base-100);
+  }
+}
+
 /* A dotted grid behind code, the same as the Node view's canvas. */
 .dot-grid {
   background-image: radial-gradient(circle, color-mix(in oklab, var(--color-base-content) 40%, transparent) 0.5px, transparent 0.5px);

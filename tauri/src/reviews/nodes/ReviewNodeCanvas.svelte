@@ -6,7 +6,7 @@
   import "@xyflow/svelte/dist/style.css";
   import GroupCardNode from "./GroupCardNode.svelte";
   import LinkChipNode from "./LinkChipNode.svelte";
-  import { buildGroupGraph, groupNodeId } from "./layout.js";
+  import { buildGroupGraph, groupNodeId, showGroupPadding, startingViewport } from "./layout.js";
 
   /**
    * @type {{
@@ -38,7 +38,8 @@
       pendingGroupId = groupId;
       return;
     }
-    fitView({ nodes: [{ id: groupNodeId(groupId) }], padding: 0.4, maxZoom: 1, duration: 500 });
+    const padding = showGroupPadding(window.innerWidth);
+    fitView({ nodes: [{ id: groupNodeId(groupId) }], padding, maxZoom: 1, duration: 500 });
   }
 
   function showPendingGroup() {
@@ -80,7 +81,7 @@
   bind:edges
   {nodeTypes}
   {colorMode}
-  initialViewport={{ x: 24, y: 24, zoom: 0.85 }}
+  initialViewport={startingViewport(window.innerWidth)}
   minZoom={0.2}
   maxZoom={1.5}
   nodesDraggable={false}

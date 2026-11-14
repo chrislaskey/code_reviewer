@@ -5,9 +5,16 @@
 
 /** @typedef {"changed" | "unchanged" | "system"} FrameEmphasis */
 
-export const SHOWN_OPTIONS = [
-  { value: "shown", label: "Shown" },
-  { value: "hidden", label: "Hidden" },
+// Which calls the stack shows: `systemCalls` is "hidden" for Your code.
+export const SYSTEM_CALL_CHOICES = [
+  { value: "hidden", label: "Your code", explanation: "Calls into dependencies and the standard library are hidden." },
+  { value: "shown", label: "All calls", explanation: "Calls into dependencies and the standard library are shown, as slim rows." },
+];
+
+// Which project functions the stack shows: `unchanged` is "hidden" for Changed only.
+export const UNCHANGED_CHOICES = [
+  { value: "shown", label: "All functions", explanation: "Unchanged functions are shown, as one-line cards." },
+  { value: "hidden", label: "Changed only", explanation: "Unchanged functions are hidden, and each change notes the calls left out above it." },
 ];
 
 export const STOP_LABELS = {
@@ -21,6 +28,17 @@ export function frameEmphasis(frame) {
   if (!frame.defined_in_project) return "system";
   if (frame.change && !frame.repeated) return "changed";
   return "unchanged";
+}
+
+/** How many frames are changed, project functions and system calls. */
+export function frameCounts(frames) {
+  const emphases = frames.map(frameEmphasis);
+  const system = emphases.filter((emphasis) => emphasis === "system").length;
+  return {
+    changed: emphases.filter((emphasis) => emphasis === "changed").length,
+    project: frames.length - system,
+    system,
+  };
 }
 
 export function functionLabel({ module, name, arity }) {

@@ -152,7 +152,7 @@
     <p class="px-6 py-10 text-sm text-base-content/50">Nothing changed between the two.</p>
   {:else}
     <!-- On small windows the page scrolls as a whole, and the toolbar stays at the top. -->
-    <Toolbar class="review-toolbar max-sm:sticky max-sm:top-0 max-sm:z-10 max-sm:bg-base-100">
+    <Toolbar class="full-page-toolbar">
       <SegmentedControl value={view} options={VIEW_OPTIONS} onchange={changeView} />
       {#if view === "ledger"}
         <div class="flex items-center gap-1">

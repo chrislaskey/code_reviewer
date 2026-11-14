@@ -86,6 +86,28 @@ pub struct Pane {
 /// How long to wait between pasting a prompt and pressing Enter.
 const PASTE_SETTLE_TIME: std::time::Duration = std::time::Duration::from_millis(150);
 
+/// How much longer to wait for each image path in a pasted prompt: Claude
+/// Code reads the image of each one into the prompt, and drops an Enter
+/// that comes before it is done.
+const IMAGE_PATH_SETTLE_TIME: std::time::Duration = std::time::Duration::from_millis(1000);
+
+const IMAGE_EXTENSIONS: [&str; 5] = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+
+/// How long to wait between pasting `prompt` and pressing Enter.
+fn paste_settle_time(prompt: &str) -> std::time::Duration {
+    let image_paths = prompt.split_whitespace().filter(|word| is_image_path(word));
+    let image_path_count = u32::try_from(image_paths.count()).unwrap_or(u32::MAX);
+    PASTE_SETTLE_TIME.saturating_add(IMAGE_PATH_SETTLE_TIME.saturating_mul(image_path_count))
+}
+
+fn is_image_path(word: &str) -> bool {
+    let word = word.to_ascii_lowercase();
+    word.starts_with('/')
+        && IMAGE_EXTENSIONS
+            .iter()
+            .any(|extension| word.ends_with(extension))
+}
+
 #[derive(Clone, Debug)]
 pub struct Tmux {
     program: String,
@@ -266,7 +288,7 @@ impl Tmux {
         self.run_checked(&["paste-buffer", "-p", "-d", "-b", &buffer, "-t", pane_id])
             .await?;
         // An agent can read an Enter that comes with the paste as part of it.
-        tokio::time::sleep(PASTE_SETTLE_TIME).await;
+        tokio::time::sleep(paste_settle_time(prompt)).await;
         self.run_checked(&["send-keys", "-t", pane_id, "Enter"])
             .await
     }
@@ -387,6 +409,15 @@ mod tests {
     use std::time::Duration;
 
     use super::*;
+
+    #[test]
+    fn waits_longer_after_pasting_image_paths() {
+        assert_eq!(paste_settle_time("Fix the toolbar"), PASTE_SETTLE_TIME);
+        assert_eq!(
+            paste_settle_time("See /tmp/a.png and /tmp/b.JPG but not image.png\n/tmp/c.webp"),
+            PASTE_SETTLE_TIME + IMAGE_PATH_SETTLE_TIME * 3
+        );
+    }
 
     /// A tmux server of its own, stopped and its socket removed when the
     /// test ends, even when it fails.

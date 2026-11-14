@@ -76,6 +76,29 @@ function edge(id, source, target, tone) {
 
 const FIXED = { draggable: false, selectable: false, connectable: false };
 
+/** Where the canvas starts on wide screens: the rows from the left, input chips first. */
+const WIDE_VIEWPORT = { x: 24, y: 24, zoom: 0.85 };
+
+/** Narrower than this, the canvas starts on the group cards. Tailwind's `sm`. */
+const NARROW_CANVAS_WIDTH = 640;
+
+/**
+ * Where the canvas starts. A narrow canvas, like a phone's, starts on the
+ * group cards, zoomed to fit them across; the input chips are a pan left.
+ */
+export function startingViewport(canvasWidth) {
+  if (canvasWidth >= NARROW_CANVAS_WIDTH) return WIDE_VIEWPORT;
+  const margin = 16;
+  const cardX = SIZES.chipWidth + SIZES.columnGap;
+  const zoom = Math.min(WIDE_VIEWPORT.zoom, (canvasWidth - 2 * margin) / SIZES.cardWidth);
+  return { x: margin - cardX * zoom, y: WIDE_VIEWPORT.y, zoom };
+}
+
+/** The room around a group card the canvas moves to, as a share of the canvas: less on a narrow one. */
+export function showGroupPadding(canvasWidth) {
+  return canvasWidth < NARROW_CANVAS_WIDTH ? 0.05 : 0.4;
+}
+
 /** The nodes and edges of the rows, stacked top to bottom. */
 export function buildGroupGraph(rows) {
   const nodes = [];

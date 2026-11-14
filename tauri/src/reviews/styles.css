@@ -23,13 +23,7 @@
 
 @media (width < 40rem) {
   .review-file {
-    scroll-margin-top: 64px;
-  }
-
-  /* Paints the phone's status bar strip above the stuck toolbar, so the
-     page doesn't show through it as it scrolls. */
-  .review-toolbar {
-    box-shadow: 0 calc(-1 * env(safe-area-inset-top, 0px)) 0 var(--color-base-100);
+    scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 64px);
   }
 }
 
