@@ -69,7 +69,7 @@
   }
 </script>
 
-<div id="review-file-{file.id}" class="overflow-hidden rounded-xl border border-base-300 bg-base-100 shadow-sm" style="width: {WIDTH}px">
+<div id="review-file-{file.id}" class="review-file overflow-hidden rounded-xl border border-base-300 bg-base-100 shadow-sm" style="width: {WIDTH}px">
   <button
     type="button"
     onclick={() => (expanded.open = !expanded.open)}

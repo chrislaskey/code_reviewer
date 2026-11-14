@@ -1,12 +1,24 @@
-<!-- The two buttons that open or close every ledger and code block. -->
+<!-- The two icon buttons that open or close every ledger and code block. -->
 <script>
+  import Icon from "../../lib/components/Icon.svelte";
+
   /** @type {{ oncommand: (open: boolean) => void }} */
   let { oncommand } = $props();
 
-  const BUTTON = "px-3 py-1 bg-base-100 text-base-content/60 hover:text-base-content";
+  const BUTTONS = [
+    { open: true, icon: "lucide-chevrons-up-down", title: "Open all the files and their code" },
+    { open: false, icon: "lucide-chevrons-down-up", title: "Close all the files and their code" },
+  ];
 </script>
 
-<div class="inline-flex overflow-hidden rounded-lg border border-base-300 text-xs">
-  <button type="button" onclick={() => oncommand(true)} class={BUTTON}>Open all</button>
-  <button type="button" onclick={() => oncommand(false)} class={[BUTTON, "border-l border-base-300"]}>Close all</button>
-</div>
+{#each BUTTONS as button (button.open)}
+  <button
+    type="button"
+    class="btn btn-ghost btn-sm btn-square"
+    title={button.title}
+    aria-label={button.title}
+    onclick={() => oncommand(button.open)}
+  >
+    <Icon name={button.icon} class="size-4" />
+  </button>
+{/each}

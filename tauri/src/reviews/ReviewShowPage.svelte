@@ -1,11 +1,14 @@
 <!-- The review page: runs the comparison in the URL, then shows the result
-     in the Node view (groups and files on a canvas) or the Ledger view (the
-     files of one group with their functions, calls, callers and code). The
-     tree on the left lists All changes, the groups and the files of the
-     chosen group, and one click always means the same view:
+     in the Files tab, the Node view (groups and files on a canvas), or the
+     Code tab, the Ledger view (the files of one group with their functions,
+     calls, callers and code). The tree on the left lists All changes, the
+     groups and the files of the chosen group, and one click always means the
+     same view:
      - All changes shows the Node view, moved to the All changes row.
      - A group shows the Node view, moved to that group, and lists its files.
-     - A file shows the Ledger view of its group, scrolled to the file. -->
+     - A file shows the Ledger view of its group, scrolled to the file.
+     Small windows have one column: on Files the tree, full width, above the
+     canvas, and on Code only the code. -->
 <script>
   import { onMount, setContext, tick } from "svelte";
   import AppNav from "../lib/components/AppNav.svelte";
@@ -13,6 +16,10 @@
   import { reviewNewUrl, reviewRequestFromSearch } from "../lib/routes.js";
   import { plural } from "../lib/change_styles.js";
   import { describeRequest } from "../lib/comparison_form.js";
+  import ChoiceMenu from "../lib/components/ChoiceMenu.svelte";
+  import Icon from "../lib/components/Icon.svelte";
+  import InfoPopover from "../lib/components/InfoPopover.svelte";
+  import MenuChoice from "../lib/components/MenuChoice.svelte";
   import MarkerIcon from "./MarkerIcon.svelte";
   import ReviewTree from "./ReviewTree.svelte";
   import SegmentedControl from "../lib/components/SegmentedControl.svelte";
@@ -25,13 +32,14 @@
   import { ALL_CHANGES_ID, findFileById, toViewFiles, toViewGroupRows } from "./view_model.js";
 
   const VIEW_OPTIONS = [
-    { value: "nodes", label: "Nodes" },
-    { value: "ledger", label: "Ledger" },
+    { value: "nodes", label: "Files" },
+    { value: "ledger", label: "Code" },
   ];
 
-  const OUTSIDE_OPTIONS = [
-    { value: "dimmed", label: "Dimmed" },
-    { value: "hidden", label: "Hidden" },
+  // How the Code tab draws calls into dependencies and the standard library.
+  const OUTSIDE_CHOICES = [
+    { value: "hidden", label: "Your code", explanation: "Calls into dependencies and the standard library are hidden." },
+    { value: "dimmed", label: "All calls", explanation: "Calls into dependencies and the standard library are shown, dimmed." },
   ];
 
   const request = reviewRequestFromSearch(window.location.search);
@@ -53,6 +61,7 @@
   let functionCount = $derived(files.reduce((sum, file) => sum + file.functions.length, 0));
   let selectedGroup = $derived(result?.groups.find((group) => group.id === selectedGroupId) ?? null);
   let selectedRow = $derived(groupRows.find((row) => row.group.id === selectedGroupId));
+  let outsideLabel = $derived(OUTSIDE_CHOICES.find((choice) => choice.value === outside)?.label);
 
   const openAll = createOpenAllCommand();
 
@@ -116,32 +125,19 @@
 
 <AppNav current="reviews" />
 
-<div class="full-page">
+<div class="full-page max-sm:h-auto">
   <div class="full-page-title">
     <h1>Review</h1>
     {#if request}
       <span class="comparison font-mono text-[11px] text-base-content/70">
         <span class="text-base-content">{request.repo_path}</span>
         <span>{describeRequest(request)}</span>
-        {#if result}
-          <span>
-            {plural(result.files.length, "changed file")}, {plural(functionCount, "changed function")} ·
-            {shortCommit(result.base_commit)} → {result.head_commit ? shortCommit(result.head_commit) : "working tree"}
-          </span>
-          {#if result.skipped_files.length > 0}
-            <details class="relative">
-              <summary class="cursor-pointer">{plural(result.skipped_files.length, "skipped file")}</summary>
-              <ul class="absolute z-10 mt-1 max-h-64 overflow-auto rounded-lg border border-base-300 bg-base-100 p-2 shadow">
-                {#each result.skipped_files as skipped (skipped.path)}
-                  <li>{skipped.path} · {skipped.reason}</li>
-                {/each}
-              </ul>
-            </details>
-          {/if}
-        {/if}
       </span>
     {/if}
-    <a href={reviewNewUrl(request)} class="ml-auto text-sm text-primary">Edit review</a>
+    <a href={reviewNewUrl(request)} class="btn btn-ghost btn-sm ml-auto">
+      <Icon name="hero-pencil-square-micro" class="size-4" />
+      Edit
+    </a>
   </div>
 
   {#if request === null}
@@ -155,31 +151,71 @@
   {:else if result.files.length === 0}
     <p class="px-6 py-10 text-sm text-base-content/50">Nothing changed between the two.</p>
   {:else}
-    <Toolbar>
-      <SegmentedControl label="View" value={view} options={VIEW_OPTIONS} onchange={changeView} />
+    <!-- On small windows the page scrolls as a whole, and the toolbar stays at the top. -->
+    <Toolbar class="review-toolbar max-sm:sticky max-sm:top-0 max-sm:z-10 max-sm:bg-base-100">
+      <SegmentedControl value={view} options={VIEW_OPTIONS} onchange={changeView} />
       {#if view === "ledger"}
-        <SegmentedControl
-          label="Dependencies and standard library"
-          value={outside}
-          options={OUTSIDE_OPTIONS}
-          onchange={(value) => (outside = value === "dimmed" ? "dimmed" : "hidden")}
-        />
-        <OpenAllButtons oncommand={openAll.send} />
+        <div class="flex items-center gap-1">
+          <ChoiceMenu title="Which calls the code shows" class="btn btn-ghost btn-sm" align="start">
+            {#snippet buttonContent()}
+              <span class="max-sm:hidden">Show</span>
+              {outsideLabel}
+            {/snippet}
+            {#snippet children({ close })}
+              {#each OUTSIDE_CHOICES as choice (choice.value)}
+                <MenuChoice
+                  label={choice.label}
+                  explanation={choice.explanation}
+                  onclick={() => {
+                    outside = choice.value === "dimmed" ? "dimmed" : "hidden";
+                    close();
+                  }}
+                />
+              {/each}
+            {/snippet}
+          </ChoiceMenu>
+          <OpenAllButtons oncommand={openAll.send} />
+        </div>
       {/if}
-      <span class="text-[11px] text-base-content/50">
-        {#if view === "nodes"}
-          Click a file to open its group in the Ledger view, a group to show it.
-        {:else}
-          Hover a function to see its code, click the code to keep it open.
-        {/if}
-      </span>
-      <ul class="ml-auto flex flex-wrap gap-x-5 text-[11px] text-base-content/70">
-        <li class="flex items-center gap-1.5"><MarkerIcon marker="stale" /> stale caller</li>
-        <li class="flex items-center gap-1.5"><MarkerIcon marker="also_changed" /> also changed, click to jump</li>
-      </ul>
+      <div class="ml-auto flex items-center gap-3">
+        <span class="font-mono text-[11px] text-base-content/50 max-sm:hidden">
+          {plural(result.files.length, "file")} · {plural(functionCount, "function")}
+        </span>
+        <InfoPopover title="How to use this view, what its markers mean, and what was compared" class="dropdown-end">
+          <p>
+            {#if view === "nodes"}
+              Click a group to show it, a file to open its group's code.
+            {:else}
+              Hover a function to see its code, click the code to keep it open.
+            {/if}
+          </p>
+          <ul class="mt-2 flex flex-col gap-1">
+            <li class="flex items-center gap-1.5"><MarkerIcon marker="stale" /> stale caller</li>
+            <li class="flex items-center gap-1.5"><MarkerIcon marker="also_changed" /> also changed, click to jump</li>
+          </ul>
+          <p class="mt-2 font-mono text-xs">
+            {plural(result.files.length, "changed file")}, {plural(functionCount, "changed function")} ·
+            {shortCommit(result.base_commit)} → {result.head_commit ? shortCommit(result.head_commit) : "working tree"}
+          </p>
+          {#if result.skipped_files.length > 0}
+            <p class="mt-2">{plural(result.skipped_files.length, "skipped file")}:</p>
+            <ul class="max-h-40 overflow-auto font-mono text-xs">
+              {#each result.skipped_files as skipped (skipped.path)}
+                <li>{skipped.path} · {skipped.reason}</li>
+              {/each}
+            </ul>
+          {/if}
+        </InfoPopover>
+      </div>
     </Toolbar>
-    <div class="full-page-body">
-      <aside class="w-60 shrink-0 overflow-y-auto border-r border-base-300">
+    <div class="full-page-body max-sm:flex-col">
+      <aside
+        class={[
+          "w-60 shrink-0 overflow-y-auto border-r border-base-300",
+          "max-sm:w-full max-sm:overflow-visible max-sm:border-r-0",
+          view === "ledger" && "max-sm:hidden",
+        ]}
+      >
         <ReviewTree
           {allChangesRow}
           groups={result.groups}
@@ -191,7 +227,7 @@
         />
       </aside>
       {#if view === "nodes"}
-        <div class="full-page-canvas">
+        <div class="full-page-canvas max-sm:h-[60svh] max-sm:flex-none max-sm:border-t max-sm:border-base-300">
           <ReviewNodeView
             bind:this={nodeView}
             rows={[allChangesRow, ...groupRows]}
@@ -200,7 +236,7 @@
           />
         </div>
       {:else}
-        <div class="full-page-content flex flex-col">
+        <div class="full-page-content flex flex-col max-sm:overflow-y-visible">
           <ReviewLedgerView
             bind:this={ledgerView}
             group={selectedGroup}

@@ -64,10 +64,10 @@
       title={item.title ?? item.label}
       style="padding-left: calc(var(--page-gutter) + {item.depth * INDENT}px)"
       class={[
-        "flex w-full items-center gap-1.5 py-1 pr-3 text-left",
+        "flex w-full items-center gap-1.5 py-1 pr-3 text-left max-sm:py-2",
         item.selected ? "bg-primary/10 font-semibold" : "hover:bg-base-content/5",
         item.dim ? "text-base-content/60" : "",
-        item.mono ? "font-mono text-[11px]" : "text-xs",
+        item.mono ? "font-mono text-[11px] max-sm:text-xs" : "text-xs max-sm:text-sm",
       ]}
     >
       <span class="shrink-0 text-base-content/50"><Icon name={item.icon} class="size-3.5" /></span>

@@ -15,6 +15,24 @@
   pointer-events: all !important;
 }
 
+/* Where the Ledger view scrolls a file to: clear of the toolbar, which
+   stays at the top of small windows as the page scrolls. */
+.review-file {
+  scroll-margin-top: 16px;
+}
+
+@media (width < 40rem) {
+  .review-file {
+    scroll-margin-top: 64px;
+  }
+
+  /* Paints the phone's status bar strip above the stuck toolbar, so the
+     page doesn't show through it as it scrolls. */
+  .review-toolbar {
+    box-shadow: 0 calc(-1 * env(safe-area-inset-top, 0px)) 0 var(--color-base-100);
+  }
+}
+
 /* Rendered Markdown (GitHub flavored). The HTML comes from the backend. */
 .markdown-html {
   --added-gutter: 2rem;

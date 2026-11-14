@@ -24,7 +24,6 @@
   export function scrollToFile(fileId) {
     const element = document.getElementById(`review-file-${fileId}`);
     if (!element) return;
-    element.style.scrollMarginTop = "16px";
     element.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 </script>

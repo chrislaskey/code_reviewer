@@ -31,7 +31,7 @@
   <summary class="flex cursor-pointer list-none text-base-content/50 hover:text-base-content" {title}>
     <Icon name={icon} class="size-[1.1rem]" />
   </summary>
-  <div class="dropdown-content panel z-10 mt-1 w-[30rem] p-4 text-sm leading-relaxed text-base-content/70">
+  <div class="dropdown-content panel z-10 mt-1 w-[30rem] max-w-[calc(100vw-2*var(--page-gutter))] p-4 text-sm leading-relaxed text-base-content/70">
     {@render children()}
   </div>
 </details>
