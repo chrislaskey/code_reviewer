@@ -69,15 +69,29 @@
 }
 
 /* The toolbar of a full page, which stays at the top of small windows as
-   the page scrolls, just below the phone's status bar. The shadow paints
-   the status bar strip above it, so the page doesn't show through it. */
+   the page scrolls, its buttons just below the phone's status bar (its top
+   padding reaches into it). A fixed strip paints the status bar area above
+   it, so the page doesn't show through; iOS doesn't paint a sticky
+   element's shadow there. */
 @media (width < 40rem) {
+  .full-page {
+    --toolbar-top: max(0px, calc(env(safe-area-inset-top, 0px) - 0.5rem));
+  }
+
+  .full-page::before {
+    content: "";
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 10;
+    height: var(--toolbar-top);
+    background: var(--color-base-100);
+  }
+
   .full-page-toolbar {
     position: sticky;
-    top: env(safe-area-inset-top, 0px);
+    top: var(--toolbar-top);
     z-index: 10;
     background: var(--color-base-100);
-    box-shadow: 0 calc(-1 * env(safe-area-inset-top, 0px)) 0 var(--color-base-100);
   }
 }
 
