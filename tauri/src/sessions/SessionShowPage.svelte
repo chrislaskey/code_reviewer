@@ -5,6 +5,7 @@
 <script>
   import { onMount } from "svelte";
   import AppNav from "../lib/components/AppNav.svelte";
+  import Button from "../lib/components/Button.svelte";
   import Header from "../lib/components/Header.svelte";
   import InfoPopover from "../lib/components/InfoPopover.svelte";
   import StillWaves from "../lib/components/StillWaves.svelte";
@@ -33,6 +34,7 @@
   import SessionStatusBar from "./SessionStatusBar.svelte";
 
   const REFRESH_INTERVAL_MS = 5000;
+  const REFRESH_RIPPLE_STRENGTH = 20;
   // Toggles for the prompt box's layout, each on or off by itself.
   const CHAT_LAYOUT_TOGGLES = [
     { value: "pinned", icon: "lucide-pin", title: "Pin the prompt in view while the chat scrolls" },
@@ -61,11 +63,12 @@
     !session ? "No running session to write to" : !session.agent?.tmux_pane_id ? "No agent running in the session" : "",
   );
 
+  let waves;
   let refreshing = false;
   let lastRefreshError;
 
   async function refresh() {
-    if (refreshing || name === null) return;
+    if (refreshing || name === null) return false;
     refreshing = true;
     try {
       session = await getSession(name);
@@ -84,6 +87,13 @@
     if (refreshError && refreshError !== lastRefreshError) log(`Refreshing ${name} failed: ${refreshError}`);
     lastRefreshError = refreshError;
     refreshing = false;
+    return !refreshError;
+  }
+
+  async function refreshFromButton(event) {
+    const box = event.currentTarget.getBoundingClientRect();
+    waves.ripple(REFRESH_RIPPLE_STRENGTH, box.left + box.width / 2);
+    if (await refresh()) log(`${name}: Refreshed`);
   }
 
   async function sendPrompt(prompt) {
@@ -148,9 +158,7 @@
     {/each}
     <ChoiceMenu title="Which messages the chat shows" class="btn btn-ghost btn-sm" align="start">
       {#snippet buttonContent()}
-        <!-- A filter icon in place of "Show" on small windows. -->
         <span class="max-sm:hidden">Show</span>
-        <Icon name="lucide-list-filter" class="size-4 sm:hidden" />
         {chatFilterLabel}
       {/snippet}
       {#snippet children({ close })}
@@ -169,7 +177,7 @@
   </div>
 {/snippet}
 
-<StillWaves rippleOnLoad />
+<StillWaves bind:this={waves} rippleOnLoad />
 
 <TopBackgroundPattern />
 
@@ -222,8 +230,16 @@
           </p>
         </InfoPopover>
       </div>
-      <!-- Small windows have it in the status bar's Git menu above. -->
-      {#if session?.git}<span class="max-sm:hidden"><GitStatus git={session.git} /></span>{/if}
+      <div class="flex items-baseline gap-2">
+        <!-- Small windows have it in the status bar's Git menu above. -->
+        {#if session?.git}<span class="max-sm:hidden"><GitStatus git={session.git} /></span>{/if}
+        {#if name !== null}
+          <Button class="btn btn-ghost" onclick={refreshFromButton}>
+            <Icon name="hero-arrow-path-micro" class="size-4" />
+            Refresh
+          </Button>
+        {/if}
+      </div>
     </div>
     {#if name !== null}
       <div class={["chat-prompt", chatLayout]}>

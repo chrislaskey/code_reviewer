@@ -143,7 +143,7 @@
       Refreshes every 5 seconds.
     {/snippet}
     {#snippet actions()}
-      <Button variant="primary" href={sessionNewUrl()}>New session</Button>
+      <Button variant="primary" href={sessionNewUrl()}>New<span class="max-sm:hidden">&nbsp;session</span></Button>
     {/snippet}
   </Header>
 
