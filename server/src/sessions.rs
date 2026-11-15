@@ -250,6 +250,24 @@ pub async fn get_agent_chat_history(
                 .map_err(|error| format!("Reading the chat failed: {error}"))?
         }
         AgentKind::Codex => {
+            #[cfg(unix)]
+            if crate::codex_local::socket_path().is_some_and(|path| path.exists()) {
+                let session_id = match agent.session_id {
+                    Some(id) => id,
+                    None => {
+                        codex::get_local_thread(
+                            session
+                                .directory
+                                .as_deref()
+                                .ok_or("The Codex pane has no working directory")?,
+                        )
+                        .await
+                        .map_err(|error| error.to_string())?
+                        .id
+                    }
+                };
+                return codex_chat::read_local_chat_history(&session_id).await;
+            }
             let session_id = agent
                 .session_id
                 .ok_or_else(|| format!("Codex in {name} hasn't started its rollout yet"))?;
@@ -480,7 +498,7 @@ async fn find_agent(
     let (process, pane) = find_process_in_panes(session_panes, processes, Process::is_codex)?;
     Some(AgentSession {
         tmux_pane_id: Some(pane.id.clone()),
-        ..codex::get_session(process.pid).await
+        ..codex::get_session(process.pid, &pane.current_path).await
     })
 }
 

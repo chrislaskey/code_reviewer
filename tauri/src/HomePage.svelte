@@ -56,9 +56,27 @@
   .feature {
     display: block;
     padding: 1rem 1.25rem;
+    border: 1px solid transparent;
     color: inherit;
     text-decoration: none;
     cursor: pointer;
+    transition:
+      transform 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .feature:hover,
+  .feature:focus-visible {
+    transform: translateY(-2px);
+    border-color: var(--color-primary);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .feature {
+      transition: none;
+    }
   }
 
   .feature-text {

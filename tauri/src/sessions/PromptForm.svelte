@@ -12,14 +12,15 @@
 
   /** `controls`: shown on the left of the Send row, like the chat's toggles. */
   /** `onAttachImage`: saves an image and resolves to its path, or `null` when it couldn't. */
-  /** @type {{ draftKey?: string, disabled?: boolean, disabledReason?: string, onSend: (prompt: string) => Promise<boolean>, onAttachImage?: (file: File) => Promise<string | null>, controls?: import("svelte").Snippet<[]> }} */
-  let { draftKey, disabled = false, disabledReason = "", onSend, onAttachImage, controls } = $props();
+  /** @type {{ draftKey?: string, disabled?: boolean, disabledReason?: string, onSend: (prompt: string) => Promise<boolean>, onAttachImage?: (file: File) => Promise<string | null>, onAttachmentError?: (message: string) => void, controls?: import("svelte").Snippet<[]> }} */
+  let { draftKey, disabled = false, disabledReason = "", onSend, onAttachImage, onAttachmentError, controls } = $props();
 
   // The page is remounted per session, so the key only matters at the start.
   // svelte-ignore state_referenced_locally
   let prompt = $state(draftKey ? loadPromptDraft(draftKey) : "");
   let sending = $state(false);
   let attachingCount = $state(0);
+  let attachmentError = $state("");
   /** @type {HTMLTextAreaElement | undefined} */
   let textarea = $state();
   /** @type {HTMLInputElement | undefined} */
@@ -44,15 +45,33 @@
 
   async function attachImages(files) {
     if (!onAttachImage || files.length === 0) return;
+    attachmentError = "";
     attachingCount += files.length;
     for (const file of files) {
       try {
         const path = await onAttachImage(file);
         if (path) insertAtCursor(path);
+        else reportAttachmentError(`Could not add ${file.name}. See recent logs for details.`);
+      } catch (error) {
+        reportAttachmentError(`Could not add ${file.name}: ${error}`);
       } finally {
         attachingCount -= 1;
       }
     }
+  }
+
+  function reportAttachmentError(message) {
+    attachmentError = message;
+    onAttachmentError?.(message);
+  }
+
+  function filesToAttach(source) {
+    const files = imageFilesIn(source);
+    const hasFiles = Array.from(source?.files ?? []).length > 0 || Array.from(source?.items ?? []).some((item) => item.kind === "file");
+    if (files.length === 0 && hasFiles) {
+      reportAttachmentError("No readable image found. Choose a PNG, JPEG, GIF or WebP file.");
+    }
+    return files;
   }
 
   function insertAtCursor(text) {
@@ -63,21 +82,21 @@
   }
 
   function attachPastedImages(event) {
-    const files = imageFilesIn(event.clipboardData);
+    const files = filesToAttach(event.clipboardData);
     if (!onAttachImage || files.length === 0) return;
     event.preventDefault();
     attachImages(files);
   }
 
   function attachDroppedImages(event) {
-    const files = imageFilesIn(event.dataTransfer);
+    const files = filesToAttach(event.dataTransfer);
     if (!onAttachImage || files.length === 0) return;
     event.preventDefault();
     attachImages(files);
   }
 
   function attachPickedImages(event) {
-    attachImages(imageFilesIn(event.currentTarget));
+    attachImages(filesToAttach(event.currentTarget));
     event.currentTarget.value = "";
   }
 
@@ -99,6 +118,9 @@
     ondrop={attachDroppedImages}
     {disabled}
   ></textarea>
+  {#if attachmentError}
+    <p class="text-error text-sm" role="alert">{attachmentError}</p>
+  {/if}
   <div class="prompt-actions">
     {@render controls?.()}
     <div class="prompt-send-group">

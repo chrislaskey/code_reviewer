@@ -249,6 +249,7 @@
           disabledReason={promptDisabledReason}
           onSend={sendPrompt}
           onAttachImage={attachImage}
+          onAttachmentError={(message) => log(`${name}: ${message}`)}
           controls={chatControls}
         />
       </div>

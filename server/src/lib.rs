@@ -26,6 +26,8 @@ mod claude_code;
 mod claude_code_chat;
 mod codex;
 mod codex_chat;
+#[cfg(unix)]
+mod codex_local;
 mod cursor_agent;
 mod cursor_agent_chat;
 mod git;

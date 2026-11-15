@@ -1,4 +1,5 @@
-//! Reads a Codex session's chat from its rollout (see `codex.rs` for where
+//! Reads a Codex session's chat through the local server, or from its rollout
+//! for standalone CLIs (see `codex.rs` for where
 //! it is), one `{"timestamp", "type", "payload"}` object per line. The
 //! `response_item` lines hold the chat as OpenAI's Responses API items:
 //! messages, reasoning summaries, tool calls and their outputs, paired by
@@ -6,8 +7,8 @@
 //! the rest repeat the items. Older versions wrote the items themselves, one
 //! per line, which are read too.
 //!
-//! The rollout is undocumented and was read from Codex's source, not a
-//! running Codex, so lines and items that don't parse are skipped.
+//! The legacy rollout is undocumented, so unrecognized lines are skipped.
+//! The local reader uses the server's paginated full turn items.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -51,6 +52,192 @@ pub fn read_chat_history(session_id: &str) -> Result<ChatHistory, String> {
         summary: summarize_chat(&messages),
         messages,
     })
+}
+
+/// Reads paginated history from the existing local server without resuming a turn.
+#[cfg(unix)]
+pub(crate) async fn read_local_chat_history(session_id: &str) -> Result<ChatHistory, String> {
+    let mut reader = crate::codex_local::Reader::connect()
+        .await
+        .map_err(|error| error.to_string())?;
+    let thread = reader
+        .read_thread(session_id)
+        .await
+        .map_err(|error| error.to_string())?;
+    if thread.history_mode.as_deref() != Some("paginated") {
+        let session_id = session_id.to_string();
+        return tokio::task::spawn_blocking(move || read_chat_history(&session_id))
+            .await
+            .map_err(|error| format!("Reading the Codex rollout failed: {error}"))?;
+    }
+    let turns = reader
+        .read_turns(session_id)
+        .await
+        .map_err(|error| error.to_string())?;
+    tokio::task::spawn_blocking(move || {
+        let messages = parse_local_turns(&turns);
+        ChatHistory {
+            agent: AgentKind::Codex,
+            path: thread
+                .path
+                .unwrap_or_else(|| format!("local Codex thread {}", thread.id)),
+            has_tool_results: true,
+            summary: summarize_chat(&messages),
+            messages,
+        }
+    })
+    .await
+    .map_err(|error| format!("Reading local Codex history failed: {error}"))
+}
+
+#[cfg(unix)]
+fn parse_local_turns(turns: &[Value]) -> Vec<ChatMessage> {
+    let mut messages = Vec::new();
+    for turn in turns {
+        let timestamp = turn["startedAt"]
+            .as_i64()
+            .and_then(|seconds| chrono::DateTime::from_timestamp(seconds, 0))
+            .map(|time| time.to_rfc3339());
+        for item in turn["items"].as_array().into_iter().flatten() {
+            let Some(id) = item["id"].as_str() else {
+                continue;
+            };
+            let kind = item["type"].as_str().unwrap_or_default();
+            if kind == "userMessage" {
+                let content: Vec<Value> = item["content"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|input| {
+                        let text = match input["type"].as_str()? {
+                            "text" => input["text"].as_str()?.to_string(),
+                            "localImage" | "localAudio" | "skill" => {
+                                input["path"].as_str()?.to_string()
+                            }
+                            "image" | "audio" => "[media attachment]".to_string(),
+                            _ => return None,
+                        };
+                        Some(serde_json::json!({"type":"input_text","text":text}))
+                    })
+                    .collect();
+                let response = serde_json::json!({"role":"user","content":content});
+                if let Some(ChatEntry::Message(message)) =
+                    read_message(id, timestamp.clone(), &response)
+                {
+                    messages.push(message);
+                }
+                continue;
+            }
+            let part = match kind {
+                "agentMessage" | "plan" => {
+                    let Some(part) = text_part(item["text"].as_str().unwrap_or_default()) else {
+                        continue;
+                    };
+                    part
+                }
+                "reasoning" => {
+                    let text = ["summary", "content"]
+                        .into_iter()
+                        .flat_map(|key| item[key].as_array().into_iter().flatten())
+                        .filter_map(Value::as_str)
+                        .collect::<Vec<_>>()
+                        .join("\n\n");
+                    if text.is_empty() {
+                        continue;
+                    }
+                    ChatPart::Thinking { text }
+                }
+                "contextCompaction" => ChatPart::PlainText {
+                    text: tool_text("Conversation compacted".into()),
+                },
+                _ => local_tool_part(id, kind, item),
+            };
+            messages.push(ChatMessage {
+                id: id.to_string(),
+                role: ChatRole::Assistant,
+                timestamp: timestamp.clone(),
+                note: None,
+                parts: vec![part],
+            });
+        }
+        if matches!(turn["status"].as_str(), Some("failed" | "interrupted")) {
+            messages.push(ChatMessage {
+                id: format!("{}-status", turn["id"].as_str().unwrap_or_default()),
+                role: ChatRole::Note,
+                timestamp,
+                note: Some(ChatNote {
+                    kind: ChatNoteKind::Interrupted,
+                    summary: format!("Turn {}", turn["status"].as_str().unwrap_or_default()),
+                }),
+                parts: vec![ChatPart::PlainText {
+                    text: tool_text(turn["error"].to_string()),
+                }],
+            });
+        }
+    }
+    messages
+}
+
+#[cfg(unix)]
+fn local_tool_part(id: &str, kind: &str, item: &Value) -> ChatPart {
+    let name = item["tool"]
+        .as_str()
+        .unwrap_or(match kind {
+            "commandExecution" => "Command",
+            "fileChange" => "File changes",
+            "webSearch" => "Web search",
+            "imageView" => "View image",
+            _ => kind,
+        })
+        .to_string();
+    let input = item.get("arguments").unwrap_or(item);
+    let summary = item
+        .get("command")
+        .or_else(|| item.get("query"))
+        .and_then(Value::as_str)
+        .map(|text| shorten(text, MAX_TOOL_SUMMARY_CHARS))
+        .unwrap_or_else(|| {
+            if kind == "fileChange" {
+                let paths = item["changes"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|change| change["path"].as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                shorten(&paths, MAX_TOOL_SUMMARY_CHARS)
+            } else {
+                codex_tool_summary(input)
+            }
+        });
+    let status = item["status"].as_str();
+    let is_error = matches!(status, Some("failed" | "declined"))
+        || item["exitCode"].as_i64().is_some_and(|code| code != 0)
+        || item["success"] == false
+        || !item["error"].is_null();
+    let result = if matches!(status, Some("inProgress" | "pending")) {
+        None
+    } else {
+        let output = item
+            .get("aggregatedOutput")
+            .filter(|value| !value.is_null())
+            .or_else(|| item.get("result").filter(|value| !value.is_null()))
+            .or_else(|| item.get("contentItems").filter(|value| !value.is_null()))
+            .or_else(|| item.get("output"))
+            .or_else(|| item.get("changes"))
+            .unwrap_or(item);
+        Some(ToolResult {
+            output: tool_output(output).output,
+            is_error,
+        })
+    };
+    ChatPart::ToolUse {
+        id: id.into(),
+        name,
+        summary,
+        input: input_text(input),
+        result,
+    }
 }
 
 /// The rollout named after `session_id` in `sessions/<year>/<month>/<day>/`,
@@ -485,6 +672,35 @@ fn reports_failed_exit_code(output: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[cfg(unix)]
+    fn reads_local_messages_and_distinguishes_running_and_failed_tools() {
+        let turns = vec![
+            serde_json::json!({"id":"turn-1","startedAt":1794710050,"status":"inProgress","items":[
+                {"id":"prompt","type":"userMessage","content":[{"type":"text","text":"Fix it"}]},
+                {"id":"command","type":"commandExecution","command":"cargo check","status":"completed","exitCode":1,"aggregatedOutput":"compile failed"},
+                {"id":"patch","type":"fileChange","status":"inProgress","changes":[]},
+                {"id":"answer","type":"agentMessage","text":"Working on it"}
+            ]}),
+        ];
+        let messages = parse_local_turns(&turns);
+        assert_eq!(messages.len(), 4);
+        assert!(messages.iter().all(|message| message.parts.len() == 1));
+        assert!(matches!(&messages[3].parts[0], ChatPart::Text { .. }));
+        assert!(
+            matches!(&messages[1].parts[0], ChatPart::ToolUse { name, .. } if name == "Command")
+        );
+        let summary = summarize_chat(&messages);
+        assert_eq!(summary.prompts, 1);
+        assert_eq!(summary.tool_calls, 2);
+        assert_eq!(summary.failed_tool_calls, 1);
+        assert_eq!(summary.tool_calls_without_result, 1);
+        assert!(messages[0].timestamp.is_some());
+        assert!(
+            matches!(&messages[1].parts[0], ChatPart::ToolUse {result:Some(ToolResult {is_error:true,output}),..} if output.text == "compile failed")
+        );
+    }
 
     const ROLLOUT: &str = r##"{"timestamp":"2026-11-14T14:30:12.001Z","type":"session_meta","payload":{"id":"5973b6c0-94b8-487b-a530-2aeb6098ae0e","cwd":"/repo"}}
 {"timestamp":"2026-11-14T14:30:12.002Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>\n  <cwd>/repo</cwd>\n</environment_context>"}]}}

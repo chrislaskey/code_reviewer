@@ -1,15 +1,9 @@
 //! Tells whether OpenAI's Codex CLI is busy or idle in a tmux pane.
 //!
-//! Like Cursor's `agent`, Codex writes no status file. It writes each chat
-//! as it goes to a "rollout" transcript,
-//! `~/.codex/sessions/<year>/<month>/<day>/rollout-<time>-<session id>.jsonl`
-//! (under `$CODEX_HOME` instead of `~/.codex` when set), and keeps it open.
-//! So the status is a guess from the writes to the rollout the process has
-//! open (found with `lsof`), see `recent_writes.rs`. The rollout's name ends
-//! with the session's id, which `codex_chat.rs` finds it by.
-//!
-//! Written from Codex's source and docs, not yet checked against a running
-//! Codex; see decision 26 in `docs/decisions.md`.
+//! Standalone CLIs expose their rollout through open files. Daemon-backed
+//! CLIs are matched to the sole loaded root thread in their pane's worktree,
+//! using the existing local Unix socket. Ambiguous worktrees are not matched.
+//! See decision 26 in `docs/decisions.md`.
 
 use std::path::{Path, PathBuf};
 
@@ -23,23 +17,55 @@ const SESSIONS_DIRECTORY: &str = "sessions";
 /// A session id is a UUID, like `5973b6c0-94b8-487b-a530-2aeb6098ae0e`.
 const SESSION_ID_LENGTH: usize = 36;
 
-/// The `codex` process `pid` with its session's id and the status guessed
-/// from its rollout. Both are `None` when the process has no rollout open
-/// yet, as before the first prompt.
-pub async fn get_session(pid: u32) -> AgentSession {
+/// The CLI process with its standalone rollout or local server thread status.
+pub async fn get_session(pid: u32, directory: &str) -> AgentSession {
+    #[cfg(not(unix))]
+    let _ = directory;
     let rollout = recent_writes::find_open_file(pid, is_rollout).await;
     let write_status = match &rollout {
         Some(rollout) => recent_writes::get_write_status(rollout).await,
         None => None,
     };
-    AgentSession {
+    let session = AgentSession {
         kind: AgentKind::Codex,
         pid,
         session_id: rollout.as_deref().and_then(session_id_of),
         tmux_pane_id: None,
         status_updated_at: write_status.as_ref().and_then(|write| write.updated_at),
         status: write_status.map(|write| write.status),
+    };
+    #[cfg(unix)]
+    if session.session_id.is_none() {
+        match get_local_thread(directory).await {
+            Ok(thread) => {
+                return AgentSession {
+                    session_id: Some(thread.id),
+                    status: match thread.status["type"].as_str() {
+                        Some("active") => Some("busy".into()),
+                        Some("idle") => Some("idle".into()),
+                        _ => None,
+                    },
+                    status_updated_at: thread
+                        .updated_at
+                        .and_then(|seconds| seconds.checked_mul(1000)),
+                    ..session
+                };
+            }
+            Err(error) => log::debug!("Could not identify local Codex chat: {error}"),
+        }
     }
+    session
+}
+
+/// Finds the sole loaded root conversation in this pane's worktree.
+#[cfg(unix)]
+pub(crate) async fn get_local_thread(
+    directory: &str,
+) -> Result<crate::codex_local::Thread, crate::codex_local::ReadError> {
+    crate::codex_local::Reader::connect()
+        .await?
+        .find_thread(Path::new(directory))
+        .await
 }
 
 /// Where Codex keeps its rollouts: `$CODEX_HOME/sessions`, else

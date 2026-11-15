@@ -934,3 +934,31 @@ the rollout open (if not, the session has no status or chat), the rollout's
 lines against the reader's tests, and that a pasted prompt is sent by the
 Enter that follows it.
 
+Checked against Codex 0.169.0 on 2026-11-14: the terminal UI uses a shared
+local daemon, and that daemon holds the rollout open. Inspecting the CLI's
+open files therefore misses its conversation. On Unix, the backend now
+also reads the existing `$CODEX_HOME/app-server-control/app-server-control.sock`
+(or `~/.codex/...`) with the standard WebSocket handshake, using
+`tokio-tungstenite`. It never starts a daemon, resumes a thread, or sends
+prompts through this connection; prompts still go through tmux.
+
+The read client lists loaded thread IDs and reads their metadata. It uses
+the sole loaded main conversation whose cwd matches the pane's worktree;
+subagent sources are excluded. Multiple matches produce an explicit error
+instead of selecting the latest conversation. This identifies a worktree's
+conversation, not a particular terminal subscriber; concurrent main chats
+in the same worktree require a future explicit thread association.
+
+Chat history comes from `thread/turns/list` with full items, following every
+page in chronological order, and status comes from `thread/read`. These
+requests do not resume or subscribe to the thread. The existing five-second
+refresh updates the page. The rollout reader remains for legacy history
+and standalone Codex when no default daemon socket exists. Custom daemon sockets are not yet
+discovered. The local protocol and default socket were verified against
+the running session as well as a mock Unix-socket server. See the
+[app-server protocol](https://learn.chatgpt.com/docs/app-server).
+
+Each local API item is a separate chat message, keeping command and file
+change boxes separate from the agent's written replies. The Last filter
+therefore shows the final reply without preceding tool calls.
+
