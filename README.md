@@ -77,7 +77,7 @@ Inside the Tauri app each is a command of the same name
 | `pendingChangesList()` | none: the web has nothing waiting |
 | `deviceAccountsList()`, `deviceAccountsSwitch(userId)`, `deviceAccountsDeactivate()`, `deviceAccountsRemove(userId, losingChanges)` | none: the web keeps no accounts, see "Accounts on a device" |
 
-Both call the function in `app_core::posts` (`core/src/posts.rs`),
+Both call the function in `app_core::posts` (`core/src/app/posts.rs`),
 `posts::list`, `posts::get` and so on, named through their module as the
 standard library's `fs::read` is, as the user acting, see [Who the
 user is](#who-the-user-is), and answer with the same JSON, serialized
@@ -98,7 +98,7 @@ converge is under "Sync".
 
 ## Who the user is
 
-Every core function takes the `users::User` acting (`core/src/users.rs`):
+Every core function takes the `users::User` acting (`core/src/app/users.rs`):
 what they write is theirs, `user_id` on a post, and what they read is
 what they own or what is in a community of theirs, see
 [Communities](#communities). `app_users` is the app's view of each person, one row
@@ -206,7 +206,7 @@ page as a `FormError` (`svelte/src/lib/core/form_error.js`), whose
 to. The page checks nothing itself beyond `accept` and `required`.
 
 A file goes from the person's device straight to object storage, never
-through the server (`core/src/avatars.rs`, `core/src/storage.rs`, over
+through the server (`core/src/app/avatars.rs`, `core/src/storage.rs`, over
 `object_store`): the server checks what was picked and answers a URL
 signed for its key and content type, the page PUTs the file there, and
 the server checks the file arrived and is the image it said before the
@@ -219,7 +219,7 @@ Garage, which `bin/dev` starts with the web server when it is installed
 
 ## Files added offline
 
-A file (`core/src/files.rs`) is the second upload pattern: a resource
+A file (`core/src/app/files.rs`) is the second upload pattern: a resource
 of its own whose row syncs like a post while its bytes travel apart. In
 the app a file picked on the New page is kept at once in the account's
 folder on the device, `accounts/<user id>/files/<file id>`, with a row
@@ -245,17 +245,23 @@ out `docs/suggestions/files.md`.
 
 ## Communities
 
-A community (`core/src/communities.rs`) is the soft boundary inside a
+A community (`core/src/app/communities.rs`) is the soft boundary inside a
 deployment: any user creates one and joins it, every user sees every one
-and may join or leave (`core/src/memberships.rs`), and a post is in the
+and may join or leave (`core/src/app/memberships.rs`), and a post is in the
 communities its owner chose, zero or more
-(`core/src/posts_communities.rs`), which is what the New and Edit pages'
+(`core/src/app/posts_communities.rs`), which is what the New and Edit pages'
 checkboxes set. A user sees their own posts and the posts in their
 communities; leaving a community takes the member's own posts there
 along, and rejoining brings them back. The decisions are
 `phoenix/docs/design/multi-tenancy.md`, the port is in
 `docs/design/offline-sync.md` under "Communities and what a user sees",
 and what was left out is `docs/suggestions/communities.md`.
+
+Application resource workflows live under `core/src/app/`, declared by
+`core/src/app.rs`, alongside the accounts and ops modules. They remain
+re-exported at the crate root, so `app_core::posts` still works alongside
+`app_core::app::posts`. Database/deployment code, shared helpers and
+`data/`, `sqlite/`, `postgres/` remain at the root.
 
 ## The database
 
@@ -264,14 +270,17 @@ on it, so all three have the same tables: the web server's is the system
 of record the apps will sync with; the desktop and mobile apps each keep a
 SQLite file on the device, so they work with the network off. That is
 `core/src/database.rs`: a `Database` enum of the open connection pool,
-SQLite, or PostgreSQL for a web server that has outgrown a file. Every
-core function takes a `Deployment` (`core/src/deployment.rs`), the
+SQLite, or PostgreSQL for a web server that has outgrown a file. Public
+application operations take a `Deployment` (`core/src/deployment.rs`), the
 database with its role, `Server` for the web server and `Device` for the
-apps, and runs in one `Transaction` on it, so a row and the event that
-changed it are written together or not at all. Each statement goes
-through the `sql!` macro to the database's own module of plain SQL
-(`core/src/sqlite/posts.rs`, `core/src/postgres/posts.rs`), so the rules
-of a resource are written once and the SQL once per database.
+apps, and own one `Transaction`, so a row and its event commit together.
+Internal record contexts under `core/src/data/` borrow that transaction
+and dispatch to private SQLite/PostgreSQL adapters (for example,
+`core/src/data/posts/sqlite.rs` and `postgres.rs`). Workflows compose
+contexts for authorization, sync and multi-resource changes. Atomic bulk
+lifecycle and maintenance operations are explicit exceptions documented
+in `docs/design/low-level-contexts.md`. The backend root modules contain
+only migration runners; there is no shared SQL-dispatch bypass macro.
 
 The database is [sqlx](https://github.com/launchbadge/sqlx): async, one
 library for both databases, with `$1` placeholders in both. Ids are
@@ -329,12 +338,12 @@ design, carried over from the Phoenix version, is
 `docs/design/offline-sync.md`. In short:
 
 * Every write, on every deployment, is an **event**
-  (`core/src/events.rs`): the fields the person changed, from the row's
+  (`core/src/app/events.rs`): the fields the person changed, from the row's
   version they started at, and who made it. The server applies it at
   once, increments the row's `version` and records the event in
   `app_events`; a device applies it at once too and queues it there for
   the next push.
-* A **sync** on a device (`core/src/sync.rs`, `sync::run`) pushes the
+* A **sync** on a device (`core/src/app/sync.rs`, `sync::run`) pushes the
   pending events to `POST /api/sync/push` with the device's token, where
   the server applies each as that user with the same function, refusing
   a change to someone else's post, and answers it; then pulls the rows
@@ -348,13 +357,13 @@ design, carried over from the Phoenix version, is
   server runs those due every 15 minutes; `cargo run -p app_web -- jobs
   run` does the same once, for a scheduler outside it, and `jobs run
   purge` runs one job now. Each run is recorded in `app_jobs`.
-* The **purge** (`core/src/purge.rs`, a daily job, see below)
+* The **purge** (`core/src/app/purge.rs`, a daily job, see below)
   hard-deletes what was deleted more than 90 days
   ago and records the horizon; a device away longer than that is told to
   start over on its next pull, and does, keeping its pending changes.
 * Conflicts are decided by versions, never clocks, field by field. A
   field someone else changed first keeps their value, and the device's
-  value is kept as a **conflict** (`core/src/conflicts.rs`) the person
+  value is kept as a **conflict** (`core/src/app/conflicts.rs`) the person
   reapplies or lets go on the `/conflicts` page, which the sync status in
   the nav links to. Deletes are soft, `deleted_at`, so they sync like any
   edit.
@@ -431,7 +440,7 @@ and kept in `svelte/src/lib/current_user.js`; the nav shows who is
 signed in with Sign out, or Sign in and Sign up.
 
 The nav also shows the current community, the one community the person
-works in (`core/src/current_community.rs`), and a click opens a dialog
+works in (`core/src/app/current_community.rs`), and a click opens a dialog
 of their communities to switch to, which reloads the page. Any page
 asks for it with `currentCommunityLoad()` from
 `svelte/src/lib/current_community.js`; none filters by it yet. It is

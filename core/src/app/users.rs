@@ -8,6 +8,7 @@
 //! `get_by_token`, and a device keeps who is signed in as a device
 //! setting, `signed_in`. Nobody acts until someone signs in.
 
+use crate::data::users as users_records;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -15,12 +16,23 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::accounts::users::{self as accounts_users, AccountUserError};
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::device_settings::{self, DeviceSettingsError, SIGNED_IN};
 use crate::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
 use crate::sync::{Cursor, TableRow};
 use crate::tokens;
+
+/// A row accepted by this resource's event, lifecycle or replication workflow.
+/// Only this module can construct an accepted write.
+pub(crate) struct AcceptedUser<'a>(&'a User);
+
+impl AcceptedUser<'_> {
+    /// Borrows the accepted row for persistence.
+    pub(crate) fn row(&self) -> &User {
+        self.0
+    }
+}
 
 pub const TABLE: &str = "app_users";
 
@@ -154,7 +166,7 @@ pub(crate) async fn create_in(
         deleted_by_id: None,
         avatar_url: None,
     };
-    sql!(&mut *tx, users::insert(&user))?;
+    users_records::create(&mut *tx, AcceptedUser(&user)).await?;
     Ok(user)
 }
 
@@ -270,7 +282,7 @@ pub(crate) async fn apply_in(
         updated.version += 1;
         updated.last_synced_at = Some(now);
     }
-    sql!(&mut *tx, users::update(&updated))?;
+    users_records::update(&mut *tx, AcceptedUser(&updated)).await?;
     finish(tx, role, user, event, conflicts, updated).await
 }
 
@@ -322,7 +334,7 @@ pub(crate) async fn update_name_in(
         last_synced_at: Some(now),
         ..user
     };
-    sql!(&mut *tx, users::update(&updated))?;
+    users_records::update(&mut *tx, AcceptedUser(&updated)).await?;
     Ok(updated)
 }
 
@@ -352,7 +364,7 @@ pub(crate) async fn update_avatar_url_in(
         last_synced_at: Some(now),
         ..user
     };
-    sql!(&mut *tx, users::update(&updated))?;
+    users_records::update(&mut *tx, AcceptedUser(&updated)).await?;
     let answer = Answer::applied(
         event.id,
         updated.version,
@@ -398,7 +410,7 @@ pub(crate) async fn delete_in(tx: &mut Transaction, id: Uuid) -> Result<User, Us
         deleted_by_id: Some(id),
         ..user
     };
-    sql!(&mut *tx, users::update_deleted(&deleted))?;
+    users_records::delete(&mut *tx, AcceptedUser(&deleted)).await?;
     let answer = Answer::applied(
         event.id,
         deleted.version,
@@ -413,7 +425,7 @@ pub(crate) async fn delete_in(tx: &mut Transaction, id: Uuid) -> Result<User, Us
 /// its file until the purge removes the row.
 #[cfg_attr(not(feature = "object-storage"), allow(dead_code))]
 pub(crate) async fn list_avatar_urls_in(tx: &mut Transaction) -> Result<Vec<String>, UserError> {
-    Ok(sql!(tx, users::list_avatar_urls())?)
+    Ok(users_records::maintenance::list_avatar_urls(tx).await?)
 }
 
 /// Deletes the users whose account never proved its email and was made
@@ -422,10 +434,7 @@ pub(crate) async fn delete_of_unconfirmed_accounts_before(
     tx: &mut Transaction,
     time: DateTime<Utc>,
 ) -> Result<(), UserError> {
-    Ok(sql!(
-        &mut *tx,
-        users::delete_of_unconfirmed_accounts_before(time)
-    )?)
+    Ok(users_records::maintenance::delete_of_unconfirmed_accounts_before(&mut *tx, time).await?)
 }
 
 /// The live user the token stands for, on the server; a token the
@@ -434,10 +443,13 @@ pub(crate) async fn delete_of_unconfirmed_accounts_before(
 pub async fn get_by_token(deployment: &Deployment, token: &str) -> Result<User, UserError> {
     let (api_made_after, session_made_after) = tokens::made_after_to_be_valid(now());
     let mut tx = deployment.begin().await?;
-    let user = sql!(
+    let user = users_records::authentication::get_by_token_hash(
         &mut tx,
-        users::get_by_token_hash(&tokens::hash(token), api_made_after, session_made_after)
-    )?;
+        &tokens::hash(token),
+        api_made_after,
+        session_made_after,
+    )
+    .await?;
     tx.commit().await?;
     match user {
         Some(user) if user.deleted_at.is_some() => Err(UserError::AccountDeleted),
@@ -491,7 +503,7 @@ pub(crate) async fn apply_server_row(tx: &mut Transaction, row: &Value) -> Resul
 
 /// Writes the server's row, or inserts it.
 pub(crate) async fn upsert_in(tx: &mut Transaction, user: &User) -> Result<(), UserError> {
-    Ok(sql!(&mut *tx, users::upsert(user))?)
+    Ok(users_records::replication::upsert(&mut *tx, AcceptedUser(user)).await?)
 }
 
 /// A page of the rows the server wrote after the cursor that the user
@@ -502,11 +514,11 @@ pub(crate) async fn list_synced_after(
     after: &Cursor,
     limit: usize,
 ) -> Result<Vec<User>, UserError> {
-    Ok(sql!(tx, users::list_synced_after(user.id, after, limit))?)
+    Ok(users_records::replication::list_synced_after(tx, user.id, after, limit).await?)
 }
 
 pub(crate) async fn get_in(tx: &mut Transaction, id: Uuid) -> Result<Option<User>, UserError> {
-    Ok(sql!(tx, users::get(id))?)
+    Ok(users_records::replication::get(tx, id).await?)
 }
 
 pub(crate) async fn list_by_ids(
@@ -516,12 +528,12 @@ pub(crate) async fn list_by_ids(
     if ids.is_empty() {
         return Ok(Vec::new());
     }
-    Ok(sql!(tx, users::list_by_ids(ids))?)
+    Ok(users_records::replication::list_by_ids(tx, ids).await?)
 }
 
 async fn get_live(tx: &mut Transaction, id: Uuid) -> Result<User, UserError> {
-    match get_in(tx, id).await? {
-        Some(user) if user.deleted_at.is_none() => Ok(user),
+    match users_records::get(tx, id).await? {
+        Some(user) => Ok(user),
         _ => Err(UserError::NotFound { id }),
     }
 }
@@ -588,6 +600,65 @@ pub(crate) mod tests {
             deleted_by_id: None,
             avatar_url: None,
         }
+    }
+
+    #[tokio::test]
+    async fn users_delete_in_rolls_back_profile_and_event_together() {
+        with_each_database(|database| async move {
+            let deployment = server(database);
+            let alice = create(&deployment, "alice@example.com", "Alice")
+                .await
+                .expect("user");
+            let mut tx = deployment.begin().await.expect("transaction");
+            let deleted = delete_in(&mut tx, alice.id).await.expect("deleted");
+            assert!(deleted.deleted_at.is_some());
+            assert_eq!(
+                events::count(&mut tx, events::EventStatus::Applied)
+                    .await
+                    .expect("events"),
+                1
+            );
+            drop(tx);
+            assert_eq!(get(&deployment, alice.id).await.expect("restored"), alice);
+            let mut tx = deployment.begin().await.expect("transaction");
+            assert_eq!(
+                events::count(&mut tx, events::EventStatus::Applied)
+                    .await
+                    .expect("events"),
+                0
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn users_deleted_profile_is_hidden_but_available_anonymized_to_projections() {
+        with_each_database(|database| async move {
+            let deployment = server(database);
+            let alice = create(&deployment, "alice@example.com", "Alice")
+                .await
+                .expect("user");
+            let mut tx = deployment.begin().await.expect("transaction");
+            delete_in(&mut tx, alice.id).await.expect("delete");
+            tx.commit().await.expect("commit");
+            assert!(matches!(
+                get(&deployment, alice.id).await,
+                Err(UserError::NotFound { .. })
+            ));
+            let mut tx = deployment.begin().await.expect("transaction");
+            assert!(
+                users_records::get(&mut tx, alice.id)
+                    .await
+                    .expect("ordinary read")
+                    .is_none()
+            );
+            let profiles = list_by_ids(&mut tx, &[alice.id]).await.expect("projection");
+            assert_eq!(profiles.len(), 1);
+            assert_eq!(profiles[0].name, DELETED_NAME);
+            assert!(profiles[0].avatar_url.is_none());
+            assert!(profiles[0].deleted_at.is_some());
+        })
+        .await;
     }
 
     #[tokio::test]

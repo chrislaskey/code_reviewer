@@ -5,12 +5,13 @@
 //! brings a device up to date with that list when the app starts, so a
 //! setting is always there to read. Never synced.
 
+use crate::data::device_settings as device_settings_records;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use thiserror::Error;
 
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::Deployment;
 
 /// Whether the device works offline, making no request, see `sync`.
@@ -68,8 +69,8 @@ pub async fn upgrade(deployment: &Deployment) -> Result<usize, DeviceSettingsErr
     let mut tx = deployment.begin().await?;
     let mut added = 0;
     for (key, value) in defaults() {
-        if sql!(&mut tx, device_settings::get(key))?.is_none() {
-            sql!(&mut tx, device_settings::set(key, &value))?;
+        if device_settings_records::get(&mut tx, key).await?.is_none() {
+            device_settings_records::upsert(&mut tx, key, &value).await?;
             added += 1;
         }
     }
@@ -82,7 +83,8 @@ pub async fn get<T: DeserializeOwned>(
     tx: &mut Transaction,
     key: &str,
 ) -> Result<T, DeviceSettingsError> {
-    let value = sql!(&mut *tx, device_settings::get(key))?
+    let value = device_settings_records::get(&mut *tx, key)
+        .await?
         .ok_or_else(|| DeviceSettingsError::Missing(key.to_string()))?;
     serde_json::from_value(value).map_err(|source| DeviceSettingsError::Invalid {
         key: key.to_string(),
@@ -99,7 +101,7 @@ pub async fn set<T: Serialize>(
         key: key.to_string(),
         source,
     })?;
-    Ok(sql!(&mut *tx, device_settings::set(key, &value))?)
+    Ok(device_settings_records::upsert(&mut *tx, key, &value).await?)
 }
 
 #[cfg(test)]

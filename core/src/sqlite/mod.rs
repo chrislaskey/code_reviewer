@@ -1,40 +1,5 @@
-//! The SQLite database: its migrations, embedded from `migrations/sqlite`,
-//! and one module of plain SQL per table, each function on the
-//! connection of the transaction a core function runs in.
+//! Embedded sqlite migrations. Record adapters live privately under `data`.
 
 use sqlx::migrate::Migrator;
-
-#[cfg(feature = "app-store")]
-pub mod accounts_app_store_notifications;
-#[cfg(feature = "stripe")]
-pub mod accounts_checkouts;
-#[cfg(feature = "stripe")]
-pub mod accounts_prices;
-#[cfg(feature = "stripe")]
-pub mod accounts_products;
-#[cfg(feature = "stripe")]
-pub mod accounts_purchases;
-#[cfg(feature = "stripe")]
-pub mod accounts_stripe_events;
-#[cfg(feature = "stripe")]
-pub mod accounts_subscriptions;
-pub mod accounts_users;
-pub mod communities;
-pub mod credentials;
-pub mod device_settings;
-pub mod events;
-pub mod files;
-pub mod jobs;
-pub mod local_users;
-pub mod memberships;
-pub mod ops_staff;
-pub mod posts;
-pub mod posts_communities;
-pub mod purges;
-pub mod sync_backfills;
-pub mod sync_state;
-pub mod tokens;
-pub mod trial_users;
-pub mod users;
 
 pub static MIGRATOR: Migrator = sqlx::migrate!("migrations/sqlite");

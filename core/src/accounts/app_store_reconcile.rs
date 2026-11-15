@@ -3,13 +3,13 @@
 //! and copied as it is now, as `stripe_reconcile` does for Stripe's.
 //! Server only, on a server with the App Store.
 
+use crate::data::accounts_subscriptions as accounts_subscriptions_records;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::accounts::app_store::{self, AppStore, AppStoreError};
 use crate::accounts::purchases::Store;
 use crate::accounts::store_transactions::{self, StoreTransactionError};
-use crate::database::sql;
 use crate::deployment::{Deployment, Role};
 
 /// What the job asked Apple for.
@@ -38,10 +38,9 @@ pub async fn run(
         return Err(AppStoreReconcileError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let live = sql!(
-        &mut tx,
-        accounts_subscriptions::list_live_store_ids(Store::AppStore)
-    )?;
+    let live =
+        accounts_subscriptions_records::processing::list_live_store_ids(&mut tx, Store::AppStore)
+            .await?;
     tx.commit().await?;
 
     let mut left = 0;

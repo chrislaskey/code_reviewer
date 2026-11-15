@@ -15,6 +15,8 @@
 //! offline, `set_offline`, a device setting, makes no request at all
 //! until it chooses otherwise.
 
+use crate::data::sync_backfills as sync_backfills_records;
+use crate::data::sync_state as sync_state_records;
 use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
 use std::path::Path;
@@ -29,7 +31,7 @@ use crate::accounts::{self, AccountError, Session};
 #[cfg(feature = "sync-http")]
 use crate::avatars::{AvatarUpdate, AvatarUpload, AvatarUploadNew};
 use crate::communities::{self, Community, CommunityError};
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
 use crate::device_settings::{self, DeviceSettingsError, WORK_OFFLINE};
 use crate::events::{self, Answer, AnswerStatus, Event, EventKind, EventStatus, StoredEvent};
@@ -1218,7 +1220,7 @@ pub async fn status(deployment: &Deployment) -> Result<Status, SyncError> {
         offline: device_settings::get(&mut tx, WORK_OFFLINE).await?,
         pending: events::count(&mut tx, EventStatus::Pending).await?,
         conflicts: events::count(&mut tx, EventStatus::Conflict).await?,
-        cursor: sql!(&mut tx, sync_state::cursor())?,
+        cursor: sync_state_records::get(&mut tx).await?,
     };
     tx.commit().await?;
     Ok(status)
@@ -1433,7 +1435,7 @@ async fn pull_pages<T: Transport>(
         }
         report.pulled += page.rows.len();
         if let Some(cursor) = page.cursor {
-            sql!(&mut tx, sync_state::save_cursor(&cursor))?;
+            sync_state_records::upsert(&mut tx, &cursor).await?;
         }
         tx.commit().await?;
         match page.next {
@@ -1457,7 +1459,7 @@ async fn pull_pages<T: Transport>(
 /// posts point at it.
 async fn reset(deployment: &Deployment, user: &User) -> Result<(), SyncError> {
     let mut tx = deployment.begin().await?;
-    sql!(&mut tx, sync_state::reset(user.id))?;
+    sync_state_records::maintenance::reset(&mut tx, user.id).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -1473,7 +1475,7 @@ async fn backfill_pending<T: Transport>(
     report: &mut Report,
 ) -> Result<(), SyncError> {
     let mut tx = deployment.begin().await?;
-    let communities = sql!(&mut tx, sync_backfills::list())?;
+    let communities = sync_backfills_records::list(&mut tx).await?;
     tx.commit().await?;
     for community_id in communities {
         let mut after = None;
@@ -1494,7 +1496,7 @@ async fn backfill_pending<T: Transport>(
             }
             report.backfilled += page.rows.len();
             if page.next.is_none() {
-                sql!(&mut tx, sync_backfills::delete(community_id))?;
+                sync_backfills_records::delete(&mut tx, community_id).await?;
             }
             tx.commit().await?;
             match page.next {
@@ -1533,10 +1535,7 @@ async fn apply_row(tx: &mut Transaction, user: &User, row: &TableRow) -> Result<
                     .is_none_or(|had| had.deleted_at.is_some() || had.last_synced_at.is_none());
             let written = memberships::apply_server_row(tx, &row.row).await?;
             if written && joined {
-                sql!(
-                    &mut *tx,
-                    sync_backfills::insert_if_missing(incoming.community_id)
-                )?;
+                sync_backfills_records::create(&mut *tx, incoming.community_id).await?;
             }
             Ok(written)
         }
@@ -1619,6 +1618,112 @@ pub(crate) mod tests {
 
     async fn pending(deployment: &Deployment) -> i64 {
         status(deployment).await.expect("the status").pending
+    }
+
+    #[tokio::test]
+    async fn sync_page_rows_backfill_cursor_and_settings_commit_together() {
+        with_each_database(|database| async move {
+            let device = Deployment::new(database, Role::Device);
+            let user = users::tests::alice();
+            let mut tx = device.begin().await.expect("transaction");
+            users::upsert_in(&mut tx, &user).await.expect("user");
+            tx.commit().await.expect("commit");
+            let now = crate::deployment::now();
+            let community = communities::Community {
+                id: Uuid::now_v7(),
+                name: "Gardening".to_string(),
+                inserted_at: now,
+                updated_at: now,
+                version: 1,
+                last_synced_at: Some(now),
+                deleted_at: None,
+                deleted_by_id: None,
+            };
+            let membership = memberships::Membership {
+                id: Uuid::now_v7(),
+                user_id: user.id,
+                community_id: community.id,
+                role: memberships::ROLE_MEMBER.to_string(),
+                inserted_at: now,
+                updated_at: now,
+                version: 1,
+                last_synced_at: Some(now),
+                deleted_at: None,
+                deleted_by_id: None,
+            };
+            let rows = [
+                communities::table_row(&community).expect("row"),
+                memberships::table_row(&membership).expect("row"),
+            ];
+            let cursor = Cursor {
+                last_synced_at: now,
+                id: membership.id,
+            };
+            for commit in [false, true] {
+                let mut tx = device.begin().await.expect("transaction");
+                for row in &rows {
+                    assert!(apply_row(&mut tx, &user, row).await.expect("apply"));
+                }
+                sync_state_records::upsert(&mut tx, &cursor)
+                    .await
+                    .expect("cursor");
+                device_settings::set(&mut tx, device_settings::WORK_OFFLINE, &true)
+                    .await
+                    .expect("setting");
+                if commit {
+                    tx.commit().await.expect("commit");
+                } else {
+                    drop(tx);
+                }
+                let mut tx = device.begin().await.expect("transaction");
+                assert_eq!(
+                    communities::get_in(&mut tx, community.id)
+                        .await
+                        .expect("community")
+                        .is_some(),
+                    commit
+                );
+                assert_eq!(
+                    memberships::get_in(&mut tx, membership.id)
+                        .await
+                        .expect("membership")
+                        .is_some(),
+                    commit
+                );
+                assert_eq!(
+                    sync_state_records::get(&mut tx)
+                        .await
+                        .expect("cursor")
+                        .is_some(),
+                    commit
+                );
+                let backfills = sync_backfills_records::list(&mut tx)
+                    .await
+                    .expect("backfills");
+                assert_eq!(
+                    backfills,
+                    if commit {
+                        vec![community.id]
+                    } else {
+                        Vec::new()
+                    }
+                );
+                assert_eq!(
+                    crate::data::device_settings::get(&mut tx, device_settings::WORK_OFFLINE)
+                        .await
+                        .expect("setting"),
+                    commit.then_some(serde_json::json!(true))
+                );
+                assert!(
+                    events::pending(&mut tx)
+                        .await
+                        .expect("no new local events")
+                        .is_empty()
+                );
+                tx.commit().await.expect("commit");
+            }
+        })
+        .await;
     }
 
     #[tokio::test]

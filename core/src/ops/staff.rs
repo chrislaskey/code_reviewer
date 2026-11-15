@@ -2,15 +2,25 @@
 //! each. Server only. Someone becomes staff from the server's command
 //! line, by their email, never from a page.
 
+use crate::data::ops_staff as ops_staff_records;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::accounts::users::{self as accounts_users, AccountUserError};
-use crate::database::sql;
 use crate::deployment::{Deployment, Role, now};
 use crate::users::User;
+
+/// A record accepted by this resource's workflow.
+pub(crate) struct AcceptedStaff<'a>(&'a Staff);
+
+impl AcceptedStaff<'_> {
+    /// Borrows the accepted record for persistence.
+    pub(crate) fn row(&self) -> &Staff {
+        self.0
+    }
+}
 
 pub const TABLE: &str = "ops_staff";
 
@@ -40,7 +50,7 @@ pub async fn get(deployment: &Deployment, user: &User) -> Result<Staff, StaffErr
         return Err(StaffError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let staff = sql!(&mut tx, ops_staff::get(user.id))?;
+    let staff = ops_staff_records::get(&mut tx, user.id).await?;
     tx.commit().await?;
     staff.ok_or(StaffError::NotStaff)
 }
@@ -52,8 +62,15 @@ pub async fn create(deployment: &Deployment, email: &str) -> Result<Staff, Staff
     }
     let mut tx = deployment.begin().await?;
     let account = account_with_email(&mut tx, email).await?;
-    sql!(&mut tx, ops_staff::insert_if_missing(account.id, now()))?;
-    let staff = sql!(&mut tx, ops_staff::get(account.id))?;
+    ops_staff_records::create(
+        &mut tx,
+        AcceptedStaff(&Staff {
+            user_id: account.id,
+            inserted_at: now(),
+        }),
+    )
+    .await?;
+    let staff = ops_staff_records::get(&mut tx, account.id).await?;
     tx.commit().await?;
     staff.ok_or(StaffError::NotStaff)
 }
@@ -66,7 +83,7 @@ pub async fn delete(deployment: &Deployment, email: &str) -> Result<(), StaffErr
     }
     let mut tx = deployment.begin().await?;
     let account = account_with_email(&mut tx, email).await?;
-    let deleted = sql!(&mut tx, ops_staff::delete(account.id))?;
+    let deleted = ops_staff_records::delete(&mut tx, account.id).await?;
     tx.commit().await?;
     if deleted == 0 {
         return Err(StaffError::NotStaff);

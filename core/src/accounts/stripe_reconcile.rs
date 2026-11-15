@@ -6,6 +6,8 @@
 //! is fine for a small app; a big one would ask only for what changed.
 //! See `docs/design/purchasing.md`.
 
+use crate::data::accounts_checkouts as accounts_checkouts_records;
+use crate::data::accounts_subscriptions as accounts_subscriptions_records;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -13,7 +15,6 @@ use crate::accounts::products::{self, ProductError};
 use crate::accounts::purchases::Store;
 use crate::accounts::stripe::{Stripe, StripeError};
 use crate::accounts::{checkouts, subscriptions};
-use crate::database::sql;
 use crate::deployment::{Deployment, Role, now};
 
 /// What the job asked Stripe for.
@@ -47,24 +48,23 @@ pub async fn run(
     let synced = products::sync(deployment, stripe).await?;
 
     let mut tx = deployment.begin().await?;
-    let pending_session_ids = sql!(
-        &mut tx,
-        accounts_checkouts::list_pending_stripe_session_ids()
-    )?;
-    let of_deleted_accounts = sql!(
-        &mut tx,
-        accounts_subscriptions::list_live_store_ids_of_deleted_accounts(Store::Stripe)
-    )?;
+    let pending_session_ids =
+        accounts_checkouts_records::processing::list_pending_stripe_session_ids(&mut tx).await?;
+    let of_deleted_accounts =
+        accounts_subscriptions_records::processing::list_live_store_ids_of_deleted_accounts(
+            &mut tx,
+            Store::Stripe,
+        )
+        .await?;
     tx.commit().await?;
 
     for subscription_id in &of_deleted_accounts {
         stripe.subscription_cancel(subscription_id).await?;
     }
     let mut tx = deployment.begin().await?;
-    let live_subscription_ids = sql!(
-        &mut tx,
-        accounts_subscriptions::list_live_store_ids(Store::Stripe)
-    )?;
+    let live_subscription_ids =
+        accounts_subscriptions_records::processing::list_live_store_ids(&mut tx, Store::Stripe)
+            .await?;
     tx.commit().await?;
 
     for session_id in &pending_session_ids {

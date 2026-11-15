@@ -9,7 +9,7 @@ This is a second pattern beside `uploads.md`, which stays as it is: a
 user's picture is online only, a column on its row, sent by the page.
 Which pattern a file follows is the application's choice. How these
 decisions were reached, with the alternatives, is `offline-files.md`.
-Built as written, in `core/src/files.rs`; what was left out is
+Built as written, in `core/src/app/files.rs`; what was left out is
 `docs/suggestions/files.md`.
 
 ## Decisions

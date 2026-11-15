@@ -4,13 +4,24 @@
 //! Argon2id with the crate's defaults; hashing and checking run off the
 //! async runtime's threads, since each takes a moment by design.
 
+use crate::data::credentials as credentials_records;
 use argon2::Argon2;
 use argon2::password_hash::{PasswordHasher, PasswordVerifier};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::now;
+
+/// A password hash produced by this module after validation and hashing.
+pub(crate) struct AcceptedPasswordHash<'a>(&'a str);
+
+impl AcceptedPasswordHash<'_> {
+    /// Borrows the encoded hash for persistence.
+    pub(crate) fn value(&self) -> &str {
+        self.0
+    }
+}
 
 /// Phoenix's rule: long enough to be worth hashing, and bounded.
 pub const MIN_PASSWORD_LENGTH: usize = 12;
@@ -39,16 +50,19 @@ pub(crate) async fn set(
     password: &str,
 ) -> Result<(), CredentialError> {
     let password_hash = checked_hash(password).await?;
-    sql!(
+    credentials_records::upsert(
         &mut *tx,
-        credentials::upsert(user_id, &password_hash, now())
-    )?;
+        user_id,
+        AcceptedPasswordHash(&password_hash),
+        now(),
+    )
+    .await?;
     Ok(())
 }
 
 /// Whether the user has a password.
 pub(crate) async fn is_set(tx: &mut Transaction, user_id: Uuid) -> Result<bool, CredentialError> {
-    Ok(sql!(&mut *tx, credentials::get_password_hash(user_id))?.is_some())
+    Ok(credentials_records::get(&mut *tx, user_id).await?.is_some())
 }
 
 /// The hash of the password, once checked for length.
@@ -71,7 +85,7 @@ pub(crate) async fn verify(
     password: &str,
 ) -> Result<bool, CredentialError> {
     let password_hash = match user_id {
-        Some(user_id) => sql!(&mut *tx, credentials::get_password_hash(user_id))?,
+        Some(user_id) => credentials_records::get(&mut *tx, user_id).await?,
         None => None,
     };
     let nobody = password_hash.is_none();

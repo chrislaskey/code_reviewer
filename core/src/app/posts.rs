@@ -18,7 +18,8 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::communities::{self, Community};
-use crate::database::{Transaction, sql};
+use crate::data::posts as records;
+use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
 use crate::posts_communities::{self, PostCommunityError};
@@ -47,6 +48,17 @@ pub struct Post {
     pub last_synced_at: Option<DateTime<Utc>>,
     pub deleted_at: Option<DateTime<Utc>>,
     pub deleted_by_id: Option<Uuid>,
+}
+
+/// A row accepted by the post event handler or authoritative replication path.
+/// Only this module can construct it; persistence cannot bypass those checks.
+pub(crate) struct AcceptedPost<'a>(&'a Post);
+
+impl AcceptedPost<'_> {
+    /// Borrows the accepted row for persistence.
+    pub(crate) fn row(&self) -> &Post {
+        self.0
+    }
 }
 
 /// A post as the pages show it: with who wrote it and where it is.
@@ -92,7 +104,7 @@ pub async fn list(
     user: &User,
 ) -> Result<Vec<PostWithOwnerAndCommunities>, PostError> {
     let mut tx = deployment.begin().await?;
-    let posts = sql!(&mut tx, posts::list_visible(user.id))?;
+    let posts = records::list(&mut tx, records::Filter::VisibleTo(user.id)).await?;
     let listed = with_owners_and_communities(&mut tx, posts).await?;
     tx.commit().await?;
     Ok(listed)
@@ -214,19 +226,19 @@ pub(crate) async fn apply_server_row(tx: &mut Transaction, row: &Value) -> Resul
     if events::has_pending(tx, TABLE, post.id).await? {
         return Ok(false);
     }
-    sql!(&mut *tx, posts::upsert(&post))?;
+    records::replication::upsert(tx, AcceptedPost(&post)).await?;
     Ok(true)
 }
 
 /// Removes a device's post whose create the server refused.
 pub(crate) async fn delete_row(tx: &mut Transaction, id: Uuid) -> Result<(), PostError> {
-    Ok(sql!(tx, posts::delete_row(id))?)
+    Ok(records::maintenance::delete(tx, id).await?)
 }
 
 /// Removes every post the user no longer sees from a device, after a
 /// pull: not theirs, and in no community they are in. How many went.
 pub(crate) async fn prune(tx: &mut Transaction, user: &User) -> Result<u64, PostError> {
-    Ok(sql!(tx, posts::delete_unreachable(user.id))?)
+    Ok(records::maintenance::prune(tx, user.id).await?)
 }
 
 /// The posts with their owners and live communities, in the order given.
@@ -280,17 +292,17 @@ pub(crate) async fn list_synced_after(
     after: &Cursor,
     limit: usize,
 ) -> Result<Vec<Post>, PostError> {
-    Ok(sql!(tx, posts::list_synced_after(user.id, after, limit))?)
+    Ok(records::replication::list(tx, user.id, after, limit).await?)
 }
 
 /// The row by its id, deleted or not, whoever sees it.
 pub(crate) async fn get_in(tx: &mut Transaction, id: Uuid) -> Result<Option<Post>, PostError> {
-    Ok(sql!(tx, posts::get(id))?)
+    Ok(records::replication::get(tx, id).await?)
 }
 
 /// The live post, if the user sees it.
 async fn get_live(tx: &mut Transaction, user: &User, id: Uuid) -> Result<Post, PostError> {
-    match sql!(&mut *tx, posts::get_visible(user.id, id))? {
+    match records::get(tx, user.id, id).await? {
         Some(post) if post.deleted_at.is_none() => Ok(post),
         _ => Err(PostError::NotFound { id }),
     }
@@ -378,7 +390,7 @@ pub(crate) async fn apply_in(
                 Ok(post) => post,
                 Err(error) => return rejected(event, format!("invalid: {error}"), None),
             };
-            sql!(&mut *tx, posts::insert(&post))?;
+            records::create(tx, AcceptedPost(&post)).await?;
             finish(tx, role, user, event, Conflicts::new(), post).await?
         }
         EventKind::Update => {
@@ -410,7 +422,7 @@ pub(crate) async fn apply_in(
                     updated.version += 1;
                     updated.last_synced_at = Some(now);
                 }
-                sql!(&mut *tx, posts::update(&updated))?;
+                records::update(tx, AcceptedPost(&updated)).await?;
                 if changes.contains_key("deleted_at") && updated.deleted_at.is_some() {
                     posts_communities::delete_with_post(tx, role, &updated).await?;
                 }
@@ -517,6 +529,69 @@ mod tests {
     async fn events_with_status(deployment: &Deployment, status: EventStatus) -> i64 {
         let mut tx = deployment.begin().await.expect("a transaction");
         events::count(&mut tx, status).await.expect("a count")
+    }
+
+    #[tokio::test]
+    async fn posts_create_with_unknown_community_rolls_back_row_and_event() {
+        with_each_database(|database| async move {
+            let deployment = server(database);
+            let alice = user(&deployment, "alice@example.com").await;
+            let before = events_with_status(&deployment, EventStatus::Applied).await;
+            assert!(
+                create(&deployment, &alice, "rolled back", &[Uuid::now_v7()])
+                    .await
+                    .is_err()
+            );
+            assert!(list(&deployment, &alice).await.expect("posts").is_empty());
+            assert_eq!(
+                events_with_status(&deployment, EventStatus::Applied).await,
+                before
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn posts_records_get_excludes_inaccessible_and_deleted_rows() {
+        with_each_database(|database| async move {
+            let deployment = server(database);
+            let alice = user(&deployment, "alice@example.com").await;
+            let bob = user(&deployment, "bob@example.com").await;
+            let post = create(&deployment, &alice, "private", &[])
+                .await
+                .expect("post");
+            let mut tx = deployment.begin().await.expect("transaction");
+            assert!(
+                records::get(&mut tx, bob.id, post.id)
+                    .await
+                    .expect("read")
+                    .is_none()
+            );
+            assert!(
+                records::get(&mut tx, alice.id, post.id)
+                    .await
+                    .expect("read")
+                    .is_some()
+            );
+            tx.commit().await.expect("commit");
+            delete(&deployment, &alice, post.id).await.expect("delete");
+            let mut tx = deployment.begin().await.expect("transaction");
+            assert!(
+                records::get(&mut tx, alice.id, post.id)
+                    .await
+                    .expect("read")
+                    .is_none()
+            );
+            assert!(
+                records::replication::get(&mut tx, post.id)
+                    .await
+                    .expect("tombstone")
+                    .expect("row")
+                    .deleted_at
+                    .is_some()
+            );
+        })
+        .await;
     }
 
     #[tokio::test]

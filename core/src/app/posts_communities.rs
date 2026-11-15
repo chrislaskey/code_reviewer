@@ -10,19 +10,31 @@
 //! is applied through the same add and remove, and the server's row comes
 //! back.
 
+use crate::data::posts_communities as posts_communities_records;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
 use crate::memberships::{self, Membership, id_field};
 use crate::posts::Post;
 use crate::sync::{Cursor, TableRow};
 use crate::users::User;
+
+/// A row accepted by this resource's event or replication workflow.
+/// Only this module can construct an accepted write.
+pub(crate) struct AcceptedPostCommunity<'a>(&'a PostCommunity);
+
+impl AcceptedPostCommunity<'_> {
+    /// Borrows the accepted row for persistence.
+    pub(crate) fn row(&self) -> &PostCommunity {
+        self.0
+    }
+}
 
 pub const TABLE: &str = "app_posts_communities";
 const CREATE_FIELDS: &[&str] = &["post_id", "community_id", "users_communities_id"];
@@ -33,6 +45,7 @@ pub struct PostCommunity {
     pub id: Uuid,
     pub post_id: Uuid,
     pub community_id: Uuid,
+
     /// The owner's membership the post was added under.
     pub users_communities_id: Uuid,
     pub inserted_at: DateTime<Utc>,
@@ -128,10 +141,13 @@ pub(crate) async fn add_in(
     else {
         return Err(PostCommunityError::NotAMember { community_id });
     };
-    let event = match sql!(
+    let event = match posts_communities_records::replication::get_by_post_and_community(
         &mut *tx,
-        posts_communities::get_by_post_and_community(post.id, community_id)
-    )? {
+        post.id,
+        community_id,
+    )
+    .await?
+    {
         None => Event::create(
             TABLE,
             Uuid::now_v7(),
@@ -163,10 +179,13 @@ pub(crate) async fn remove_in(
     community_id: Uuid,
 ) -> Result<PostCommunity, PostCommunityError> {
     let post = own_live_post(tx, user, post_id).await?;
-    let row = match sql!(
+    let row = match posts_communities_records::replication::get_by_post_and_community(
         &mut *tx,
-        posts_communities::get_by_post_and_community(post.id, community_id)
-    )? {
+        post.id,
+        community_id,
+    )
+    .await?
+    {
         Some(row) if row.deleted_at.is_none() => row,
         _ => return Err(PostCommunityError::NotFound { community_id }),
     };
@@ -190,7 +209,11 @@ pub(crate) async fn set_in(
     post_id: Uuid,
     community_ids: &[Uuid],
 ) -> Result<(), PostCommunityError> {
-    let current = sql!(&mut *tx, posts_communities::list_live_of_posts(&[post_id]))?;
+    let current = posts_communities_records::list(
+        &mut *tx,
+        posts_communities_records::Filter::Posts(&[post_id]),
+    )
+    .await?;
     for row in &current {
         if !community_ids.contains(&row.community_id) {
             remove_in(tx, role, user, post_id, row.community_id).await?;
@@ -212,7 +235,10 @@ pub(crate) async fn list_live_of_posts(
     if post_ids.is_empty() {
         return Ok(Vec::new());
     }
-    Ok(sql!(tx, posts_communities::list_live_of_posts(post_ids))?)
+    Ok(
+        posts_communities_records::list(tx, posts_communities_records::Filter::Posts(post_ids))
+            .await?,
+    )
 }
 
 /// Deletes the post's live rows with it, at the post's moment.
@@ -221,7 +247,12 @@ pub(crate) async fn delete_with_post(
     role: Role,
     post: &Post,
 ) -> Result<(), PostCommunityError> {
-    for mut row in sql!(&mut *tx, posts_communities::list_live_of_posts(&[post.id]))? {
+    for mut row in posts_communities_records::list(
+        &mut *tx,
+        posts_communities_records::Filter::Posts(&[post.id]),
+    )
+    .await?
+    {
         row.deleted_at = post.deleted_at;
         row.deleted_by_id = post.deleted_by_id;
         write_changed(tx, role, &mut row).await?;
@@ -236,10 +267,12 @@ pub(crate) async fn delete_with_membership(
     role: Role,
     membership: &Membership,
 ) -> Result<(), PostCommunityError> {
-    for mut row in sql!(
+    for mut row in posts_communities_records::list(
         &mut *tx,
-        posts_communities::list_live_of_membership(membership.id)
-    )? {
+        posts_communities_records::Filter::Membership(membership.id),
+    )
+    .await?
+    {
         row.deleted_at = membership.deleted_at;
         row.deleted_by_id = membership.deleted_by_id;
         write_changed(tx, role, &mut row).await?;
@@ -256,11 +289,14 @@ pub(crate) async fn revive_with_membership(
     membership: &Membership,
     left_at: DateTime<Utc>,
 ) -> Result<(), PostCommunityError> {
-    for mut row in sql!(
+    for mut row in posts_communities_records::replication::list_of_membership_deleted_at(
         &mut *tx,
-        posts_communities::list_of_membership_deleted_at(membership.id, left_at)
-    )? {
-        let post = sql!(&mut *tx, posts::get(row.post_id))?;
+        membership.id,
+        left_at,
+    )
+    .await?
+    {
+        let post = crate::data::posts::replication::get(tx, row.post_id).await?;
         row.deleted_at = post.as_ref().and_then(|post| post.deleted_at);
         row.deleted_by_id = post.as_ref().and_then(|post| post.deleted_by_id);
         write_changed(tx, role, &mut row).await?;
@@ -278,19 +314,19 @@ pub(crate) async fn apply_server_row(
     if events::has_pending(tx, TABLE, row.id).await? {
         return Ok(false);
     }
-    sql!(&mut *tx, posts_communities::upsert(&row))?;
+    posts_communities_records::replication::upsert(&mut *tx, AcceptedPostCommunity(&row)).await?;
     Ok(true)
 }
 
 pub(crate) async fn delete_row(tx: &mut Transaction, id: Uuid) -> Result<(), PostCommunityError> {
-    Ok(sql!(tx, posts_communities::delete_row(id))?)
+    Ok(posts_communities_records::maintenance::delete(tx, id).await?)
 }
 
 pub(crate) async fn get_in(
     tx: &mut Transaction,
     id: Uuid,
 ) -> Result<Option<PostCommunity>, PostCommunityError> {
-    Ok(sql!(tx, posts_communities::get(id))?)
+    Ok(posts_communities_records::replication::get(tx, id).await?)
 }
 
 pub(crate) async fn list_synced_after(
@@ -299,10 +335,10 @@ pub(crate) async fn list_synced_after(
     after: &Cursor,
     limit: usize,
 ) -> Result<Vec<PostCommunity>, PostCommunityError> {
-    Ok(sql!(
-        tx,
-        posts_communities::list_synced_after(user.id, after, limit)
-    )?)
+    Ok(
+        posts_communities_records::replication::list_synced_after(tx, user.id, after, limit)
+            .await?,
+    )
 }
 
 /// A page of the community's live rows after the cursor: a backfill.
@@ -312,10 +348,15 @@ pub(crate) async fn list_live_of_community_after(
     after: &Cursor,
     limit: usize,
 ) -> Result<Vec<PostCommunity>, PostCommunityError> {
-    Ok(sql!(
-        tx,
-        posts_communities::list_live_of_community_after(community_id, after, limit)
-    )?)
+    Ok(
+        posts_communities_records::replication::list_live_of_community_after(
+            tx,
+            community_id,
+            after,
+            limit,
+        )
+        .await?,
+    )
 }
 
 async fn own_live_post(
@@ -323,7 +364,7 @@ async fn own_live_post(
     user: &User,
     post_id: Uuid,
 ) -> Result<Post, PostCommunityError> {
-    match sql!(&mut *tx, posts::get(post_id))? {
+    match crate::data::posts::replication::get(tx, post_id).await? {
         Some(post) if post.deleted_at.is_none() && post.user_id == user.id => Ok(post),
         Some(post) if post.deleted_at.is_none() => {
             let _ = post;
@@ -402,10 +443,13 @@ async fn apply_in(
             else {
                 return rejected(event, "not_a_member", None);
             };
-            match sql!(
+            match posts_communities_records::replication::get_by_post_and_community(
                 &mut *tx,
-                posts_communities::get_by_post_and_community(post.id, community_id)
-            )? {
+                post.id,
+                community_id,
+            )
+            .await?
+            {
                 Some(existing) if existing.deleted_at.is_none() => existing,
                 Some(removed) => add_back(tx, role, removed, &membership, &post).await?,
                 None => {
@@ -429,7 +473,8 @@ async fn apply_in(
                         deleted_at: None,
                         deleted_by_id: None,
                     };
-                    sql!(&mut *tx, posts_communities::insert(&row))?;
+                    posts_communities_records::create(&mut *tx, AcceptedPostCommunity(&row))
+                        .await?;
                     row
                 }
             }
@@ -438,7 +483,7 @@ async fn apply_in(
             let Some(row) = get_in(tx, event.row_id).await? else {
                 return rejected(event, "unknown_row", None);
             };
-            let post = match sql!(&mut *tx, posts::get(row.post_id))? {
+            let post = match crate::data::posts::replication::get(tx, row.post_id).await? {
                 Some(post) if post.user_id == user.id => post,
                 Some(_) => return rejected(event, "not_owner", Some(row)),
                 None => return rejected(event, "unknown_post", Some(row)),
@@ -514,7 +559,7 @@ async fn write_changed(
         row.version += 1;
         row.last_synced_at = Some(now);
     }
-    sql!(&mut *tx, posts_communities::update(row))?;
+    posts_communities_records::update(&mut *tx, AcceptedPostCommunity(row)).await?;
     Ok(())
 }
 
@@ -698,10 +743,12 @@ mod tests {
                 .await
                 .expect("a post");
             let mut tx = deployment.begin().await.expect("a transaction");
-            let first = sql!(
+            let first = posts_communities_records::replication::get_by_post_and_community(
                 &mut tx,
-                posts_communities::get_by_post_and_community(post.id, gardening.id)
+                post.id,
+                gardening.id,
             )
+            .await
             .expect("the row")
             .expect("there");
             tx.commit().await.expect("committed");
@@ -723,10 +770,12 @@ mod tests {
             .expect("put back");
             assert_eq!(bodies(&deployment, &bob).await, vec!["shared"]);
             let mut tx = deployment.begin().await.expect("a transaction");
-            let back = sql!(
+            let back = posts_communities_records::replication::get_by_post_and_community(
                 &mut tx,
-                posts_communities::get_by_post_and_community(post.id, gardening.id)
+                post.id,
+                gardening.id,
             )
+            .await
             .expect("the row")
             .expect("there");
             assert_eq!(back.id, first.id, "the same row");
@@ -762,13 +811,16 @@ mod tests {
                 .expect("deleted");
             assert!(bodies(&deployment, &bob).await.is_empty());
             let mut tx = deployment.begin().await.expect("a transaction");
-            let deleted = sql!(&mut tx, posts::get(post.id))
+            let deleted = crate::data::posts::replication::get(&mut tx, post.id)
+                .await
                 .expect("the post")
                 .expect("kept");
-            let row = sql!(
+            let row = posts_communities_records::replication::get_by_post_and_community(
                 &mut tx,
-                posts_communities::get_by_post_and_community(post.id, gardening.id)
+                post.id,
+                gardening.id,
             )
+            .await
             .expect("the row")
             .expect("kept");
             assert_eq!(row.deleted_at, deleted.deleted_at);

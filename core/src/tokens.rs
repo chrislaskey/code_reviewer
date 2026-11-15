@@ -12,12 +12,33 @@
 //! `accounts::deletions`.
 //! Made and deleted there; the expired ones go with the purge.
 
+use crate::data::tokens as tokens_records;
 use chrono::{DateTime, Duration, Utc};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::now;
+
+/// A replacement code already hashed by the token workflow.
+pub(crate) struct AcceptedCodeHash<'a>(&'a str);
+
+impl AcceptedCodeHash<'_> {
+    /// Borrows the code hash for persistence.
+    pub(crate) fn value(&self) -> &str {
+        self.0
+    }
+}
+
+/// A record accepted by this resource's workflow.
+pub(crate) struct AcceptedToken<'a>(&'a Token);
+
+impl AcceptedToken<'_> {
+    /// Borrows the accepted record for persistence.
+    pub(crate) fn row(&self) -> &Token {
+        self.0
+    }
+}
 
 /// How long an app's token works, as Phoenix's API tokens do.
 pub const API_VALIDITY_DAYS: i64 = 365;
@@ -209,7 +230,7 @@ pub(crate) fn delete_code_hash(user_id: Uuid) -> String {
 /// and its wrong attempts forgotten; the code to email.
 pub(crate) async fn reset_code(tx: &mut Transaction, id: Uuid) -> Result<String, sqlx::Error> {
     let code = random_code();
-    sql!(&mut *tx, tokens::set_code(id, &hash(&code), now()))?;
+    tokens_records::update_code(&mut *tx, id, AcceptedCodeHash(&hash(&code)), now()).await?;
     Ok(code)
 }
 
@@ -221,20 +242,23 @@ pub(crate) async fn get_valid(
     context: Context,
     now: DateTime<Utc>,
 ) -> Result<Option<Token>, sqlx::Error> {
-    sql!(
+    tokens_records::get(
         &mut *tx,
-        tokens::get_by_hash(token_hash, context, context.made_after_to_be_valid(now))
+        token_hash,
+        context,
+        context.made_after_to_be_valid(now),
     )
+    .await
 }
 
 /// Counts one more wrong code against the pending sign-in; the attempts
 /// so far, this one included.
 pub(crate) async fn count_attempt(tx: &mut Transaction, id: Uuid) -> Result<i64, sqlx::Error> {
-    sql!(&mut *tx, tokens::increment_attempts(id))
+    tokens_records::increment_attempts(&mut *tx, id).await
 }
 
 pub(crate) async fn delete_by_id(tx: &mut Transaction, id: Uuid) -> Result<(), sqlx::Error> {
-    sql!(&mut *tx, tokens::delete_by_id(id))
+    tokens_records::delete(&mut *tx, id).await
 }
 
 /// Deletes the user's tokens of the context.
@@ -243,13 +267,13 @@ pub(crate) async fn delete_of_user(
     user_id: Uuid,
     context: Context,
 ) -> Result<u64, sqlx::Error> {
-    sql!(&mut *tx, tokens::delete_of_user(user_id, context))
+    tokens_records::delete_of_user(&mut *tx, user_id, context).await
 }
 
 /// Deletes an app's or the browser's token, so it no longer stands for
 /// anyone; whether it did.
 pub(crate) async fn delete(tx: &mut Transaction, token: &str) -> Result<bool, sqlx::Error> {
-    sql!(&mut *tx, tokens::delete_signed_in_by_hash(&hash(token)))
+    tokens_records::delete_signed_in_by_hash(&mut *tx, &hash(token)).await
 }
 
 /// Deletes the tokens that have expired as of `now`, each context by its
@@ -260,10 +284,12 @@ pub(crate) async fn delete_expired(
 ) -> Result<u64, sqlx::Error> {
     let mut deleted = 0;
     for context in Context::ALL {
-        deleted += sql!(
+        deleted += tokens_records::maintenance::delete_made_before(
             &mut *tx,
-            tokens::delete_made_before(context, context.made_after_to_be_valid(now))
-        )?;
+            context,
+            context.made_after_to_be_valid(now),
+        )
+        .await?;
     }
     Ok(deleted)
 }
@@ -327,7 +353,7 @@ async fn insert(
         sent_to: sent_to.map(str::to_string),
         inserted_at: now(),
     };
-    sql!(&mut *tx, tokens::insert(&row))
+    tokens_records::create(&mut *tx, AcceptedToken(&row)).await
 }
 
 #[cfg(test)]
@@ -336,6 +362,55 @@ mod tests {
     use crate::database::with_each_database;
     use crate::deployment::{Deployment, Role};
     use crate::users::{self, UserError};
+
+    #[tokio::test]
+    async fn tokens_reset_code_preserves_pending_token_and_restarts_attempts() {
+        with_each_database(|database| async move {
+            let deployment = Deployment::new(database, Role::Server);
+            let alice = users::create(&deployment, "alice@example.com", "Alice")
+                .await
+                .expect("user");
+            let mut tx = deployment.begin().await.expect("transaction");
+            let (pending, _) =
+                create_sign_in_code(&mut tx, alice.id, Some("destination@example.com"))
+                    .await
+                    .expect("code");
+            let original = get_valid(&mut tx, &hash(&pending), Context::SignInCode, now())
+                .await
+                .expect("read")
+                .expect("token");
+            assert_eq!(
+                count_attempt(&mut tx, original.id).await.expect("attempt"),
+                1
+            );
+            assert_eq!(
+                count_attempt(&mut tx, original.id).await.expect("attempt"),
+                2
+            );
+            let code = reset_code(&mut tx, original.id).await.expect("reset");
+            let reset = get_valid(&mut tx, &hash(&pending), Context::SignInCode, now())
+                .await
+                .expect("read")
+                .expect("token");
+            assert_eq!(reset.id, original.id);
+            assert_eq!(reset.token_hash, original.token_hash);
+            assert_eq!(reset.sent_to, original.sent_to);
+            assert_eq!(reset.attempts, 0);
+            assert_eq!(reset.code_hash, Some(hash(&code)));
+            assert!(reset.inserted_at >= original.inserted_at);
+            assert!(
+                get_valid(&mut tx, &hash(&pending), Context::SignInPassword, now())
+                    .await
+                    .expect("other context")
+                    .is_none()
+            );
+            assert_eq!(
+                count_attempt(&mut tx, original.id).await.expect("attempt"),
+                1
+            );
+        })
+        .await;
+    }
 
     #[tokio::test]
     async fn tokens_create_stands_for_its_user_until_deleted() {

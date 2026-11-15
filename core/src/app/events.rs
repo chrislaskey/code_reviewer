@@ -14,6 +14,7 @@
 //! a server or a bucket that is failing, so an outage of any length
 //! refuses nothing.
 
+use crate::data::events as events_records;
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
@@ -22,8 +23,18 @@ use serde_json::{Map, Value};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::sync::TableRow;
+
+/// A record assembled by this resource's workflow.
+pub(crate) struct AcceptedEvent<'a>(&'a StoredEvent);
+
+impl AcceptedEvent<'_> {
+    /// Borrows the assembled record for persistence.
+    pub(crate) fn row(&self) -> &StoredEvent {
+        self.0
+    }
+}
 
 /// How many times the server or the bucket may say no to an event
 /// before a device stops trying it.
@@ -345,7 +356,7 @@ pub async fn record(
         last_error: answer.reason.clone(),
         attempts: 0,
     };
-    Ok(sql!(tx, events::insert(&stored))?)
+    Ok(events_records::create(tx, AcceptedEvent(&stored)).await?)
 }
 
 /// Queues an event a device applied, for the next push. A local user's
@@ -364,21 +375,22 @@ pub async fn queue(tx: &mut Transaction, user_id: Uuid, event: &Event) -> Result
         last_error: None,
         attempts: 0,
     };
-    sql!(tx, events::insert(&stored))
+    events_records::create(tx, AcceptedEvent(&stored)).await
 }
 
 pub async fn get(tx: &mut Transaction, id: Uuid) -> Result<Option<StoredEvent>, sqlx::Error> {
-    sql!(tx, events::get(id))
+    events_records::get(tx, id).await
 }
 
 /// The events not yet answered, in the order they were made.
 pub async fn pending(tx: &mut Transaction) -> Result<Vec<StoredEvent>, sqlx::Error> {
-    sql!(tx, events::list_by_status(EventStatus::Pending))
+    events_records::list(tx, events_records::Filter::Status(EventStatus::Pending)).await
 }
 
 /// The conflicts the person has not resolved, newest first.
 pub async fn conflicts(tx: &mut Transaction) -> Result<Vec<StoredEvent>, sqlx::Error> {
-    let mut conflicts = sql!(tx, events::list_by_status(EventStatus::Conflict))?;
+    let mut conflicts =
+        events_records::list(tx, events_records::Filter::Status(EventStatus::Conflict)).await?;
     conflicts.reverse();
     Ok(conflicts)
 }
@@ -388,11 +400,11 @@ pub async fn list_of_table(
     tx: &mut Transaction,
     table: &str,
 ) -> Result<Vec<StoredEvent>, sqlx::Error> {
-    sql!(tx, events::list_by_table(table))
+    events_records::list(tx, events_records::Filter::Table(table)).await
 }
 
 pub async fn count(tx: &mut Transaction, status: EventStatus) -> Result<i64, sqlx::Error> {
-    sql!(tx, events::count_by_status(status))
+    events_records::count(tx, status).await
 }
 
 /// Whether the row has an event not yet answered, in which case a row
@@ -402,11 +414,11 @@ pub async fn has_pending(
     table: &str,
     row_id: Uuid,
 ) -> Result<bool, sqlx::Error> {
-    sql!(tx, events::has_pending(table, row_id))
+    events_records::has_pending(tx, table, row_id).await
 }
 
 pub async fn delete(tx: &mut Transaction, id: Uuid) -> Result<(), sqlx::Error> {
-    sql!(tx, events::delete(id))
+    events_records::delete(tx, id).await
 }
 
 pub async fn delete_pending_of_row(
@@ -414,7 +426,7 @@ pub async fn delete_pending_of_row(
     table: &str,
     row_id: Uuid,
 ) -> Result<(), sqlx::Error> {
-    sql!(tx, events::delete_pending_of_row(table, row_id))
+    events_records::delete_pending_of_row(tx, table, row_id).await
 }
 
 /// Removes every event of the row, whatever its status.
@@ -423,7 +435,7 @@ pub async fn delete_of_row(
     table: &str,
     row_id: Uuid,
 ) -> Result<(), sqlx::Error> {
-    sql!(tx, events::delete_of_row(table, row_id))
+    events_records::delete_of_row(tx, table, row_id).await
 }
 
 pub async fn mark_conflict(
@@ -431,13 +443,13 @@ pub async fn mark_conflict(
     id: Uuid,
     conflicts: &Conflicts,
 ) -> Result<(), sqlx::Error> {
-    sql!(tx, events::mark_conflict(id, conflicts))
+    events_records::processing::mark_conflict(tx, id, conflicts).await
 }
 
 /// Keeps why a pending event did not go, without counting a try: the
 /// server or the bucket was not reached, or is failing.
 pub async fn mark_error(tx: &mut Transaction, id: Uuid, reason: &str) -> Result<(), sqlx::Error> {
-    sql!(tx, events::mark_error(id, reason))
+    events_records::processing::mark_error(tx, id, reason).await
 }
 
 /// Counts a try the server or the bucket said no to, with why. At
@@ -447,7 +459,7 @@ pub async fn count_attempt(
     id: Uuid,
     reason: &str,
 ) -> Result<bool, sqlx::Error> {
-    let attempts = sql!(&mut *tx, events::add_attempt(id, reason))?;
+    let attempts = events_records::processing::add_attempt(&mut *tx, id, reason).await?;
     if attempts < MAX_ATTEMPTS {
         return Ok(false);
     }
@@ -476,12 +488,12 @@ pub async fn refuse(tx: &mut Transaction, id: Uuid, reason: &str) -> Result<(), 
             )
         })
         .collect();
-    sql!(tx, events::mark_refused(id, &conflicts, reason))
+    events_records::processing::mark_refused(tx, id, &conflicts, reason).await
 }
 
 /// Puts a refused event back in the queue, its tries counted from none.
 pub async fn try_again(tx: &mut Transaction, id: Uuid) -> Result<(), sqlx::Error> {
-    sql!(tx, events::mark_pending(id))
+    events_records::processing::mark_pending(tx, id).await
 }
 
 #[cfg(test)]
@@ -495,6 +507,56 @@ mod tests {
             Value::Object(fields) => fields,
             _ => panic!("fields are an object"),
         }
+    }
+
+    #[tokio::test]
+    async fn events_retry_transitions_roll_back_and_restart_without_stale_metadata() {
+        crate::database::with_each_database(|database| async move {
+            let deployment =
+                crate::deployment::Deployment::new(database, crate::deployment::Role::Server);
+            let user = crate::users::create(&deployment, "alice@example.com", "Alice")
+                .await
+                .expect("user");
+            let event = Event::create(
+                crate::posts::TABLE,
+                Uuid::now_v7(),
+                fields(json!({"body": "pending"})),
+                crate::deployment::now(),
+            );
+            let mut tx = deployment.begin().await.expect("transaction");
+            queue(&mut tx, user.id, &event).await.expect("queue");
+            tx.commit().await.expect("commit");
+            let mut tx = deployment.begin().await.expect("transaction");
+            for attempt in 1..=MAX_ATTEMPTS {
+                assert_eq!(
+                    count_attempt(&mut tx, event.id, "refused")
+                        .await
+                        .expect("attempt"),
+                    attempt == MAX_ATTEMPTS
+                );
+            }
+            let refused = get(&mut tx, event.id).await.expect("read").expect("event");
+            assert_eq!(refused.status, EventStatus::Conflict);
+            assert_eq!(refused.attempts, MAX_ATTEMPTS);
+            assert!(!refused.conflicts.is_empty());
+            drop(tx);
+            let mut tx = deployment.begin().await.expect("transaction");
+            let pending = get(&mut tx, event.id).await.expect("read").expect("event");
+            assert_eq!(pending.status, EventStatus::Pending);
+            assert_eq!(pending.attempts, 0);
+            assert!(pending.last_error.is_none());
+            refuse(&mut tx, event.id, "refused").await.expect("refuse");
+            try_again(&mut tx, event.id).await.expect("retry");
+            tx.commit().await.expect("commit");
+            let mut tx = deployment.begin().await.expect("transaction");
+            let retried = get(&mut tx, event.id).await.expect("read").expect("event");
+            assert_eq!(retried.status, EventStatus::Pending);
+            assert_eq!(retried.attempts, 0);
+            assert!(retried.conflicts.is_empty());
+            assert!(retried.last_error.is_none());
+            assert_eq!(retried.event, pending.event);
+        })
+        .await;
     }
 
     #[test]

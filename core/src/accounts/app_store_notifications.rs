@@ -10,14 +10,24 @@
 //! the purchase's revocation, which `store_transactions` marks through
 //! `purchases::refund_in`.
 
+use crate::data::accounts_app_store_notifications as accounts_app_store_notifications_records;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::accounts::app_store::{AppStore, AppStoreError};
 use crate::accounts::store_transactions::{self, StoreTransactionError};
-use crate::database::sql;
 use crate::deployment::{Deployment, Role, now};
+
+/// A record accepted by the app store notifications workflow.
+pub(crate) struct AcceptedAppStoreNotification<'a>(&'a AppStoreNotification);
+
+impl AcceptedAppStoreNotification<'_> {
+    /// Borrows the accepted record for persistence.
+    pub(crate) fn row(&self) -> &AppStoreNotification {
+        self.0
+    }
+}
 
 pub const TABLE: &str = "accounts_app_store_notifications";
 
@@ -73,10 +83,15 @@ pub async fn create(
 
     let now = now();
     let mut tx = deployment.begin().await?;
-    let inserted = sql!(
+    let inserted = accounts_app_store_notifications_records::create(
         &mut tx,
-        accounts_app_store_notifications::insert_if_missing(id, notification_type, now)
-    )?;
+        AcceptedAppStoreNotification(&AppStoreNotification {
+            id: id.to_string(),
+            notification_type: notification_type.to_string(),
+            handled_at: now,
+        }),
+    )
+    .await?;
     if inserted > 0
         && let Some(current) = &current
     {
@@ -88,7 +103,7 @@ pub async fn create(
             }
         }
     }
-    let recorded = sql!(&mut tx, accounts_app_store_notifications::get(id))?;
+    let recorded = accounts_app_store_notifications_records::get(&mut tx, id).await?;
     tx.commit().await?;
     let recorded = recorded.ok_or(sqlx::Error::RowNotFound)?;
     if inserted == 0 {
@@ -104,7 +119,7 @@ pub async fn get(
     id: &str,
 ) -> Result<Option<AppStoreNotification>, sqlx::Error> {
     let mut tx = deployment.begin().await?;
-    let recorded = sql!(&mut tx, accounts_app_store_notifications::get(id))?;
+    let recorded = accounts_app_store_notifications_records::get(&mut tx, id).await?;
     tx.commit().await?;
     Ok(recorded)
 }

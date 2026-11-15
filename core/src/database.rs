@@ -3,8 +3,8 @@
 //! PostgreSQL for the web server, behind the `postgres` feature. Opening
 //! runs the migrations under `migrations/`, so every deployment has the
 //! same tables. A core function runs in one `Transaction` on it, and
-//! through the `sql!` macro each statement runs in the database's own SQL
-//! module, see `sqlite` and `postgres`.
+//! each record context dispatches to its private SQLite or PostgreSQL
+//! adapter. The backend root modules hold only migration runners.
 
 use std::path::Path;
 use std::str::FromStr;
@@ -29,25 +29,6 @@ pub enum Transaction {
     #[cfg(feature = "postgres")]
     Postgres(sqlx::Transaction<'static, sqlx::Postgres>),
 }
-
-/// Runs one statement of a SQL module on the transaction's connection:
-/// `sql!(tx, posts::list())` is `sqlite::posts::list(connection)` on
-/// SQLite and `postgres::posts::list(connection)` on PostgreSQL, so a
-/// resource's rules are written once and the SQL once per database.
-macro_rules! sql {
-    ($tx:expr, $module:ident :: $function:ident ( $($argument:expr),* $(,)? )) => {
-        match $tx {
-            $crate::database::Transaction::Sqlite(tx) => {
-                $crate::sqlite::$module::$function(&mut **tx, $($argument),*).await
-            }
-            #[cfg(feature = "postgres")]
-            $crate::database::Transaction::Postgres(tx) => {
-                $crate::postgres::$module::$function(&mut **tx, $($argument),*).await
-            }
-        }
-    };
-}
-pub(crate) use sql;
 
 impl Transaction {
     pub async fn commit(self) -> Result<(), sqlx::Error> {

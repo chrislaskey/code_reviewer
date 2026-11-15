@@ -6,40 +6,35 @@
 //! `deployment`; the server and the app only translate between their
 //! transport and these functions.
 //!
-//! Every function that reads or writes a resource takes the `users::User`
-//! acting, who owns what they write and sees what is theirs or in a
-//! community of theirs. Every write is an event, see `events`, which is
-//! how the apps' local databases and the web server converge, see `sync`
-//! and `docs/design/offline-sync.md`.
+//! Application entry points own transactions and enforce the acting user's
+//! scope. Internal contexts under `data` borrow those transactions and own
+//! private database adapters. Synced business writes use events so devices
+//! and the server converge; identity, commerce and infrastructure records
+//! use their existing transactional workflows. Bulk maintenance exceptions
+//! are documented in `docs/design/low-level-contexts.md`.
 
 pub mod accounts;
-pub mod avatars;
-pub mod communities;
-pub mod conflicts;
+pub mod app;
 pub mod credentials;
-pub mod current_community;
+mod data;
 pub mod database;
 pub mod deployment;
 pub mod device_settings;
-pub mod events;
 pub mod field_errors;
-pub mod files;
 pub mod jobs;
-pub mod local_users;
 pub mod mailer;
 pub mod mails;
-pub mod memberships;
 pub mod ops;
-pub mod pending_changes;
 #[cfg(feature = "postgres")]
 mod postgres;
-pub mod posts;
-pub mod posts_communities;
-pub mod purge;
 mod sqlite;
 #[cfg(feature = "object-storage")]
 pub mod storage;
-pub mod sync;
 pub mod tokens;
 pub mod trial_users;
-pub mod users;
+
+// Preserve existing resource paths while grouping their implementations under app.
+pub use app::{
+    avatars, communities, conflicts, current_community, events, files, local_users, memberships,
+    pending_changes, posts, posts_communities, purge, sync, users,
+};

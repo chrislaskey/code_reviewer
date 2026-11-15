@@ -7,11 +7,12 @@
 //! keeps it in a cookie, so it passes the stored id in and stores what
 //! comes back.
 
+use crate::data::memberships as memberships_records;
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::communities::{self, Community, CommunityError};
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::{Deployment, Role};
 use crate::device_settings::{self, CURRENT_COMMUNITY, DeviceSettingsError};
 use crate::users::User;
@@ -123,7 +124,8 @@ async fn list_mine(
     tx: &mut Transaction,
     user: &User,
 ) -> Result<Vec<Community>, CurrentCommunityError> {
-    let memberships = sql!(&mut *tx, memberships::list_live_of_user(user.id))?;
+    let memberships =
+        memberships_records::list(&mut *tx, memberships_records::Filter::User(user.id)).await?;
     let ids: Vec<Uuid> = memberships
         .iter()
         .map(|membership| membership.community_id)

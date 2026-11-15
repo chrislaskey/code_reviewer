@@ -8,12 +8,12 @@
 //! one runs it. A job that fails is recorded with its error and tried
 //! again once it is due; every job may be run again safely.
 
+use crate::data::jobs as jobs_records;
 use chrono::{DateTime, Duration, Utc};
 use serde_json::Value;
 use thiserror::Error;
 
 use crate::avatars::AvatarError;
-use crate::database::sql;
 use crate::deployment::{Deployment, Role};
 use crate::files::FileError;
 use crate::purge::{self, PurgeError};
@@ -172,7 +172,8 @@ pub async fn run_due(deployment: &Deployment, now: DateTime<Utc>) -> Result<Vec<
             continue;
         }
         let mut tx = deployment.begin().await?;
-        let claimed = sql!(&mut tx, jobs::claim_if_due(job, now, now - job.interval()))?;
+        let claimed =
+            jobs_records::processing::claim_if_due(&mut tx, job, now, now - job.interval()).await?;
         tx.commit().await?;
         if !claimed {
             continue;
@@ -193,7 +194,7 @@ pub async fn run(deployment: &Deployment, job: Job, now: DateTime<Utc>) -> Resul
         return Err(JobError::NotSetUp(job));
     }
     let mut tx = deployment.begin().await?;
-    sql!(&mut tx, jobs::claim(job, now))?;
+    jobs_records::processing::claim(&mut tx, job, now).await?;
     tx.commit().await?;
     let result = perform(deployment, job, now).await;
     finish(deployment, job, &result).await?;
@@ -203,7 +204,7 @@ pub async fn run(deployment: &Deployment, job: Job, now: DateTime<Utc>) -> Resul
 /// The job's last run, or none before its first.
 pub async fn get(deployment: &Deployment, job: Job) -> Result<Option<JobRecord>, JobError> {
     let mut tx = deployment.begin().await?;
-    let record = sql!(&mut tx, jobs::get(job))?;
+    let record = jobs_records::get(&mut tx, job).await?;
     tx.commit().await?;
     Ok(record)
 }
@@ -259,10 +260,7 @@ async fn finish(
     };
     let finished_at = crate::deployment::now();
     let mut tx = deployment.begin().await?;
-    sql!(
-        &mut tx,
-        jobs::finish(job, finished_at, report, error.as_deref())
-    )?;
+    jobs_records::processing::finish(&mut tx, job, finished_at, report, error.as_deref()).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -278,6 +276,38 @@ mod tests {
 
     fn jobs_of(runs: &[JobRun]) -> Vec<Job> {
         runs.iter().map(|run| run.job).collect()
+    }
+
+    #[tokio::test]
+    async fn jobs_rolled_back_claim_can_be_reclaimed_and_committed_claim_is_exclusive() {
+        with_each_database(|database| async move {
+            let deployment = server(database);
+            let now = crate::deployment::now();
+            let due_after = now - Duration::days(1);
+            let mut tx = deployment.begin().await.expect("transaction");
+            assert!(
+                jobs_records::processing::claim_if_due(&mut tx, Job::Purge, now, due_after)
+                    .await
+                    .expect("claim")
+            );
+            drop(tx);
+            assert!(get(&deployment, Job::Purge).await.expect("read").is_none());
+            let mut tx = deployment.begin().await.expect("transaction");
+            assert!(
+                jobs_records::processing::claim_if_due(&mut tx, Job::Purge, now, due_after)
+                    .await
+                    .expect("reclaim")
+            );
+            tx.commit().await.expect("commit");
+            let mut tx = deployment.begin().await.expect("transaction");
+            assert!(
+                !jobs_records::processing::claim_if_due(&mut tx, Job::Purge, now, due_after)
+                    .await
+                    .expect("already claimed")
+            );
+            tx.commit().await.expect("commit");
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -330,8 +360,10 @@ mod tests {
             let now = crate::deployment::now();
             let a_day_ago = now - Duration::days(1);
             let mut tx = deployment.begin().await.expect("a transaction");
-            let first = sql!(&mut tx, jobs::claim_if_due(Job::Purge, now, a_day_ago));
-            let second = sql!(&mut tx, jobs::claim_if_due(Job::Purge, now, a_day_ago));
+            let first =
+                jobs_records::processing::claim_if_due(&mut tx, Job::Purge, now, a_day_ago).await;
+            let second =
+                jobs_records::processing::claim_if_due(&mut tx, Job::Purge, now, a_day_ago).await;
             tx.commit().await.expect("committed");
             assert!(first.expect("a claim"));
             assert!(!second.expect("a claim"), "the first one runs it");

@@ -3,12 +3,23 @@
 //! price the catalog cannot sell, with no fixed amount, or billed every
 //! few months, is kept inactive.
 
+use crate::data::accounts_prices as accounts_prices_records;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::accounts::stripe::StripePrice;
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
+
+/// A record accepted by the prices workflow.
+pub(crate) struct AcceptedPrice<'a>(&'a Price);
+
+impl AcceptedPrice<'_> {
+    /// Borrows the accepted record for persistence.
+    pub(crate) fn row(&self) -> &Price {
+        self.0
+    }
+}
 
 pub const TABLE: &str = "accounts_prices";
 
@@ -78,16 +89,16 @@ pub(crate) async fn upsert_in(
         inserted_at: now,
         updated_at: now,
     };
-    sql!(&mut *tx, accounts_prices::upsert(&price))
+    accounts_prices_records::upsert(&mut *tx, AcceptedPrice(&price)).await
 }
 
 /// Every price, active or not.
 pub(crate) async fn list_in(tx: &mut Transaction) -> Result<Vec<Price>, sqlx::Error> {
-    sql!(&mut *tx, accounts_prices::list())
+    accounts_prices_records::list(&mut *tx).await
 }
 
 pub(crate) async fn get_in(tx: &mut Transaction, id: Uuid) -> Result<Option<Price>, sqlx::Error> {
-    sql!(&mut *tx, accounts_prices::get(id))
+    accounts_prices_records::get(&mut *tx, id).await
 }
 
 /// Every price inactive, before a sync makes active again what Stripe
@@ -96,5 +107,5 @@ pub(crate) async fn deactivate_all_in(
     tx: &mut Transaction,
     now: DateTime<Utc>,
 ) -> Result<(), sqlx::Error> {
-    sql!(&mut *tx, accounts_prices::deactivate_all(now))
+    accounts_prices_records::maintenance::deactivate_all(&mut *tx, now).await
 }

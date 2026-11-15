@@ -7,9 +7,9 @@
 //! `trial_expires_at`:
 //!
 //! - nobody else sees their communities or joins them, and they join
-//!   nobody else's (`sqlite::communities`, `memberships`), so nothing
+//!   nobody else's (`data::communities`, `memberships`), so nothing
 //!   of theirs ever reaches a device or another person;
-//! - they see only their own communities (`sqlite::communities`);
+//! - they see only their own communities (`data::communities`);
 //! - they have no files and no picture (`files::create_upload`,
 //!   `avatars::create_upload`);
 //! - they make `MAX_WRITES` writes and no more (`events::record`);
@@ -19,6 +19,8 @@
 //! Signing up, `accounts::sign_up_from_trial`, makes the same user a
 //! full one: nothing moves, since every row is already theirs.
 
+use crate::data::accounts_users as accounts_users_records;
+use crate::data::trial_users as trial_users_records;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -27,7 +29,7 @@ use uuid::Uuid;
 use crate::accounts::users::{self as accounts_users, AccountUserError};
 use crate::accounts::{AccountError, Session};
 use crate::communities::{self, CommunityError};
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::tokens::{self, Context};
 use crate::users::{self, User, UserError};
@@ -96,7 +98,7 @@ pub async fn create(deployment: &Deployment, max: i64) -> Result<Session, TrialU
         return Err(TrialUserError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    if sql!(&mut tx, trial_users::count())? >= max {
+    if trial_users_records::count(&mut tx).await? >= max {
         return Err(TrialUserError::Full);
     }
     let name = format!("{NAME_PREFIX}{}", tokens::random_letters_and_digits(11));
@@ -118,7 +120,7 @@ pub async fn create(deployment: &Deployment, max: i64) -> Result<Session, TrialU
 /// How many trial users there are, for the cap.
 pub async fn count(deployment: &Deployment) -> Result<i64, TrialUserError> {
     let mut tx = deployment.begin().await?;
-    let count = sql!(&mut tx, trial_users::count())?;
+    let count = trial_users_records::count(&mut tx).await?;
     tx.commit().await?;
     Ok(count)
 }
@@ -126,7 +128,7 @@ pub async fn count(deployment: &Deployment) -> Result<i64, TrialUserError> {
 /// Whether the user is a trial user. On a device, never.
 pub async fn is_trial(deployment: &Deployment, user: &User) -> Result<bool, sqlx::Error> {
     let mut tx = deployment.begin().await?;
-    let account = sql!(&mut tx, accounts_users::get(user.id))?;
+    let account = accounts_users_records::lifecycle::get(&mut tx, user.id).await?;
     tx.commit().await?;
     Ok(account.is_some_and(|account| account.trial_expires_at.is_some()))
 }
@@ -136,11 +138,11 @@ pub(crate) async fn writes_are_full_in(
     tx: &mut Transaction,
     user_id: Uuid,
 ) -> Result<bool, sqlx::Error> {
-    let account = sql!(&mut *tx, accounts_users::get(user_id))?;
+    let account = accounts_users_records::lifecycle::get(&mut *tx, user_id).await?;
     if !account.is_some_and(|account| account.trial_expires_at.is_some()) {
         return Ok(false);
     }
-    Ok(sql!(tx, trial_users::count_writes(user_id))? >= MAX_WRITES)
+    Ok(trial_users_records::count_writes(tx, user_id).await? >= MAX_WRITES)
 }
 
 /// Removes outright every trial user whose trial ended more than
@@ -156,7 +158,8 @@ pub async fn delete_expired(
     }
     let ended_before = now - Duration::hours(KEPT_AFTER_HOURS);
     let mut tx = deployment.begin().await?;
-    let users = sql!(&mut tx, trial_users::delete_expired_before(ended_before))?;
+    let users =
+        trial_users_records::maintenance::delete_expired_before(&mut tx, ended_before).await?;
     tx.commit().await?;
     Ok(TrialUsersDeleted { users })
 }
@@ -165,7 +168,7 @@ pub async fn delete_expired(
 /// `delete_expired` would later: a trial deleting itself, see
 /// `accounts::deletions`. Whether they were a trial.
 pub(crate) async fn delete_in(tx: &mut Transaction, user_id: Uuid) -> Result<bool, sqlx::Error> {
-    sql!(tx, trial_users::delete_one(user_id))
+    trial_users_records::maintenance::delete_one(tx, user_id).await
 }
 
 /// Shows a trial user's communities to everyone, once they signed up:
@@ -174,7 +177,7 @@ pub(crate) async fn show_communities_in(
     tx: &mut Transaction,
     user_id: Uuid,
 ) -> Result<(), sqlx::Error> {
-    sql!(tx, trial_users::touch_communities_of(user_id, now()))
+    trial_users_records::maintenance::touch_communities_of(tx, user_id, now()).await
 }
 
 #[cfg(test)]
@@ -353,7 +356,9 @@ mod tests {
             let server = server(database);
             let trial = create(&server, 10).await.expect("a trial").user;
             let mut tx = server.begin().await.expect("a transaction");
-            let made = sql!(&mut tx, trial_users::count_writes(trial.id)).expect("counted");
+            let made = trial_users_records::count_writes(&mut tx, trial.id)
+                .await
+                .expect("counted");
             tx.commit().await.expect("committed");
             assert_eq!(made, 2, "their community and their membership");
             for number in made..MAX_WRITES {
@@ -393,7 +398,9 @@ mod tests {
                 "whatever the resource"
             );
             let mut tx = server.begin().await.expect("a transaction");
-            let recorded = sql!(&mut tx, trial_users::count_writes(trial.id)).expect("counted");
+            let recorded = trial_users_records::count_writes(&mut tx, trial.id)
+                .await
+                .expect("counted");
             tx.commit().await.expect("committed");
             assert_eq!(recorded, MAX_WRITES, "a refused write leaves no row");
             let posts_made = usize::try_from(MAX_WRITES - made).expect("a count");

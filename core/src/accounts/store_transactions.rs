@@ -7,6 +7,8 @@
 //! product id, which is the lookup key, one plan per user, and a
 //! product bought once only once.
 
+use crate::data::accounts_purchases as accounts_purchases_records;
+use crate::data::accounts_subscriptions as accounts_subscriptions_records;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -17,7 +19,7 @@ use crate::accounts::products::{Grant, ProductKind};
 use crate::accounts::purchases::{self, Purchase, Store};
 use crate::accounts::subscriptions::{self, Subscription, SubscriptionStatus};
 use crate::accounts::users as accounts_users;
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::users::User;
 
@@ -165,14 +167,22 @@ pub async fn apply_in(
 ) -> Result<StoreRow, StoreTransactionError> {
     let store_id = transaction.details.store_id();
     let existing = match &transaction.details {
-        StoreTransactionDetails::OneTime { .. } => sql!(
-            &mut *tx,
-            accounts_purchases::get_ids_by_store_id(transaction.store, store_id)
-        )?,
-        StoreTransactionDetails::Subscription { .. } => sql!(
-            &mut *tx,
-            accounts_subscriptions::get_ids_by_store_id(transaction.store, store_id)
-        )?,
+        StoreTransactionDetails::OneTime { .. } => {
+            accounts_purchases_records::processing::get_ids_by_store_id(
+                &mut *tx,
+                transaction.store,
+                store_id,
+            )
+            .await?
+        }
+        StoreTransactionDetails::Subscription { .. } => {
+            accounts_subscriptions_records::processing::get_ids_by_store_id(
+                &mut *tx,
+                transaction.store,
+                store_id,
+            )
+            .await?
+        }
     };
     let user_id = owner(transaction.user_id, existing.map(|(_, user)| user), sent_by)?;
     if existing.is_none() {
@@ -217,10 +227,12 @@ pub async fn apply_in(
             if let Some(refunded_at) = refunded_at {
                 purchases::refund_in(tx, transaction.store, store_id, *refunded_at).await?;
             }
-            let (id, _) = sql!(
+            let (id, _) = accounts_purchases_records::processing::get_ids_by_store_id(
                 &mut *tx,
-                accounts_purchases::get_ids_by_store_id(transaction.store, store_id)
-            )?
+                transaction.store,
+                store_id,
+            )
+            .await?
             .ok_or(sqlx::Error::RowNotFound)?;
             Ok(StoreRow::Purchase(id))
         }
@@ -238,10 +250,14 @@ pub async fn apply_in(
                 return Err(StoreTransactionError::PriceNotForSale);
             }
             let replaced = match replaced_store_id {
-                Some(replaced) => sql!(
-                    &mut *tx,
-                    accounts_subscriptions::get_ids_by_store_id(transaction.store, replaced)
-                )?,
+                Some(replaced) => {
+                    accounts_subscriptions_records::processing::get_ids_by_store_id(
+                        &mut *tx,
+                        transaction.store,
+                        replaced,
+                    )
+                    .await?
+                }
                 None => None,
             };
             if existing.is_none()
@@ -271,14 +287,16 @@ pub async fn apply_in(
                 inserted_at: now,
                 updated_at: now,
             };
-            sql!(&mut *tx, accounts_subscriptions::upsert(&subscription))?;
+            subscriptions::upsert_in(&mut *tx, &subscription).await?;
             if let Some((replaced_id, _)) = replaced {
                 end_replaced_in(tx, replaced_id, now).await?;
             }
-            let (id, _) = sql!(
+            let (id, _) = accounts_subscriptions_records::processing::get_ids_by_store_id(
                 &mut *tx,
-                accounts_subscriptions::get_ids_by_store_id(transaction.store, store_id)
-            )?
+                transaction.store,
+                store_id,
+            )
+            .await?
             .ok_or(sqlx::Error::RowNotFound)?;
             Ok(StoreRow::Subscription(id))
         }
@@ -353,7 +371,8 @@ async fn end_replaced_in(
     id: Uuid,
     now: DateTime<Utc>,
 ) -> Result<(), sqlx::Error> {
-    let Some((replaced, _)) = sql!(&mut *tx, accounts_subscriptions::get(id))? else {
+    let Some((replaced, _)) = accounts_subscriptions_records::processing::get(&mut *tx, id).await?
+    else {
         return Ok(());
     };
     if replaced.ended_at.is_some() {
@@ -368,7 +387,7 @@ async fn end_replaced_in(
         updated_at: now,
         ..replaced
     };
-    sql!(&mut *tx, accounts_subscriptions::upsert(&ended))
+    subscriptions::upsert_in(&mut *tx, &ended).await
 }
 
 #[cfg(test)]
@@ -472,6 +491,68 @@ pub(crate) mod tests {
         let applied = apply_in(&mut tx, transaction, sent_by).await;
         tx.commit().await.expect("committed");
         applied
+    }
+
+    #[tokio::test]
+    async fn store_transactions_license_and_refund_follow_transaction_commit() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            catalog(&server).await;
+            let alice = full_user(&server, "alice@example.com").await;
+            let license = one_time(Some(alice.id), "license", "license_rollback");
+            let mut tx = server.begin().await.expect("transaction");
+            apply_in(&mut tx, &license, Some(alice.id))
+                .await
+                .expect("license");
+            drop(tx);
+            assert!(
+                purchases::list(&server, &alice)
+                    .await
+                    .expect("purchases")
+                    .is_empty()
+            );
+            let row = apply(&server, &license, Some(alice.id))
+                .await
+                .expect("retry");
+            let StoreRow::Purchase(id) = row else {
+                panic!("purchase");
+            };
+            let purchase = purchases::get(&server, &alice, id).await.expect("purchase");
+            let mut tx = server.begin().await.expect("transaction");
+            assert!(
+                purchases::owns_in(&mut tx, alice.id, purchase.purchase.product_id)
+                    .await
+                    .expect("owned")
+            );
+            purchases::refund_in(&mut tx, Store::AppStore, "license_rollback", now())
+                .await
+                .expect("refund");
+            assert!(
+                !purchases::owns_in(&mut tx, alice.id, purchase.purchase.product_id)
+                    .await
+                    .expect("refunded")
+            );
+            drop(tx);
+            let mut tx = server.begin().await.expect("transaction");
+            assert!(
+                purchases::owns_in(&mut tx, alice.id, purchase.purchase.product_id)
+                    .await
+                    .expect("refund rolled back")
+            );
+            purchases::refund_in(&mut tx, Store::AppStore, "license_rollback", now())
+                .await
+                .expect("refund");
+            tx.commit().await.expect("commit");
+            assert!(
+                purchases::get(&server, &alice, id)
+                    .await
+                    .expect("history retained")
+                    .purchase
+                    .refunded_at
+                    .is_some()
+            );
+        })
+        .await;
     }
 
     #[tokio::test]

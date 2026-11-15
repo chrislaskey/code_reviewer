@@ -4,13 +4,34 @@
 //! apps sync of a person is `crate::users`, a row with the same id,
 //! written with this one at sign-up, see `docs/design/multi-app.md`.
 
+use crate::data::accounts_users as accounts_users_records;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
+
+/// An account change accepted by this lifecycle workflow.
+pub(crate) struct AcceptedUpdate<'a>(accounts_users_records::Update<'a>);
+
+impl AcceptedUpdate<'_> {
+    /// Borrows the accepted lifecycle change.
+    pub(crate) fn value(&self) -> &accounts_users_records::Update<'_> {
+        &self.0
+    }
+}
+
+/// A record accepted by this resource's workflow.
+pub(crate) struct AcceptedAccountUser<'a>(&'a AccountUser);
+
+impl AcceptedAccountUser<'_> {
+    /// Borrows the accepted record for persistence.
+    pub(crate) fn row(&self) -> &AccountUser {
+        self.0
+    }
+}
 
 pub const TABLE: &str = "accounts_users";
 
@@ -90,13 +111,20 @@ async fn create_with_trial_in(
         updated_at: now,
         deleted_at: None,
     };
-    sql!(&mut *tx, accounts_users::insert(&account)).map_err(email_taken)?;
+    accounts_users_records::create(&mut *tx, AcceptedAccountUser(&account))
+        .await
+        .map_err(email_taken)?;
     Ok(account)
 }
 
 /// Marks the account's email as proved, now.
 pub(crate) async fn confirm_in(tx: &mut Transaction, id: Uuid) -> Result<(), AccountUserError> {
-    Ok(sql!(&mut *tx, accounts_users::set_confirmed_at(id, now()))?)
+    Ok(accounts_users_records::update(
+        &mut *tx,
+        id,
+        AcceptedUpdate(accounts_users_records::Update::Confirm(now())),
+    )
+    .await?)
 }
 
 /// Makes a trial user's account the person's own, with the email they
@@ -106,7 +134,13 @@ pub(crate) async fn sign_up_trial_in(
     id: Uuid,
     email: &str,
 ) -> Result<(), AccountUserError> {
-    sql!(&mut *tx, accounts_users::set_signed_up(id, email, now())).map_err(email_taken)
+    accounts_users_records::update(
+        &mut *tx,
+        id,
+        AcceptedUpdate(accounts_users_records::Update::SignUp { email, at: now() }),
+    )
+    .await
+    .map_err(email_taken)
 }
 
 /// Removes an account and its user outright: a sign-up that never
@@ -115,13 +149,13 @@ pub(crate) async fn delete_unconfirmed_in(
     tx: &mut Transaction,
     id: Uuid,
 ) -> Result<(), AccountUserError> {
-    Ok(sql!(&mut *tx, accounts_users::delete_row(id))?)
+    Ok(accounts_users_records::maintenance::delete(&mut *tx, id).await?)
 }
 
 /// Marks the account deleted: sign-in finds it no longer, and its
 /// email is free to sign up again, see `accounts::deletions`.
 pub(crate) async fn delete_in(tx: &mut Transaction, id: Uuid) -> Result<(), AccountUserError> {
-    Ok(sql!(&mut *tx, accounts_users::set_deleted_at(id, now()))?)
+    Ok(accounts_users_records::delete(&mut *tx, id, now()).await?)
 }
 
 /// The live account by its id.
@@ -129,8 +163,7 @@ pub(crate) async fn get_in(
     tx: &mut Transaction,
     id: Uuid,
 ) -> Result<Option<AccountUser>, AccountUserError> {
-    let account = sql!(&mut *tx, accounts_users::get(id))?;
-    Ok(account.filter(|account| account.deleted_at.is_none()))
+    Ok(accounts_users_records::get(tx, id).await?)
 }
 
 /// The live account with the email as `checked_email` would keep it.
@@ -138,10 +171,7 @@ pub(crate) async fn get_by_email_in(
     tx: &mut Transaction,
     email: &str,
 ) -> Result<Option<AccountUser>, AccountUserError> {
-    Ok(sql!(
-        &mut *tx,
-        accounts_users::get_by_email(&normalized_email(email))
-    )?)
+    Ok(accounts_users_records::get_by_email(&mut *tx, &normalized_email(email)).await?)
 }
 
 /// Deletes the accounts that never proved their email and were made
@@ -151,16 +181,13 @@ pub(crate) async fn delete_unconfirmed_before(
     tx: &mut Transaction,
     time: DateTime<Utc>,
 ) -> Result<u64, AccountUserError> {
-    Ok(sql!(
-        &mut *tx,
-        accounts_users::delete_unconfirmed_before(time)
-    )?)
+    Ok(accounts_users_records::maintenance::delete_unconfirmed_before(&mut *tx, time).await?)
 }
 
 /// Deletes the accounts whose user the purge removed, with their
 /// credentials and tokens; how many.
 pub(crate) async fn delete_without_user(tx: &mut Transaction) -> Result<u64, AccountUserError> {
-    Ok(sql!(&mut *tx, accounts_users::delete_without_user())?)
+    Ok(accounts_users_records::maintenance::delete_without_user(&mut *tx).await?)
 }
 
 /// The email as it is kept: `normalized_email`, with an @ and no
@@ -192,5 +219,112 @@ fn email_taken(error: sqlx::Error) -> AccountUserError {
             AccountUserError::EmailTaken
         }
         _ => AccountUserError::Database(error),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::with_each_database;
+    use crate::deployment::Role;
+    use crate::ops::staff;
+    use crate::{credentials, tokens, users};
+
+    #[tokio::test]
+    async fn accounts_users_signup_records_roll_back_together() {
+        with_each_database(|database| async move {
+            let deployment = Deployment::new(database, Role::Server);
+            let id = Uuid::now_v7();
+            let mut tx = deployment.begin().await.expect("transaction");
+            create_in(&mut tx, id, " Alice@Example.com ", false)
+                .await
+                .expect("account");
+            users::create_in(&mut tx, id, "Alice")
+                .await
+                .expect("profile");
+            credentials::set(&mut tx, id, "correct horse battery")
+                .await
+                .expect("password");
+            let token = tokens::create(&mut tx, id, tokens::Context::Api)
+                .await
+                .expect("token");
+            confirm_in(&mut tx, id).await.expect("confirm");
+            assert!(
+                get_in(&mut tx, id)
+                    .await
+                    .expect("read")
+                    .expect("account")
+                    .confirmed_at
+                    .is_some()
+            );
+            drop(tx);
+            let mut tx = deployment.begin().await.expect("transaction");
+            assert!(get_in(&mut tx, id).await.expect("account").is_none());
+            assert!(users::get_in(&mut tx, id).await.expect("profile").is_none());
+            assert!(!credentials::is_set(&mut tx, id).await.expect("password"));
+            assert!(
+                tokens::get_valid(&mut tx, &tokens::hash(&token), tokens::Context::Api, now())
+                    .await
+                    .expect("token")
+                    .is_none()
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn accounts_users_cleanup_cascades_credentials_tokens_and_staff_atomically() {
+        with_each_database(|database| async move {
+            let deployment = Deployment::new(database, Role::Server);
+            let id = Uuid::now_v7();
+            let mut tx = deployment.begin().await.expect("transaction");
+            create_in(&mut tx, id, "alice@example.com", false)
+                .await
+                .expect("account");
+            let profile = users::create_in(&mut tx, id, "Alice")
+                .await
+                .expect("profile");
+            credentials::set(&mut tx, id, "correct horse battery")
+                .await
+                .expect("password");
+            let token = tokens::create(&mut tx, id, tokens::Context::Api)
+                .await
+                .expect("token");
+            tx.commit().await.expect("commit");
+            staff::create(&deployment, "alice@example.com")
+                .await
+                .expect("staff");
+            let mut tx = deployment.begin().await.expect("transaction");
+            delete_unconfirmed_in(&mut tx, id).await.expect("cleanup");
+            assert!(!credentials::is_set(&mut tx, id).await.expect("password"));
+            drop(tx);
+            assert!(staff::get(&deployment, &profile).await.is_ok());
+            let mut tx = deployment.begin().await.expect("transaction");
+            assert!(credentials::is_set(&mut tx, id).await.expect("password"));
+            assert!(
+                tokens::get_valid(&mut tx, &tokens::hash(&token), tokens::Context::Api, now())
+                    .await
+                    .expect("token")
+                    .is_some()
+            );
+            delete_unconfirmed_in(&mut tx, id).await.expect("cleanup");
+            tx.commit().await.expect("commit");
+            let mut tx = deployment.begin().await.expect("transaction");
+            assert!(get_in(&mut tx, id).await.expect("account").is_none());
+            assert!(users::get_in(&mut tx, id).await.expect("profile").is_none());
+            assert!(!credentials::is_set(&mut tx, id).await.expect("password"));
+            assert!(
+                tokens::get_valid(&mut tx, &tokens::hash(&token), tokens::Context::Api, now())
+                    .await
+                    .expect("token")
+                    .is_none()
+            );
+            tx.commit().await.expect("commit");
+            assert!(matches!(
+                staff::get(&deployment, &profile).await,
+                Err(crate::ops::staff::StaffError::NotStaff)
+            ));
+        })
+        .await;
     }
 }

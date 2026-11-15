@@ -10,6 +10,9 @@
 //! meant, applied through the same join and leave, and the server's row
 //! comes back whatever the device wrote.
 
+use crate::data::communities as communities_records;
+use crate::data::memberships as memberships_records;
+use crate::data::trial_users as trial_users_records;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -17,12 +20,23 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::communities::Community;
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
 use crate::posts_communities;
 use crate::sync::{Cursor, TableRow};
 use crate::users::User;
+
+/// A row accepted by this resource's event or replication workflow.
+/// Only this module can construct an accepted write.
+pub(crate) struct AcceptedMembership<'a>(&'a Membership);
+
+impl AcceptedMembership<'_> {
+    /// Borrows the accepted row for persistence.
+    pub(crate) fn row(&self) -> &Membership {
+        self.0
+    }
+}
 
 pub const TABLE: &str = "app_users_communities";
 pub const ROLE_MEMBER: &str = "member";
@@ -71,7 +85,8 @@ pub async fn list_mine(
     user: &User,
 ) -> Result<Vec<Membership>, MembershipError> {
     let mut tx = deployment.begin().await?;
-    let memberships = sql!(&mut tx, memberships::list_live_of_user(user.id))?;
+    let memberships =
+        memberships_records::list(&mut tx, memberships_records::Filter::User(user.id)).await?;
     tx.commit().await?;
     Ok(memberships)
 }
@@ -126,10 +141,13 @@ pub(crate) async fn join_in(
     user: &User,
     community_id: Uuid,
 ) -> Result<Membership, MembershipError> {
-    let event = match sql!(
+    let event = match memberships_records::replication::get_by_user_and_community(
         &mut *tx,
-        memberships::get_by_user_and_community(user.id, community_id)
-    )? {
+        user.id,
+        community_id,
+    )
+    .await?
+    {
         None => Event::create(
             TABLE,
             Uuid::now_v7(),
@@ -177,18 +195,14 @@ pub(crate) async fn get_live_in(
     user_id: Uuid,
     community_id: Uuid,
 ) -> Result<Option<Membership>, MembershipError> {
-    Ok(sql!(
-        tx,
-        memberships::get_by_user_and_community(user_id, community_id)
-    )?
-    .filter(|membership| membership.deleted_at.is_none()))
+    Ok(memberships_records::get(tx, user_id, community_id).await?)
 }
 
 pub(crate) async fn get_in(
     tx: &mut Transaction,
     id: Uuid,
 ) -> Result<Option<Membership>, MembershipError> {
-    Ok(sql!(tx, memberships::get(id))?)
+    Ok(memberships_records::replication::get(tx, id).await?)
 }
 
 /// Writes the server's row over the device's, unless an event of the
@@ -201,12 +215,12 @@ pub(crate) async fn apply_server_row(
     if events::has_pending(tx, TABLE, membership.id).await? {
         return Ok(false);
     }
-    sql!(&mut *tx, memberships::upsert(&membership))?;
+    memberships_records::replication::upsert(&mut *tx, AcceptedMembership(&membership)).await?;
     Ok(true)
 }
 
 pub(crate) async fn delete_row(tx: &mut Transaction, id: Uuid) -> Result<(), MembershipError> {
-    Ok(sql!(tx, memberships::delete_row(id))?)
+    Ok(memberships_records::maintenance::delete(tx, id).await?)
 }
 
 pub(crate) async fn list_synced_after(
@@ -215,10 +229,7 @@ pub(crate) async fn list_synced_after(
     after: &Cursor,
     limit: usize,
 ) -> Result<Vec<Membership>, MembershipError> {
-    Ok(sql!(
-        tx,
-        memberships::list_synced_after(user.id, after, limit)
-    )?)
+    Ok(memberships_records::replication::list_synced_after(tx, user.id, after, limit).await?)
 }
 
 struct Applied {
@@ -278,21 +289,21 @@ async fn apply_in(
             let Some(community_id) = community_id else {
                 return rejected(event, "unknown_community", None);
             };
-            match sql!(&mut *tx, communities::get(community_id))? {
+            match communities_records::replication::get(&mut *tx, community_id).await? {
                 Some(community) if community.deleted_at.is_none() => {}
                 _ => return rejected(event, "unknown_community", None),
             }
             // A trial user and anyone else are never in one community
-            if sql!(
-                &mut *tx,
-                trial_users::join_is_walled_off(user.id, community_id)
-            )? {
+            if trial_users_records::join_is_walled_off(&mut *tx, user.id, community_id).await? {
                 return rejected(event, "unknown_community", None);
             }
-            match sql!(
+            match memberships_records::replication::get_by_user_and_community(
                 &mut *tx,
-                memberships::get_by_user_and_community(user.id, community_id)
-            )? {
+                user.id,
+                community_id,
+            )
+            .await?
+            {
                 Some(existing) if existing.deleted_at.is_none() => existing,
                 Some(left) => revive(tx, role, left).await?,
                 None => {
@@ -316,7 +327,7 @@ async fn apply_in(
                         deleted_at: None,
                         deleted_by_id: None,
                     };
-                    sql!(&mut *tx, memberships::insert(&membership))?;
+                    memberships_records::create(&mut *tx, AcceptedMembership(&membership)).await?;
                     membership
                 }
             }
@@ -339,7 +350,9 @@ async fn apply_in(
             };
             match (membership.deleted_at, deleted_at) {
                 (Some(_), None) => {
-                    match sql!(&mut *tx, communities::get(membership.community_id))? {
+                    match communities_records::replication::get(&mut *tx, membership.community_id)
+                        .await?
+                    {
                         Some(community) if community.deleted_at.is_none() => {}
                         _ => return rejected(event, "unknown_community", Some(membership)),
                     }
@@ -392,7 +405,12 @@ pub(crate) async fn delete_with_community(
     role: Role,
     community: &Community,
 ) -> Result<(), MembershipError> {
-    for mut membership in sql!(&mut *tx, memberships::list_live_of_community(community.id))? {
+    for mut membership in memberships_records::list(
+        &mut *tx,
+        memberships_records::Filter::Community(community.id),
+    )
+    .await?
+    {
         membership.deleted_at = community.deleted_at;
         membership.deleted_by_id = community.deleted_by_id;
         write_changed(tx, role, &mut membership).await?;
@@ -435,7 +453,7 @@ async fn write_changed(
         membership.version += 1;
         membership.last_synced_at = Some(now);
     }
-    sql!(&mut *tx, memberships::update(membership))?;
+    memberships_records::update(&mut *tx, AcceptedMembership(membership)).await?;
     Ok(())
 }
 
@@ -468,6 +486,7 @@ fn fields(value: Value) -> Fields {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::data::posts_communities as posts_communities_records;
     use crate::database::{Database, with_each_database};
     use crate::{communities, posts, posts_communities, users};
 
@@ -538,10 +557,12 @@ mod tests {
                 .expect("kept");
             let left_at = left.deleted_at.expect("deleted");
             assert_eq!(left.deleted_by_id, Some(alice.id));
-            let rows = sql!(
+            let rows = posts_communities_records::replication::list_of_membership_deleted_at(
                 &mut tx,
-                posts_communities::list_of_membership_deleted_at(membership.id, left_at)
+                membership.id,
+                left_at,
             )
+            .await
             .expect("the rows");
             assert_eq!(
                 rows.len(),
@@ -604,13 +625,16 @@ mod tests {
                 .expect("rejoined");
             assert!(bodies(&deployment, &bob).await.is_empty());
             let mut tx = deployment.begin().await.expect("a transaction");
-            let row = sql!(
+            let row = posts_communities_records::replication::get_by_post_and_community(
                 &mut tx,
-                posts_communities::get_by_post_and_community(roses.id, gardening.id)
+                roses.id,
+                gardening.id,
             )
+            .await
             .expect("the row")
             .expect("kept");
-            let post = sql!(&mut tx, posts::get(roses.id))
+            let post = crate::data::posts::replication::get(&mut tx, roses.id)
+                .await
                 .expect("the post")
                 .expect("kept");
             assert_eq!(

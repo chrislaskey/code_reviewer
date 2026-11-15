@@ -25,7 +25,7 @@ person meant it.
   indexes on email only over rows not deleted, so a deleted account's
   email can sign up again at once. Sign-in already looks up only live
   accounts (`accounts_users::get_by_email`).
-- The purge (`core/src/purge.rs`): daily, removes rows soft-deleted
+- The purge (`core/src/app/purge.rs`): daily, removes rows soft-deleted
   more than `RETENTION_DAYS`, 90, ago, children first, then the
   accounts of the users it removed. The database's `ON DELETE CASCADE`
   takes the user's tokens, credentials, staff row, checkouts, purchases

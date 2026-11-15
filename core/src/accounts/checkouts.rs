@@ -8,6 +8,10 @@
 //! webhook, which applies the same session, `apply_session_in`. See
 //! `docs/design/purchasing.md`, P2 and P3.
 
+use crate::data::accounts_checkouts as accounts_checkouts_records;
+use crate::data::accounts_products as accounts_products_records;
+use crate::data::accounts_purchases as accounts_purchases_records;
+use crate::data::accounts_users as accounts_users_records;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -22,9 +26,29 @@ use crate::accounts::stripe::{
     StripeCheckoutSessionStatus, StripeError, StripePaymentStatus, StripeSubscription,
 };
 use crate::accounts::{plans, subscriptions};
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::users::User;
+
+/// A checkout status accepted by provider-session processing.
+pub(crate) struct AcceptedStatus(CheckoutStatus);
+
+impl AcceptedStatus {
+    /// Returns the accepted provider status.
+    pub(crate) fn value(&self) -> CheckoutStatus {
+        self.0
+    }
+}
+
+/// A record accepted by the checkouts workflow.
+pub(crate) struct AcceptedCheckout<'a>(&'a Checkout);
+
+impl AcceptedCheckout<'_> {
+    /// Borrows the accepted record for persistence.
+    pub(crate) fn row(&self) -> &Checkout {
+        self.0
+    }
+}
 
 pub const TABLE: &str = "accounts_checkouts";
 
@@ -172,8 +196,9 @@ pub async fn create(
         return Err(CheckoutError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let account =
-        sql!(&mut tx, accounts_users::get(user.id))?.ok_or(CheckoutError::NeedsAccount)?;
+    let account = accounts_users_records::lifecycle::get(&mut tx, user.id)
+        .await?
+        .ok_or(CheckoutError::NeedsAccount)?;
     if account.trial_expires_at.is_some() || account.confirmed_at.is_none() {
         return Err(CheckoutError::NeedsAccount);
     }
@@ -181,7 +206,8 @@ pub async fn create(
         .await?
         .ok_or(CheckoutError::PriceNotForSale)?;
     let owned = purchases::owns_in(&mut tx, user.id, price.product_id).await?;
-    let customer_id = sql!(&mut tx, accounts_users::get_stripe_customer_id(user.id))?;
+    let customer_id =
+        accounts_users_records::billing::get_stripe_customer_id(&mut tx, user.id).await?;
     tx.commit().await?;
     let product = products::get_for_sale(deployment, price.product_id).await?;
     if !product.prices.iter().any(|sold| sold.id == price_id) {
@@ -235,7 +261,7 @@ pub async fn create(
         updated_at: now,
     };
     let mut tx = deployment.begin().await?;
-    sql!(&mut tx, accounts_checkouts::insert(&checkout))?;
+    accounts_checkouts_records::create(&mut tx, AcceptedCheckout(&checkout)).await?;
     tx.commit().await?;
     Ok(CheckoutCreated { checkout, url })
 }
@@ -269,9 +295,11 @@ pub async fn get(
     let price = prices::get_in(&mut tx, checkout.price_id)
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
-    let product =
-        sql!(&mut tx, accounts_products::get(price.product_id))?.ok_or(sqlx::Error::RowNotFound)?;
-    let purchase_id = sql!(&mut tx, accounts_purchases::get_by_checkout_id(checkout.id))?;
+    let product = accounts_products_records::get(&mut tx, price.product_id)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)?;
+    let purchase_id =
+        accounts_purchases_records::processing::get_by_checkout_id(&mut tx, checkout.id).await?;
     tx.commit().await?;
     let kind = match price.interval {
         Some(_) => ProductKind::Plan,
@@ -296,19 +324,16 @@ pub(crate) async fn apply_session_in(
     subscription: Option<&StripeSubscription>,
     now: DateTime<Utc>,
 ) -> Result<(), sqlx::Error> {
-    let Some(checkout) = sql!(
-        &mut *tx,
-        accounts_checkouts::get_by_stripe_session_id(&session.id)
-    )?
+    let Some(checkout) =
+        accounts_checkouts_records::processing::get_by_stripe_session_id(&mut *tx, &session.id)
+            .await?
     else {
         return Ok(());
     };
     let status = CheckoutStatus::of(session);
     if status != checkout.status {
-        sql!(
-            &mut *tx,
-            accounts_checkouts::update_status(checkout.id, status, now)
-        )?;
+        accounts_checkouts_records::update(&mut *tx, checkout.id, AcceptedStatus(status), now)
+            .await?;
     }
     if let Some(subscription) = subscription {
         subscriptions::upsert_from_stripe_in(tx, subscription, now).await?;
@@ -343,11 +368,9 @@ async fn checkout_of(
     id: Uuid,
 ) -> Result<Checkout, CheckoutError> {
     let mut tx = deployment.begin().await?;
-    let checkout = sql!(&mut tx, accounts_checkouts::get(id))?;
+    let checkout = accounts_checkouts_records::get(&mut tx, user.id, id).await?;
     tx.commit().await?;
-    checkout
-        .filter(|checkout| checkout.user_id == user.id)
-        .ok_or(CheckoutError::NotFound { id })
+    checkout.ok_or(CheckoutError::NotFound { id })
 }
 
 /// The account's Stripe customer, made now. Two checkouts at once may
@@ -362,11 +385,9 @@ async fn customer_for(
         .customer_create(&account_id.to_string(), email)
         .await?;
     let mut tx = deployment.begin().await?;
-    sql!(
-        &mut tx,
-        accounts_users::set_stripe_customer_id_if_missing(account_id, &made)
-    )?;
-    let kept = sql!(&mut tx, accounts_users::get_stripe_customer_id(account_id))?;
+    accounts_users_records::billing::set_stripe_customer_id_if_missing(&mut tx, account_id, &made)
+        .await?;
+    let kept = accounts_users_records::billing::get_stripe_customer_id(&mut tx, account_id).await?;
     tx.commit().await?;
     Ok(kept.unwrap_or(made))
 }

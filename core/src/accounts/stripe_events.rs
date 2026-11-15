@@ -7,6 +7,7 @@
 //! fetched from Stripe and copied as it is now, so events out of order
 //! never leave an older state. See `docs/design/purchasing.md`.
 
+use crate::data::accounts_stripe_events as accounts_stripe_events_records;
 use chrono::{DateTime, Utc};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
@@ -19,8 +20,18 @@ use crate::accounts::stripe::{
     StripeSubscription,
 };
 use crate::accounts::{checkouts, prices, products, subscriptions};
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
+
+/// A record accepted by the stripe events workflow.
+pub(crate) struct AcceptedStripeEvent<'a>(&'a StripeEvent);
+
+impl AcceptedStripeEvent<'_> {
+    /// Borrows the accepted record for persistence.
+    pub(crate) fn row(&self) -> &StripeEvent {
+        self.0
+    }
+}
 
 pub const TABLE: &str = "accounts_stripe_events";
 
@@ -126,14 +137,19 @@ pub async fn create(
 
     let now = now();
     let mut tx = deployment.begin().await?;
-    let inserted = sql!(
+    let inserted = accounts_stripe_events_records::create(
         &mut tx,
-        accounts_stripe_events::insert_if_missing(id, event_type, now)
-    )?;
+        AcceptedStripeEvent(&StripeEvent {
+            id: id.to_string(),
+            event_type: event_type.to_string(),
+            handled_at: now,
+        }),
+    )
+    .await?;
     if inserted > 0 {
         apply_in(&mut tx, fetched, now).await?;
     }
-    let recorded = sql!(&mut tx, accounts_stripe_events::get(id))?;
+    let recorded = accounts_stripe_events_records::get(&mut tx, id).await?;
     tx.commit().await?;
     let recorded = recorded.ok_or(sqlx::Error::RowNotFound)?;
     if inserted == 0 {
@@ -232,7 +248,7 @@ pub async fn get(
         return Err(StripeEventError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let event = sql!(&mut tx, accounts_stripe_events::get(id))?;
+    let event = accounts_stripe_events_records::get(&mut tx, id).await?;
     tx.commit().await?;
     Ok(event)
 }
@@ -274,6 +290,66 @@ mod tests {
 
     fn secret() -> SecretString {
         SecretString::from(SIGNING_SECRET)
+    }
+
+    #[tokio::test]
+    async fn stripe_events_receipt_and_catalog_roll_back_and_delivery_can_retry() {
+        with_each_database(|database| async move {
+            let deployment = Deployment::new(database, Role::Server);
+            let product = StripeProduct {
+                id: "prod_rollback".to_string(),
+                name: "License".to_string(),
+                description: None,
+                active: true,
+            };
+            let mut tx = deployment.begin().await.expect("transaction");
+            let receipt = StripeEvent {
+                id: "evt_rollback".to_string(),
+                event_type: "product.created".to_string(),
+                handled_at: now(),
+            };
+            assert_eq!(
+                accounts_stripe_events_records::create(&mut tx, AcceptedStripeEvent(&receipt))
+                    .await
+                    .expect("receipt"),
+                1
+            );
+            products::upsert_in(&mut tx, &product, now())
+                .await
+                .expect("product");
+            drop(tx);
+            assert!(
+                get(&deployment, &receipt.id)
+                    .await
+                    .expect("receipt")
+                    .is_none()
+            );
+            let mut tx = deployment.begin().await.expect("transaction");
+            assert!(
+                crate::data::accounts_products::get_by_stripe_id(&mut tx, &product.id)
+                    .await
+                    .expect("product")
+                    .is_none()
+            );
+            tx.commit().await.expect("commit");
+            let stripe = Stripe::memory();
+            stripe.memory_product_put(product);
+            let body = event_body_for(&receipt.id, &receipt.event_type, "prod_rollback");
+            let signature = signature_for(&body, SIGNING_SECRET, 0);
+            assert!(matches!(
+                create(&deployment, &stripe, &secret(), &body, &signature)
+                    .await
+                    .expect("retry"),
+                StripeEventCreated::New(_)
+            ));
+            assert!(matches!(
+                create(&deployment, &stripe, &secret(), &body, &signature)
+                    .await
+                    .expect("repeat"),
+                StripeEventCreated::Repeat(_)
+            ));
+        })
+        .await;
     }
 
     #[tokio::test]

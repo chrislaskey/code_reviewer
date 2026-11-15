@@ -14,6 +14,12 @@
 //! it. Nothing a local user made exists anywhere else, so there is
 //! nothing to merge.
 
+use crate::data::communities as communities_records;
+use crate::data::device_settings as device_settings_records;
+use crate::data::files as files_records;
+use crate::data::local_users as local_users_records;
+use crate::data::memberships as memberships_records;
+use crate::data::posts_communities as posts_communities_records;
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Duration, Utc};
@@ -24,7 +30,7 @@ use uuid::Uuid;
 
 use crate::accounts::Session;
 use crate::communities::{self, CommunityError};
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::device_settings::{self, DeviceSettingsError, LOCAL_USER_MOVED, SIGNED_IN};
 use crate::events::{self, Event, Fields};
@@ -135,7 +141,7 @@ pub async fn is_signed_in(deployment: &Deployment) -> Result<bool, LocalUserErro
 /// `is_signed_in` in the caller's transaction: someone is signed in and
 /// has no token. On a server, and with nobody signed in, false.
 pub(crate) async fn is_signed_in_in(tx: &mut Transaction) -> Result<bool, sqlx::Error> {
-    let signed_in = sql!(&mut *tx, device_settings::get(SIGNED_IN))?;
+    let signed_in = device_settings_records::get(&mut *tx, SIGNED_IN).await?;
     Ok(signed_in.is_some_and(|signed_in| {
         signed_in.is_object() && signed_in.get("token").is_none_or(Value::is_null)
     }))
@@ -146,7 +152,7 @@ pub(crate) async fn is_signed_in_in(tx: &mut Transaction) -> Result<bool, sqlx::
 pub async fn count_items(deployment: &Deployment) -> Result<i64, LocalUserError> {
     let mut tx = deployment.begin().await?;
     let local = local_user_in(&mut tx).await?;
-    let count = sql!(&mut tx, local_users::count_items(local))?;
+    let count = local_users_records::count_items(&mut tx, local).await?;
     tx.commit().await?;
     Ok(count)
 }
@@ -168,9 +174,9 @@ pub async fn move_to_account(
     let mut tx = deployment.begin().await?;
     let local = local_user_in(&mut tx).await?;
     users::upsert_in(&mut tx, &account).await?;
-    sql!(&mut tx, local_users::give_rows_to_user(local, account.id))?;
-    sql!(&mut tx, local_users::delete_deleted_rows())?;
-    sql!(&mut tx, local_users::delete_user(local))?;
+    local_users_records::maintenance::give_rows_to_user(&mut tx, local, account.id).await?;
+    local_users_records::maintenance::delete_deleted_rows(&mut tx).await?;
+    local_users_records::maintenance::delete_user(&mut tx, local).await?;
     let signed_in = SignedIn {
         user_id: account.id,
         token: Some(session.token),
@@ -235,7 +241,7 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
             queue.push(Event::create(table, id, fields(changes), made_at));
         };
 
-    for community in sql!(&mut *tx, communities::list_live(user.id))? {
+    for community in communities_records::list(&mut *tx, user.id).await? {
         add(
             communities::TABLE,
             community.id,
@@ -244,7 +250,9 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
             json!({ "name": community.name }),
         );
     }
-    for membership in sql!(&mut *tx, memberships::list_live_of_user(user.id))? {
+    for membership in
+        memberships_records::list(&mut *tx, memberships_records::Filter::User(user.id)).await?
+    {
         add(
             memberships::TABLE,
             membership.id,
@@ -257,7 +265,8 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
             }),
         );
     }
-    let posts = sql!(&mut *tx, posts::list_visible(user.id))?;
+    let posts =
+        crate::data::posts::list(tx, crate::data::posts::Filter::VisibleTo(user.id)).await?;
     let post_ids: Vec<Uuid> = posts.iter().map(|post| post.id).collect();
     for post in posts {
         add(
@@ -269,7 +278,12 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
         );
     }
     if !post_ids.is_empty() {
-        for row in sql!(&mut *tx, posts_communities::list_live_of_posts(&post_ids))? {
+        for row in posts_communities_records::list(
+            &mut *tx,
+            posts_communities_records::Filter::Posts(&post_ids),
+        )
+        .await?
+        {
             add(
                 posts_communities::TABLE,
                 row.id,
@@ -283,7 +297,7 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
             );
         }
     }
-    for file in sql!(&mut *tx, files::list_owned(user.id))? {
+    for file in files_records::list(&mut *tx, user.id).await? {
         add(
             files::TABLE,
             file.id,

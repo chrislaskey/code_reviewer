@@ -21,6 +21,7 @@
 //! `delete_unreferenced_on_device` in the account's folder, at the end
 //! of each sync.
 
+use crate::data::files as files_records;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -31,7 +32,7 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::{Deployment, FileStore, Role, now};
 use crate::device_settings::{self, WORK_OFFLINE};
 use crate::events::{
@@ -42,6 +43,17 @@ use crate::field_errors::FieldErrors;
 use crate::storage::{Storage, StorageError};
 use crate::sync::{Cursor, SyncError, TableRow, Transport};
 use crate::users::{self, User};
+
+/// A row accepted by this resource's event, lifecycle or replication workflow.
+/// Only this module can construct an accepted write.
+pub(crate) struct AcceptedFile<'a>(&'a File);
+
+impl AcceptedFile<'_> {
+    /// Borrows the accepted row for persistence.
+    pub(crate) fn row(&self) -> &File {
+        self.0
+    }
+}
 
 pub const TABLE: &str = "app_files";
 /// The largest file, 25 MB.
@@ -237,7 +249,7 @@ impl From<serde_json::Error> for FileError {
 /// The user's files, not deleted, newest first, each with its state.
 pub async fn list(deployment: &Deployment, user: &User) -> Result<Vec<FileWithState>, FileError> {
     let mut tx = deployment.begin().await?;
-    let files = sql!(&mut tx, files::list_owned(user.id))?;
+    let files = files_records::list(&mut tx, user.id).await?;
     let listed = with_states(&mut tx, deployment.role, files).await?;
     tx.commit().await?;
     Ok(listed)
@@ -607,7 +619,8 @@ pub async fn delete_unreferenced(
 ) -> Result<crate::avatars::DeleteUnreferencedReport, FileError> {
     let storage = bucket(deployment)?;
     let mut tx = deployment.begin().await?;
-    let referenced: BTreeSet<String> = sql!(&mut tx, files::list_ids())?
+    let referenced: BTreeSet<String> = files_records::maintenance::list_ids(&mut tx)
+        .await?
         .into_iter()
         .map(|(id, user_id, _deleted)| storage_key(user_id, id))
         .collect();
@@ -659,7 +672,7 @@ pub async fn delete_unreferenced_on_device(
         return Ok(0);
     };
     let mut tx = deployment.begin().await?;
-    let rows = sql!(&mut tx, files::list_ids())?;
+    let rows = files_records::maintenance::list_ids(&mut tx).await?;
     tx.commit().await?;
 
     let cutoff = now - chrono::Duration::days(UNREFERENCED_DAYS);
@@ -747,13 +760,13 @@ pub(crate) async fn apply_server_row(tx: &mut Transaction, row: &Value) -> Resul
     if events::has_pending(tx, TABLE, file.id).await? {
         return Ok(false);
     }
-    sql!(&mut *tx, files::upsert(&file))?;
+    files_records::replication::upsert(&mut *tx, AcceptedFile(&file)).await?;
     Ok(true)
 }
 
 /// Removes a device's row the server holds under another id.
 pub(crate) async fn delete_row(tx: &mut Transaction, id: Uuid) -> Result<(), FileError> {
-    Ok(sql!(tx, files::delete_row(id))?)
+    Ok(files_records::maintenance::delete(tx, id).await?)
 }
 
 /// A page of the user's rows the server wrote after the cursor, deleted
@@ -764,12 +777,12 @@ pub(crate) async fn list_synced_after(
     after: &Cursor,
     limit: usize,
 ) -> Result<Vec<File>, FileError> {
-    Ok(sql!(tx, files::list_synced_after(user.id, after, limit))?)
+    Ok(files_records::replication::list_synced_after(tx, user.id, after, limit).await?)
 }
 
 /// The row by its id, deleted or not, whoever owns it.
 pub(crate) async fn get_in(tx: &mut Transaction, id: Uuid) -> Result<Option<File>, FileError> {
-    Ok(sql!(tx, files::get(id))?)
+    Ok(files_records::replication::get(tx, id).await?)
 }
 
 /// Where the bytes of the user's file are on this device, fetched from
@@ -828,7 +841,7 @@ pub async fn local_copy<T: Transport>(
 /// `delete_local_copy`.
 pub(crate) async fn forget_in(tx: &mut Transaction, id: Uuid) -> Result<(), FileError> {
     events::delete_of_row(tx, TABLE, id).await?;
-    Ok(sql!(tx, files::delete_row(id))?)
+    Ok(files_records::maintenance::delete(tx, id).await?)
 }
 
 /// Removes a file's bytes from this device, if they are there.
@@ -878,8 +891,8 @@ async fn create_of(tx: &mut Transaction, id: Uuid) -> Result<Option<StoredEvent>
 /// The live file, if the user owns it; another user's is not found, as
 /// if it were not there.
 async fn get_own(tx: &mut Transaction, user: &User, id: Uuid) -> Result<File, FileError> {
-    match get_in(tx, id).await? {
-        Some(file) if file.deleted_at.is_none() && file.user_id == user.id => Ok(file),
+    match files_records::get(tx, user.id, id).await? {
+        Some(file) => Ok(file),
         _ => Err(FileError::NotFound { id }),
     }
 }
@@ -1047,7 +1060,7 @@ pub(crate) async fn apply_in(
             if !uploaded {
                 return rejected(event, FILE_NOT_UPLOADED, None);
             }
-            sql!(&mut *tx, files::insert(&file))?;
+            files_records::create(&mut *tx, AcceptedFile(&file)).await?;
             finish(tx, role, user, event, Conflicts::new(), file).await
         }
         EventKind::Update => {
@@ -1079,7 +1092,7 @@ pub(crate) async fn apply_in(
                     updated.version += 1;
                     updated.last_synced_at = Some(now);
                 }
-                sql!(&mut *tx, files::update(&updated))?;
+                files_records::update(&mut *tx, AcceptedFile(&updated)).await?;
                 updated
             };
             finish(tx, role, user, event, conflicts, file).await
@@ -1303,6 +1316,109 @@ pub(crate) mod tests {
             .await
             .with_file_store(FileStore::Folder(folder.path().to_path_buf()));
         (deployment, folder)
+    }
+
+    #[tokio::test]
+    async fn files_records_enforce_owner_and_keep_cleanup_references_for_tombstones() {
+        with_each_database(|database| async move {
+            let (deployment, storage) = server(database);
+            let alice = users::create(&deployment, "alice@example.com", "Alice")
+                .await
+                .expect("user");
+            let bob = users::create(&deployment, "bob@example.com", "Bob")
+                .await
+                .expect("user");
+            let file = uploaded(&deployment, &storage, &alice, "notes.txt", b"x").await;
+            let mut tx = deployment.begin().await.expect("transaction");
+            assert!(
+                files_records::get(&mut tx, alice.id, file.id)
+                    .await
+                    .expect("owner")
+                    .is_some()
+            );
+            assert!(
+                files_records::get(&mut tx, bob.id, file.id)
+                    .await
+                    .expect("other user")
+                    .is_none()
+            );
+            tx.commit().await.expect("commit");
+            delete(&deployment, &alice, file.id).await.expect("delete");
+            let mut tx = deployment.begin().await.expect("transaction");
+            assert!(
+                files_records::get(&mut tx, alice.id, file.id)
+                    .await
+                    .expect("ordinary read")
+                    .is_none()
+            );
+            assert!(
+                files_records::list(&mut tx, alice.id)
+                    .await
+                    .expect("list")
+                    .is_empty()
+            );
+            assert!(
+                files_records::replication::get(&mut tx, file.id)
+                    .await
+                    .expect("read")
+                    .expect("tombstone")
+                    .deleted_at
+                    .is_some()
+            );
+            assert!(
+                files_records::maintenance::list_ids(&mut tx)
+                    .await
+                    .expect("references")
+                    .contains(&(file.id, alice.id, true))
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn files_apply_in_rolls_back_row_and_event_together() {
+        with_each_database(|database| async move {
+            let (deployment, storage) = server(database);
+            let alice = users::create(&deployment, "alice@example.com", "Alice")
+                .await
+                .expect("user");
+            let file = uploaded(&deployment, &storage, &alice, "before.txt", b"x").await;
+            let event = Event::update(
+                TABLE,
+                file.id,
+                file.version,
+                fields(json!({"name": file.name})),
+                fields(json!({"name": "after.txt"})),
+                now(),
+            );
+            let mut tx = deployment.begin().await.expect("transaction");
+            let applied = apply_in(&mut tx, Role::Server, &alice, &event, true)
+                .await
+                .expect("applied");
+            assert_eq!(applied.file.expect("file").name, "after.txt");
+            assert!(
+                events::get(&mut tx, event.id)
+                    .await
+                    .expect("event")
+                    .is_some()
+            );
+            drop(tx);
+            assert_eq!(
+                get(&deployment, &alice, file.id)
+                    .await
+                    .expect("restored")
+                    .file,
+                file
+            );
+            let mut tx = deployment.begin().await.expect("transaction");
+            assert!(
+                events::get(&mut tx, event.id)
+                    .await
+                    .expect("event")
+                    .is_none()
+            );
+        })
+        .await;
     }
 
     #[tokio::test]

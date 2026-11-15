@@ -4,14 +4,25 @@
 //! store's id for it, which is how a repeat of the same payment is
 //! recognized. A refunded purchase gives nothing.
 
+use crate::data::accounts_purchases as accounts_purchases_records;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::{Deployment, Role};
 use crate::users::User;
+
+/// A record accepted by the purchases workflow.
+pub(crate) struct AcceptedPurchase<'a>(&'a Purchase);
+
+impl AcceptedPurchase<'_> {
+    /// Borrows the accepted record for persistence.
+    pub(crate) fn row(&self) -> &Purchase {
+        self.0
+    }
+}
 
 pub const TABLE: &str = "accounts_purchases";
 
@@ -89,7 +100,7 @@ pub async fn list(
         return Err(PurchaseError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let purchases = sql!(&mut tx, accounts_purchases::list_by_user(user.id))?;
+    let purchases = accounts_purchases_records::list(&mut tx, user.id).await?;
     tx.commit().await?;
     Ok(purchases)
 }
@@ -104,11 +115,9 @@ pub async fn get(
         return Err(PurchaseError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let purchase = sql!(&mut tx, accounts_purchases::get(id))?;
+    let purchase = accounts_purchases_records::get(&mut tx, user.id, id).await?;
     tx.commit().await?;
-    purchase
-        .filter(|shown| shown.purchase.user_id == user.id)
-        .ok_or(PurchaseError::NotFound { id })
+    purchase.ok_or(PurchaseError::NotFound { id })
 }
 
 /// Records the purchase, unless the store's payment is recorded already.
@@ -116,7 +125,7 @@ pub(crate) async fn insert_if_missing_in(
     tx: &mut Transaction,
     purchase: &Purchase,
 ) -> Result<(), sqlx::Error> {
-    sql!(&mut *tx, accounts_purchases::insert_if_missing(purchase))
+    accounts_purchases_records::create(&mut *tx, AcceptedPurchase(purchase)).await
 }
 
 /// Whether the user has the product, bought and not refunded.
@@ -125,7 +134,7 @@ pub(crate) async fn owns_in(
     user_id: Uuid,
     product_id: Uuid,
 ) -> Result<bool, sqlx::Error> {
-    sql!(&mut *tx, accounts_purchases::owns(user_id, product_id))
+    accounts_purchases_records::owns(&mut *tx, user_id, product_id).await
 }
 
 /// The store's payment refunded in full: the purchase gives nothing now.
@@ -135,5 +144,5 @@ pub(crate) async fn refund_in(
     store_id: &str,
     now: DateTime<Utc>,
 ) -> Result<(), sqlx::Error> {
-    sql!(&mut *tx, accounts_purchases::refund(store, store_id, now))
+    accounts_purchases_records::refund(&mut *tx, store, store_id, now).await
 }

@@ -7,6 +7,9 @@
 //! and resumes from its page, `update`, and changes their card on
 //! Stripe's Customer Portal, `portal_create`.
 
+use crate::data::accounts_prices as accounts_prices_records;
+use crate::data::accounts_subscriptions as accounts_subscriptions_records;
+use crate::data::accounts_users as accounts_users_records;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -18,9 +21,19 @@ use crate::accounts::prices::{self, Price, PriceInterval};
 use crate::accounts::products::{self, ProductError, ProductKind};
 use crate::accounts::purchases::Store;
 use crate::accounts::stripe::{Stripe, StripeError, StripeSubscription};
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::users::User;
+
+/// A record accepted by the subscriptions workflow.
+pub(crate) struct AcceptedSubscription<'a>(&'a Subscription);
+
+impl AcceptedSubscription<'_> {
+    /// Borrows the accepted record for persistence.
+    pub(crate) fn row(&self) -> &Subscription {
+        self.0
+    }
+}
 
 pub const TABLE: &str = "accounts_subscriptions";
 
@@ -182,7 +195,7 @@ pub async fn list(
         return Err(SubscriptionError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let rows = sql!(&mut tx, accounts_subscriptions::list_by_user(user.id))?;
+    let rows = accounts_subscriptions_records::list(&mut tx, user.id).await?;
     let mut shown = Vec::with_capacity(rows.len());
     for (subscription, product_name) in rows {
         shown.push(shown_in(&mut tx, subscription, product_name).await?);
@@ -201,8 +214,8 @@ pub async fn get(
         return Err(SubscriptionError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let row = sql!(&mut tx, accounts_subscriptions::get(id))?
-        .filter(|(subscription, _)| subscription.user_id == user.id)
+    let row = accounts_subscriptions_records::get(&mut tx, user.id, id)
+        .await?
         .ok_or(SubscriptionError::NotFound { id })?;
     let shown = shown_in(&mut tx, row.0, row.1).await?;
     tx.commit().await?;
@@ -333,7 +346,15 @@ pub(crate) async fn list_in(
     tx: &mut Transaction,
     user_id: Uuid,
 ) -> Result<Vec<(Subscription, String)>, sqlx::Error> {
-    sql!(&mut *tx, accounts_subscriptions::list_by_user(user_id))
+    accounts_subscriptions_records::list(&mut *tx, user_id).await
+}
+
+/// Persists a subscription accepted by Stripe or store-transaction processing.
+pub(crate) async fn upsert_in(
+    tx: &mut Transaction,
+    subscription: &Subscription,
+) -> Result<(), sqlx::Error> {
+    accounts_subscriptions_records::upsert(tx, AcceptedSubscription(subscription)).await
 }
 
 /// The subscription as Stripe has it now: made, or updated in place by
@@ -344,16 +365,15 @@ pub(crate) async fn upsert_from_stripe_in(
     stripe_subscription: &StripeSubscription,
     now: DateTime<Utc>,
 ) -> Result<(), sqlx::Error> {
-    let user_id = sql!(
+    let user_id = accounts_users_records::billing::get_id_by_stripe_customer_id(
         &mut *tx,
-        accounts_users::get_id_by_stripe_customer_id(&stripe_subscription.customer_id)
-    )?;
-    let price = sql!(
-        &mut *tx,
-        accounts_prices::get_by_stripe_id(&stripe_subscription.price_id)
-    )?;
+        &stripe_subscription.customer_id,
+    )
+    .await?;
+    let price =
+        accounts_prices_records::get_by_stripe_id(&mut *tx, &stripe_subscription.price_id).await?;
     let scheduled_price = match &stripe_subscription.scheduled_price_id {
-        Some(stripe_id) => sql!(&mut *tx, accounts_prices::get_by_stripe_id(stripe_id))?,
+        Some(stripe_id) => accounts_prices_records::get_by_stripe_id(&mut *tx, stripe_id).await?,
         None => None,
     };
     let (Some(user_id), Some(price)) = (user_id, price) else {
@@ -395,7 +415,7 @@ pub(crate) async fn upsert_from_stripe_in(
         inserted_at: now,
         updated_at: now,
     };
-    sql!(&mut *tx, accounts_subscriptions::upsert(&subscription))
+    accounts_subscriptions_records::upsert(&mut *tx, AcceptedSubscription(&subscription)).await
 }
 
 async fn shown_in(

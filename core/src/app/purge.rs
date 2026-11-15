@@ -13,6 +13,8 @@
 //!
 //! It runs daily, before the sweeps, see `jobs`.
 
+use crate::data::events as events_records;
+use crate::data::purges as purges_records;
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Duration, Utc};
@@ -20,9 +22,18 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::database::sql;
 use crate::deployment::{Deployment, Role};
-use crate::{accounts, communities, files, memberships, posts, posts_communities, tokens, users};
+use crate::{accounts, tokens, users};
+
+/// A record assembled by this resource's workflow.
+pub(crate) struct AcceptedPurge<'a>(&'a Purge);
+
+impl AcceptedPurge<'_> {
+    /// Borrows the assembled record for persistence.
+    pub(crate) fn row(&self) -> &Purge {
+        self.0
+    }
+}
 
 /// How long a deleted row is kept, and how long a device may stay away.
 pub const RETENTION_DAYS: i64 = 90;
@@ -30,13 +41,13 @@ pub const RETENTION_DAYS: i64 = 90;
 pub const UNCONFIRMED_DAYS: i64 = 1;
 
 /// The tables purged, children first.
-const TABLES: &[&str] = &[
-    posts_communities::TABLE,
-    posts::TABLE,
-    files::TABLE,
-    memberships::TABLE,
-    communities::TABLE,
-    users::TABLE,
+const TABLES: &[purges_records::Table] = &[
+    purges_records::Table::PostsCommunities,
+    purges_records::Table::Posts,
+    purges_records::Table::Files,
+    purges_records::Table::Memberships,
+    purges_records::Table::Communities,
+    purges_records::Table::Users,
 ];
 
 /// One run as `app_purges` keeps it.
@@ -78,10 +89,11 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
     let mut tx = deployment.begin().await?;
     let mut removed = BTreeMap::new();
     for table in TABLES {
-        let count = sql!(&mut tx, purges::delete_deleted_before(table, horizon))?;
-        removed.insert(table.to_string(), count);
+        let count =
+            purges_records::maintenance::delete_deleted_before(&mut tx, *table, horizon).await?;
+        removed.insert(table.name().to_string(), count);
     }
-    let events = sql!(&mut tx, events::delete_of_missing_rows())?;
+    let events = events_records::maintenance::delete_of_missing_rows(&mut tx).await?;
     removed.insert("app_events".to_string(), events);
     let expired_tokens = tokens::delete_expired(&mut tx, now).await?;
     removed.insert("accounts_tokens".to_string(), expired_tokens);
@@ -97,7 +109,7 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
         horizon,
         inserted_at: now,
     };
-    sql!(&mut tx, purges::insert(&purge))?;
+    purges_records::create(&mut tx, AcceptedPurge(&purge)).await?;
     tx.commit().await?;
     Ok(PurgeReport { horizon, removed })
 }
@@ -106,7 +118,7 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
 /// learn of, or none before the first run.
 pub async fn horizon(deployment: &Deployment) -> Result<Option<DateTime<Utc>>, PurgeError> {
     let mut tx = deployment.begin().await?;
-    let horizon = sql!(&mut tx, purges::latest_horizon())?;
+    let horizon = purges_records::get(&mut tx).await?;
     tx.commit().await?;
     Ok(horizon)
 }
@@ -117,6 +129,7 @@ mod tests {
     use crate::database::{Database, with_each_database};
     use crate::deployment::now;
     use crate::events::{self, EventStatus};
+    use crate::{communities, posts, posts_communities};
 
     #[tokio::test]
     async fn purge_removes_what_was_deleted_before_the_horizon_with_its_rows_and_events() {

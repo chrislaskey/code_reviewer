@@ -15,13 +15,20 @@
 //! A trial user needs no code, having no real email, and goes outright,
 //! as their trial would. A local user has no account on the server.
 
+#[cfg(feature = "stripe")]
+use crate::data::accounts_subscriptions as accounts_subscriptions_records;
+#[cfg(any(feature = "stripe", test))]
+use crate::data::accounts_users as accounts_users_records;
+use crate::data::files as files_records;
+use crate::data::memberships as memberships_records;
+use crate::data::ops_staff as ops_staff_records;
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::accounts::users::{self as accounts_users, AccountUser, AccountUserError};
 use crate::accounts::{AccountError, MAX_CODE_ATTEMPTS};
 use crate::communities::{self, CommunityError};
-use crate::database::{Transaction, sql};
+use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::events::{Answer, AnswerStatus, Event, Fields};
 use crate::files::{self, FileError};
@@ -136,19 +143,22 @@ pub async fn create(
 /// staff row and the account.
 async fn delete_in(tx: &mut Transaction, user: &User) -> Result<(), DeletionError> {
     let role = Role::Server;
-    for post in sql!(&mut *tx, posts::list_live_of_user(user.id))? {
+    for post in crate::data::posts::list(tx, crate::data::posts::Filter::OwnedBy(user.id)).await? {
         let event = deleted_event(posts::TABLE, post.id, post.version);
         refused_unless_applied(&posts::apply_in(tx, role, user, &event).await?.answer)?;
     }
-    for file in sql!(&mut *tx, files::list_owned(user.id))? {
+    for file in files_records::list(&mut *tx, user.id).await? {
         let event = deleted_event(files::TABLE, file.id, file.version);
         refused_unless_applied(&files::apply_in(tx, role, user, &event, true).await?.answer)?;
     }
-    for membership in sql!(&mut *tx, memberships::list_live_of_user(user.id))? {
-        let members = sql!(
+    for membership in
+        memberships_records::list(&mut *tx, memberships_records::Filter::User(user.id)).await?
+    {
+        let members = memberships_records::list(
             &mut *tx,
-            memberships::list_live_of_community(membership.community_id)
-        )?;
+            memberships_records::Filter::Community(membership.community_id),
+        )
+        .await?;
         if members.iter().all(|member| member.user_id == user.id) {
             community_delete_in(tx, user, membership.community_id).await?;
         } else {
@@ -156,7 +166,7 @@ async fn delete_in(tx: &mut Transaction, user: &User) -> Result<(), DeletionErro
         }
     }
     users::delete_in(tx, user.id).await?;
-    sql!(&mut *tx, ops_staff::delete(user.id))?;
+    ops_staff_records::delete(&mut *tx, user.id).await?;
     accounts_users::delete_in(tx, user.id).await?;
     Ok(())
 }
@@ -241,7 +251,8 @@ async fn stripe_left_in(tx: &mut Transaction, user_id: Uuid) -> Result<StripeLef
     use crate::accounts::purchases::Store;
     use crate::accounts::subscriptions::SubscriptionStatus;
 
-    let subscription_ids = sql!(&mut *tx, accounts_subscriptions::list_by_user(user_id))?
+    let subscription_ids = accounts_subscriptions_records::list(&mut *tx, user_id)
+        .await?
         .into_iter()
         .map(|(subscription, _product_name)| subscription)
         .filter(|subscription| {
@@ -254,7 +265,8 @@ async fn stripe_left_in(tx: &mut Transaction, user_id: Uuid) -> Result<StripeLef
         })
         .map(|subscription| subscription.store_id)
         .collect();
-    let customer_id = sql!(&mut *tx, accounts_users::get_stripe_customer_id(user_id))?;
+    let customer_id =
+        accounts_users_records::billing::get_stripe_customer_id(&mut *tx, user_id).await?;
     Ok(StripeLeft {
         subscription_ids,
         customer_id,
@@ -523,7 +535,8 @@ mod tests {
                     .is_none()
             );
             assert!(
-                sql!(&mut tx, accounts_users::get(alice.user.id))
+                accounts_users_records::lifecycle::get(&mut tx, alice.user.id)
+                    .await
                     .expect("read")
                     .is_none(),
                 "the account goes with the user"
