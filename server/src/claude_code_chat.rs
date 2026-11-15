@@ -17,9 +17,10 @@ use serde_json::Value;
 
 use crate::agent::AgentKind;
 use crate::agent_chat::{
-    ChatHistory, ChatMessage, ChatNote, ChatNoteKind, ChatPart, ChatRole, MAX_TOOL_SUMMARY_CHARS,
-    ToolResult, content_text, find_in_subdirectories, home_directory_path, shorten, strip_tags,
-    summarize_chat, tag_contents, text_part, tool_summary, tool_text, validate_chat_id,
+    ChatHistory, ChatMessage, ChatNote, ChatNoteKind, ChatPart, ChatRole, ContextUsage,
+    MAX_TOOL_SUMMARY_CHARS, ToolResult, content_text, find_in_subdirectories, home_directory_path,
+    shorten, strip_tags, summarize_chat, tag_contents, text_part, tool_summary, tool_text,
+    validate_chat_id,
 };
 
 #[derive(Deserialize)]
@@ -51,7 +52,35 @@ struct TranscriptOrigin {
 struct TranscriptMessage {
     id: Option<String>,
     content: Value,
+    model: Option<String>,
+    usage: Option<TranscriptUsage>,
 }
+
+/// The tokens of one API response.
+#[derive(Deserialize)]
+struct TranscriptUsage {
+    #[serde(default)]
+    input_tokens: u64,
+    #[serde(default)]
+    cache_creation_input_tokens: u64,
+    #[serde(default)]
+    cache_read_input_tokens: u64,
+}
+
+const ONE_MILLION_TOKENS: u64 = 1_000_000;
+const TWO_HUNDRED_THOUSAND_TOKENS: u64 = 200_000;
+/// Model families with a 1M token window. Every other Claude model has 200K.
+const ONE_MILLION_TOKEN_MODELS: [&str; 9] = [
+    "claude-fable-",
+    "claude-mythos-",
+    "claude-opus-5",
+    "claude-sonnet-5",
+    "claude-haiku-5",
+    "claude-opus-4-6",
+    "claude-opus-4-7",
+    "claude-opus-4-8",
+    "claude-sonnet-4-6",
+];
 
 /// The chat of the Claude Code session `session_id`. Reads the whole
 /// transcript, so call it from a blocking task.
@@ -69,7 +98,39 @@ pub fn read_chat_history(session_id: &str) -> Result<ChatHistory, String> {
         has_tool_results: true,
         summary: summarize_chat(&messages),
         messages,
+        context_usage: read_context_usage(&contents),
     })
+}
+
+/// The context window use the latest main assistant message reports: its
+/// input, cache read and cache creation tokens.
+fn read_context_usage(contents: &str) -> Option<ContextUsage> {
+    contents.lines().rev().find_map(|line| {
+        let line = serde_json::from_str::<TranscriptLine>(line).ok()?;
+        if line.kind != "assistant" || line.is_sidechain {
+            return None;
+        }
+        let message = line.message?;
+        let usage = message.usage?;
+        let used_tokens =
+            usage.input_tokens + usage.cache_creation_input_tokens + usage.cache_read_input_tokens;
+        let window_tokens = message.model.as_deref().and_then(claude_context_window);
+        Some(ContextUsage::new(used_tokens, window_tokens))
+    })
+}
+
+/// The context window of a Claude model id, like `claude-opus-5-5`, also
+/// with a provider prefix like `us.anthropic.`.
+fn claude_context_window(model: &str) -> Option<u64> {
+    let model = &model[model.find("claude-")?..];
+    if ONE_MILLION_TOKEN_MODELS
+        .iter()
+        .any(|family| model.starts_with(family))
+    {
+        Some(ONE_MILLION_TOKENS)
+    } else {
+        Some(TWO_HUNDRED_THOUSAND_TOKENS)
+    }
 }
 
 fn parse_transcript(contents: &str) -> Vec<ChatMessage> {
@@ -490,5 +551,30 @@ mod tests {
             summary.started_at.as_deref(),
             Some("2026-11-04T19:50:08.854Z")
         );
+    }
+
+    #[test]
+    fn reads_the_context_usage_of_the_latest_main_assistant_message() {
+        let transcript = r#"{"type":"assistant","message":{"id":"m1","model":"claude-opus-5-5","content":[],"usage":{"input_tokens":5,"cache_creation_input_tokens":10,"cache_read_input_tokens":1000}}}
+{"type":"assistant","message":{"id":"m2","model":"claude-opus-5-5","content":[],"usage":{"input_tokens":2,"cache_creation_input_tokens":3000,"cache_read_input_tokens":77000}}}
+{"type":"assistant","isSidechain":true,"message":{"id":"m3","model":"claude-haiku-4-5","content":[],"usage":{"input_tokens":9}}}
+{"type":"user","message":{"content":"next"}}"#;
+
+        let usage = read_context_usage(transcript).expect("the usage is read");
+
+        assert_eq!(usage, ContextUsage::new(80_002, Some(1_000_000)));
+        assert_eq!(usage.percent_used, Some(9));
+        assert_eq!(read_context_usage(TRANSCRIPT), None);
+    }
+
+    #[test]
+    fn knows_the_context_window_of_claude_models() {
+        assert_eq!(claude_context_window("claude-sonnet-5-5"), Some(1_000_000));
+        assert_eq!(
+            claude_context_window("us.anthropic.claude-opus-4-8"),
+            Some(1_000_000)
+        );
+        assert_eq!(claude_context_window("claude-haiku-4-5"), Some(200_000));
+        assert_eq!(claude_context_window("gpt-6.1-sol"), None);
     }
 }

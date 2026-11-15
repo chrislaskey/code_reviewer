@@ -177,18 +177,27 @@ impl Backend {
         .await
     }
 
-    /// Creates a git worktree of `repository` on a branch named `name` and a
-    /// tmux session named `<prefix>-<name>` in it with `PORT` set to `port`,
+    /// Creates a git worktree of `repository` on a branch named `name`, from
+    /// `base_branch` unless the branch exists, and a tmux session named `<prefix>-<name>` in it with `PORT` set to `port`,
     /// types `command` into it and opens it in the terminal app. Returns the
     /// session's full name, prefix included.
     pub async fn create_session(
         &self,
         name: &str,
         repository: &str,
+        base_branch: &str,
         command: &str,
         port: u16,
     ) -> Result<String, String> {
-        sessions::create_session(self.settings().await, name, repository, command, port).await
+        sessions::create_session(
+            self.settings().await,
+            name,
+            repository,
+            base_branch,
+            command,
+            port,
+        )
+        .await
     }
 
     /// Starts a tmux session again in one of the app's worktrees, named after
@@ -198,11 +207,18 @@ impl Backend {
         sessions::continue_session(self.settings().await, name).await
     }
 
-    /// Merges a session's branch into the main branch (fast-forward only),
-    /// removes its worktree, deletes the branch and closes its tmux session.
-    /// `name` is the worktree's name, prefix included. Returns what was done.
-    pub async fn merge_session(&self, name: &str) -> Result<String, String> {
-        sessions::merge_session(self.settings().await, self.artifacts.as_ref(), name).await
+    /// Merges a session's branch into `into_branch`, the main branch or its
+    /// base branch (fast-forward only), removes its worktree, deletes the
+    /// branch and closes its tmux session. `name` is the worktree's name,
+    /// prefix included. Returns what was done.
+    pub async fn merge_session(&self, name: &str, into_branch: &str) -> Result<String, String> {
+        sessions::merge_session(
+            self.settings().await,
+            self.artifacts.as_ref(),
+            name,
+            into_branch,
+        )
+        .await
     }
 
     /// Removes a session's worktree, keeping its branch, and closes its tmux

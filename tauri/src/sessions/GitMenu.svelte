@@ -20,6 +20,7 @@
     return countOf(git[git.most_important_change], noun);
   });
   let branch = $derived(git?.branch ?? (git?.commit ? `detached at ${git.commit}` : name));
+  let baseBranch = $derived(git?.base_branch && git.base_branch !== mainBranch ? git.base_branch : null);
 </script>
 
 <ChoiceMenu label="Git" title="Git: {summary}" class={class_}>
@@ -41,7 +42,9 @@
             <dd>{git[key]}</dd>
           {/each}
         </dl>
-        <p class="git-hint">Commit or remove the changes before turning it into a branch or merging it into {mainBranch}.</p>
+        <p class="git-hint">
+          Commit or remove the changes before turning it into a branch or merging it into {baseBranch ?? mainBranch}.
+        </p>
       </li>
     {:else}
       <MenuChoice
@@ -52,12 +55,24 @@
           onClose(name);
         }}
       />
+      {#if baseBranch}
+        <MenuChoice
+          label="Merge into {baseBranch}"
+          explanation="Fast-forwards {baseBranch}, the branch {branch} was created from, with {branch}, then removes the worktree, deletes the branch and closes the session. The work lives on in {baseBranch}."
+          onclick={() => {
+            close();
+            onMerge(name, baseBranch);
+          }}
+        />
+      {/if}
       <MenuChoice
         label="Merge into {mainBranch}"
-        explanation="Fast-forwards {mainBranch} with {branch}, then removes the worktree, deletes the branch and closes the session. The work lives on in {mainBranch}."
+        explanation={baseBranch
+          ? `Fast-forwards ${mainBranch} with ${branch}, which brings ${baseBranch}'s commits too, then removes the worktree, deletes the branch and closes the session. The work lives on in ${mainBranch}.`
+          : `Fast-forwards ${mainBranch} with ${branch}, then removes the worktree, deletes the branch and closes the session. The work lives on in ${mainBranch}.`}
         onclick={() => {
           close();
-          onMerge(name);
+          onMerge(name, mainBranch);
         }}
       />
     {/if}

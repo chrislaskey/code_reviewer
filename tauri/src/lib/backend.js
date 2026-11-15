@@ -88,11 +88,11 @@ export function savePromptImageForSession(name, mediaType, dataBase64) {
 }
 
 /**
- * Creates a git worktree of `repository` and a tmux session in it, both named `<prefix>-<name>`, with `PORT` set to
- * `port` and `command` typed in, and opens it in the terminal app. Returns the session's full name, prefix included.
+ * Creates a git worktree of `repository` and a tmux session in it, both named `<prefix>-<name>`, on a new branch from
+ * `baseBranch` unless the branch exists, with `PORT` set to `port` and `command` typed in, and opens it in the terminal app. Returns the session's full name, prefix included.
  */
-export function createSession({ name, repository, command, port }) {
-  return invoke("create_session", { name, repository, command, port });
+export function createSession({ name, repository, baseBranch, command, port }) {
+  return invoke("create_session", { name, repository, baseBranch, command, port });
 }
 
 /** Starts a tmux session again in one of the app's worktrees, named after it, and opens it in the terminal app. */
@@ -101,11 +101,11 @@ export function continueSession(name) {
 }
 
 /**
- * Merges a session's branch into the main branch (fast-forward only), removes its worktree, deletes the branch and
- * closes its tmux session. Resolves to a sentence saying what was done.
+ * Merges a session's branch into `intoBranch`, the main branch or its base branch (fast-forward only), removes its
+ * worktree, deletes the branch and closes its tmux session. Resolves to a sentence saying what was done.
  */
-export function mergeSession(name) {
-  return invoke("merge_session", { name });
+export function mergeSession(name, intoBranch) {
+  return invoke("merge_session", { name, intoBranch });
 }
 
 /** Removes a session's worktree, keeping its branch, and closes its tmux session. Resolves to what was done. */

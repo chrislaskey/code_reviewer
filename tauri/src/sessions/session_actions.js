@@ -59,7 +59,7 @@ export function createSessionActions({ refresh, onFinished }) {
       }
     },
 
-    merge: (name) => finish(name, mergeSession, "Merging"),
+    merge: (name, intoBranch) => finish(name, (name) => mergeSession(name, intoBranch), "Merging"),
 
     close: (name) => finish(name, closeSession, "Closing"),
 

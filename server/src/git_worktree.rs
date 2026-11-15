@@ -10,6 +10,8 @@ use futures_util::future::join_all;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
+use crate::git::base_branch_config_key;
+
 /// Where the worktrees go, under the repository's root. Added to the
 /// repository's local excludes so they never show as untracked.
 const WORKTREES_DIRECTORY: &str = ".worktrees";
@@ -93,8 +95,13 @@ pub fn worktree_path(root: &Path, name: &str) -> PathBuf {
 }
 
 /// Adds the worktree `<root>/.worktrees/<name>` on the branch `name`,
-/// created from the repository's current HEAD unless it already exists.
-pub async fn add_worktree(root: &Path, name: &str) -> Result<AddedWorktree, String> {
+/// created from `base_branch` unless it already exists. A created branch
+/// records `base_branch` in git config, for Merge and Review to find.
+pub async fn add_worktree(
+    root: &Path,
+    name: &str,
+    base_branch: &str,
+) -> Result<AddedWorktree, String> {
     if run_git(root, &["rev-parse", "--verify", "--quiet", "HEAD"])
         .await?
         .is_err()
@@ -122,14 +129,29 @@ pub async fn add_worktree(root: &Path, name: &str) -> Result<AddedWorktree, Stri
     )
     .await?
     .is_ok();
+    if !branch_exists {
+        let base_commit = format!("{base_branch}^{{commit}}");
+        let base_found = run_git(root, &["rev-parse", "--verify", "--quiet", &base_commit])
+            .await?
+            .is_ok();
+        if base_branch.starts_with('-') || !base_found {
+            return Err(format!(
+                "{} has no branch named {base_branch} to start from",
+                root.display()
+            ));
+        }
+    }
     let args: Vec<&str> = if branch_exists {
         vec!["worktree", "add", "--", &path_text, name]
     } else {
-        vec!["worktree", "add", "-b", name, "--", &path_text]
+        vec!["worktree", "add", "-b", name, "--", &path_text, base_branch]
     };
     run_git(root, &args)
         .await?
         .map_err(|stderr| format!("git worktree add failed: {stderr}"))?;
+    if !branch_exists {
+        record_base_branch(root, name, base_branch).await;
+    }
     exclude_worktrees_directory(root).await;
 
     Ok(AddedWorktree {
@@ -139,49 +161,83 @@ pub async fn add_worktree(root: &Path, name: &str) -> Result<AddedWorktree, Stri
     })
 }
 
-/// Merges the worktree's branch into `main_branch` in the main checkout, a
-/// fast-forward only so `main_branch` never gets a merge commit or a
-/// conflict, then removes the worktree and deletes the branch. Refuses a
-/// worktree with uncommitted changes, which would be lost, and a main
-/// checkout that doesn't have `main_branch` checked out.
-pub async fn merge_worktree(worktree: &Worktree, main_branch: &str) -> Result<(), String> {
-    let branch = refuse_unless_finishable(worktree, main_branch).await?;
+/// Merges the worktree's branch into `into_branch`, a fast-forward only so
+/// `into_branch` never gets a merge commit or a conflict, then removes the
+/// worktree and deletes the branch. Where `into_branch` is checked out, in
+/// the main checkout or another worktree, the merge runs there; elsewhere
+/// the branch is moved. Refuses a worktree with uncommitted changes, which
+/// would be lost.
+pub async fn merge_worktree(worktree: &Worktree, into_branch: &str) -> Result<(), String> {
+    let branch = refuse_unless_finishable(worktree, into_branch).await?;
     let repository = Path::new(&worktree.repository);
-    let checked_out = run_git(repository, &["branch", "--show-current"])
-        .await?
-        .map(|stdout| stdout.trim().to_string())
-        .unwrap_or_default();
-    if checked_out != main_branch {
-        return Err(format!(
-            "{} must have {main_branch} checked out, it has {}",
-            worktree.repository,
-            if checked_out.is_empty() {
-                "a detached HEAD"
-            } else {
-                &checked_out
-            }
-        ));
-    }
-
-    let main_is_ancestor = run_git(
+    let into_reference = format!("refs/heads/{into_branch}");
+    let into_commit = run_git(
         repository,
-        &["merge-base", "--is-ancestor", main_branch, &branch],
+        &["rev-parse", "--verify", "--quiet", &into_reference],
+    )
+    .await?
+    .map(|stdout| stdout.trim().to_string())
+    .map_err(|_| format!("{into_branch} is not a local branch to merge into"))?;
+
+    let into_is_ancestor = run_git(
+        repository,
+        &["merge-base", "--is-ancestor", &into_commit, &branch],
     )
     .await?
     .is_ok();
-    if !main_is_ancestor {
+    if !into_is_ancestor {
         return Err(format!(
-            "{branch} cannot fast-forward {main_branch}, run `git rebase {main_branch}` in the worktree first"
+            "{branch} cannot fast-forward {into_branch}, run `git rebase {into_branch}` in the worktree first"
         ));
     }
-    run_git(repository, &["merge", "--ff-only", "--", &branch])
-        .await?
-        .map_err(|stderr| format!("Merging {branch} into {main_branch} failed: {stderr}"))?;
-    remove_worktree(worktree).await?;
-    run_git(repository, &["branch", "-d", "--", &branch])
+
+    let checkouts = list_checkouts(repository).await?;
+    let into_checkout = checkouts
+        .iter()
+        .find(|checkout| checkout.branch.as_deref() == Some(into_branch));
+    match into_checkout {
+        Some(checkout) => run_git(
+            Path::new(&checkout.path),
+            &["merge", "--ff-only", "--", &branch],
+        )
         .await?
         .map(|_| ())
-        .map_err(|stderr| format!("git branch -d failed: {stderr}"))
+        .map_err(|stderr| format!("Merging {branch} into {into_branch} failed: {stderr}"))?,
+        None => run_git(
+            repository,
+            &[
+                "update-ref",
+                "-m",
+                &format!("merge {branch}: Fast-forward"),
+                &into_reference,
+                &branch,
+                &into_commit,
+            ],
+        )
+        .await?
+        .map(|_| ())
+        .map_err(|stderr| format!("Moving {into_branch} to {branch} failed: {stderr}"))?,
+    }
+    remove_worktree(worktree).await?;
+    // `-D` since `-d` checks the main checkout's HEAD, which may be another
+    // branch; `into_branch` has every commit of `branch` now.
+    run_git(repository, &["branch", "-D", "--", &branch])
+        .await?
+        .map(|_| ())
+        .map_err(|stderr| format!("git branch -D failed: {stderr}"))
+}
+
+/// Records the branch `branch` was created from, see
+/// `base_branch_config_key`. Without it the Git menu only offers the main
+/// branch, so a failure is logged.
+async fn record_base_branch(root: &Path, branch: &str, base_branch: &str) {
+    let key = base_branch_config_key(branch);
+    match run_git(root, &["config", &key, base_branch]).await {
+        Ok(Ok(_)) => {}
+        Ok(Err(error)) | Err(error) => {
+            log::warn!("Could not record {base_branch} as the base of {branch}: {error}");
+        }
+    }
 }
 
 /// Removes the worktree, keeping its branch for `git switch` in the main
@@ -195,14 +251,14 @@ pub async fn close_worktree(worktree: &Worktree, main_branch: &str) -> Result<()
 /// own, as `bin/worktree` requires.
 async fn refuse_unless_finishable(
     worktree: &Worktree,
-    main_branch: &str,
+    into_branch: &str,
 ) -> Result<String, String> {
     let path = Path::new(&worktree.path);
     let Some(branch) = &worktree.branch else {
         return Err(format!("No branch is checked out in {}", worktree.path));
     };
-    if branch == main_branch {
-        return Err(format!("{} is on {main_branch} itself", worktree.path));
+    if branch == into_branch {
+        return Err(format!("{} is on {into_branch} itself", worktree.path));
     }
     let status = run_git(path, &["status", "--porcelain"])
         .await?
@@ -281,21 +337,31 @@ async fn list_repository_worktrees(repository: &Path) -> Vec<Worktree> {
     }
 }
 
-/// Parses `git worktree list --porcelain`: one block per worktree, the main
+/// A checkout of a repository, its main checkout or a worktree, with the
+/// branch it has checked out.
+struct ListedCheckout {
+    path: String,
+    /// `None` when HEAD is detached.
+    branch: Option<String>,
+}
+
+/// Every checkout of the repository, the main checkout first.
+async fn list_checkouts(repository: &Path) -> Result<Vec<ListedCheckout>, String> {
+    let stdout = run_git(repository, &["worktree", "list", "--porcelain"])
+        .await?
+        .map_err(|stderr| format!("git worktree list failed: {stderr}"))?;
+    Ok(parse_checkouts(&stdout))
+}
+
+/// Parses `git worktree list --porcelain`: one block per checkout, the main
 /// checkout first, each with `worktree <path>`, `HEAD <commit>` and either
 /// `branch refs/heads/<name>` or `detached`.
-fn parse_worktree_list(stdout: &str) -> Vec<Worktree> {
-    let mut blocks = stdout
+fn parse_checkouts(stdout: &str) -> Vec<ListedCheckout> {
+    stdout
         .split("\n\n")
-        .filter(|block| !block.trim().is_empty());
-    let Some(repository) = blocks.next().and_then(worktree_path_of) else {
-        return Vec::new();
-    };
-
-    blocks
+        .filter(|block| !block.trim().is_empty())
         .filter_map(|block| {
             let path = worktree_path_of(block)?;
-            let name = Path::new(&path).file_name()?.to_string_lossy().into_owned();
             let branch = block
                 .lines()
                 .find_map(|line| line.strip_prefix("branch "))
@@ -305,10 +371,28 @@ fn parse_worktree_list(stdout: &str) -> Vec<Worktree> {
                         .unwrap_or(reference)
                         .to_string()
                 });
+            Some(ListedCheckout { path, branch })
+        })
+        .collect()
+}
+
+/// The worktrees in `git worktree list --porcelain`, main checkout left out.
+fn parse_worktree_list(stdout: &str) -> Vec<Worktree> {
+    let mut checkouts = parse_checkouts(stdout).into_iter();
+    let Some(repository) = checkouts.next().map(|checkout| checkout.path) else {
+        return Vec::new();
+    };
+
+    checkouts
+        .filter_map(|checkout| {
+            let name = Path::new(&checkout.path)
+                .file_name()?
+                .to_string_lossy()
+                .into_owned();
             Some(Worktree {
                 name,
-                path,
-                branch,
+                path: checkout.path,
+                branch: checkout.branch,
                 repository: repository.clone(),
             })
         })
@@ -455,13 +539,13 @@ mod tests {
         let repository = directory.init_repository("repo").await;
         git(&repository, &["branch", "cr-existing"]).await;
 
-        let created = add_worktree(&repository, "cr-feature")
+        let created = add_worktree(&repository, "cr-feature", "main")
             .await
             .expect("the worktree is added");
-        let checked_out = add_worktree(&repository, "cr-existing")
+        let checked_out = add_worktree(&repository, "cr-existing", "main")
             .await
             .expect("the worktree is added");
-        let again = add_worktree(&repository, "cr-feature").await;
+        let again = add_worktree(&repository, "cr-feature", "main").await;
         let worktrees = git(&repository, &["worktree", "list"]).await;
         let status = git(&repository, &["status", "--porcelain"]).await;
         let exclude = std::fs::read_to_string(repository.join(".git/info/exclude"))
@@ -478,13 +562,85 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn adds_a_worktree_on_a_new_branch_from_the_base_branch() {
+        let directory = TestDirectory::create("base");
+        let repository = directory.init_repository("repo").await;
+        git(&repository, &["checkout", "-q", "-b", "release"]).await;
+        git(
+            &repository,
+            &["commit", "-q", "--allow-empty", "-m", "Release commit"],
+        )
+        .await;
+        git(&repository, &["checkout", "-q", "main"]).await;
+
+        let added = add_worktree(&repository, "cr-fix", "release")
+            .await
+            .expect("the worktree is added");
+        let subject = git(&added.path, &["log", "-1", "--format=%s"]).await;
+        let missing = add_worktree(&repository, "cr-other", "no-such-branch").await;
+
+        let recorded = git(
+            &repository,
+            &["config", "--get", "branch.cr-fix.codeReviewerBaseBranch"],
+        )
+        .await;
+
+        assert_eq!(subject.trim(), "Release commit");
+        assert_eq!(recorded.trim(), "release");
+        assert!(missing.is_err_and(|error| error.contains("no branch named no-such-branch")));
+    }
+
+    #[tokio::test]
+    async fn merges_into_a_branch_checked_out_nowhere_or_in_another_worktree() {
+        let directory = TestDirectory::create("merge-base");
+        let repository = directory.init_repository("repo").await;
+        git(&repository, &["branch", "release"]).await;
+        let parent = add_worktree(&repository, "cr-parent", "main")
+            .await
+            .expect("the worktree is added");
+        let onto_release = add_worktree(&repository, "cr-onto-release", "release")
+            .await
+            .expect("the worktree is added");
+        let onto_parent = add_worktree(&repository, "cr-onto-parent", "cr-parent")
+            .await
+            .expect("the worktree is added");
+        for path in [&onto_release.path, &onto_parent.path] {
+            git(path, &["commit", "-q", "--allow-empty", "-m", "Work"]).await;
+        }
+
+        merge_worktree(
+            &worktree_named(&directory.path, "cr-onto-release").await,
+            "release",
+        )
+        .await
+        .expect("release is moved");
+        merge_worktree(
+            &worktree_named(&directory.path, "cr-onto-parent").await,
+            "cr-parent",
+        )
+        .await
+        .expect("the parent worktree is fast-forwarded");
+        let release_subject = git(&repository, &["log", "-1", "--format=%s", "release"]).await;
+        let parent_subject = git(&parent.path, &["log", "-1", "--format=%s"]).await;
+        let parent_status = git(&parent.path, &["status", "--porcelain"]).await;
+        let main_subject = git(&repository, &["log", "-1", "--format=%s", "main"]).await;
+        let branches = git(&repository, &["branch", "--list", "cr-onto-*"]).await;
+
+        assert_eq!(release_subject.trim(), "Work");
+        assert_eq!(parent_subject.trim(), "Work");
+        assert_eq!(parent_status, "", "the parent's files moved with it");
+        assert_eq!(main_subject.trim(), "Initial commit");
+        assert_eq!(branches.trim(), "");
+    }
+
+    #[tokio::test]
     async fn refuses_a_repository_without_commits() {
         let directory = TestDirectory::create("empty");
         let root = directory.path.join("repo");
         std::fs::create_dir_all(&root).expect("the directory is created");
         git(&root, &["init", "-q"]).await;
 
-        let result = add_worktree(&root, "cr-feature").await;
+        let result = add_worktree(&root, "cr-feature", "main").await;
         assert!(result.is_err_and(|error| error.contains("no commits")));
     }
 
@@ -493,7 +649,7 @@ mod tests {
         let directory = TestDirectory::create("list");
         let repository = directory.init_repository("repo").await;
         std::fs::create_dir_all(directory.path.join("not-a-repo")).expect("created");
-        add_worktree(&repository, "cr-feature")
+        add_worktree(&repository, "cr-feature", "main")
             .await
             .expect("the worktree is added");
 
@@ -524,7 +680,7 @@ mod tests {
     async fn merges_a_worktrees_branch_and_removes_it() {
         let directory = TestDirectory::create("merge");
         let repository = directory.init_repository("repo").await;
-        let added = add_worktree(&repository, "cr-done")
+        let added = add_worktree(&repository, "cr-done", "main")
             .await
             .expect("the worktree is added");
         std::fs::write(added.path.join("work.txt"), "done").expect("the file is written");
@@ -548,7 +704,7 @@ mod tests {
     async fn refuses_to_finish_a_worktree_with_changes_or_behind_main() {
         let directory = TestDirectory::create("refuse");
         let repository = directory.init_repository("repo").await;
-        let added = add_worktree(&repository, "cr-dirty")
+        let added = add_worktree(&repository, "cr-dirty", "main")
             .await
             .expect("the worktree is added");
         std::fs::write(added.path.join("new.txt"), "").expect("the file is written");
@@ -579,7 +735,7 @@ mod tests {
     async fn merge_reports_gits_error_when_the_main_checkout_has_changes_in_the_way() {
         let directory = TestDirectory::create("blocked");
         let repository = directory.init_repository("repo").await;
-        let added = add_worktree(&repository, "cr-blocked")
+        let added = add_worktree(&repository, "cr-blocked", "main")
             .await
             .expect("the worktree is added");
         std::fs::write(added.path.join("README.md"), "from the branch")

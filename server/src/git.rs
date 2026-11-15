@@ -37,6 +37,9 @@ pub struct GitStatus {
     pub dirty: bool,
     /// The kind of change most in need of attention, `None` when clean.
     pub most_important_change: Option<GitChange>,
+    /// The branch `branch` was created from, when the app created it (see
+    /// `base_branch_config_key`).
+    pub base_branch: Option<String>,
 }
 
 /// A kind of uncommitted change, most in need of attention first.
@@ -73,7 +76,35 @@ pub async fn get_status(directory: &str) -> Option<GitStatus> {
     }
     let mut status = parse_status(&String::from_utf8_lossy(&output.stdout));
     status.repository_name = get_repository_name(directory).await;
+    if let Some(branch) = &status.branch {
+        status.base_branch = get_base_branch(directory, branch).await;
+    }
     Some(status)
+}
+
+/// The git config key the app records a new branch's base branch under,
+/// removed by git with the branch.
+pub fn base_branch_config_key(branch: &str) -> String {
+    format!("branch.{branch}.codeReviewerBaseBranch")
+}
+
+/// The base branch recorded for `branch` in the repository `directory` is
+/// in, see `base_branch_config_key`.
+pub async fn get_base_branch(directory: &str, branch: &str) -> Option<String> {
+    let output = Command::new("git")
+        .args(["-C", directory])
+        .args(["config", "--get", &base_branch_config_key(branch)])
+        .kill_on_drop(true)
+        .output();
+    let output = tokio::time::timeout(GIT_STATUS_TIMEOUT, output)
+        .await
+        .ok()?
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let base_branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    (!base_branch.is_empty()).then_some(base_branch)
 }
 
 async fn get_repository_name(directory: &str) -> Option<String> {
@@ -203,6 +234,7 @@ u UU N... 100644 100644 100644 100644 abc abc abc conflict.rs
                 conflicted: 1,
                 dirty: true,
                 most_important_change: Some(GitChange::Conflicted),
+                base_branch: None,
             }
         );
     }

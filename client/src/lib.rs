@@ -13,7 +13,7 @@ use code_reviewer_core::git::{
     ListBranchesAndRecentCommitsRequest, ListBranchesAndRecentCommitsResponse,
 };
 use code_reviewer_server::requests::{
-    CreatePairedDeviceRequest, CreateSessionRequest, PairedDeviceIdRequest,
+    CreatePairedDeviceRequest, CreateSessionRequest, MergeSessionRequest, PairedDeviceIdRequest,
     SavePromptImageForSessionRequest, SendPromptToSessionRequest, SessionNameRequest,
     SetRemoteAccessEnabledRequest,
 };
@@ -235,10 +235,13 @@ impl BackendClient {
         self.post_session_name("continue_session", name).await
     }
 
-    /// Merges a session's branch into the main branch and removes the session.
-    /// Returns what was done.
-    pub async fn merge_session(&self, name: &str) -> Result<String, ClientError> {
-        self.post_session_name("merge_session", name).await
+    /// Merges a session's branch into the main branch or its base branch and
+    /// removes the session. Returns what was done.
+    pub async fn merge_session(
+        &self,
+        request: &MergeSessionRequest,
+    ) -> Result<String, ClientError> {
+        self.post("merge_session", request).await
     }
 
     /// Removes a session's worktree, keeping its branch, and closes its tmux

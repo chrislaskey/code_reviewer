@@ -39,6 +39,32 @@ pub struct ChatHistory {
     pub has_tool_results: bool,
     pub messages: Vec<ChatMessage>,
     pub summary: ChatSummary,
+    /// How full the agent's context window was after its latest reply, when
+    /// the transcript says.
+    pub context_usage: Option<ContextUsage>,
+}
+
+/// The tokens in an agent's context window after its latest reply.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ContextUsage {
+    pub used_tokens: u64,
+    /// The window's size, when the model's is known.
+    pub window_tokens: Option<u64>,
+    /// `used_tokens` as a whole percentage of `window_tokens`.
+    pub percent_used: Option<u64>,
+}
+
+impl ContextUsage {
+    pub fn new(used_tokens: u64, window_tokens: Option<u64>) -> Self {
+        let percent_used = window_tokens
+            .filter(|window| *window > 0)
+            .map(|window| (used_tokens * 100).div_ceil(window).min(100));
+        Self {
+            used_tokens,
+            window_tokens,
+            percent_used,
+        }
+    }
 }
 
 /// Counts over the whole chat, whatever the page filters.

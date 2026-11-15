@@ -2,7 +2,9 @@
 //! Tauri commands, each one call to the backend server the app
 //! is connected to.
 
-use code_reviewer_server::requests::{CreateSessionRequest, SavePromptImageForSessionRequest};
+use code_reviewer_server::requests::{
+    CreateSessionRequest, MergeSessionRequest, SavePromptImageForSessionRequest,
+};
 use code_reviewer_server::{
     ChatHistory, DetectedSettings, SessionList, SessionStatus, ShowOutcome,
 };
@@ -113,8 +115,8 @@ pub async fn save_prompt_image_for_session(
         .map_err(|error| error.to_string())
 }
 
-/// Creates a git worktree of `repository` on a branch named `name` and a
-/// tmux session named `<prefix>-<name>` in it with `PORT` set to `port`,
+/// Creates a git worktree of `repository` on a branch named `name`, from
+/// `base_branch` unless the branch exists, and a tmux session named `<prefix>-<name>` in it with `PORT` set to `port`,
 /// types `command` into it and opens it in the terminal app. Returns the
 /// session's full name, prefix included.
 #[tauri::command]
@@ -122,12 +124,14 @@ pub async fn create_session(
     connection: State<'_, BackendConnection>,
     name: String,
     repository: String,
+    base_branch: String,
     command: String,
     port: u16,
 ) -> Result<String, String> {
     let request = CreateSessionRequest {
         name,
         repository,
+        base_branch,
         command,
         port,
     };
@@ -153,17 +157,20 @@ pub async fn continue_session(
         .map_err(|error| error.to_string())
 }
 
-/// Merges a session's branch into the main branch (fast-forward only),
-/// removes its worktree, deletes the branch and closes its tmux session.
-/// `name` is the worktree's name, prefix included. Returns what was done.
+/// Merges a session's branch into `into_branch`, the main branch or its
+/// base branch (fast-forward only), removes its worktree, deletes the branch
+/// and closes its tmux session. `name` is the worktree's name, prefix
+/// included. Returns what was done.
 #[tauri::command]
 pub async fn merge_session(
     connection: State<'_, BackendConnection>,
     name: String,
+    into_branch: String,
 ) -> Result<String, String> {
+    let request = MergeSessionRequest { name, into_branch };
     connection
         .client()?
-        .merge_session(&name)
+        .merge_session(&request)
         .await
         .map_err(|error| error.to_string())
 }

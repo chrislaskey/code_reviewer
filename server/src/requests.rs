@@ -9,6 +9,14 @@ pub struct SessionNameRequest {
     pub name: String,
 }
 
+/// A session to merge, and the branch to merge it into: the main branch or
+/// the base branch it was created from.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MergeSessionRequest {
+    pub name: String,
+    pub into_branch: String,
+}
+
 /// What to type into the agent's pane in one of the app's sessions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SendPromptToSessionRequest {
@@ -31,6 +39,8 @@ pub struct SavePromptImageForSessionRequest {
 pub struct CreateSessionRequest {
     pub name: String,
     pub repository: String,
+    /// The branch a new branch named `name` starts from.
+    pub base_branch: String,
     pub command: String,
     pub port: u16,
 }

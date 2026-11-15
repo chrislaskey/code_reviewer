@@ -18,9 +18,9 @@ use serde_json::Value;
 
 use crate::agent::AgentKind;
 use crate::agent_chat::{
-    ChatHistory, ChatMessage, ChatNote, ChatNoteKind, ChatPart, ChatRole, MAX_TOOL_SUMMARY_CHARS,
-    ToolResult, ToolText, shorten, strip_tags, summarize_chat, text_part, tool_summary, tool_text,
-    validate_chat_id,
+    ChatHistory, ChatMessage, ChatNote, ChatNoteKind, ChatPart, ChatRole, ContextUsage,
+    MAX_TOOL_SUMMARY_CHARS, ToolResult, ToolText, shorten, strip_tags, summarize_chat, text_part,
+    tool_summary, tool_text, validate_chat_id,
 };
 use crate::codex;
 
@@ -51,6 +51,7 @@ pub fn read_chat_history(session_id: &str) -> Result<ChatHistory, String> {
         has_tool_results: true,
         summary: summarize_chat(&messages),
         messages,
+        context_usage: read_context_usage(&contents),
     })
 }
 
@@ -76,6 +77,11 @@ pub(crate) async fn read_local_chat_history(session_id: &str) -> Result<ChatHist
         .map_err(|error| error.to_string())?;
     tokio::task::spawn_blocking(move || {
         let messages = parse_local_turns(&turns);
+        let context_usage = thread
+            .path
+            .as_deref()
+            .and_then(|path| std::fs::read_to_string(path).ok())
+            .and_then(|contents| read_context_usage(&contents));
         ChatHistory {
             agent: AgentKind::Codex,
             path: thread
@@ -84,6 +90,7 @@ pub(crate) async fn read_local_chat_history(session_id: &str) -> Result<ChatHist
             has_tool_results: true,
             summary: summarize_chat(&messages),
             messages,
+            context_usage,
         }
     })
     .await
@@ -238,6 +245,27 @@ fn local_tool_part(id: &str, kind: &str, item: &Value) -> ChatPart {
         input: input_text(input),
         result,
     }
+}
+
+/// The context window use the rollout's latest `token_count` event reports:
+/// the tokens of the last model call, out of `model_context_window`.
+fn read_context_usage(contents: &str) -> Option<ContextUsage> {
+    contents.lines().rev().find_map(|line| {
+        let line = serde_json::from_str::<Value>(line).ok()?;
+        let Some(RolloutItem::Event(event)) = rollout_item(&line) else {
+            return None;
+        };
+        if event.get("type")?.as_str()? != "token_count" {
+            return None;
+        }
+        let info = event.get("info")?;
+        let used_tokens = info
+            .get("last_token_usage")?
+            .get("total_tokens")?
+            .as_u64()?;
+        let window_tokens = info.get("model_context_window").and_then(Value::as_u64);
+        Some(ContextUsage::new(used_tokens, window_tokens))
+    })
 }
 
 /// The rollout named after `session_id` in `sessions/<year>/<month>/<day>/`,
@@ -831,5 +859,19 @@ mod tests {
             None
         );
         std::fs::remove_dir_all(&sessions).expect("the directory is removed");
+    }
+
+    #[test]
+    fn reads_the_context_usage_of_the_latest_token_count() {
+        let rollout = r#"{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"total_tokens":1000},"model_context_window":475000}}}
+{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"total_tokens":95000},"model_context_window":475000}}}
+{"type":"event_msg","payload":{"type":"token_count","info":null}}
+{"type":"response_item","payload":{"type":"message","role":"assistant","content":[]}}"#;
+
+        let usage = read_context_usage(rollout).expect("the usage is read");
+
+        assert_eq!(usage, ContextUsage::new(95_000, Some(475_000)));
+        assert_eq!(usage.percent_used, Some(20));
+        assert_eq!(read_context_usage(""), None);
     }
 }

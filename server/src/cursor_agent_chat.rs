@@ -55,6 +55,7 @@ pub fn read_chat_history(chat_id: &str) -> Result<ChatHistory, String> {
         has_tool_results: false,
         summary: summarize_chat(&messages),
         messages,
+        context_usage: None,
     })
 }
 

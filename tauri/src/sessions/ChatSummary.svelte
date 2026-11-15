@@ -1,7 +1,7 @@
 <!-- What a chat holds (ChatSummary in agent_chat.rs), laid out like the
      Git menu's breakdown, and where it was read from. -->
 <script>
-  import { AGENT_NAMES, countOf, timeAgo } from "./formatting.js";
+  import { AGENT_NAMES, contextUsageText, countOf, timeAgo } from "./formatting.js";
 
   let { chat } = $props();
 
@@ -32,6 +32,10 @@
     <dd>{summary.failed_tool_calls}</dd>
     <dt>Without a result yet</dt>
     <dd>{summary.tool_calls_without_result}</dd>
+  {/if}
+  {#if chat.context_usage}
+    <dt>Context window</dt>
+    <dd>{contextUsageText(chat.context_usage)}</dd>
   {/if}
   <dt>Started</dt>
   <dd>{timeOf(summary.started_at)}</dd>

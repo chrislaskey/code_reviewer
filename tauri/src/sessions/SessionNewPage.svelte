@@ -15,7 +15,7 @@
   import { createSession, getDefaultSessionPort, getSessionSettings } from "../lib/backend.js";
   import { log } from "../lib/log.svelte.js";
 
-  let newSession = $state({ name: "", repository: "", command: "claude", port: "" });
+  let newSession = $state({ name: "", repository: "", baseBranch: "", command: "claude", port: "" });
   let creating = $state(false);
   let prefix = $state("");
 
@@ -27,6 +27,7 @@
       const sessionName = await createSession({
         name,
         repository: newSession.repository,
+        baseBranch: newSession.baseBranch,
         command: newSession.command,
         port: Number(newSession.port),
       });
@@ -42,6 +43,7 @@
       .then((detected) => {
         prefix = detected.settings.session_name_prefix;
         if (newSession.repository === "") newSession.repository = detected.directory;
+        if (newSession.baseBranch === "") newSession.baseBranch = detected.settings.main_branch;
       })
       .catch((error) => log(`Detecting the settings failed: ${error}`));
     getDefaultSessionPort()
@@ -73,7 +75,7 @@
         <label for="new-session-name">Name</label>
         <InfoPopover title="What the name sets">
           The worktree goes in the repository's <code>.worktrees/{prefix}-&lt;name&gt;</code> directory, on a new
-          branch of that name from the repository's current commit, or on the existing branch. The prefix tells the
+          branch of that name from the base branch, or on the existing branch. The prefix tells the
           sessions list which tmux sessions and worktrees were made here.
         </InfoPopover>
       </span>
@@ -101,6 +103,22 @@
         required
         spellcheck="false"
         placeholder="Detecting…"
+      />
+    </div>
+    <div class="field">
+      <span class="field-label">
+        <label for="new-session-base-branch">Base branch</label>
+        <InfoPopover title="What the base branch is">
+          The branch a new worktree branch starts from. It's not used when a branch with the session's name already
+          exists.
+        </InfoPopover>
+      </span>
+      <input
+        id="new-session-base-branch"
+        bind:value={newSession.baseBranch}
+        required
+        spellcheck="false"
+        placeholder="main"
       />
     </div>
     <div class="field">

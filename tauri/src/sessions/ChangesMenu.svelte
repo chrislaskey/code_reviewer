@@ -1,6 +1,6 @@
 <!-- A menu on a session or worktree card that opens the changes in its
      directory in another feature: the uncommitted changes, or everything
-     the branch committed since the main branch. Each choice is a plain link
+     the branch committed since its base branch, or the main branch. Each choice is a plain link
      to the page `urlFor` names, such as the review or the trace show page. -->
 <script>
   import ChoiceMenu from "../lib/components/ChoiceMenu.svelte";
@@ -19,11 +19,12 @@
    */
   let { label, title, directory, git, mainBranch, urlFor, class: class_ } = $props();
 
+  let baseBranch = $derived(git?.base_branch ?? mainBranch);
   let uncommittedChangesUrl = $derived(urlFor({ repo_path: directory }));
   let committedChangesUrl = $derived(
     urlFor({
       repo_path: directory,
-      base_ref: mainBranch,
+      base_ref: baseBranch,
       head_ref: git?.branch ?? "HEAD",
       compare_from_merge_base: true,
     }),
@@ -40,7 +41,7 @@
     />
     <MenuChoice
       label="Committed changes"
-      explanation="Everything the branch committed since it branched off {mainBranch}, like a pull request."
+      explanation="Everything the branch committed since it branched off {baseBranch}, like a pull request."
       href={committedChangesUrl}
       onclick={close}
     />

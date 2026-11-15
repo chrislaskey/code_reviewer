@@ -526,18 +526,20 @@ fn runs_in_pane(session: &ClaudeCodeSession, pane: &Pane) -> bool {
 }
 
 /// Creates a session named `<prefix>-<name>`: a git worktree of
-/// `repository` on a branch of that same name (see
-/// `git_worktree::add_worktree`) and a tmux session running the user's
+/// `repository` on a branch of that same name, created from `base_branch`
+/// unless it exists (see `git_worktree::add_worktree`), and a tmux session running the user's
 /// shell in it with `PORT` set to `port`, with `command` typed in, opened
 /// in the terminal app. Returns the session's full name, prefix included.
 pub async fn create_session(
     settings: &Settings,
     name: &str,
     repository: &str,
+    base_branch: &str,
     command: &str,
     port: u16,
 ) -> Result<String, String> {
     let name = name.trim();
+    let base_branch = base_branch.trim();
     tmux::validate_session_name(name)?;
     let session_name = add_session_name_prefix(&settings.session_name_prefix, name);
     tmux::validate_session_name(&session_name)?;
@@ -571,7 +573,7 @@ pub async fn create_session(
         ));
     }
 
-    let worktree = git_worktree::add_worktree(&repository_root, &session_name).await?;
+    let worktree = git_worktree::add_worktree(&repository_root, &session_name, base_branch).await?;
     log::info!(
         "Added the worktree {} on the {} branch {}",
         worktree.path.display(),
@@ -611,7 +613,8 @@ pub async fn continue_session(settings: &Settings, name: &str) -> Result<ShowOut
     .await
 }
 
-/// Finishes a session by merging its branch into the main branch, a
+/// Finishes a session by merging its branch into `into_branch`, the main
+/// branch or the base branch the session's branch was created from, a
 /// fast-forward only (see `git_worktree::merge_worktree`), removing its
 /// worktree, deleting the branch and closing its tmux session, like
 /// `bin/worktree merge`. `name` is the worktree's name, prefix included.
@@ -620,14 +623,24 @@ pub async fn merge_session(
     settings: &Settings,
     artifacts: Option<&ArtifactsServer>,
     name: &str,
+    into_branch: &str,
 ) -> Result<String, String> {
     let worktree = find_worktree(settings, name).await?;
-    git_worktree::merge_worktree(&worktree, &settings.main_branch).await?;
+    let base_branch = match &worktree.branch {
+        Some(branch) => git::get_base_branch(&worktree.path, branch).await,
+        None => None,
+    };
+    if into_branch != settings.main_branch && base_branch.as_deref() != Some(into_branch) {
+        return Err(format!(
+            "{name} can only merge into {} or the branch it was created from",
+            settings.main_branch
+        ));
+    }
+    git_worktree::merge_worktree(&worktree, into_branch).await?;
     let session_closed = close_tmux_session_if_running(settings, name).await?;
     let artifacts_deleted = delete_worktree_artifacts(artifacts, &worktree).await;
     Ok(format!(
-        "Merged {name} into {}, removed the worktree and deleted the branch{session_closed}{artifacts_deleted}",
-        settings.main_branch
+        "Merged {name} into {into_branch}, removed the worktree and deleted the branch{session_closed}{artifacts_deleted}"
     ))
 }
 

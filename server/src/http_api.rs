@@ -27,7 +27,7 @@ use crate::agent_chat::ChatHistory;
 use crate::backend::Backend;
 use crate::remote_access::{CreatedPairedDevice, RemoteAccess, RemoteAccessStatus};
 use crate::requests::{
-    CreatePairedDeviceRequest, CreateSessionRequest, PairedDeviceIdRequest,
+    CreatePairedDeviceRequest, CreateSessionRequest, MergeSessionRequest, PairedDeviceIdRequest,
     SavePromptImageForSessionRequest, SendPromptToSessionRequest, SessionNameRequest,
     SetRemoteAccessEnabledRequest,
 };
@@ -297,12 +297,13 @@ async fn create_session(
     let CreateSessionRequest {
         name,
         repository,
+        base_branch,
         command,
         port,
     } = request;
     Ok(Json(
         backend
-            .create_session(&name, &repository, &command, port)
+            .create_session(&name, &repository, &base_branch, &command, port)
             .await?,
     ))
 }
@@ -316,9 +317,10 @@ async fn continue_session(
 
 async fn merge_session(
     State(backend): BackendState,
-    JsonBody(request): JsonBody<SessionNameRequest>,
+    JsonBody(request): JsonBody<MergeSessionRequest>,
 ) -> ApiResult<String> {
-    Ok(Json(backend.merge_session(&request.name).await?))
+    let MergeSessionRequest { name, into_branch } = request;
+    Ok(Json(backend.merge_session(&name, &into_branch).await?))
 }
 
 async fn close_session(

@@ -156,8 +156,9 @@
           {watchedDirectories} that have no session, as after a restart. Open new tmux session starts a session in the worktree and types
           <code>claude --continue</code>. Open details, shown when a terminal is attached and an agent runs, opens the
           session's page with the agent's chat history. The Git menu finishes one: Merge into {mainBranch} fast-forwards {mainBranch} with the
-          branch, removes the worktree, deletes the branch and closes the session; Turn into branch removes the worktree and
-          keeps the branch. Both need a clean worktree. The
+          branch, removes the worktree, deletes the branch and closes the session; Merge into the base branch does the same
+          for the branch a session was created from, when that isn't {mainBranch}; Turn into branch removes the worktree and
+          keeps the branch. All need a clean worktree. The
           agent is Claude Code, Cursor's <code>agent</code> or <code>codex</code>. Claude Code's status is read from
           <code>~/.claude/sessions</code>, which it doesn't document, so it may change. <code>agent</code> and
           <code>codex</code> report none, so each is busy when its chat was written to in the last few seconds, else idle.

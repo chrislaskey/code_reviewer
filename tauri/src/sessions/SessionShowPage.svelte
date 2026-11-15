@@ -27,6 +27,7 @@
   import { CHAT_FILTERS, filterChatMessages } from "./chat_filters.js";
   import ChatMessage from "./ChatMessage.svelte";
   import ChatSummary from "./ChatSummary.svelte";
+  import { contextUsagePercent } from "./formatting.js";
   import GitStatus from "./GitStatus.svelte";
   import PromptForm from "./PromptForm.svelte";
   import { readFileAsBase64 } from "./prompt_images.js";
@@ -216,6 +217,9 @@
           <span class="chat-count muted">
             {chatFilter === "all" ? "" : `${shownMessages.length} of `}{chat.messages.length} messages
           </span>
+          {#if chat.context_usage}
+            <span class="chat-count muted" title="Context window used">{contextUsagePercent(chat.context_usage)}</span>
+          {/if}
         {/if}
         <InfoPopover title="What the chat holds, and how prompts are sent">
           {#if chat}
