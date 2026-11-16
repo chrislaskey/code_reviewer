@@ -38,6 +38,7 @@ use crate::claude_code::{self, ClaudeCodeSession};
 use crate::claude_code_chat;
 use crate::codex;
 use crate::codex_chat;
+use crate::continue_command;
 use crate::cursor_agent;
 use crate::cursor_agent_chat;
 use crate::git::{self, GitStatus};
@@ -53,8 +54,6 @@ const SESSION_NAME_PREFIX: &str = "cr";
 /// Where the app's worktrees are looked for: these directories and their
 /// first-level subdirectories that are git repositories.
 const WATCHED_DIRECTORIES: [&str; 1] = ["~/code"];
-/// Typed into a session continued in an existing worktree.
-const CONTINUE_COMMAND: &str = "claude --continue";
 /// The branch a finished session's branch is merged into.
 const MAIN_BRANCH: &str = "main";
 /// The port the first session gets; the next free one after it for each
@@ -583,8 +582,9 @@ pub async fn create_session(
 /// Starts a session again in one of the app's worktrees (see
 /// `SessionSummaries::worktrees`): a tmux session named after the worktree,
 /// running the user's shell in it with the default port (see
-/// `get_default_session_port`) and `CONTINUE_COMMAND` typed in, opened in
-/// the terminal app. `name` is the worktree's name, prefix included.
+/// `get_default_session_port`) and the command that resumes the agent last
+/// chatting in it typed in (see `continue_command.rs`), opened in the
+/// terminal app. `name` is the worktree's name, prefix included.
 pub async fn continue_session(settings: &Settings, name: &str) -> Result<ShowOutcome, String> {
     let worktree = find_worktree(settings, name).await?;
     let tmux = Tmux::new(&settings.tmux_path);
@@ -594,15 +594,15 @@ pub async fn continue_session(settings: &Settings, name: &str) -> Result<ShowOut
         ));
     }
     let port = get_default_session_port(settings).await?;
+    let directory = PathBuf::from(&worktree.path);
+    let command = {
+        let directory = directory.clone();
+        tokio::task::spawn_blocking(move || continue_command::find_continue_command(&directory))
+            .await
+            .map_err(|error| format!("Finding the agent to continue failed: {error}"))?
+    };
 
-    start_session_in_directory(
-        settings,
-        name,
-        Path::new(&worktree.path),
-        CONTINUE_COMMAND,
-        port,
-    )
-    .await
+    start_session_in_directory(settings, name, &directory, &command, port).await
 }
 
 /// Finishes a session by merging its branch into `into_branch`, the main

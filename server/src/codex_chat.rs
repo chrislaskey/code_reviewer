@@ -290,7 +290,7 @@ fn find_rollout(sessions: &Path, session_id: &str) -> Option<PathBuf> {
 }
 
 /// Named by number (`2026`, `11`, `14`), so the names sort newest last.
-fn list_subdirectories_newest_first(directory: &Path) -> Vec<PathBuf> {
+pub(crate) fn list_subdirectories_newest_first(directory: &Path) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(directory) else {
         return Vec::new();
     };

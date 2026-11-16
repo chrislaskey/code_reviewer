@@ -29,6 +29,7 @@ mod codex;
 mod codex_chat;
 #[cfg(unix)]
 mod codex_local;
+mod continue_command;
 mod cursor_agent;
 mod cursor_agent_chat;
 mod git;

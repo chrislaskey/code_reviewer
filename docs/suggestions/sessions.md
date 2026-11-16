@@ -5,7 +5,7 @@ Ideas and template features not in the rewrite. None are planned.
 - A settings form to correct the detected shell, terminal app and tmux path,
   as the Starter Pack's tmux example had, and to change the prefix of the
   sessions the app creates (`cr`), the directories looked in for worktrees
-  (`~/code`), the command Continue types (`claude --continue`) and the
+  (`~/code`) and the
   branch Complete merges into (`main`), all constants in `sessions.rs` now. The app detects them once per run;
   restarting it detects again.
 - The per-pane rows the template showed: each window and pane with its
@@ -23,7 +23,7 @@ Ideas and template features not in the rewrite. None are planned.
 - Choose which commit or branch the new worktree's branch starts from; it is
   the repository's current HEAD now.
 - Remember the command a session was created with, so Continue can type it
-  again instead of `claude --continue`.
+  again instead of the agent's plain resume command.
 - Remember a session's port with its worktree (in the repository's git
   config, say), so Continue starts it on the same port as before instead of
   the lowest free one, and bookmarks keep working. A Port field on Continue
@@ -58,8 +58,6 @@ Ideas and template features not in the rewrite. None are planned.
   waits for an approval.
 - Codex: when the process has no rollout open, find the newest rollout
   whose `session_meta` `cwd` is the pane's directory.
-- Continue a worktree with the agent that last ran in it (`codex resume
-  --last`, `cursor-agent resume`) instead of always `claude --continue`.
 - Show a subagent's messages (Claude Code's sidechains) folded under the
   tool call that started it.
 - Artifacts for other projects (`artifacts/README.md`): sessions in

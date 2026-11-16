@@ -154,8 +154,9 @@
         <InfoPopover title="Which sessions are listed, and what the actions do">
           Only tmux sessions named {prefix}-… are listed, and the worktrees named {prefix}-… of the repositories in
           {watchedDirectories} that have no session, as after a restart. A session opens its page, with the agent's chat
-          and the Open, Review, Trace and Git menus. Open new tmux session starts a session in the worktree, types
-          <code>claude --continue</code> and opens its page. The agent is Claude Code, Cursor's <code>agent</code> or <code>codex</code>. Claude Code's status is read from
+          and the Open, Review, Trace and Git menus. Open new tmux session starts a session in the worktree, types the command
+          that resumes the agent last chatting there (<code>claude --continue</code>, <code>codex resume</code> or
+          <code>cursor-agent --resume</code>) and opens its page. The agent is Claude Code, Cursor's <code>agent</code> or <code>codex</code>. Claude Code's status is read from
           <code>~/.claude/sessions</code>, which it doesn't document, so it may change. <code>agent</code> and
           <code>codex</code> report none, so each is busy when its chat was written to in the last few seconds, else idle.
         </InfoPopover>

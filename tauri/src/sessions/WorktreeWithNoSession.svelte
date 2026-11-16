@@ -19,7 +19,7 @@
     <div class="session-actions">
       <Button
         class="btn btn-ghost max-sm:btn-sm"
-        title="Starts a tmux session in the worktree, opens it in the terminal app and types claude --continue"
+        title="Starts a tmux session in the worktree, opens it in the terminal app and resumes the agent last chatting there"
         onclick={() => onContinue(worktree.name)}
       >
         Open new tmux session

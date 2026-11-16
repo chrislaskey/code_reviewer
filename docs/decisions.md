@@ -236,8 +236,8 @@ After a restart the tmux sessions are gone but the worktrees remain, with
 the work and Claude Code's conversation in them. **Decision:** the list
 also shows the app's worktrees with no session running, under the sessions,
 with a Continue button that starts a tmux session named after the worktree
-in it, types `claude --continue` (a constant, `CONTINUE_COMMAND`) and opens
-it in the terminal app.
+in it, types `claude --continue` and opens it in the terminal app (see
+decision 28 for other agents).
 
 The worktrees are found in the repositories under watched directories: a
 configurable list (`Settings.watched_directories`, `~/code` by default),
@@ -992,3 +992,27 @@ session's page is where the work happens, so the list is now a way to it.
   over 15 seconds ago (an agent switches files on a new chat), or is gone.
 * **The More sheet** on small windows lists the sessions with their agent
   status from the same list, to switch between them.
+
+
+## 28. Sessions: Continue resumes the agent that last chatted in the worktree
+
+Continue always typed `claude --continue`, so a worktree last worked on
+with Codex or Cursor's `agent` started a new Claude Code chat instead.
+**Decision:** Continue (`continue_command.rs`) finds each agent's newest
+chat in the worktree's directory, where each keeps them, and types the
+resume command of the one written to last:
+
+* **Claude Code:** `~/.claude/projects/<the directory, each
+  non-alphanumeric as ->/*.jsonl` → `claude --continue`.
+* **Cursor's `agent`:** `~/.cursor/chats/<MD5 of the directory>/<chat
+  id>/` → `cursor-agent --resume <chat id>`. The transcripts under
+  `~/.cursor/projects/` aren't used: they include chats the CLI can't
+  resume.
+* **Codex:** the rollout last written to whose `session_meta` line names
+  the directory as its `cwd` → `codex resume <session id>`. Rollouts are
+  opened newest first, so usually only a few are read.
+* **None found:** `claude --continue`, as before.
+
+The ids are checked to be letters, digits and `-` before they're typed.
+None of these layouts is documented, so they may change; then Continue
+falls back to Claude Code.
