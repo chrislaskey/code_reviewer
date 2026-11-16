@@ -19,6 +19,7 @@
   } from "../lib/backend.js";
   import { log } from "../lib/log.svelte.js";
   import LogList from "../lib/LogList.svelte";
+  import { repeatWhileVisible } from "../lib/repeat_while_visible.js";
   import { navigateToUrl } from "../lib/router.js";
   import { sessionNameFromPath, sessionsIndexUrl } from "../lib/routes.js";
   import ChoiceMenu from "../lib/components/ChoiceMenu.svelte";
@@ -131,13 +132,13 @@
   });
 
   onMount(() => {
-    let interval;
+    let stopRefreshing;
     getSessionSettings()
       .then((detected) => (mainBranch = detected.settings.main_branch))
       .catch((error) => log(`Detecting the settings failed: ${error}`))
       .then(refresh)
-      .then(() => (interval = setInterval(refresh, REFRESH_INTERVAL_MS)));
-    return () => clearInterval(interval);
+      .then(() => (stopRefreshing = repeatWhileVisible(refresh, REFRESH_INTERVAL_MS)));
+    return () => stopRefreshing?.();
   });
 </script>
 
@@ -197,7 +198,7 @@
       <div class="panel empty muted">The address names no session.</div>
     {:else if session}
       <div class="panel" class:working>
-        <SessionStatusBar {session} {mainBranch} {actions} showDetailsLink={false} />
+        <SessionStatusBar {session} {mainBranch} {actions} />
       </div>
       {#if sessionError}
         <p class="hint muted">{sessionError}. Showing it as it was last seen.</p>

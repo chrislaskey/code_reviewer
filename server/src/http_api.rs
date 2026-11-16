@@ -31,7 +31,8 @@ use crate::requests::{
     SavePromptImageForSessionRequest, SendPromptToSessionRequest, SessionNameRequest,
     SetRemoteAccessEnabledRequest,
 };
-use crate::sessions::{DetectedSettings, SessionList, SessionStatus};
+use crate::session_summaries::SessionSummaries;
+use crate::sessions::{DetectedSettings, SessionStatus};
 use crate::terminal_app::ShowOutcome;
 
 /// The largest request body, room for big screenshots sent as base64. The
@@ -77,7 +78,7 @@ fn routes_for_every_client() -> Router<Arc<Backend>> {
             "/api/get_default_session_port",
             post(get_default_session_port),
         )
-        .route("/api/list_sessions", post(list_sessions))
+        .route("/api/list_session_summaries", post(list_session_summaries))
         .route("/api/get_session", post(get_session))
         .route("/api/get_agent_chat_history", post(get_agent_chat_history))
         .route("/api/send_prompt_to_session", post(send_prompt_to_session))
@@ -245,8 +246,8 @@ async fn get_default_session_port(State(backend): BackendState) -> ApiResult<u16
     Ok(Json(backend.get_default_session_port().await?))
 }
 
-async fn list_sessions(State(backend): BackendState) -> ApiResult<SessionList> {
-    Ok(Json(backend.list_sessions().await?))
+async fn list_session_summaries(State(backend): BackendState) -> ApiResult<SessionSummaries> {
+    Ok(Json(backend.list_session_summaries().await?))
 }
 
 async fn get_session(
@@ -521,7 +522,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_route_only_takes_post() {
-        let (status, response) = send(Method::GET, "/api/list_sessions", "").await;
+        let (status, response) = send(Method::GET, "/api/list_session_summaries", "").await;
 
         assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
         assert_eq!(response["error"], "API routes take POST");

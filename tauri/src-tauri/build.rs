@@ -10,7 +10,7 @@ fn main() {
         "get_test_call_stack",
         "get_session_settings",
         "get_default_session_port",
-        "list_sessions",
+        "list_session_summaries",
         "get_session",
         "get_agent_chat_history",
         "send_prompt_to_session",

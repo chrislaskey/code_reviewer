@@ -22,7 +22,6 @@
 //! The settings are detected once per app run (see `AppState` in `lib.rs`)
 //! and passed to every call.
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -135,14 +134,6 @@ pub fn has_session_name_prefix(prefix: &str, session_name: &str) -> bool {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SessionList {
-    pub sessions: Vec<SessionStatus>,
-    /// The app's worktrees with no tmux session running in them, for a
-    /// session to be continued in.
-    pub worktrees: Vec<WorktreeStatus>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SessionStatus {
     #[serde(flatten)]
     pub session: Session,
@@ -156,63 +147,30 @@ pub struct SessionStatus {
     pub port: Option<u16>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct WorktreeStatus {
-    #[serde(flatten)]
-    pub worktree: Worktree,
-    pub git: Option<GitStatus>,
+/// One of the app's running tmux sessions with the directory of its current
+/// pane and the agent running in it: what `SessionStatus` has but its git
+/// status and port, which take longer to find.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct SessionAgent {
+    pub session: Session,
+    pub directory: Option<String>,
+    pub agent: Option<AgentSession>,
 }
 
 /// The tmux sessions the app started (see `has_session_name_prefix`), each
-/// with the agent running in it, and the app's worktrees
-/// without a session.
-pub async fn list_sessions(settings: &Settings) -> Result<SessionList, String> {
+/// with the agent running in it.
+pub async fn list_session_agents(settings: &Settings) -> Result<Vec<SessionAgent>, String> {
     let tmux = Tmux::new(&settings.tmux_path);
     let sessions = list_app_sessions(&tmux, settings).await?;
-
-    let worktrees: Vec<Worktree> = list_worktrees(settings)
-        .await
-        .into_iter()
-        .filter(|worktree| !sessions.iter().any(|session| session.name == worktree.name))
-        .collect();
-    let mut sessions = get_session_statuses(&tmux, sessions).await?;
-
-    let directories = sessions
-        .iter()
-        .filter_map(|session| session.directory.as_deref())
-        .chain(worktrees.iter().map(|worktree| worktree.path.as_str()));
-    let git_statuses = get_git_statuses(directories).await;
-    for session in &mut sessions {
-        session.git = session
-            .directory
-            .as_ref()
-            .and_then(|directory| git_statuses.get(directory).cloned());
-    }
-    let worktrees = worktrees
-        .into_iter()
-        .map(|worktree| WorktreeStatus {
-            git: git_statuses.get(&worktree.path).cloned(),
-            worktree,
-        })
-        .collect();
-
-    Ok(SessionList {
-        sessions,
-        worktrees,
-    })
+    find_session_agents(&tmux, sessions).await
 }
 
-/// One of the app's running tmux sessions, with its agent and git status,
-/// as `list_sessions` gives it. `name` is the full session name, prefix
-/// included.
+/// One of the app's running tmux sessions, with its agent and git status.
+/// `name` is the full session name, prefix included.
 pub async fn get_session(settings: &Settings, name: &str) -> Result<SessionStatus, String> {
     validate_app_session_name(settings, name)?;
     let tmux = Tmux::new(&settings.tmux_path);
-    let session = list_app_sessions(&tmux, settings)
-        .await?
-        .into_iter()
-        .find(|session| session.name == name)
-        .ok_or_else(|| format!("There is no session named {name}"))?;
+    let session = find_app_session(&tmux, settings, name).await?;
     let mut statuses = get_session_statuses(&tmux, vec![session]).await?;
     let mut status = statuses
         .pop()
@@ -223,12 +181,24 @@ pub async fn get_session(settings: &Settings, name: &str) -> Result<SessionStatu
     Ok(status)
 }
 
+/// One of the app's running tmux sessions with its agent, as
+/// `list_session_agents` gives it.
+async fn get_session_agent(settings: &Settings, name: &str) -> Result<SessionAgent, String> {
+    validate_app_session_name(settings, name)?;
+    let tmux = Tmux::new(&settings.tmux_path);
+    let session = find_app_session(&tmux, settings, name).await?;
+    find_session_agents(&tmux, vec![session])
+        .await?
+        .pop()
+        .ok_or_else(|| format!("There is no session named {name}"))
+}
+
 /// The chat of the agent running in one of the app's sessions.
 pub async fn get_agent_chat_history(
     settings: &Settings,
     name: &str,
 ) -> Result<ChatHistory, String> {
-    let session = get_session(settings, name).await?;
+    let session = get_session_agent(settings, name).await?;
     let agent = session
         .agent
         .ok_or_else(|| format!("No agent is running in {name}"))?;
@@ -308,6 +278,14 @@ fn validate_app_session_name(settings: &Settings, name: &str) -> Result<(), Stri
 }
 
 /// The running tmux sessions the app started (see `has_session_name_prefix`).
+async fn find_app_session(tmux: &Tmux, settings: &Settings, name: &str) -> Result<Session, String> {
+    list_app_sessions(tmux, settings)
+        .await?
+        .into_iter()
+        .find(|session| session.name == name)
+        .ok_or_else(|| format!("There is no session named {name}"))
+}
+
 async fn list_app_sessions(tmux: &Tmux, settings: &Settings) -> Result<Vec<Session>, String> {
     Ok(tmux
         .list_sessions()
@@ -371,30 +349,9 @@ fn validate_port(port: u16) -> Result<(), String> {
     Ok(())
 }
 
-/// The git status of each directory, all asked at the same time.
-async fn get_git_statuses<'a>(
-    directories: impl Iterator<Item = &'a str>,
-) -> HashMap<String, GitStatus> {
-    let mut directories: Vec<&str> = directories.collect();
-    directories.sort_unstable();
-    directories.dedup();
-
-    let statuses = join_all(
-        directories
-            .iter()
-            .map(|directory| git::get_status(directory)),
-    )
-    .await;
-    directories
-        .into_iter()
-        .zip(statuses)
-        .filter_map(|(directory, status)| Some((directory.to_string(), status?)))
-        .collect()
-}
-
 /// The app's worktrees (named with the prefix) in the repositories under the
 /// watched directories.
-async fn list_worktrees(settings: &Settings) -> Vec<Worktree> {
+pub async fn list_worktrees(settings: &Settings) -> Vec<Worktree> {
     let directories: Vec<PathBuf> = settings
         .watched_directories
         .iter()
@@ -407,40 +364,55 @@ async fn list_worktrees(settings: &Settings) -> Vec<Worktree> {
         .collect()
 }
 
-/// Each session with the agent running in it. Panes and processes are
-/// listed only when there are sessions to look at.
+/// Each session with its agent and port, with no git status yet.
 async fn get_session_statuses(
     tmux: &Tmux,
     sessions: Vec<Session>,
 ) -> Result<Vec<SessionStatus>, String> {
+    let ports = get_session_ports(tmux, &sessions).await;
+    let agents = find_session_agents(tmux, sessions).await?;
+    Ok(agents
+        .into_iter()
+        .zip(ports)
+        .map(|(agent, port)| SessionStatus {
+            session: agent.session,
+            directory: agent.directory,
+            agent: agent.agent,
+            git: None,
+            port,
+        })
+        .collect())
+}
+
+/// Each session with the agent running in it. Panes and processes are
+/// listed only when there are sessions to look at.
+async fn find_session_agents(
+    tmux: &Tmux,
+    sessions: Vec<Session>,
+) -> Result<Vec<SessionAgent>, String> {
     if sessions.is_empty() {
         return Ok(Vec::new());
     }
     let panes = tmux.list_panes().await?;
     let processes = process::list_processes().await?;
     let claude_code_sessions = claude_code::list_sessions(&processes).await;
-    let ports = get_session_ports(tmux, &sessions).await;
 
-    Ok(
-        join_all(sessions.into_iter().zip(ports).map(|(session, port)| {
-            let session_panes: Vec<&Pane> = panes
-                .iter()
-                .filter(|pane| pane.session_name == session.name)
-                .collect();
-            let processes = &processes;
-            let claude_code_sessions = &claude_code_sessions;
-            async move {
-                SessionStatus {
-                    directory: current_pane(&session_panes).map(|pane| pane.current_path.clone()),
-                    agent: find_agent(&session_panes, processes, claude_code_sessions).await,
-                    session,
-                    git: None,
-                    port,
-                }
+    Ok(join_all(sessions.into_iter().map(|session| {
+        let session_panes: Vec<&Pane> = panes
+            .iter()
+            .filter(|pane| pane.session_name == session.name)
+            .collect();
+        let processes = &processes;
+        let claude_code_sessions = &claude_code_sessions;
+        async move {
+            SessionAgent {
+                directory: current_pane(&session_panes).map(|pane| pane.current_path.clone()),
+                agent: find_agent(&session_panes, processes, claude_code_sessions).await,
+                session,
             }
-        }))
-        .await,
-    )
+        }
+    }))
+    .await)
 }
 
 /// The current pane of the session's current window.
@@ -589,7 +561,7 @@ pub async fn create_session(
 }
 
 /// Starts a session again in one of the app's worktrees (see
-/// `SessionList::worktrees`): a tmux session named after the worktree,
+/// `SessionSummaries::worktrees`): a tmux session named after the worktree,
 /// running the user's shell in it with the default port (see
 /// `get_default_session_port`) and `CONTINUE_COMMAND` typed in, opened in
 /// the terminal app. `name` is the worktree's name, prefix included.

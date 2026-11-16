@@ -54,14 +54,14 @@ export function getDefaultSessionPort() {
 }
 
 /**
- * The tmux sessions this app started (named with its prefix), each with its agent status, and its git worktrees
- * with no session running.
+ * The tmux sessions this app started (named with its prefix), each with its repository and agent status, and its
+ * git worktrees with no session running, as the backend found them up to a few seconds ago.
  */
-export function listSessions() {
-  return invoke("list_sessions");
+export function listSessionSummaries() {
+  return invoke("list_session_summaries");
 }
 
-/** One of the app's tmux sessions, with its agent and git status, as `listSessions` gives it. `name` includes the prefix. */
+/** One of the app's tmux sessions, with its agent and git status. `name` includes the prefix. */
 export function getSession(name) {
   return invoke("get_session", { name });
 }

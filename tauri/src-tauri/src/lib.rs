@@ -53,7 +53,7 @@ pub fn run() {
             trace::get_test_call_stack,
             sessions::get_session_settings,
             sessions::get_default_session_port,
-            sessions::list_sessions,
+            sessions::list_session_summaries,
             sessions::get_session,
             sessions::get_agent_chat_history,
             sessions::send_prompt_to_session,

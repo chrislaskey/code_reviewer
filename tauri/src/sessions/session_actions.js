@@ -1,5 +1,5 @@
-// What the actions on a session's status bar do (SessionStatusBar), shared by
-// the sessions page and a session's page. Each logs what happened, then calls
+// What the actions on a session's status bar do (SessionStatusBar), on a
+// session's page. Each logs what happened, then calls
 // `refresh` so the page shows the session as it is now. Merging or closing a
 // session ends it, so on success those call `onFinished` instead, when given.
 import {

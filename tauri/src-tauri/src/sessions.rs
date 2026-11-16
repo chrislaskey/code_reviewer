@@ -6,7 +6,7 @@ use code_reviewer_server::requests::{
     CreateSessionRequest, MergeSessionRequest, SavePromptImageForSessionRequest,
 };
 use code_reviewer_server::{
-    ChatHistory, DetectedSettings, SessionList, SessionStatus, ShowOutcome,
+    ChatHistory, DetectedSettings, SessionStatus, SessionSummaries, ShowOutcome,
 };
 use tauri::{AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
@@ -39,14 +39,14 @@ pub async fn get_default_session_port(
 }
 
 /// The tmux sessions the app started, each with its agent status, and
-/// its worktrees without a session.
+/// its worktrees without a session, as found up to a few seconds ago.
 #[tauri::command]
-pub async fn list_sessions(
+pub async fn list_session_summaries(
     connection: State<'_, BackendConnection>,
-) -> Result<SessionList, String> {
+) -> Result<SessionSummaries, String> {
     connection
         .client()?
-        .list_sessions()
+        .list_session_summaries()
         .await
         .map_err(|error| error.to_string())
 }

@@ -17,7 +17,8 @@ use tokio::sync::OnceCell;
 use crate::agent_chat::ChatHistory;
 use crate::analysis::run_analysis;
 use crate::artifacts::ArtifactsServer;
-use crate::sessions::{self, DetectedSettings, SessionList, SessionStatus, Settings};
+use crate::session_summaries::{SessionSummaries, SessionSummaryCache};
+use crate::sessions::{self, DetectedSettings, SessionStatus, Settings};
 use crate::terminal_app::ShowOutcome;
 
 /// What the commands share. One instance lives for the whole process.
@@ -26,6 +27,8 @@ pub struct Backend {
     analysis: Arc<AnalysisService>,
     /// The shell, terminal app and tmux, detected on first use.
     session_settings: OnceCell<DetectedSettings>,
+    /// The sessions page's list, served at once and refreshed behind it.
+    session_summaries: SessionSummaryCache,
     /// Where bin/dev keeps and serves artifacts; `None` when it didn't start the app.
     artifacts: Option<ArtifactsServer>,
 }
@@ -43,6 +46,7 @@ impl Backend {
         Self {
             analysis: Arc::new(AnalysisService::new()),
             session_settings: OnceCell::new(),
+            session_summaries: SessionSummaryCache::new(),
             artifacts: ArtifactsServer::from_environment(),
         }
     }
@@ -136,9 +140,11 @@ impl Backend {
     }
 
     /// The tmux sessions the app started, each with its agent status, and
-    /// its worktrees without a session.
-    pub async fn list_sessions(&self) -> Result<SessionList, String> {
-        sessions::list_sessions(self.settings().await).await
+    /// its worktrees without a session, as found up to a few seconds ago.
+    pub async fn list_session_summaries(&self) -> Result<SessionSummaries, String> {
+        self.session_summaries
+            .list_session_summaries(self.settings().await)
+            .await
     }
 
     /// One of the app's tmux sessions, with its agent and git status. `name`
@@ -189,7 +195,7 @@ impl Backend {
         command: &str,
         port: u16,
     ) -> Result<String, String> {
-        sessions::create_session(
+        let created = sessions::create_session(
             self.settings().await,
             name,
             repository,
@@ -197,14 +203,18 @@ impl Backend {
             command,
             port,
         )
-        .await
+        .await;
+        self.session_summaries.forget().await;
+        created
     }
 
     /// Starts a tmux session again in one of the app's worktrees, named after
     /// it, and opens it in the terminal app. `name` is the worktree's name,
     /// prefix included.
     pub async fn continue_session(&self, name: &str) -> Result<ShowOutcome, String> {
-        sessions::continue_session(self.settings().await, name).await
+        let continued = sessions::continue_session(self.settings().await, name).await;
+        self.session_summaries.forget().await;
+        continued
     }
 
     /// Merges a session's branch into `into_branch`, the main branch or its
@@ -212,20 +222,25 @@ impl Backend {
     /// branch and closes its tmux session. `name` is the worktree's name,
     /// prefix included. Returns what was done.
     pub async fn merge_session(&self, name: &str, into_branch: &str) -> Result<String, String> {
-        sessions::merge_session(
+        let merged = sessions::merge_session(
             self.settings().await,
             self.artifacts.as_ref(),
             name,
             into_branch,
         )
-        .await
+        .await;
+        self.session_summaries.forget().await;
+        merged
     }
 
     /// Removes a session's worktree, keeping its branch, and closes its tmux
     /// session. `name` is the worktree's name, prefix included. Returns what
     /// was done.
     pub async fn close_session(&self, name: &str) -> Result<String, String> {
-        sessions::close_session(self.settings().await, self.artifacts.as_ref(), name).await
+        let closed =
+            sessions::close_session(self.settings().await, self.artifacts.as_ref(), name).await;
+        self.session_summaries.forget().await;
+        closed
     }
 
     /// Brings the terminal window of one of the app's sessions to the front,

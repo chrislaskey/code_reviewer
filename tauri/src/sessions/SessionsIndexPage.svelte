@@ -1,10 +1,10 @@
 <!-- The sessions page: the tmux sessions this app started, named with the
-     app's prefix, with the agent status in each, then its git worktrees
-     with no session running, to continue. The Rust side detects the shell,
-     terminal app and tmux once and does the work (see
-     src-tauri/src/sessions.rs). -->
+     app's prefix, with the agent status in each, each opening its own page,
+     then its git worktrees with no session running, to start one in. The
+     list comes from the backend's cache (server/src/session_summaries.rs),
+     so it shows at once and is at most a refresh old. -->
 <script>
-  import { sessionNewUrl } from "../lib/routes.js";
+  import { sessionNewUrl, sessionShowUrl } from "../lib/routes.js";
   import { onMount } from "svelte";
   import AppNav from "../lib/components/AppNav.svelte";
   import Button from "../lib/components/Button.svelte";
@@ -13,16 +13,18 @@
   import InfoPopover from "../lib/components/InfoPopover.svelte";
   import StillWaves from "../lib/components/StillWaves.svelte";
   import TopBackgroundPattern from "../lib/components/TopBackgroundPattern.svelte";
-  import { continueSession, getSessionSettings, listSessions } from "../lib/backend.js";
+  import { continueSession, getSessionSettings, listSessionSummaries } from "../lib/backend.js";
   import { log } from "../lib/log.svelte.js";
   import LogList from "../lib/LogList.svelte";
-  import GitWorktree from "./GitWorktree.svelte";
+  import { repeatWhileVisible } from "../lib/repeat_while_visible.js";
+  import { navigateToUrl } from "../lib/router.js";
   import { countOf } from "./formatting.js";
-  import { createSessionActions, SHOW_OUTCOMES } from "./session_actions.js";
+  import { SHOW_OUTCOMES } from "./session_actions.js";
   import { listSessionChanges } from "./session_changes.js";
-  import TmuxSession from "./TmuxSession.svelte";
+  import SessionSummary from "./SessionSummary.svelte";
+  import WorktreeWithNoSession from "./WorktreeWithNoSession.svelte";
 
-  const REFRESH_INTERVAL_MS = 5000;
+  const REFRESH_INTERVAL_MS = 2000;
 
   const RIPPLE_STRENGTHS = { added: 40, removed: 25, statusChanged: 30, refreshed: 20, action: 25 };
 
@@ -33,7 +35,6 @@
 
   let prefix = $derived(detected?.settings.session_name_prefix ?? "");
   let watchedDirectories = $derived(detected?.settings.watched_directories.join(", ") ?? "");
-  let mainBranch = $derived(detected?.settings.main_branch ?? "main");
   let empty = $derived(sessionList?.sessions.length === 0 && sessionList?.worktrees.length === 0);
 
   let detectedSettings = $derived.by(() => {
@@ -46,7 +47,6 @@
       ["tmux", settings.tmux_path],
       ["Session prefix", `${settings.session_name_prefix}-…`],
       ["Watched directories", settings.watched_directories.join(", ")],
-      ["Main branch", settings.main_branch],
     ];
   });
 
@@ -58,7 +58,7 @@
     if (refreshing) return false;
     refreshing = true;
     try {
-      const nextSessionList = await listSessions();
+      const nextSessionList = await listSessionSummaries();
       if (sessionList) showSessionChanges(listSessionChanges(sessionList, nextSessionList));
       sessionList = nextSessionList;
       lastRefreshError = undefined;
@@ -104,26 +104,26 @@
     return () => element.removeEventListener("click", rippleOnAction);
   }
 
-  const actions = createSessionActions({ refresh });
-
+  // Opens the new session's page once it's running.
   async function continueInWorktree(name) {
     try {
       const outcome = await continueSession(name);
       log(`${name}: ${SHOW_OUTCOMES[outcome] ?? outcome}`);
     } catch (error) {
       log(`Continuing ${name} failed: ${error}`);
+      await refresh();
+      return;
     }
-    await refresh();
+    navigateToUrl(sessionShowUrl(name));
   }
 
   onMount(() => {
-    let interval;
+    let stopRefreshing;
     getSessionSettings()
       .then((settings) => (detected = settings))
-      .catch((error) => (detectError = String(error)))
-      .then(refresh)
-      .then(() => (interval = setInterval(refresh, REFRESH_INTERVAL_MS)));
-    return () => clearInterval(interval);
+      .catch((error) => (detectError = String(error)));
+    refresh().then(() => (stopRefreshing = repeatWhileVisible(refresh, REFRESH_INTERVAL_MS)));
+    return () => stopRefreshing?.();
   });
 </script>
 
@@ -140,7 +140,7 @@
     Sessions
     {#snippet subtitle()}
       The tmux sessions started here, with the agent status in each, then the worktrees with no session running.
-      Refreshes every 5 seconds.
+      Refreshes every 2 seconds.
     {/snippet}
     {#snippet actions()}
       <Button variant="primary" href={sessionNewUrl()}>New<span class="max-sm:hidden">&nbsp;session</span></Button>
@@ -153,13 +153,9 @@
         <h2>Current sessions</h2>
         <InfoPopover title="Which sessions are listed, and what the actions do">
           Only tmux sessions named {prefix}-… are listed, and the worktrees named {prefix}-… of the repositories in
-          {watchedDirectories} that have no session, as after a restart. Open new tmux session starts a session in the worktree and types
-          <code>claude --continue</code>. Open details, shown when a terminal is attached and an agent runs, opens the
-          session's page with the agent's chat history. The Git menu finishes one: Merge into {mainBranch} fast-forwards {mainBranch} with the
-          branch, removes the worktree, deletes the branch and closes the session; Merge into the base branch does the same
-          for the branch a session was created from, when that isn't {mainBranch}; Turn into branch removes the worktree and
-          keeps the branch. All need a clean worktree. The
-          agent is Claude Code, Cursor's <code>agent</code> or <code>codex</code>. Claude Code's status is read from
+          {watchedDirectories} that have no session, as after a restart. A session opens its page, with the agent's chat
+          and the Open, Review, Trace and Git menus. Open new tmux session starts a session in the worktree, types
+          <code>claude --continue</code> and opens its page. The agent is Claude Code, Cursor's <code>agent</code> or <code>codex</code>. Claude Code's status is read from
           <code>~/.claude/sessions</code>, which it doesn't document, so it may change. <code>agent</code> and
           <code>codex</code> report none, so each is busy when its chat was written to in the last few seconds, else idle.
         </InfoPopover>
@@ -178,8 +174,7 @@
           {/if}
           <p class="mt-2">
             The shell, terminal app and tmux the app found on this Mac, the prefix of the sessions and worktrees it
-            creates, the directories whose repositories are looked in for worktrees, and the branch the Git menu merges into.
-            New sessions run the shell, and Open uses the terminal app.
+            creates, and the directories whose repositories are looked in for worktrees. New sessions run the shell, and Open uses the terminal app.
           </p>
         </InfoPopover>
       </div>
@@ -193,16 +188,10 @@
         <div class="panel empty muted">No sessions or worktrees. New session starts one, named {prefix}-…</div>
       {/if}
       {#each sessionList?.sessions ?? [] as session (session.name)}
-        <TmuxSession {session} {mainBranch} {actions} />
+        <SessionSummary {session} />
       {/each}
       {#each sessionList?.worktrees ?? [] as worktree (worktree.path)}
-        <GitWorktree
-          {worktree}
-          {mainBranch}
-          onContinue={continueInWorktree}
-          onMerge={actions.merge}
-          onClose={actions.close}
-        />
+        <WorktreeWithNoSession {worktree} onContinue={continueInWorktree} />
       {/each}
     </div>
   </section>

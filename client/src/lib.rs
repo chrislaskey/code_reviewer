@@ -18,7 +18,7 @@ use code_reviewer_server::requests::{
     SetRemoteAccessEnabledRequest,
 };
 use code_reviewer_server::{
-    ChatHistory, DetectedSettings, SessionList, SessionStatus, ShowOutcome,
+    ChatHistory, DetectedSettings, SessionStatus, SessionSummaries, ShowOutcome,
 };
 use code_reviewer_server::{CreatedPairedDevice, PairingCode, RemoteAccessStatus};
 use secrecy::{ExposeSecret, SecretString};
@@ -184,9 +184,9 @@ impl BackendClient {
     }
 
     /// The tmux sessions the app started, each with its agent status, and
-    /// its worktrees without a session.
-    pub async fn list_sessions(&self) -> Result<SessionList, ClientError> {
-        self.post("list_sessions", &EmptyBody {}).await
+    /// its worktrees without a session, as found up to a few seconds ago.
+    pub async fn list_session_summaries(&self) -> Result<SessionSummaries, ClientError> {
+        self.post("list_session_summaries", &EmptyBody {}).await
     }
 
     /// One of the app's tmux sessions, with its agent and git status.

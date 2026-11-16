@@ -1,10 +1,9 @@
 <!-- A tmux session's status bar: its name and repository, the agent's
      status, and the Open, Review, Trace and Git menus, which move to a
-     second line of smaller buttons on small windows. On the sessions page
-     and on a session's own page, which passes `showDetailsLink={false}`.
+     second line of smaller buttons on small windows. On a session's page.
      `actions` comes from createSessionActions (session_actions.js). -->
 <script>
-  import { reviewShowUrl, sessionShowUrl, traceShowUrl } from "../lib/routes.js";
+  import { reviewShowUrl, traceShowUrl } from "../lib/routes.js";
   import AgentBadge from "./AgentBadge.svelte";
   import Badge from "./Badge.svelte";
   import ChangesMenu from "./ChangesMenu.svelte";
@@ -12,21 +11,16 @@
   import OpenMenu from "./OpenMenu.svelte";
   import RepositoryName from "./RepositoryName.svelte";
 
-  let { session, mainBranch, actions, showDetailsLink = true } = $props();
+  let { session, mainBranch, actions } = $props();
 
   const ACTION_BUTTON_CLASS = "btn btn-ghost max-sm:btn-sm";
 
   let attached = $derived(session.attached_clients > 0);
-  let detailsUrl = $derived(showDetailsLink && attached && session.agent ? sessionShowUrl(session.name) : null);
 </script>
 
 <div class="session-header">
   <span class="session-title">
-    {#if detailsUrl}
-      <a class="name" href={detailsUrl}>{session.name}</a>
-    {:else}
-      <span class="name">{session.name}</span>
-    {/if}
+    <span class="name">{session.name}</span>
     <RepositoryName path={session.directory ?? ""} git={session.git} />
   </span>
   {#if session.agent}
@@ -41,7 +35,6 @@
     <OpenMenu
       name={session.name}
       port={session.port}
-      {detailsUrl}
       onOpen={actions.showInTerminalApp}
       onOpenInBrowser={actions.openInBrowser}
       onOpenArtifacts={actions.openArtifactsInBrowser}

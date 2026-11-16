@@ -68,10 +68,17 @@
   font-weight: 600;
 }
 
-.session-header a.name {
+/* A session's card on the sessions page opens its page. */
+a.session-link {
+  display: block;
   color: inherit;
   text-decoration: none;
-  cursor: pointer;
+}
+
+.session-link-arrow {
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: 0.45;
 }
 
 .session-header .name.no-session {

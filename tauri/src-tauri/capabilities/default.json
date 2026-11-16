@@ -15,7 +15,7 @@
     "allow-get-test-call-stack",
     "allow-get-session-settings",
     "allow-get-default-session-port",
-    "allow-list-sessions",
+    "allow-list-session-summaries",
     "allow-get-session",
     "allow-get-agent-chat-history",
     "allow-send-prompt-to-session",

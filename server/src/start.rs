@@ -138,6 +138,7 @@ pub async fn start(config: ServerConfig) -> Result<RunningServer, ServerError> {
         tokens: AccessTokens::One(desktop_token.clone()),
     };
     let backend = Arc::new(Backend::new());
+    tokio::spawn(fill_session_summaries(Arc::clone(&backend)));
     let remote_access = RemoteAccess::open(&config.data_directory, Arc::clone(&backend))
         .map(Arc::new)
         .map_err(ServerError::RemoteAccess)?;
@@ -179,6 +180,14 @@ pub async fn start(config: ServerConfig) -> Result<RunningServer, ServerError> {
 fn allowed_hosts_for(address: SocketAddr) -> Vec<String> {
     let port = address.port();
     vec![address.to_string(), format!("localhost:{port}")]
+}
+
+/// Finds the sessions page's list once at launch, so its first load needn't
+/// wait for it.
+async fn fill_session_summaries(backend: Arc<Backend>) {
+    if let Err(error) = backend.list_session_summaries().await {
+        log::warn!("Listing the sessions at launch failed: {error}");
+    }
 }
 
 #[cfg(test)]

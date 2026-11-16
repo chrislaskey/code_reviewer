@@ -7,7 +7,8 @@
 //!     one test walked top to bottom. Also computed by the core crate.
 //!   * Sessions (`sessions`): the tmux sessions the app started, named
 //!     `cr-<name>`, with the agent (Claude Code, Cursor or Codex) status and chat in
-//!     each, and its git worktrees without a session.
+//!     each, and its git worktrees without a session. The sessions page's
+//!     list is kept in memory (`session_summaries`).
 //!
 //! [`Backend`] holds the state they share and has one method per command,
 //! served as HTTP routes by [`localhost_router`] and [`tailnet_router`].
@@ -39,6 +40,7 @@ mod process;
 mod recent_writes;
 mod remote_access;
 pub mod requests;
+mod session_summaries;
 mod sessions;
 mod start;
 mod tailnet_listener;
@@ -53,6 +55,7 @@ pub use http_api::{ApiError, localhost_router, tailnet_router};
 pub use paired_devices::PairedDevice;
 pub use pairing_code::PairingCode;
 pub use remote_access::{CreatedPairedDevice, RemoteAccessStatus};
-pub use sessions::{DetectedSettings, SessionList, SessionStatus};
+pub use session_summaries::SessionSummaries;
+pub use sessions::{DetectedSettings, SessionStatus};
 pub use start::{RunningServer, ServerConfig, ServerError, start};
 pub use terminal_app::ShowOutcome;

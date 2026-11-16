@@ -962,3 +962,27 @@ Each local API item is a separate chat message, keeping command and file
 change boxes separate from the agent's written replies. The Last filter
 therefore shows the final reply without preceding tool calls.
 
+
+## 27. Sessions: a quick, cached list on the sessions page
+
+The sessions page listed every session with its git status, port and the
+Open, Review, Trace and Git menus, and every worktree with no session,
+found afresh every 5 seconds: about 420 ms and 45 processes (37 of them
+`git worktree list`, one per repository watched) for each viewer. A
+session's page is where the work happens, so the list is now a way to it.
+**Decision:**
+
+* **The list** (`list_session_summaries`) has each tmux session's name,
+  repository and agent status, and the worktrees with no session. Each
+  session's card opens its page, which keeps all the actions. A worktree
+  with no session has one action, Open new tmux session, which then opens
+  the new session's page, so that page only ever shows a running session.
+* **Kept in memory** (`session_summaries.rs`) in two parts: the agents
+  (tmux and `ps`, kept 1 second) and the worktrees (kept 5 seconds). A part
+  older than that is served while it's found again in the background, so
+  the page shows at once, at most one refresh old, and viewers on the
+  desktop and a phone share the refreshes. Creating, continuing, merging or
+  closing a session drops both, so the next call waits for the new list.
+  The list is found once at launch.
+* **The page** asks every 2 seconds, and a session's page every 5, both
+  only while visible.
