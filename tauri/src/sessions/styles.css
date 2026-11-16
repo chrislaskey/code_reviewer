@@ -68,6 +68,22 @@
   font-weight: 600;
 }
 
+/* A session card has no menus, so it keeps to one line on small windows:
+   the name and repository shorten instead of the badge wrapping. */
+.session-link .session-header {
+  flex-wrap: nowrap;
+}
+
+.session-link .badge {
+  flex-shrink: 0;
+}
+
+.session-link .name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* A session's card on the sessions page opens its page. */
 a.session-link {
   display: block;

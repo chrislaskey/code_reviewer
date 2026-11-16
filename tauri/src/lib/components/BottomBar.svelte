@@ -25,6 +25,7 @@
   let linksInMore = $derived(links.filter((link) => link.id !== "home"));
 
   let open = $state(false);
+  let sessions = $state(null);
 
   function close() {
     open = false;
@@ -51,9 +52,11 @@
         </li>
       {/each}
     </ul>
-    <h2 class="sheet-heading">Sessions</h2>
+    {#if sessions?.length}
+      <h2 class="sheet-heading">Sessions</h2>
+    {/if}
     <ul class="menu w-full p-0">
-      <SessionChoices onchoose={close} />
+      <SessionChoices bind:sessions onchoose={close} />
     </ul>
     <h2 class="sheet-heading">Theme</h2>
     <ul class="menu w-full p-0">

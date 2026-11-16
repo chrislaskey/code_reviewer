@@ -1,12 +1,14 @@
 <!-- A menu's choices of session, to switch between them: each of the app's
      tmux sessions with its repository and agent status, from the cached
      list the sessions page shows, asked for again while the menu is open.
-     A choice opens the session's page, then calls `onchoose`. -->
+     Nothing shows until there are sessions, an error included; `sessions`
+     is bindable so the menu can show its heading only then. A choice opens
+     the session's page, then calls `onchoose`. -->
 <script>
   import { onMount } from "svelte";
   import { listSessionSummaries } from "../lib/backend.js";
   import { repeatWhileVisible } from "../lib/repeat_while_visible.js";
-  import { sessionNameFromPath, sessionShowUrl } from "../lib/routes.js";
+  import { sessionShowUrl } from "../lib/routes.js";
   import AgentBadge from "./AgentBadge.svelte";
   import Badge from "./Badge.svelte";
 
@@ -14,22 +16,18 @@
 
   /**
    * @typedef {Object} Props
+   * @property {object[] | null} [sessions]
    * @property {() => void} [onchoose]
    */
 
   /** @type {Props} */
-  let { onchoose } = $props();
-
-  let sessions = $state(null);
-  let error = $state(null);
-  const currentName = sessionNameFromPath(location.pathname);
+  let { sessions = $bindable(null), onchoose } = $props();
 
   async function refresh() {
     try {
       sessions = (await listSessionSummaries()).sessions;
-      error = null;
-    } catch (caught) {
-      error = String(caught);
+    } catch (error) {
+      console.error("Listing sessions for the menu failed:", error);
     }
   }
 
@@ -39,14 +37,10 @@
   });
 </script>
 
-{#if error && !sessions}
-  <li class="menu-disabled"><span class="text-error">{error}</span></li>
-{:else if sessions?.length === 0}
-  <li class="menu-disabled"><span>No sessions</span></li>
-{:else if sessions}
+{#if sessions}
   {#each sessions as session (session.name)}
     <li>
-      <a href={sessionShowUrl(session.name)} class="session-choice" class:menu-active={session.name === currentName} onclick={onchoose}>
+      <a href={sessionShowUrl(session.name)} class="session-choice text-base-content no-underline" onclick={onchoose}>
         <span class="session-choice-name">
           {session.name}
           {#if session.repository_name}<span class="session-choice-repository">{session.repository_name}</span>{/if}
