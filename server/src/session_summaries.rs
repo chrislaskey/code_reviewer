@@ -16,6 +16,7 @@ use tokio::sync::Mutex;
 
 use crate::agent::AgentSession;
 use crate::git_worktree::Worktree;
+use crate::recent_writes::OpenFileCache;
 use crate::sessions::{self, SessionAgent, Settings};
 
 /// Finding the agents takes a tmux and a `ps` call, so it's done often.
@@ -43,20 +44,17 @@ pub struct SessionSummary {
 
 /// The two parts of the list, each refreshed on its own.
 pub struct SessionSummaryCache {
+    open_files: Arc<OpenFileCache>,
     session_agents: Arc<Cached<Vec<SessionAgent>>>,
     worktrees: Arc<Cached<Vec<Worktree>>>,
 }
 
-impl Default for SessionSummaryCache {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl SessionSummaryCache {
-    /// An empty cache: the first call waits for both parts.
-    pub fn new() -> Self {
+    /// An empty cache: the first call waits for both parts. `open_files`
+    /// is shared with the other lookups of agents.
+    pub fn new(open_files: Arc<OpenFileCache>) -> Self {
         Self {
+            open_files,
             session_agents: Arc::new(Cached::new(SESSION_AGENTS_MAX_AGE)),
             worktrees: Arc::new(Cached::new(WORKTREES_MAX_AGE)),
         }
@@ -69,9 +67,11 @@ impl SessionSummaryCache {
     ) -> Result<SessionSummaries, String> {
         let agents_settings = settings.clone();
         let worktrees_settings = settings.clone();
+        let open_files = Arc::clone(&self.open_files);
         let (session_agents, worktrees) = tokio::join!(
-            self.session_agents
-                .get(|| async move { sessions::list_session_agents(&agents_settings).await }),
+            self.session_agents.get(|| async move {
+                sessions::list_session_agents(&agents_settings, &open_files).await
+            }),
             self.worktrees
                 .get(|| async move { Ok(sessions::list_worktrees(&worktrees_settings).await) }),
         );

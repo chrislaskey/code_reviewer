@@ -986,3 +986,9 @@ session's page is where the work happens, so the list is now a way to it.
   The list is found once at launch.
 * **The page** asks every 2 seconds, and a session's page every 5, both
   only while visible.
+* **Open files kept too** (`OpenFileCache` in `recent_writes.rs`): the
+  chat file `lsof` finds for each Cursor or Codex process is kept by pid
+  and found again only once it has gone 10 seconds unwritten and was found
+  over 15 seconds ago (an agent switches files on a new chat), or is gone.
+* **The More sheet** on small windows lists the sessions with their agent
+  status from the same list, to switch between them.

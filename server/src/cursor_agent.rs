@@ -9,7 +9,7 @@
 use std::path::Path;
 
 use crate::agent::{AgentKind, AgentSession};
-use crate::recent_writes;
+use crate::recent_writes::{self, OpenFileCache};
 
 /// The file of a chat database that is written to first.
 const CHAT_WRITE_AHEAD_LOG: &str = "store.db-wal";
@@ -19,8 +19,10 @@ const CHATS_DIRECTORY_MARKER: &str = "/.cursor/chats/";
 /// The `agent` process `pid` with its chat's id and the status guessed from
 /// its chat database. Both are `None` when the process has no chat database
 /// open yet.
-pub async fn get_session(pid: u32) -> AgentSession {
-    let chat_log = recent_writes::find_open_file(pid, is_chat_write_ahead_log).await;
+pub async fn get_session(open_files: &OpenFileCache, pid: u32) -> AgentSession {
+    let chat_log = open_files
+        .find_open_file(pid, is_chat_write_ahead_log)
+        .await;
     let write_status = match &chat_log {
         Some(log) => recent_writes::get_write_status(log).await,
         None => None,

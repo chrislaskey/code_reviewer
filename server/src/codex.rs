@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use crate::agent::{AgentKind, AgentSession};
 use crate::agent_chat::home_directory_path;
-use crate::recent_writes;
+use crate::recent_writes::{self, OpenFileCache};
 
 const ROLLOUT_PREFIX: &str = "rollout-";
 const ROLLOUT_EXTENSION: &str = ".jsonl";
@@ -18,10 +18,10 @@ const SESSIONS_DIRECTORY: &str = "sessions";
 const SESSION_ID_LENGTH: usize = 36;
 
 /// The CLI process with its standalone rollout or local server thread status.
-pub async fn get_session(pid: u32, directory: &str) -> AgentSession {
+pub async fn get_session(open_files: &OpenFileCache, pid: u32, directory: &str) -> AgentSession {
     #[cfg(not(unix))]
     let _ = directory;
-    let rollout = recent_writes::find_open_file(pid, is_rollout).await;
+    let rollout = open_files.find_open_file(pid, is_rollout).await;
     let write_status = match &rollout {
         Some(rollout) => recent_writes::get_write_status(rollout).await,
         None => None,

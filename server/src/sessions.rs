@@ -43,6 +43,7 @@ use crate::cursor_agent_chat;
 use crate::git::{self, GitStatus};
 use crate::git_worktree::{self, Worktree};
 use crate::process::{self, Process};
+use crate::recent_writes::OpenFileCache;
 use crate::terminal_app::{self, InstalledTerminalApp, ShowOutcome, TerminalApp};
 use crate::tmux::{self, Pane, Session, Tmux};
 
@@ -159,19 +160,26 @@ pub struct SessionAgent {
 
 /// The tmux sessions the app started (see `has_session_name_prefix`), each
 /// with the agent running in it.
-pub async fn list_session_agents(settings: &Settings) -> Result<Vec<SessionAgent>, String> {
+pub async fn list_session_agents(
+    settings: &Settings,
+    open_files: &OpenFileCache,
+) -> Result<Vec<SessionAgent>, String> {
     let tmux = Tmux::new(&settings.tmux_path);
     let sessions = list_app_sessions(&tmux, settings).await?;
-    find_session_agents(&tmux, sessions).await
+    find_session_agents(&tmux, open_files, sessions).await
 }
 
 /// One of the app's running tmux sessions, with its agent and git status.
 /// `name` is the full session name, prefix included.
-pub async fn get_session(settings: &Settings, name: &str) -> Result<SessionStatus, String> {
+pub async fn get_session(
+    settings: &Settings,
+    open_files: &OpenFileCache,
+    name: &str,
+) -> Result<SessionStatus, String> {
     validate_app_session_name(settings, name)?;
     let tmux = Tmux::new(&settings.tmux_path);
     let session = find_app_session(&tmux, settings, name).await?;
-    let mut statuses = get_session_statuses(&tmux, vec![session]).await?;
+    let mut statuses = get_session_statuses(&tmux, open_files, vec![session]).await?;
     let mut status = statuses
         .pop()
         .ok_or_else(|| format!("There is no session named {name}"))?;
@@ -183,11 +191,15 @@ pub async fn get_session(settings: &Settings, name: &str) -> Result<SessionStatu
 
 /// One of the app's running tmux sessions with its agent, as
 /// `list_session_agents` gives it.
-async fn get_session_agent(settings: &Settings, name: &str) -> Result<SessionAgent, String> {
+async fn get_session_agent(
+    settings: &Settings,
+    open_files: &OpenFileCache,
+    name: &str,
+) -> Result<SessionAgent, String> {
     validate_app_session_name(settings, name)?;
     let tmux = Tmux::new(&settings.tmux_path);
     let session = find_app_session(&tmux, settings, name).await?;
-    find_session_agents(&tmux, vec![session])
+    find_session_agents(&tmux, open_files, vec![session])
         .await?
         .pop()
         .ok_or_else(|| format!("There is no session named {name}"))
@@ -196,9 +208,10 @@ async fn get_session_agent(settings: &Settings, name: &str) -> Result<SessionAge
 /// The chat of the agent running in one of the app's sessions.
 pub async fn get_agent_chat_history(
     settings: &Settings,
+    open_files: &OpenFileCache,
     name: &str,
 ) -> Result<ChatHistory, String> {
-    let session = get_session_agent(settings, name).await?;
+    let session = get_session_agent(settings, open_files, name).await?;
     let agent = session
         .agent
         .ok_or_else(|| format!("No agent is running in {name}"))?;
@@ -252,6 +265,7 @@ pub async fn get_agent_chat_history(
 /// in, and presses Enter.
 pub async fn send_prompt_to_session(
     settings: &Settings,
+    open_files: &OpenFileCache,
     name: &str,
     prompt: &str,
 ) -> Result<(), String> {
@@ -259,7 +273,7 @@ pub async fn send_prompt_to_session(
     if prompt.is_empty() {
         return Err("The prompt is empty".to_string());
     }
-    let session = get_session(settings, name).await?;
+    let session = get_session(settings, open_files, name).await?;
     let pane_id = session
         .agent
         .and_then(|agent| agent.tmux_pane_id)
@@ -367,10 +381,11 @@ pub async fn list_worktrees(settings: &Settings) -> Vec<Worktree> {
 /// Each session with its agent and port, with no git status yet.
 async fn get_session_statuses(
     tmux: &Tmux,
+    open_files: &OpenFileCache,
     sessions: Vec<Session>,
 ) -> Result<Vec<SessionStatus>, String> {
     let ports = get_session_ports(tmux, &sessions).await;
-    let agents = find_session_agents(tmux, sessions).await?;
+    let agents = find_session_agents(tmux, open_files, sessions).await?;
     Ok(agents
         .into_iter()
         .zip(ports)
@@ -388,6 +403,7 @@ async fn get_session_statuses(
 /// listed only when there are sessions to look at.
 async fn find_session_agents(
     tmux: &Tmux,
+    open_files: &OpenFileCache,
     sessions: Vec<Session>,
 ) -> Result<Vec<SessionAgent>, String> {
     if sessions.is_empty() {
@@ -396,6 +412,8 @@ async fn find_session_agents(
     let panes = tmux.list_panes().await?;
     let processes = process::list_processes().await?;
     let claude_code_sessions = claude_code::list_sessions(&processes).await;
+    let running_pids: Vec<u32> = processes.iter().map(|process| process.pid).collect();
+    open_files.forget_exited_processes(&running_pids);
 
     Ok(join_all(sessions.into_iter().map(|session| {
         let session_panes: Vec<&Pane> = panes
@@ -407,7 +425,8 @@ async fn find_session_agents(
         async move {
             SessionAgent {
                 directory: current_pane(&session_panes).map(|pane| pane.current_path.clone()),
-                agent: find_agent(&session_panes, processes, claude_code_sessions).await,
+                agent: find_agent(open_files, &session_panes, processes, claude_code_sessions)
+                    .await,
                 session,
             }
         }
@@ -452,6 +471,7 @@ fn find_claude_code(
 /// `find_claude_code`), else a Cursor `agent` process on a pane's tty, else
 /// a `codex` process on one, with the pane it runs in.
 async fn find_agent(
+    open_files: &OpenFileCache,
     session_panes: &[&Pane],
     processes: &[Process],
     claude_code_sessions: &[ClaudeCodeSession],
@@ -464,13 +484,13 @@ async fn find_agent(
     {
         return Some(AgentSession {
             tmux_pane_id: Some(pane.id.clone()),
-            ..cursor_agent::get_session(process.pid).await
+            ..cursor_agent::get_session(open_files, process.pid).await
         });
     }
     let (process, pane) = find_process_in_panes(session_panes, processes, Process::is_codex)?;
     Some(AgentSession {
         tmux_pane_id: Some(pane.id.clone()),
-        ..codex::get_session(process.pid, &pane.current_path).await
+        ..codex::get_session(open_files, process.pid, &pane.current_path).await
     })
 }
 
@@ -789,9 +809,16 @@ async fn find_session_artifacts_folder(
     settings: &Settings,
     name: &str,
 ) -> Result<ArtifactsFolder, String> {
-    let directory = get_session(settings, name)
-        .await?
-        .directory
+    validate_app_session_name(settings, name)?;
+    let tmux = Tmux::new(&settings.tmux_path);
+    let session = find_app_session(&tmux, settings, name).await?;
+    let panes = tmux.list_panes().await?;
+    let session_panes: Vec<&Pane> = panes
+        .iter()
+        .filter(|pane| pane.session_name == session.name)
+        .collect();
+    let directory = current_pane(&session_panes)
+        .map(|pane| pane.current_path.clone())
         .ok_or_else(|| format!("{name} has no directory to find artifacts for"))?;
     ArtifactsFolder::of_directory(Path::new(&directory)).await
 }

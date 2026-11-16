@@ -1,13 +1,15 @@
 <!-- The app's navigation on small windows, where the gutter is hidden: a
      bar along the window's bottom edge with four buttons, Home, Back,
      Forward and More. More slides up a sheet over most of the window with
-     the other pages and the theme choices. The sheet closes on More, a tap
+     the other pages, the sessions with their agents' status and the theme
+     choices. The sheet closes on More, a tap
      above it, a choice and Escape. `links` and `current` are AppNav's;
      `current` marks the open page in the sheet. -->
 <script>
   import { fade, fly } from "svelte/transition";
   import Icon from "./Icon.svelte";
   import ThemeChoices from "./ThemeChoices.svelte";
+  import SessionChoices from "../../sessions/SessionChoices.svelte";
   import { goBackInHistory, goForwardInHistory, navigationHistory } from "../navigation_history.svelte.js";
 
   /**
@@ -48,6 +50,10 @@
           </a>
         </li>
       {/each}
+    </ul>
+    <h2 class="sheet-heading">Sessions</h2>
+    <ul class="menu w-full p-0">
+      <SessionChoices onchoose={close} />
     </ul>
     <h2 class="sheet-heading">Theme</h2>
     <ul class="menu w-full p-0">

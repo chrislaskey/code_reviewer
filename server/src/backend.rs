@@ -17,6 +17,7 @@ use tokio::sync::OnceCell;
 use crate::agent_chat::ChatHistory;
 use crate::analysis::run_analysis;
 use crate::artifacts::ArtifactsServer;
+use crate::recent_writes::OpenFileCache;
 use crate::session_summaries::{SessionSummaries, SessionSummaryCache};
 use crate::sessions::{self, DetectedSettings, SessionStatus, Settings};
 use crate::terminal_app::ShowOutcome;
@@ -29,6 +30,9 @@ pub struct Backend {
     session_settings: OnceCell<DetectedSettings>,
     /// The sessions page's list, served at once and refreshed behind it.
     session_summaries: SessionSummaryCache,
+    /// The file each Cursor or Codex process writes, so `lsof` isn't run on
+    /// every refresh.
+    open_files: Arc<OpenFileCache>,
     /// Where bin/dev keeps and serves artifacts; `None` when it didn't start the app.
     artifacts: Option<ArtifactsServer>,
 }
@@ -43,10 +47,12 @@ impl Backend {
     /// A backend with an empty analysis cache, session settings not yet
     /// detected, and the artifacts bin/dev set up, if it started the app.
     pub fn new() -> Self {
+        let open_files = Arc::new(OpenFileCache::new());
         Self {
             analysis: Arc::new(AnalysisService::new()),
             session_settings: OnceCell::new(),
-            session_summaries: SessionSummaryCache::new(),
+            session_summaries: SessionSummaryCache::new(Arc::clone(&open_files)),
+            open_files,
             artifacts: ArtifactsServer::from_environment(),
         }
     }
@@ -150,19 +156,20 @@ impl Backend {
     /// One of the app's tmux sessions, with its agent and git status. `name`
     /// is the full session name, prefix included.
     pub async fn get_session(&self, name: &str) -> Result<SessionStatus, String> {
-        sessions::get_session(self.settings().await, name).await
+        sessions::get_session(self.settings().await, &self.open_files, name).await
     }
 
     /// The chat history of the agent in one of the app's sessions: its
     /// messages and tool calls, read from the transcript the agent writes.
     pub async fn get_agent_chat_history(&self, name: &str) -> Result<ChatHistory, String> {
-        sessions::get_agent_chat_history(self.settings().await, name).await
+        sessions::get_agent_chat_history(self.settings().await, &self.open_files, name).await
     }
 
     /// Types `prompt` into the agent's pane in one of the app's sessions and
     /// presses Enter, as if the user typed it there.
     pub async fn send_prompt_to_session(&self, name: &str, prompt: &str) -> Result<(), String> {
-        sessions::send_prompt_to_session(self.settings().await, name, prompt).await
+        sessions::send_prompt_to_session(self.settings().await, &self.open_files, name, prompt)
+            .await
     }
 
     /// Saves an image, sent as base64, in the artifacts of a session's
