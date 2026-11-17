@@ -282,7 +282,7 @@ pub async fn send_prompt_to_session(
         .await
 }
 
-fn validate_app_session_name(settings: &Settings, name: &str) -> Result<(), String> {
+pub(crate) fn validate_app_session_name(settings: &Settings, name: &str) -> Result<(), String> {
     tmux::validate_session_name(name)?;
     if !has_session_name_prefix(&settings.session_name_prefix, name) {
         return Err(format!("{name} is not a session this app started"));

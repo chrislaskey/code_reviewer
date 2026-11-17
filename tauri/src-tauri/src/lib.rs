@@ -19,7 +19,11 @@
 //! to (`connection.rs`, decision 25): on the desktop, the server it starts at
 //! launch on localhost; on a phone, the computer it was paired with.
 
+#[cfg(target_os = "ios")]
+mod apple_push_registration;
 mod connection;
+#[cfg(desktop)]
+mod notifications;
 mod remote_access;
 mod review;
 mod sessions;
@@ -37,11 +41,19 @@ pub fn run() {
     )
     .init();
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+    let builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_notification::init());
+    #[cfg(target_os = "ios")]
+    let builder = builder.plugin(tauri_plugin_notifications::init());
+    builder
         .setup(|app| {
             let connection = connect_to_backend(app)?;
             app.manage(connection);
+            #[cfg(target_os = "ios")]
+            tauri::async_runtime::spawn(apple_push_registration::send_apple_push_token_if_allowed(
+                app.handle().clone(),
+            ));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -65,6 +77,8 @@ pub fn run() {
             sessions::show_session_in_terminal_app,
             sessions::open_session_in_browser,
             sessions::open_session_artifacts_in_browser,
+            sessions::get_session_notifications_enabled,
+            sessions::set_session_notifications_enabled,
             remote_access::get_app_platform,
             remote_access::get_remote_access_status,
             remote_access::set_remote_access_enabled,
@@ -89,7 +103,12 @@ fn connect_to_backend(app: &mut App) -> Result<BackendConnection, Box<dyn std::e
     let server = tauri::async_runtime::block_on(code_reviewer_server::start(config))?;
     let client = BackendClient::new(server.localhost_url(), server.desktop_token().clone());
     app.manage(server);
-    Ok(BackendConnection::to_local_server(client))
+    let connection = BackendConnection::to_local_server(client);
+    tauri::async_runtime::spawn(notifications::show_session_notifications(
+        app.handle().clone(),
+        connection.client()?,
+    ));
+    Ok(connection)
 }
 
 /// On a phone: connects to the computer it was paired with, if it was.

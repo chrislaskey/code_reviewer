@@ -72,3 +72,9 @@ Ideas and template features not in the rewrite. None are planned.
   both Claude Code and Codex (tested through the same tmux paste). A model
   picker on the session page could send it. Claude Code saves the choice as
   the default for new sessions; Codex keeps it for that session only.
+- Tapping a session's push notification on the phone opens its page. The
+  push carries `session_name`, but the app doesn't listen for taps yet
+  (`tauri-plugin-notifications` reports them to JavaScript through its own
+  npm package), so a tap only opens the app.
+- Turning a phone's push off without unpairing: its bells can be turned off,
+  but the token stays until the device is revoked or Apple rejects it.

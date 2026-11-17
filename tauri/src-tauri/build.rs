@@ -22,6 +22,8 @@ fn main() {
         "show_session_in_terminal_app",
         "open_session_in_browser",
         "open_session_artifacts_in_browser",
+        "get_session_notifications_enabled",
+        "set_session_notifications_enabled",
         "get_app_platform",
         "get_remote_access_status",
         "set_remote_access_enabled",

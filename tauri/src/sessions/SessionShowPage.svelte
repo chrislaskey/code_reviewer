@@ -30,6 +30,7 @@
   import ChatSummary from "./ChatSummary.svelte";
   import { contextUsagePercent } from "./formatting.js";
   import GitStatus from "./GitStatus.svelte";
+  import NotificationBell from "./NotificationBell.svelte";
   import PromptForm from "./PromptForm.svelte";
   import { readFileAsBase64 } from "./prompt_images.js";
   import { createSessionActions } from "./session_actions.js";
@@ -190,6 +191,9 @@
     {name ?? "No session"}
     {#snippet subtitle()}
       The session's status and actions, and the agent's chat history. Refreshes every 5 seconds.
+    {/snippet}
+    {#snippet actions()}
+      {#if name !== null}<NotificationBell {name} />{/if}
     {/snippet}
   </Header>
 

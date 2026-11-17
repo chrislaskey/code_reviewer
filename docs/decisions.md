@@ -1016,3 +1016,84 @@ resume command of the one written to last:
 The ids are checked to be letters, digits and `-` before they're typed.
 None of these layouts is documented, so they may change; then Continue
 falls back to Claude Code.
+
+## 29. Sessions: a bell per device, notified each time the agent finishes
+
+Planned in `docs/plans/notifications.md`. Running agents in several
+sessions means checking back on each to see whether it's done.
+**Decision:** a session's page has a bell. While a
+device's bell is on, that device gets a system notification each time
+the session's agent finishes, until the bell is turned off or the session
+is merged, closed or ended. The session cards and the More sheet show a
+bell icon where the asking device's bell is on; `list_session_summaries`
+adds it per caller to the cached list, so the cache stays shared.
+
+* **Bells kept in a file** (`session_notifications.json` in the data
+  directory, beside `paired_devices.json`, readable only by the user):
+  session name → the ids of the devices whose bell is on. Keyed by name
+  rather than kept in tmux, so another way of running sessions could use
+  it unchanged. Merge and Close remove the session's entry; the watcher
+  removes a session missing from the list two checks in a row (the list
+  can be a refresh old), so a session continued later under the same name
+  starts with no bells; revoking a device removes its bells.
+* **Per device**: the access middleware now adds the `Caller` to each
+  request (`desktop` for the localhost token, the paired device's id for a
+  tailnet one), and the routes act on the caller's own bell.
+* **The watcher** (`finished_sessions.rs`), started with the server,
+  checks every 2 seconds while any bell is on, through the sessions list's
+  cache, so it shares refreshes with the pages. Finished is busy, then not
+  busy: at once for Claude Code, which reports its status; after 30
+  seconds of quiet for Cursor and Codex, whose status is guessed from
+  writes, so a quiet tool call doesn't count. An agent exiting while busy
+  counts too. A turn shorter than a check can be missed.
+* **The text**: the session's name, and the first line of the agent's
+  newest message with text (from `get_agent_chat_history`, read once per
+  finish), else "Finished".
+* **Delivery** by long poll: `wait_for_session_notifications` returns the
+  caller's waiting notifications, or waits up to 25 seconds for one. The
+  desktop app's Rust side loops on it and shows each with
+  `tauri-plugin-notification`; a click brings the window forward and the
+  pages open the session (`session_notification_clicked` event). At most
+  20 are kept for a device not asking. Everything goes over HTTP, so a
+  standalone server would work the same.
+
+A phone can't long-poll while suspended, so its bell waits for push
+notifications through APNs (steps 4 and 5 of the plan). In dev builds the
+plugin posts as Terminal on macOS, so the notifications show under
+Terminal's name and settings until the app is bundled. The bundled app asks for
+persistent alerts (`NSUserNotificationAlertStyle` in `Info.plist`), which
+macOS uses only until the user picks a style.
+
+## 30. Sessions: phones get their notifications pushed through Apple
+
+Planned in `docs/plans/notifications.md`, set up by
+`docs/guides/apple-push-notifications.md`. A suspended iOS app can't
+long-poll (decision 29), so only Apple Push Notification service reaches a
+locked phone. **Decision:** the server pushes each finish to the phones
+whose bell is on, through APNs' sandbox. This is the first time the server
+talks to an outside service: a notification's session name and first line
+pass through Apple.
+
+* **The key stays out of the repository**: `apple_push_notifications_key.p8`
+  and `apple_push_notifications.json` (key id, team id) in the data
+  directory. Without them push is off and nothing else changes; broken
+  ones log a warning at launch instead of stopping the server.
+* **Sandbox only** (`api.sandbox.push.apple.com`, `aps-environment:
+  development`): development builds installed with `bin/run-on-iphone` get
+  sandbox tokens, and the app is never released, so there's no production
+  host to choose.
+* **Sending** (`apple_push.rs`) is one HTTP/2 POST per phone with `reqwest`,
+  signed with an ES256 token from `jsonwebtoken`, made again every 50
+  minutes. The `a2` crate was the first choice, but its pinned rustls 0.22
+  has open advisories that fail `cargo audit`.
+* **Tokens** are kept in `apple_push_tokens.json` (device id → token),
+  beside the bells rather than in `paired_devices.json`, which only remote
+  access holds; revoking a device removes it. One Apple rejects as
+  `Unregistered` or `BadDeviceToken` is forgotten.
+* **The phone** uses `tauri-plugin-notifications` (iOS only; the desktop
+  keeps `tauri-plugin-notification`, so the two never both own iOS's
+  notification delegate) for its token. Turning a bell on asks iOS for the
+  token, which asks the user's permission the first time, and sends it with
+  `set_apple_push_token`. At launch and after pairing it's sent again
+  without asking, if notifications are allowed, since it changes when the
+  app is reinstalled.

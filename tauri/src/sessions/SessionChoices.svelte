@@ -1,5 +1,5 @@
 <!-- A menu's choices of session, to switch between them: each of the app's
-     tmux sessions with its repository and agent status, from the cached
+     tmux sessions with its repository, bell and agent status, from the cached
      list the sessions page shows, asked for again while the menu is open.
      Nothing shows until there are sessions, an error included; `sessions`
      is bindable so the menu can show its heading only then. A choice opens
@@ -11,6 +11,7 @@
   import { sessionShowUrl } from "../lib/routes.js";
   import AgentBadge from "./AgentBadge.svelte";
   import Badge from "./Badge.svelte";
+  import NotificationsEnabledIcon from "./NotificationsEnabledIcon.svelte";
 
   const REFRESH_INTERVAL_MS = 2000;
 
@@ -45,6 +46,7 @@
           {session.name}
           {#if session.repository_name}<span class="session-choice-repository">{session.repository_name}</span>{/if}
         </span>
+        {#if session.notifications_enabled}<NotificationsEnabledIcon />{/if}
         {#if session.agent}
           <AgentBadge session={session.agent} />
         {:else}

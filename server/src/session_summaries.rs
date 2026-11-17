@@ -40,6 +40,9 @@ pub struct SessionSummary {
     /// directory it runs in.
     pub repository_name: Option<String>,
     pub agent: Option<AgentSession>,
+    /// Whether the asking device's bell is on for the session.
+    #[serde(default)]
+    pub notifications_enabled: bool,
 }
 
 /// The two parts of the list, each refreshed on its own.
@@ -92,6 +95,7 @@ fn summarize(session_agents: Vec<SessionAgent>, worktrees: Vec<Worktree>) -> Ses
             name: session_agent.session.name.clone(),
             repository_name: repository_name_of(session_agent, &worktrees),
             agent: session_agent.agent.clone(),
+            notifications_enabled: false,
         })
         .collect();
     let worktrees = worktrees

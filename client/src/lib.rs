@@ -15,10 +15,11 @@ use code_reviewer_core::git::{
 use code_reviewer_server::requests::{
     CreatePairedDeviceRequest, CreateSessionRequest, MergeSessionRequest, PairedDeviceIdRequest,
     SavePromptImageForSessionRequest, SendPromptToSessionRequest, SessionNameRequest,
-    SetRemoteAccessEnabledRequest,
+    SetApplePushTokenRequest, SetRemoteAccessEnabledRequest, SetSessionNotificationsEnabledRequest,
 };
 use code_reviewer_server::{
-    ChatHistory, DetectedSettings, SessionStatus, SessionSummaries, ShowOutcome,
+    ChatHistory, DetectedSettings, SessionNotification, SessionStatus, SessionSummaries,
+    ShowOutcome,
 };
 use code_reviewer_server::{CreatedPairedDevice, PairingCode, RemoteAccessStatus};
 use secrecy::{ExposeSecret, SecretString};
@@ -270,6 +271,49 @@ impl BackendClient {
     pub async fn get_session_artifacts_url(&self, name: &str) -> Result<String, ClientError> {
         self.post_session_name("get_session_artifacts_url", name)
             .await
+    }
+
+    /* -- Session notifications -------------------------------------------- */
+
+    /// Whether this device's bell is on for one of the app's sessions.
+    pub async fn get_session_notifications_enabled(&self, name: &str) -> Result<bool, ClientError> {
+        self.post_session_name("get_session_notifications_enabled", name)
+            .await
+    }
+
+    /// Turns this device's bell for one of the app's sessions on or off.
+    /// Returns whether it's on.
+    pub async fn set_session_notifications_enabled(
+        &self,
+        name: &str,
+        enabled: bool,
+    ) -> Result<bool, ClientError> {
+        let body = SetSessionNotificationsEnabledRequest {
+            name: name.to_string(),
+            enabled,
+        };
+        self.post("set_session_notifications_enabled", &body).await
+    }
+
+    /// The notifications waiting for this device, or the next ones within
+    /// the server's wait, or none.
+    pub async fn wait_for_session_notifications(
+        &self,
+    ) -> Result<Vec<SessionNotification>, ClientError> {
+        self.post("wait_for_session_notifications", &EmptyBody {})
+            .await
+    }
+
+    /// Gives the server this phone's Apple push token, for it to be
+    /// notified while the app is suspended.
+    pub async fn set_apple_push_token(&self, token: &str) -> Result<(), ClientError> {
+        self.post(
+            "set_apple_push_token",
+            &SetApplePushTokenRequest {
+                token: token.to_string(),
+            },
+        )
+        .await
     }
 
     /* -- Remote access (the localhost listener only) ------------------------ */

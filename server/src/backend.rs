@@ -1,6 +1,8 @@
 //! The backend's commands, one method each, over the state they share.
 
+use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 
 use code_reviewer_core::analysis::file_diff::FileDiff;
 use code_reviewer_core::analysis::function_diff::FunctionDiff;
@@ -14,13 +16,21 @@ use code_reviewer_core::git::{
 };
 use tokio::sync::OnceCell;
 
+use crate::access::DESKTOP_DEVICE_ID;
 use crate::agent_chat::ChatHistory;
 use crate::analysis::run_analysis;
+use crate::apple_push::{ApplePushError, ApplePushSender};
 use crate::artifacts::ArtifactsServer;
 use crate::recent_writes::OpenFileCache;
+use crate::session_notifications::{SessionNotification, SessionNotifications};
 use crate::session_summaries::{SessionSummaries, SessionSummaryCache};
 use crate::sessions::{self, DetectedSettings, SessionStatus, Settings};
 use crate::terminal_app::ShowOutcome;
+
+/// How long a device's request for notifications waits for one.
+const SESSION_NOTIFICATIONS_WAIT: Duration = Duration::from_secs(25);
+/// Apple's device tokens are 32 bytes in hex today, and may grow.
+const APPLE_PUSH_TOKEN_LENGTHS: std::ops::RangeInclusive<usize> = 64..=200;
 
 /// What the commands share. One instance lives for the whole process.
 pub struct Backend {
@@ -35,26 +45,32 @@ pub struct Backend {
     open_files: Arc<OpenFileCache>,
     /// Where bin/dev keeps and serves artifacts; `None` when it didn't start the app.
     artifacts: Option<ArtifactsServer>,
-}
-
-impl Default for Backend {
-    fn default() -> Self {
-        Self::new()
-    }
+    /// Each device's bells, and the notifications it hasn't collected.
+    session_notifications: SessionNotifications,
+    /// Sends phones their notifications; `None` without an APNs key.
+    apple_push: Option<ApplePushSender>,
 }
 
 impl Backend {
     /// A backend with an empty analysis cache, session settings not yet
-    /// detected, and the artifacts bin/dev set up, if it started the app.
-    pub fn new() -> Self {
+    /// detected, the artifacts bin/dev set up, if it started the app, and
+    /// the bells kept in `data_directory`.
+    pub fn new(data_directory: &Path) -> Result<Self, String> {
         let open_files = Arc::new(OpenFileCache::new());
-        Self {
+        let session_notifications = SessionNotifications::open(data_directory)?;
+        Ok(Self {
             analysis: Arc::new(AnalysisService::new()),
             session_settings: OnceCell::new(),
             session_summaries: SessionSummaryCache::new(Arc::clone(&open_files)),
             open_files,
             artifacts: ArtifactsServer::from_environment(),
-        }
+            session_notifications,
+            apple_push: open_apple_push(data_directory),
+        })
+    }
+
+    pub(crate) fn session_notifications(&self) -> &SessionNotifications {
+        &self.session_notifications
     }
 
     async fn detected_settings(&self) -> &DetectedSettings {
@@ -145,9 +161,24 @@ impl Backend {
         sessions::get_default_session_port(self.settings().await).await
     }
 
-    /// The tmux sessions the app started, each with its agent status, and
-    /// its worktrees without a session, as found up to a few seconds ago.
-    pub async fn list_session_summaries(&self) -> Result<SessionSummaries, String> {
+    /// The tmux sessions the app started, each with its agent status and
+    /// `device_id`'s bell, and its worktrees without a session, as found up
+    /// to a few seconds ago.
+    pub async fn list_session_summaries(
+        &self,
+        device_id: &str,
+    ) -> Result<SessionSummaries, String> {
+        let mut summaries = self.list_cached_session_summaries().await?;
+        for session in &mut summaries.sessions {
+            session.notifications_enabled = self
+                .session_notifications
+                .is_enabled(&session.name, device_id);
+        }
+        Ok(summaries)
+    }
+
+    /// The sessions list as cached, with every bell off.
+    pub(crate) async fn list_cached_session_summaries(&self) -> Result<SessionSummaries, String> {
         self.session_summaries
             .list_session_summaries(self.settings().await)
             .await
@@ -237,6 +268,7 @@ impl Backend {
         )
         .await;
         self.session_summaries.forget().await;
+        self.remove_session_notifications_after(&merged, name);
         merged
     }
 
@@ -247,7 +279,18 @@ impl Backend {
         let closed =
             sessions::close_session(self.settings().await, self.artifacts.as_ref(), name).await;
         self.session_summaries.forget().await;
+        self.remove_session_notifications_after(&closed, name);
         closed
+    }
+
+    fn remove_session_notifications_after(&self, finished: &Result<String, String>, name: &str) {
+        if finished.is_ok()
+            && let Err(error) = self
+                .session_notifications
+                .remove_sessions(&[name.to_string()])
+        {
+            log::warn!("Turning off the bells of {name} failed: {error}");
+        }
     }
 
     /// Brings the terminal window of one of the app's sessions to the front,
@@ -266,5 +309,101 @@ impl Backend {
     pub async fn get_session_artifacts_url(&self, name: &str) -> Result<String, String> {
         sessions::get_session_artifacts_url(self.settings().await, self.artifacts.as_ref(), name)
             .await
+    }
+
+    /* -- Session notifications -------------------------------------------- */
+
+    /// Whether `device_id`'s bell is on for one of the app's sessions.
+    pub async fn get_session_notifications_enabled(
+        &self,
+        device_id: &str,
+        name: &str,
+    ) -> Result<bool, String> {
+        sessions::validate_app_session_name(self.settings().await, name)?;
+        Ok(self.session_notifications.is_enabled(name, device_id))
+    }
+
+    /// Turns `device_id`'s bell for one of the app's sessions on or off: while
+    /// it's on, the device is notified each time the session's agent
+    /// finishes. Returns whether it's on.
+    pub async fn set_session_notifications_enabled(
+        &self,
+        device_id: &str,
+        name: &str,
+        enabled: bool,
+    ) -> Result<bool, String> {
+        sessions::validate_app_session_name(self.settings().await, name)?;
+        self.session_notifications
+            .set_enabled(name, device_id, enabled)?;
+        Ok(enabled)
+    }
+
+    /// Keeps `token` as the Apple push token of the paired phone `device_id`,
+    /// for it to be notified while suspended. Phones send it at each launch,
+    /// since it changes when the app is reinstalled.
+    pub fn set_apple_push_token(&self, device_id: &str, token: &str) -> Result<(), String> {
+        if device_id == DESKTOP_DEVICE_ID {
+            return Err("Only a paired phone has a push token.".to_string());
+        }
+        if !APPLE_PUSH_TOKEN_LENGTHS.contains(&token.len())
+            || !token.bytes().all(|byte| byte.is_ascii_hexdigit())
+        {
+            return Err("That is not an Apple push token.".to_string());
+        }
+        self.session_notifications
+            .set_apple_push_token(device_id, token)
+    }
+
+    /// Pushes `notification` to each phone whose bell is on for its session,
+    /// forgetting the tokens Apple says are no longer valid.
+    pub(crate) async fn send_apple_push_notifications(&self, notification: &SessionNotification) {
+        let Some(apple_push) = &self.apple_push else {
+            return;
+        };
+        for (device_id, token) in self
+            .session_notifications
+            .list_apple_push_tokens_for(&notification.session_name)
+        {
+            match apple_push.send(&token, notification).await {
+                Ok(()) => {}
+                Err(error @ ApplePushError::DeviceTokenNotValid(_)) => {
+                    log::warn!("Pushing to {device_id}: {error}; forgetting its token");
+                    if let Err(error) = self
+                        .session_notifications
+                        .remove_apple_push_token(&device_id, &token)
+                    {
+                        log::warn!("Forgetting {device_id}'s push token failed: {error}");
+                    }
+                }
+                Err(error) => log::warn!("Pushing to {device_id}: {error}"),
+            }
+        }
+    }
+
+    /// The notifications waiting for `device_id`, else the next ones within
+    /// 25 seconds, else none: for the device to ask again at once.
+    pub async fn wait_for_session_notifications(
+        &self,
+        device_id: &str,
+    ) -> Result<Vec<SessionNotification>, String> {
+        Ok(self
+            .session_notifications
+            .wait_for(device_id, SESSION_NOTIFICATIONS_WAIT)
+            .await)
+    }
+}
+
+/// The APNs sender, or `None` when push isn't set up or its files are broken.
+fn open_apple_push(data_directory: &Path) -> Option<ApplePushSender> {
+    match ApplePushSender::open(data_directory) {
+        Ok(Some(sender)) => {
+            log::info!("Apple push notifications are on (sandbox)");
+            Some(sender)
+        }
+        Ok(None) => None,
+        Err(error) => {
+            log::warn!("Apple push notifications are off: {error}");
+            None
+        }
     }
 }

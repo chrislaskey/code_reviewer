@@ -3,9 +3,7 @@
 //! SHA-256 of each token, not the token: the pairing code shown once at
 //! pairing is the only copy.
 
-use std::fs;
-use std::io::{ErrorKind, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 use secrecy::{ExposeSecret, SecretString};
@@ -13,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
+use crate::private_file::{read_json_or_default, write_private_json};
 use crate::tokens::create_token;
 
 const MAX_DEVICE_NAME_LENGTH: usize = 60;
@@ -42,12 +41,7 @@ pub struct PairedDevices {
 impl PairedDevices {
     /// The devices in the file at `path`, or none when there is no file.
     pub fn open(path: PathBuf) -> Result<Self, String> {
-        let devices = match fs::read_to_string(&path) {
-            Ok(text) => serde_json::from_str(&text)
-                .map_err(|error| format!("{}: {error}", path.display()))?,
-            Err(error) if error.kind() == ErrorKind::NotFound => Vec::new(),
-            Err(error) => return Err(format!("{}: {error}", path.display())),
-        };
+        let devices = read_json_or_default(&path)?;
         Ok(Self {
             path,
             devices: Mutex::new(devices),
@@ -85,7 +79,7 @@ impl PairedDevices {
             device: device.clone(),
             token_sha256: sha256_hex(token.expose_secret()),
         });
-        if let Err(error) = write_private_file(&self.path, &devices) {
+        if let Err(error) = write_private_json(&self.path, &*devices) {
             devices.pop();
             return Err(error);
         }
@@ -99,7 +93,7 @@ impl PairedDevices {
             return Err("no paired device has that id".to_string());
         };
         let removed = devices.remove(index);
-        if let Err(error) = write_private_file(&self.path, &devices) {
+        if let Err(error) = write_private_json(&self.path, &*devices) {
             devices.insert(index, removed);
             return Err(error);
         }
@@ -130,25 +124,10 @@ fn sha256_hex(text: &str) -> String {
         .collect()
 }
 
-/// Writes `devices` beside `path` and moves it into place, so a crash never
-/// leaves half a file.
-fn write_private_file(path: &Path, devices: &[StoredDevice]) -> Result<(), String> {
-    let text = serde_json::to_string_pretty(devices).map_err(|error| error.to_string())?;
-    let partial_path = path.with_extension("json.partial");
-    let mut options = fs::OpenOptions::new();
-    options.write(true).create(true).truncate(true);
-    #[cfg(unix)]
-    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
-    let mut file = options
-        .open(&partial_path)
-        .map_err(|error| format!("{}: {error}", partial_path.display()))?;
-    file.write_all(text.as_bytes())
-        .map_err(|error| format!("{}: {error}", partial_path.display()))?;
-    fs::rename(&partial_path, path).map_err(|error| format!("{}: {error}", path.display()))
-}
-
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
 
     fn open_in(directory: &tempfile::TempDir) -> PairedDevices {

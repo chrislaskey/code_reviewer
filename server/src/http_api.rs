@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use axum::extract::rejection::JsonRejection;
-use axum::extract::{DefaultBodyLimit, FromRequest, State};
+use axum::extract::{DefaultBodyLimit, Extension, FromRequest, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
@@ -23,14 +23,16 @@ use code_reviewer_core::git::{
 };
 use serde::Serialize;
 
+use crate::access::Caller;
 use crate::agent_chat::ChatHistory;
 use crate::backend::Backend;
 use crate::remote_access::{CreatedPairedDevice, RemoteAccess, RemoteAccessStatus};
 use crate::requests::{
     CreatePairedDeviceRequest, CreateSessionRequest, MergeSessionRequest, PairedDeviceIdRequest,
     SavePromptImageForSessionRequest, SendPromptToSessionRequest, SessionNameRequest,
-    SetRemoteAccessEnabledRequest,
+    SetApplePushTokenRequest, SetRemoteAccessEnabledRequest, SetSessionNotificationsEnabledRequest,
 };
+use crate::session_notifications::SessionNotification;
 use crate::session_summaries::SessionSummaries;
 use crate::sessions::{DetectedSettings, SessionStatus};
 use crate::terminal_app::ShowOutcome;
@@ -98,6 +100,19 @@ fn routes_for_every_client() -> Router<Arc<Backend>> {
             "/api/get_session_artifacts_url",
             post(get_session_artifacts_url),
         )
+        .route(
+            "/api/get_session_notifications_enabled",
+            post(get_session_notifications_enabled),
+        )
+        .route(
+            "/api/set_session_notifications_enabled",
+            post(set_session_notifications_enabled),
+        )
+        .route(
+            "/api/wait_for_session_notifications",
+            post(wait_for_session_notifications),
+        )
+        .route("/api/set_apple_push_token", post(set_apple_push_token))
 }
 
 fn routes_for_this_computer() -> Router<Arc<Backend>> {
@@ -246,8 +261,13 @@ async fn get_default_session_port(State(backend): BackendState) -> ApiResult<u16
     Ok(Json(backend.get_default_session_port().await?))
 }
 
-async fn list_session_summaries(State(backend): BackendState) -> ApiResult<SessionSummaries> {
-    Ok(Json(backend.list_session_summaries().await?))
+async fn list_session_summaries(
+    State(backend): BackendState,
+    Extension(caller): Extension<Caller>,
+) -> ApiResult<SessionSummaries> {
+    Ok(Json(
+        backend.list_session_summaries(&caller.device_id).await?,
+    ))
 }
 
 async fn get_session(
@@ -356,6 +376,53 @@ async fn get_session_artifacts_url(
     ))
 }
 
+/* -- Session notifications ------------------------------------------------ */
+
+async fn get_session_notifications_enabled(
+    State(backend): BackendState,
+    Extension(caller): Extension<Caller>,
+    JsonBody(request): JsonBody<SessionNameRequest>,
+) -> ApiResult<bool> {
+    Ok(Json(
+        backend
+            .get_session_notifications_enabled(&caller.device_id, &request.name)
+            .await?,
+    ))
+}
+
+async fn set_session_notifications_enabled(
+    State(backend): BackendState,
+    Extension(caller): Extension<Caller>,
+    JsonBody(request): JsonBody<SetSessionNotificationsEnabledRequest>,
+) -> ApiResult<bool> {
+    Ok(Json(
+        backend
+            .set_session_notifications_enabled(&caller.device_id, &request.name, request.enabled)
+            .await?,
+    ))
+}
+
+async fn wait_for_session_notifications(
+    State(backend): BackendState,
+    Extension(caller): Extension<Caller>,
+) -> ApiResult<Vec<SessionNotification>> {
+    Ok(Json(
+        backend
+            .wait_for_session_notifications(&caller.device_id)
+            .await?,
+    ))
+}
+
+async fn set_apple_push_token(
+    State(backend): BackendState,
+    Extension(caller): Extension<Caller>,
+    JsonBody(request): JsonBody<SetApplePushTokenRequest>,
+) -> ApiResult<()> {
+    Ok(Json(
+        backend.set_apple_push_token(&caller.device_id, &request.token)?,
+    ))
+}
+
 /* -- Remote access (localhost only) --------------------------------------- */
 
 type RemoteAccessState = State<Arc<RemoteAccess>>;
@@ -419,7 +486,7 @@ mod tests {
     }
 
     fn test_localhost_router(data_directory: &Path) -> Router {
-        let backend = Arc::new(Backend::new());
+        let backend = Arc::new(Backend::new(data_directory).unwrap());
         let remote_access =
             Arc::new(RemoteAccess::open(data_directory, Arc::clone(&backend)).unwrap());
         localhost_router(backend, remote_access)
@@ -528,6 +595,77 @@ mod tests {
         assert_eq!(response["error"], "API routes take POST");
     }
 
+    async fn send_as(app: Router, device_id: &str, path: &str, body: Value) -> Value {
+        let request = Request::builder()
+            .method(Method::POST)
+            .uri(path)
+            .header("content-type", "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        let app = app.layer(Extension(Caller {
+            device_id: device_id.to_string(),
+        }));
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK, "{path} as {device_id}");
+        let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    #[tokio::test]
+    async fn only_a_phone_gives_a_push_token_and_it_must_be_one() {
+        let data_directory = tempfile::tempdir().unwrap();
+        let token = "ab".repeat(32);
+
+        let saved = send_as(
+            test_localhost_router(data_directory.path()),
+            "phone",
+            "/api/set_apple_push_token",
+            json!({ "token": token }),
+        )
+        .await;
+
+        assert_eq!(saved, Value::Null);
+        let backend = Backend::new(data_directory.path()).unwrap();
+        assert!(backend.set_apple_push_token("desktop", &token).is_err());
+        assert!(backend.set_apple_push_token("phone", "not-hex").is_err());
+        let text =
+            std::fs::read_to_string(data_directory.path().join("apple_push_tokens.json")).unwrap();
+        assert!(text.contains(&token));
+    }
+
+    #[tokio::test]
+    async fn each_device_turns_its_own_session_bell_on_and_off() {
+        let data_directory = tempfile::tempdir().unwrap();
+        let app = test_localhost_router(data_directory.path());
+        let session = json!({ "name": "cr-x" });
+
+        let enabled = send_as(
+            app.clone(),
+            "phone",
+            "/api/set_session_notifications_enabled",
+            json!({ "name": "cr-x", "enabled": true }),
+        )
+        .await;
+        let on_the_phone = send_as(
+            app.clone(),
+            "phone",
+            "/api/get_session_notifications_enabled",
+            session.clone(),
+        )
+        .await;
+        let on_the_desktop = send_as(
+            app,
+            "desktop",
+            "/api/get_session_notifications_enabled",
+            session,
+        )
+        .await;
+
+        assert_eq!(enabled, json!(true));
+        assert_eq!(on_the_phone, json!(true));
+        assert_eq!(on_the_desktop, json!(false));
+    }
+
     #[tokio::test]
     async fn the_tailnet_router_leaves_out_this_computers_screen_and_remote_access() {
         let data_directory = tempfile::tempdir().unwrap();
@@ -540,8 +678,8 @@ mod tests {
             "/api/create_paired_device",
             "/api/revoke_paired_device",
         ] {
-            let tailnet_status =
-                send_to(tailnet_router(Arc::new(Backend::new())), path, &body).await;
+            let backend = Backend::new(data_directory.path()).unwrap();
+            let tailnet_status = send_to(tailnet_router(Arc::new(backend)), path, &body).await;
             assert_eq!(
                 tailnet_status,
                 StatusCode::NOT_FOUND,

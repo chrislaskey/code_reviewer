@@ -8,7 +8,9 @@
 //!   * Sessions (`sessions`): the tmux sessions the app started, named
 //!     `cr-<name>`, with the agent (Claude Code, Cursor or Codex) status and chat in
 //!     each, and its git worktrees without a session. The sessions page's
-//!     list is kept in memory (`session_summaries`).
+//!     list is kept in memory (`session_summaries`). Each device can turn on
+//!     a bell per session, to be notified each time its agent finishes
+//!     (`session_notifications`, `finished_sessions`).
 //!
 //! [`Backend`] holds the state they share and has one method per command,
 //! served as HTTP routes by [`localhost_router`] and [`tailnet_router`].
@@ -21,6 +23,7 @@ mod access;
 mod agent;
 mod agent_chat;
 mod analysis;
+mod apple_push;
 mod artifacts;
 mod backend;
 mod claude_code;
@@ -32,15 +35,18 @@ mod codex_local;
 mod continue_command;
 mod cursor_agent;
 mod cursor_agent_chat;
+mod finished_sessions;
 mod git;
 mod git_worktree;
 mod http_api;
 mod paired_devices;
 mod pairing_code;
+mod private_file;
 mod process;
 mod recent_writes;
 mod remote_access;
 pub mod requests;
+mod session_notifications;
 mod session_summaries;
 mod sessions;
 mod start;
@@ -56,6 +62,7 @@ pub use http_api::{ApiError, localhost_router, tailnet_router};
 pub use paired_devices::PairedDevice;
 pub use pairing_code::PairingCode;
 pub use remote_access::{CreatedPairedDevice, RemoteAccessStatus};
+pub use session_notifications::SessionNotification;
 pub use session_summaries::SessionSummaries;
 pub use sessions::{DetectedSettings, SessionStatus};
 pub use start::{RunningServer, ServerConfig, ServerError, start};

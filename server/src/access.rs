@@ -2,7 +2,8 @@
 //! must name the listener's own address in `Host`, which stops DNS
 //! rebinding, and carry the listener's token in `Authorization`, which web
 //! pages can't know. No CORS headers are ever sent, so browsers refuse to
-//! send a page's request with that header at all.
+//! send a page's request with that header at all. The middleware also
+//! tells the routes which device is calling ([`Caller`]).
 
 use axum::extract::{Request, State};
 use axum::http::StatusCode;
@@ -27,11 +28,25 @@ pub enum AccessTokens {
     PairedDevices(Arc<PairedDevices>),
 }
 
+/// The id the desktop app is known by, beside the paired devices' ids.
+pub const DESKTOP_DEVICE_ID: &str = "desktop";
+
+/// The device a request came from: the desktop app, or a paired device.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Caller {
+    pub device_id: String,
+}
+
 impl AccessTokens {
-    fn accept(&self, token: &str) -> bool {
+    /// The id of the device whose token `token` is.
+    fn find_device_id(&self, token: &str) -> Option<String> {
         match self {
-            Self::One(expected) => tokens_match(token, expected),
-            Self::PairedDevices(devices) => devices.find_device_for_token(token).is_some(),
+            Self::One(expected) => {
+                tokens_match(token, expected).then(|| DESKTOP_DEVICE_ID.to_string())
+            }
+            Self::PairedDevices(devices) => {
+                devices.find_device_for_token(token).map(|device| device.id)
+            }
         }
     }
 }
@@ -43,10 +58,11 @@ pub struct ListenerAccess {
     pub tokens: AccessTokens,
 }
 
-/// Rejects a request with an unexpected `Host` (403) or without the token (401).
+/// Rejects a request with an unexpected `Host` (403) or without the token
+/// (401), and adds the [`Caller`] to the others.
 pub async fn require_listener_access(
     State(access): State<ListenerAccess>,
-    request: Request,
+    mut request: Request,
     next: Next,
 ) -> Response {
     let host = request
@@ -62,10 +78,11 @@ pub async fn require_listener_access(
         .get(AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "));
-    if !token.is_some_and(|token| access.tokens.accept(token)) {
+    let Some(device_id) = token.and_then(|token| access.tokens.find_device_id(token)) else {
         return ApiError::new(StatusCode::UNAUTHORIZED, "missing or wrong token").into_response();
-    }
+    };
 
+    request.extensions_mut().insert(Caller { device_id });
     next.run(request).await
 }
 
@@ -91,7 +108,7 @@ mod tests {
             tokens: AccessTokens::One(SecretString::from(TOKEN)),
         };
         let data_directory = tempfile::tempdir().unwrap();
-        let backend = Arc::new(Backend::new());
+        let backend = Arc::new(Backend::new(data_directory.path()).unwrap());
         let remote_access =
             Arc::new(RemoteAccess::open(data_directory.path(), Arc::clone(&backend)).unwrap());
         let app = localhost_router(backend, remote_access).layer(middleware::from_fn_with_state(

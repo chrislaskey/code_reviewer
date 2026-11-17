@@ -6,5 +6,8 @@
     <!-- Shown when macOS asks the user whether the app may control a terminal app (the sessions pages). -->
     <key>NSAppleEventsUsageDescription</key>
     <string>Code Reviewer opens and focuses tmux sessions in your terminal app.</string>
+    <!-- Session notifications stay on screen until clicked; macOS uses this only until the user picks a style. -->
+    <key>NSUserNotificationAlertStyle</key>
+    <string>alert</string>
   </dict>
 </plist>

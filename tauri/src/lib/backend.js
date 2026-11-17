@@ -5,6 +5,7 @@
 // the core crate's, with snake_case fields.
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 
 /* -- Reviews ------------------------------------------------------------------- */
@@ -126,6 +127,24 @@ export function openSessionInBrowser(name) {
 /** Opens the artifacts of a session's checkout in this device's browser, as openSessionInBrowser does. Returns the URL. */
 export function openSessionArtifactsInBrowser(name) {
   return invoke("open_session_artifacts_in_browser", { name });
+}
+
+/** Whether this device's bell is on for one of the app's sessions. */
+export function getSessionNotificationsEnabled(name) {
+  return invoke("get_session_notifications_enabled", { name });
+}
+
+/**
+ * Turns this device's bell for one of the app's sessions on or off: while it's on, the device gets a system
+ * notification each time the session's agent finishes. Resolves to whether it's on.
+ */
+export function setSessionNotificationsEnabled(name, enabled) {
+  return invoke("set_session_notifications_enabled", { name, enabled });
+}
+
+/** Calls `callback` with the session's name when a session notification is clicked, on the desktop. */
+export function onSessionNotificationClicked(callback) {
+  return listen("session_notification_clicked", (event) => callback(event.payload));
 }
 
 /* -- Remote access ------------------------------------------------------------- */

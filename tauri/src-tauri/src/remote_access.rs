@@ -74,13 +74,20 @@ pub fn get_pairing_status(connection: State<'_, BackendConnection>) -> PairingSt
     connection.get_pairing_status()
 }
 
-/// Pairs this phone with the computer in a pairing code.
+/// Pairs this phone with the computer in a pairing code, then gives the
+/// computer its push token if notifications are already allowed.
 #[tauri::command]
 pub async fn pair_with_computer(
+    #[cfg_attr(not(target_os = "ios"), allow(unused_variables))] app: tauri::AppHandle,
     connection: State<'_, BackendConnection>,
     code: String,
 ) -> Result<PairingStatus, String> {
-    connection.pair(&code).await
+    let status = connection.pair(&code).await?;
+    #[cfg(target_os = "ios")]
+    tauri::async_runtime::spawn(
+        crate::apple_push_registration::send_apple_push_token_if_allowed(app),
+    );
+    Ok(status)
 }
 
 /// Forgets the computer this phone is paired with.

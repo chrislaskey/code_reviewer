@@ -1,6 +1,6 @@
 //! Starting the server: the backend, a listener on localhost serving the
-//! API to anyone with the token, and the tailnet listener for paired devices
-//! when remote access is on. The desktop app calls [`start`] at
+//! API to anyone with the token, the tailnet listener for paired devices
+//! when remote access is on, and the watch for agents finishing. The desktop app calls [`start`] at
 //! launch; a standalone server binary would call the same function.
 
 use std::io;
@@ -15,6 +15,7 @@ use tokio::sync::oneshot;
 
 use crate::access::{AccessTokens, ListenerAccess, require_listener_access};
 use crate::backend::Backend;
+use crate::finished_sessions::watch_for_finished_sessions;
 use crate::http_api::localhost_router;
 use crate::remote_access::RemoteAccess;
 use crate::tokens::read_or_create_token_file;
@@ -61,6 +62,8 @@ pub enum ServerError {
     },
     #[error("couldn't read the remote access settings: {0}")]
     RemoteAccess(String),
+    #[error("couldn't read the session notification settings: {0}")]
+    SessionNotifications(String),
 }
 
 impl ServerError {
@@ -137,8 +140,11 @@ pub async fn start(config: ServerConfig) -> Result<RunningServer, ServerError> {
         allowed_hosts: allowed_hosts_for(localhost_address),
         tokens: AccessTokens::One(desktop_token.clone()),
     };
-    let backend = Arc::new(Backend::new());
+    let backend = Backend::new(&config.data_directory)
+        .map(Arc::new)
+        .map_err(ServerError::SessionNotifications)?;
     tokio::spawn(fill_session_summaries(Arc::clone(&backend)));
+    tokio::spawn(watch_for_finished_sessions(Arc::clone(&backend)));
     let remote_access = RemoteAccess::open(&config.data_directory, Arc::clone(&backend))
         .map(Arc::new)
         .map_err(ServerError::RemoteAccess)?;
@@ -185,7 +191,7 @@ fn allowed_hosts_for(address: SocketAddr) -> Vec<String> {
 /// Finds the sessions page's list once at launch, so its first load needn't
 /// wait for it.
 async fn fill_session_summaries(backend: Arc<Backend>) {
-    if let Err(error) = backend.list_session_summaries().await {
+    if let Err(error) = backend.list_cached_session_summaries().await {
         log::warn!("Listing the sessions at launch failed: {error}");
     }
 }

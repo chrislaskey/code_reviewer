@@ -144,9 +144,13 @@ impl RemoteAccess {
         })
     }
 
-    /// Unpairs a device; its token stops working at once.
+    /// Unpairs a device; its token stops working at once, and its bells
+    /// are turned off.
     pub async fn revoke_paired_device(&self, id: &str) -> Result<RemoteAccessStatus, String> {
         self.paired_devices.revoke(id)?;
+        if let Err(error) = self.backend.session_notifications().remove_device(id) {
+            log::warn!("Turning off a revoked device's bells failed: {error}");
+        }
         let state = self.state.lock().await;
         Ok(self.status_of(&state))
     }
@@ -235,7 +239,11 @@ mod tests {
     use super::*;
 
     fn open_in(directory: &tempfile::TempDir) -> RemoteAccess {
-        RemoteAccess::open(directory.path(), Arc::new(Backend::new())).unwrap()
+        RemoteAccess::open(
+            directory.path(),
+            Arc::new(Backend::new(directory.path()).unwrap()),
+        )
+        .unwrap()
     }
 
     #[tokio::test]

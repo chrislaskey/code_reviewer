@@ -27,6 +27,8 @@
     "allow-show-session-in-terminal-app",
     "allow-open-session-in-browser",
     "allow-open-session-artifacts-in-browser",
+    "allow-get-session-notifications-enabled",
+    "allow-set-session-notifications-enabled",
     "allow-get-app-platform",
     "allow-get-remote-access-status",
     "allow-set-remote-access-enabled",

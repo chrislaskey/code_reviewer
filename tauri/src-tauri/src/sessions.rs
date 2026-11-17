@@ -236,6 +236,41 @@ pub async fn open_session_artifacts_in_browser(
     open_url_on_this_device(&app, &connection, &url)
 }
 
+/// Whether this device's bell is on for one of the app's sessions.
+#[tauri::command]
+pub async fn get_session_notifications_enabled(
+    connection: State<'_, BackendConnection>,
+    name: String,
+) -> Result<bool, String> {
+    connection
+        .client()?
+        .get_session_notifications_enabled(&name)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// Turns this device's bell for one of the app's sessions on or off: while
+/// it's on, the device is notified each time the session's agent finishes.
+/// On a phone, turning one on first gives the computer its push token,
+/// asking the user's permission the first time. Returns whether it's on.
+#[tauri::command]
+pub async fn set_session_notifications_enabled(
+    #[cfg_attr(not(target_os = "ios"), allow(unused_variables))] app: AppHandle,
+    connection: State<'_, BackendConnection>,
+    name: String,
+    enabled: bool,
+) -> Result<bool, String> {
+    #[cfg(target_os = "ios")]
+    if enabled {
+        crate::apple_push_registration::register_for_apple_push(&app, &connection).await?;
+    }
+    connection
+        .client()?
+        .set_session_notifications_enabled(&name, enabled)
+        .await
+        .map_err(|error| error.to_string())
+}
+
 fn open_url_on_this_device(
     app: &AppHandle,
     connection: &BackendConnection,

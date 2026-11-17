@@ -45,6 +45,19 @@ pub struct CreateSessionRequest {
     pub port: u16,
 }
 
+/// Turns the calling device's bell for one of the app's sessions on or off.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetSessionNotificationsEnabledRequest {
+    pub name: String,
+    pub enabled: bool,
+}
+
+/// The calling phone's Apple push token, sent at each launch.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetApplePushTokenRequest {
+    pub token: String,
+}
+
 /// Turns remote access on or off.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SetRemoteAccessEnabledRequest {

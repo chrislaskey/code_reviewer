@@ -1,11 +1,12 @@
-<!-- A tmux session on the sessions page: its name, repository and agent
-     status, glowing while the agent works. The whole card opens the
+<!-- A tmux session on the sessions page: its name, repository, bell and
+     agent status, glowing while the agent works. The whole card opens the
      session's page, where its actions are. -->
 <script>
   import Icon from "../lib/components/Icon.svelte";
   import { sessionShowUrl } from "../lib/routes.js";
   import AgentBadge from "./AgentBadge.svelte";
   import Badge from "./Badge.svelte";
+  import NotificationsEnabledIcon from "./NotificationsEnabledIcon.svelte";
 
   let { session } = $props();
 
@@ -18,6 +19,7 @@
       <span class="name">{session.name}</span>
       {#if session.repository_name}<span class="repository-name">{session.repository_name}</span>{/if}
     </span>
+    {#if session.notifications_enabled}<NotificationsEnabledIcon />{/if}
     {#if session.agent}
       <AgentBadge session={session.agent} />
     {:else}
