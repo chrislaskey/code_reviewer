@@ -4,7 +4,7 @@
 // src-tauri/src/lib.rs, review.rs and trace.rs); the request and response shapes are
 // the core crate's, with snake_case fields.
 
-import { invoke } from "@tauri-apps/api/core";
+import { addPluginListener, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 
@@ -142,9 +142,20 @@ export function setSessionNotificationsEnabled(name, enabled) {
   return invoke("set_session_notifications_enabled", { name, enabled });
 }
 
-/** Calls `callback` with the session's name when a session notification is clicked, on the desktop. */
-export function onSessionNotificationClicked(callback) {
-  return listen("session_notification_clicked", (event) => callback(event.payload));
+/**
+ * Calls `callback` with the session's name when a session notification is clicked: the desktop's own, or a push
+ * tapped on a phone (the iOS plugin reports it, with the push's `session_name`, also when the tap launched the app).
+ */
+export async function onSessionNotificationClicked(callback) {
+  const unlisten = await listen("session_notification_clicked", (event) => callback(event.payload));
+  if ((await getAppPlatform()) === "mobile") {
+    await addPluginListener("notifications", "notificationClicked", (click) => {
+      const name = click?.data?.session_name;
+      if (name) callback(name);
+    });
+    await invoke("plugin:notifications|set_click_listener_active", { active: true });
+  }
+  return unlisten;
 }
 
 /* -- Remote access ------------------------------------------------------------- */

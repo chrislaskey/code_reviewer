@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/iOS-schema.json",
+  "identifier": "ios-notifications",
+  "description": "The phone's pages learn which push the user tapped, to open its session",
+  "windows": ["main"],
+  "platforms": ["iOS"],
+  "permissions": [
+    "notifications:allow-register-listener",
+    "notifications:allow-remove-listener",
+    "notifications:allow-set-click-listener-active"
+  ]
+}
