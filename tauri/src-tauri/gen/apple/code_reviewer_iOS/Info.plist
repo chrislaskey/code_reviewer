@@ -42,5 +42,7 @@
 	</array>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Code Reviewer opens and focuses tmux sessions in your terminal app.</string>
+	<key>NSUserNotificationAlertStyle</key>
+	<string>alert</string>
 </dict>
 </plist>
