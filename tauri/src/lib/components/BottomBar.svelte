@@ -1,8 +1,8 @@
 <!-- The app's navigation on small windows, where the gutter is hidden: a
      bar along the window's bottom edge with four buttons, Home, Back,
-     Forward and More. More slides up a sheet over most of the window with
+     Forward and Menu. Menu slides up a sheet over most of the window with
      the other pages, the sessions with their agents' status and the theme
-     choices. The sheet closes on More, a tap
+     choices. The sheet closes on Menu, a tap
      above it, a choice and Escape. `links` and `current` are AppNav's;
      `current` marks the open page in the sheet. -->
 <script>
@@ -22,7 +22,7 @@
   let { links, current } = $props();
 
   let homeLink = $derived(links.find((link) => link.id === "home"));
-  let linksInMore = $derived(links.filter((link) => link.id !== "home"));
+  let linksInMenu = $derived(links.filter((link) => link.id !== "home"));
 
   let open = $state(false);
   let sessions = $state(null);
@@ -41,9 +41,9 @@
 {#if open}
   <button type="button" class="sheet-backdrop" aria-label="Close menu" onclick={close} transition:fade={{ duration: 150 }}
   ></button>
-  <div class="sheet" role="dialog" aria-label="More" transition:fly={{ y: 40, duration: 200 }}>
+  <div class="sheet" role="dialog" aria-label="Menu" transition:fly={{ y: 40, duration: 200 }}>
     <ul class="page-links">
-      {#each linksInMore as link (link.id)}
+      {#each linksInMenu as link (link.id)}
         <li>
           <a href={link.href} class="page-link" class:current={current === link.id} onclick={close}>
             <Icon name={link.icon} class="size-6" />
@@ -80,7 +80,7 @@
   </button>
   <button type="button" class="bar-button" class:open aria-expanded={open} onclick={() => (open = !open)}>
     <Icon name={open ? "hero-x-mark" : "hero-bars-3"} class="bar-icon" />
-    More
+    Menu
   </button>
 </nav>
 
