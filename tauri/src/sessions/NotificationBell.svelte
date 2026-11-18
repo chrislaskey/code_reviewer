@@ -54,6 +54,5 @@
     onclick={toggle}
   >
     <Icon name={enabled ? "lucide-bell-ring" : "lucide-bell"} class="size-5" />
-    <span class="max-sm:hidden">{enabled ? "Notifying" : "Notify"}</span>
   </button>
 {/if}
