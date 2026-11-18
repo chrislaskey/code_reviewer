@@ -3,6 +3,7 @@
      web. See docs/design/accounts-local-and-trial-users.md. -->
 <script>
   import { accountsIndexUrl, accountsSignUpUrl } from "../lib/routes.js";
+  import { Button, Text } from "../lib/components/index.js";
 
   /**
    * @typedef {Object} Props
@@ -14,9 +15,9 @@
 </script>
 
 {#if kind === "local"}
-  <p>This is online only, and your account is only on this device.</p>
-  <p><a href={accountsIndexUrl()} class="btn btn-sm btn-primary">Sign up or sign in</a></p>
+  <Text>This is online only, and your account is only on this device.</Text>
+  <Text><Button size="sm" variant="primary" href={accountsIndexUrl()}>Sign up or sign in</Button></Text>
 {:else}
-  <p>This needs an account, and you are on a trial.</p>
-  <p><a href={accountsSignUpUrl()} class="btn btn-sm btn-primary">Sign up</a></p>
+  <Text>This needs an account, and you are on a trial.</Text>
+  <Text><Button size="sm" variant="primary" href={accountsSignUpUrl()}>Sign up</Button></Text>
 {/if}

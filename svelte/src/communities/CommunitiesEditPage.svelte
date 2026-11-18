@@ -1,11 +1,12 @@
 <!-- Editing a community, at /communities/:id/edit; done, it shows the
      community -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import { FormError, communitiesGet, communitiesUpdate } from "../lib/core/index.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { communitiesShowUrl } from "../lib/routes.js";
   import CommunitiesForm from "./CommunitiesForm.svelte";
+  import { ErrorMessage, Heading, Link } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   const id = pathParams().id;
   let loaded = $state(false);
@@ -42,13 +43,12 @@
   load();
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>Edit community</h1>
+<Page>
+  <Heading level={1}>Edit community</Heading>
   {#if loaded}
     <CommunitiesForm bind:name submitText="Save" {errors} {error} {busy} onsubmit={save} />
   {:else if error}
-    <p class="error">{error}</p>
+    <ErrorMessage message={error} />
   {/if}
-  <a href={communitiesShowUrl(id)}>Back to the community</a>
-</main>
+  <Link href={communitiesShowUrl(id)}>Back to the community</Link>
+</Page>

@@ -1,10 +1,11 @@
 <!-- The signed-in person's one-time purchases, newest first, at
      /accounts/purchases. See docs/design/purchasing.md, P5. -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import { accountsPurchasesList } from "../lib/core/index.js";
   import { accountsProductsIndexUrl, accountsPurchasesShowUrl } from "../lib/routes.js";
   import { moneyFormat } from "./money.js";
+  import { ErrorMessage, Heading, Link, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   let purchases = $state([]);
   let loaded = $state(false);
@@ -19,26 +20,23 @@
   );
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>Purchases</h1>
+<Page>
+  <Heading level={1}>Purchases</Heading>
 
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+  <ErrorMessage message={error} />
   {#if loaded && purchases.length === 0}
-    <p class="muted">Nothing bought yet. <a href={accountsProductsIndexUrl()} class="link">See what is for sale</a></p>
+    <Text tone="muted">Nothing bought yet. <Link href={accountsProductsIndexUrl()}>See what is for sale</Link></Text>
   {/if}
 
   <ul class="flex flex-col gap-2">
     {#each purchases as purchase (purchase.id)}
       <li>
-        <a href={accountsPurchasesShowUrl(purchase.id)} class="link">{purchase.product_name}</a>
-        <span class="muted">
+        <Link href={accountsPurchasesShowUrl(purchase.id)}>{purchase.product_name}</Link>
+        <Text as="span" tone="muted">
           · {moneyFormat(purchase.amount, purchase.currency)} · {new Date(purchase.inserted_at).toLocaleDateString()}
           {#if purchase.refunded_at}· Refunded{/if}
-        </span>
+        </Text>
       </li>
     {/each}
   </ul>
-</main>
+</Page>

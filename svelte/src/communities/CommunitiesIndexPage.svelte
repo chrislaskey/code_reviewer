@@ -1,9 +1,10 @@
 <!-- Every community, at /communities, each to show, join or leave -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import { communitiesList, onSynced } from "../lib/core/index.js";
   import { communitiesNewUrl, communitiesShowUrl } from "../lib/routes.js";
   import CommunitiesMembershipButton from "./CommunitiesMembershipButton.svelte";
+  import { Button, ErrorMessage, Heading, Link, Panel, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   let communities = $state([]);
   let error = $state("");
@@ -21,28 +22,25 @@
   load();
 </script>
 
-<main class="page">
-  <AppNav />
-  <div class="flex items-center justify-between">
-    <h1>Communities</h1>
-    <a href={communitiesNewUrl()} class="btn btn-primary btn-sm">New community</a>
+<Page>
+  <div class="flex items-center justify-between gap-4">
+    <Heading level={1}>Communities</Heading>
+    <Button variant="primary" size="sm" href={communitiesNewUrl()}>New community</Button>
   </div>
 
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+  <ErrorMessage message={error} />
 
   {#if communities.length === 0 && !error}
-    <p class="muted">No communities yet.</p>
+    <Text tone="muted">No communities yet.</Text>
   {/if}
 
-  <ul class="posts">
+  <ul class="flex flex-col gap-3">
     {#each communities as { community, membership } (community.id)}
-      <li class="post flex items-center justify-between gap-4">
+      <Panel as="li" layout="row" class="justify-between gap-4">
         <span>
-          <a href={communitiesShowUrl(community.id)} class="link">{community.name}</a>
+          <Link href={communitiesShowUrl(community.id)}>{community.name}</Link>
           {#if membership}
-            <span class="muted">· member</span>
+            <Text as="span" tone="muted">· member</Text>
           {/if}
         </span>
         <CommunitiesMembershipButton
@@ -51,7 +49,7 @@
           onchange={load}
           onerror={(problem) => (error = problem)}
         />
-      </li>
+      </Panel>
     {/each}
   </ul>
-</main>
+</Page>

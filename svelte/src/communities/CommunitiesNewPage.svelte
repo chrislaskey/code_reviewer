@@ -1,11 +1,12 @@
 <!-- Making a community, at /communities/new, which the person joins;
      done, it shows the community -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import { FormError, communitiesCreate } from "../lib/core/index.js";
   import { navigateToUrl } from "../lib/router.js";
   import { communitiesIndexUrl, communitiesShowUrl } from "../lib/routes.js";
   import CommunitiesForm from "./CommunitiesForm.svelte";
+  import { Heading, Link } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   let name = $state("");
   /** @type {Record<string, string[]>} */
@@ -29,9 +30,8 @@
   }
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>New community</h1>
+<Page>
+  <Heading level={1}>New community</Heading>
   <CommunitiesForm bind:name submitText="Create" {errors} {error} {busy} onsubmit={save} />
-  <a href={communitiesIndexUrl()}>Back to communities</a>
-</main>
+  <Link href={communitiesIndexUrl()}>Back to communities</Link>
+</Page>

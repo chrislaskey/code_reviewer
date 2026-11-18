@@ -3,8 +3,9 @@
      or a trial user is told it needs an account. -->
 <script>
   import AccountsNeeded from "../accounts/AccountsNeeded.svelte";
-  import AppNav from "../lib/AppNav.svelte";
   import { currentUserLoad } from "../lib/current_user.js";
+  import { Heading, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   /** @type {import("../lib/current_user.js").User | null} */
   let currentUser = $state(null);
@@ -15,12 +16,11 @@
   );
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>Forum</h1>
+<Page>
+  <Heading level={1}>Forum</Heading>
   {#if currentUser && currentUser.kind !== "full"}
     <AccountsNeeded kind={currentUser.kind} />
   {:else}
-    <p class="muted">Nothing here yet.</p>
+    <Text tone="muted">Nothing here yet.</Text>
   {/if}
-</main>
+</Page>

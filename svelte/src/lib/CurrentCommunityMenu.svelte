@@ -5,10 +5,11 @@
      where the keyboard would cover the list. Enter in the filter
      chooses the first match. Choosing one reloads the page in it. -->
 <script>
-  import Icon from "./Icon.svelte";
   import { communitiesList, currentCommunityUpdate, onSynced } from "./core/index.js";
   import { currentCommunityLoad, onCurrentCommunityChanged } from "./current_community.js";
   import { communitiesIndexUrl } from "./routes.js";
+  import { Button, ErrorMessage, Heading, Icon, Input, Link } from "./components/index.js";
+  import Dialog from "./Dialog.svelte";
 
   /** @type {{id: string, name: string} | null} */
   let currentCommunity = $state(null);
@@ -70,56 +71,48 @@
   load();
 </script>
 
-<button type="button" class="btn btn-ghost btn-sm gap-1" onclick={open}>
+<Button variant="ghost" size="sm" class="gap-1" onclick={open}>
   <Icon name="hero-user-group-mini" class="size-5" />
   {currentCommunity ? currentCommunity.name : "No community"}
   <Icon name="hero-chevron-down-mini" class="size-4" />
-</button>
+</Button>
 
-<dialog bind:this={dialog} class="modal">
-  <div class="modal-box flex max-h-[80vh] flex-col gap-3">
-    <div class="flex items-center justify-between gap-2">
-      <h2>Communities</h2>
-      <button type="button" class="btn btn-ghost btn-sm btn-square" aria-label="Close" onclick={() => dialog?.close()}>
-        <Icon name="hero-x-mark-mini" class="size-5" />
-      </button>
-    </div>
-    <input
-      bind:this={filterInput}
-      bind:value={filter}
-      onkeydown={chooseFirstOnEnter}
-      type="search"
-      class="input w-full"
-      placeholder="Filter communities"
-      aria-label="Filter communities"
-    />
-    {#if error}
-      <p class="error">{error}</p>
-    {/if}
-    <ul class="menu w-full flex-nowrap overflow-y-auto p-0">
-      {#each shown as community (community.id)}
-        <li>
-          <button
-            type="button"
-            class={community.id === currentCommunity?.id ? "menu-active" : ""}
-            onclick={() => choose(community.id)}
-            disabled={busy}
-          >
-            {community.name}
-            {#if community.id === currentCommunity?.id}
-              <Icon name="hero-check-mini" class="size-4" />
-            {/if}
-          </button>
-        </li>
-      {:else}
-        <li class="muted px-3 py-2">
-          {mine.length === 0 ? "You are not in a community yet." : "No community matches."}
-        </li>
-      {/each}
-    </ul>
-    <a href={communitiesIndexUrl()} class="link" onclick={() => dialog?.close()}>Join / Manage Communities</a>
+<Dialog bind:element={dialog} closeOnBackdrop class="max-h-[80vh]">
+  <div class="flex items-center justify-between gap-2">
+    <Heading>Communities</Heading>
+    <Button variant="ghost" size="sm" class="btn-square" aria-label="Close" onclick={() => dialog?.close()}>
+      <Icon name="hero-x-mark-mini" class="size-5" />
+    </Button>
   </div>
-  <form method="dialog" class="modal-backdrop">
-    <button type="submit">Close</button>
-  </form>
-</dialog>
+  <Input
+    bind:element={filterInput}
+    bind:value={filter}
+    onkeydown={chooseFirstOnEnter}
+    type="search"
+    placeholder="Filter communities"
+    aria-label="Filter communities"
+  />
+  <ErrorMessage message={error} />
+  <ul class="menu w-full flex-nowrap overflow-y-auto p-0">
+    {#each shown as community (community.id)}
+      <li>
+        <button
+          type="button"
+          class={community.id === currentCommunity?.id ? "menu-active" : ""}
+          onclick={() => choose(community.id)}
+          disabled={busy}
+        >
+          {community.name}
+          {#if community.id === currentCommunity?.id}
+            <Icon name="hero-check-mini" class="size-4" />
+          {/if}
+        </button>
+      </li>
+    {:else}
+      <li class="muted px-3 py-2">
+        {mine.length === 0 ? "You are not in a community yet." : "No community matches."}
+      </li>
+    {/each}
+  </ul>
+  <Link href={communitiesIndexUrl()} onclick={() => dialog?.close()}>Join / Manage Communities</Link>
+</Dialog>

@@ -15,6 +15,19 @@
   --title-bar-height: 28px;
   --page-inset-top: 0px;
   --page-inset-bottom: 0px;
+  /* The navigation gutter down the window's left edge (AppNav): half a
+     shade darker than the page, which sits on top of it with the open
+     tab. On small windows the bar along the bottom (BottomBar) takes its
+     place, see below. */
+  --gutter-width: 84px;
+  --bottom-bar-height: 0px;
+  --gutter-bg: color-mix(in oklab, var(--color-base-100) 55%, var(--color-base-200));
+  --gutter-ring: light-dark(rgb(0 0 0 / 0.06), rgb(255 255 255 / 0.08));
+  --gutter-shadow: light-dark(rgb(0 0 0 / 0.1), rgb(0 0 0 / 0.55));
+  --raised-shadow:
+    0 0 0 1px light-dark(rgb(0 0 0 / 0.04), rgb(255 255 255 / 0.06)),
+    0 4px 14px -2px light-dark(rgb(0 0 0 / 0.08), rgb(0 0 0 / 0.5)),
+    inset 0 1px 0 light-dark(transparent, rgb(255 255 255 / 0.07));
   font-size: 15px;
   -webkit-font-smoothing: antialiased;
 }
@@ -55,6 +68,22 @@ body {
   height: var(--title-bar-height);
 }
 
+/* Small windows (below Tailwind's sm) have no gutter: the bottom bar
+   takes its place, and runs under a phone's home indicator. */
+@media (width < 40rem) {
+  :root {
+    --gutter-width: 0px;
+    --bottom-bar-height: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* The app's pages (AppLayout), clear of the gutter and the bottom bar;
+   the body already keeps clear of the home indicator in the app. */
+.app-layout {
+  padding-left: var(--gutter-width);
+  padding-bottom: max(0px, var(--bottom-bar-height) - var(--page-inset-bottom));
+}
+
 .page {
   max-width: 560px;
   margin: 0 auto;
@@ -62,6 +91,225 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+}
+
+/* Against the gutter, as the open tab joins it. */
+.app-layout .page {
+  margin: 0;
+}
+
+/* The navigation gutter (AppNav): fixed down the window's left edge, so
+   it stays put while the page scrolls. */
+.app-gutter {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: var(--gutter-width);
+  padding-bottom: calc(10px + var(--page-inset-bottom));
+  background: var(--gutter-bg);
+}
+
+@media (width < 40rem) {
+  .app-gutter {
+    display: none;
+  }
+}
+
+/* Above the tabs, the page's top padding, and room for the macOS window
+   controls on the desktop and the status bar on a tablet. */
+.app-gutter .gutter-top {
+  flex-shrink: 0;
+  height: calc(var(--page-inset-top) + 1.5rem);
+}
+
+/* The page's edge and the open tab as one shape, so one shadow follows the
+   whole outline, curves included; the page's colour, behind the tiles. */
+.app-gutter .tab-shape {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  overflow: visible;
+  pointer-events: none;
+  fill: var(--color-base-100);
+  filter: drop-shadow(-1px 0 0 var(--gutter-ring)) drop-shadow(0 -1px 0 var(--gutter-ring))
+    drop-shadow(0 1px 0 var(--gutter-ring)) drop-shadow(-3px 1px 7px var(--gutter-shadow));
+}
+
+/* A tab: an icon over one word. */
+.app-gutter .tile {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  height: 62px;
+  color: color-mix(in oklab, var(--color-base-content) 62%, transparent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.app-gutter .tile-icon {
+  width: 22px;
+  height: 22px;
+}
+
+/* A tab that is not open lights up as an inset rounded square, while
+   hovered or while its menu is open. */
+.app-gutter .tile:not(.current):hover,
+.app-gutter details[open] > .tile {
+  color: var(--fg);
+}
+
+.app-gutter .tile:not(.current):hover::before,
+.app-gutter details[open] > .tile::before {
+  content: "";
+  position: absolute;
+  inset: 4px 7px;
+  z-index: -1;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--color-base-content) 7%, transparent);
+}
+
+.app-gutter .tile.current {
+  color: var(--fg);
+}
+
+.app-gutter .tile.current .tile-icon {
+  color: var(--color-primary);
+}
+
+.app-gutter .spacer {
+  flex: 1;
+}
+
+/* The navigation on small windows (BottomBar): fixed along the bottom in
+   the gutter's colour, a hairline above it; the buttons keep clear of
+   the phone's home indicator. */
+.bottom-bar {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 20;
+  display: none;
+  gap: 6px;
+  height: var(--bottom-bar-height);
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+  background: var(--gutter-bg);
+  box-shadow: 0 -1px 0 var(--gutter-ring);
+}
+
+@media (width < 40rem) {
+  .bottom-bar {
+    display: flex;
+  }
+}
+
+/* A button: flat, an icon over one word, sharing the bar evenly; it
+   shrinks a little while pressed. Raised only under a hovering pointer,
+   so never on a touch screen. */
+.bar-button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 10px;
+  color: var(--fg);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform 80ms,
+    background-color 80ms;
+}
+
+@media (hover: hover) {
+  .bar-button:not(:disabled):hover {
+    background: var(--color-base-100);
+    box-shadow: var(--raised-shadow);
+  }
+}
+
+.bar-button:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+.bar-button:disabled {
+  color: color-mix(in oklab, var(--color-base-content) 30%, transparent);
+  cursor: default;
+}
+
+.bar-button .bar-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* The page above the menu's sheet, dimmed; a tap on it closes the sheet. */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0 0 var(--bottom-bar-height) 0;
+  z-index: 18;
+  background: rgb(0 0 0 / 0.35);
+}
+
+/* Rises from the bottom bar, below a phone's status bar; scrolls when
+   the theme list runs long. */
+.sheet {
+  position: fixed;
+  inset: auto 0 var(--bottom-bar-height) 0;
+  z-index: 19;
+  max-height: calc(100% - var(--bottom-bar-height) - env(safe-area-inset-top, 0px) - 3rem);
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem 1rem;
+  border-radius: 16px 16px 0 0;
+  background: var(--color-base-100);
+  box-shadow: var(--raised-shadow);
+}
+
+.sheet-links {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+/* A tab in the sheet: an icon over its name, a large touch target. */
+.sheet-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 1rem 0.5rem;
+  border-radius: 12px;
+  background: var(--gutter-bg);
+  color: var(--fg);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sheet-link.current {
+  outline: 2px solid var(--color-primary);
+}
+
+.sheet-link.current .size-6 {
+  color: var(--color-primary);
+}
+
+.sheet-heading {
+  margin: 1.25rem 0 0.25rem;
+  padding: 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 /* The public website's pages (src/public) */
@@ -103,19 +351,34 @@ p {
   color: var(--color-error);
 }
 
-.posts,
-.files {
-  list-style: none;
+/* The core components' styles (lib/components). */
+
+.heading {
   margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  font-weight: 600;
 }
 
-.post {
+.heading-1 {
+  font-size: 1.4rem;
+  font-weight: bold;
+}
+
+.heading-2 {
+  font-size: 1.1rem;
+}
+
+.heading-3 {
+  font-size: 1rem;
+}
+
+.field {
   display: flex;
   flex-direction: column;
+  gap: 0.25rem;
+}
+
+.panel {
+  display: flex;
   gap: 0.5rem;
   padding: 1rem 1.25rem;
   background: var(--card);
@@ -123,14 +386,14 @@ p {
   border-radius: 10px;
 }
 
-.file {
-  display: flex;
+.panel-stack {
+  flex-direction: column;
+}
+
+.panel-row {
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  background: var(--card);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
 }
 
 /* A file's bytes on its page: an image at its own size up to the page's

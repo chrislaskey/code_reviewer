@@ -5,11 +5,12 @@
      only on this device; they and a trial user have no picture, which
      needs an account on the server. -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import FieldErrors from "../lib/FieldErrors.svelte";
   import { FormError, avatarsUpload, currentUserGet, currentUserUpdate } from "../lib/core/index.js";
   import { currentUserForget } from "../lib/current_user.js";
   import { accountsIndexUrl } from "../lib/routes.js";
+  import { Alert, Button, ErrorMessage, FileInput, Heading, Input, Label, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   /** @type {{name: string, kind?: string, avatar_url?: string | null} | null} */
   let currentUser = $state(null);
@@ -79,19 +80,18 @@
   load();
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>Profile</h1>
+<Page>
+  <Heading level={1}>Profile</Heading>
   {#if currentUser}
     {#if currentUser.kind === "local"}
-      <div class="alert alert-warning flex flex-col items-start gap-2" data-local-user>
-        <p>
+      <Alert tone="warning" class="flex flex-col items-start gap-2" data-local-user>
+        <Text>
           <strong>This account is only on this device.</strong> Nothing is backed up: if the device is lost or reset,
           or the app is removed, what you made is gone. Sign up or sign in to keep it safe and use it on your other
           devices.
-        </p>
-        <a href={accountsIndexUrl()} class="btn btn-sm">Sign up or sign in</a>
-      </div>
+        </Text>
+        <Button size="sm" href={accountsIndexUrl()}>Sign up or sign in</Button>
+      </Alert>
     {/if}
     <div class="flex items-center gap-4">
       {#if currentUser.avatar_url}
@@ -104,42 +104,36 @@
       <span>{currentUser.name}</span>
     </div>
     <form onsubmit={saveName} class="flex flex-col gap-3">
-      <label class="flex flex-col gap-1">
-        <span>Name</span>
-        <input bind:value={name} type="text" autocomplete="name" class="input w-full" maxlength="80" required />
-      </label>
-      {#if nameError}
-        <p class="error">{nameError}</p>
-      {/if}
+      <Label text="Name">
+        <Input bind:value={name} autocomplete="name" maxlength="80" required />
+      </Label>
+      <ErrorMessage message={nameError} />
       <div>
-        <button type="submit" class="btn btn-primary" disabled={nameBusy || name.trim() === currentUser.name}>Save name</button>
+        <Button variant="primary" type="submit" disabled={nameBusy || name.trim() === currentUser.name}>Save name</Button>
       </div>
     </form>
     {#if currentUser.kind === "full"}
       <form onsubmit={save} class="flex flex-col gap-3">
-        <label class="flex flex-col gap-1">
-          <span>Picture</span>
-          <input
-            type="file"
+        <Label text="Picture">
+          <FileInput
             accept="image/png,image/jpeg,image/gif,image/webp"
-            class="file-input w-full"
             onchange={pick}
             disabled={busy}
           />
           <FieldErrors {errors} fields={["content_type", "size"]} />
-        </label>
+        </Label>
         {#if progress !== null}
           <progress class="progress w-full" value={progress} max="1"></progress>
         {/if}
         {#if error && Object.keys(errors).length === 0}
-          <p class="error">{error}</p>
+          <ErrorMessage message={error} />
         {/if}
         <div>
-          <button type="submit" class="btn btn-primary" disabled={busy || !file}>Save picture</button>
+          <Button variant="primary" type="submit" disabled={busy || !file}>Save picture</Button>
         </div>
       </form>
     {/if}
   {:else if error}
-    <p class="error">{error}</p>
+    <ErrorMessage message={error} />
   {/if}
-</main>
+</Page>

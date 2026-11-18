@@ -3,6 +3,7 @@
 <script>
   import { membershipsJoin, membershipsLeave } from "../lib/core/index.js";
   import { currentCommunityChanged } from "../lib/current_community.js";
+  import { Button } from "../lib/components/index.js";
 
   /**
    * @typedef {Object} Props
@@ -31,6 +32,6 @@
   }
 </script>
 
-<button type="button" class={membership ? "btn btn-sm btn-ghost" : "btn btn-sm"} onclick={toggle} disabled={busy}>
+<Button size="sm" variant={membership ? "ghost" : "default"} onclick={toggle} disabled={busy}>
   {membership ? "Leave" : "Join"}
-</button>
+</Button>

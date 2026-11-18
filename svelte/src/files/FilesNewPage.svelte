@@ -3,11 +3,12 @@
      straight to object storage; in the app they are kept on the device
      and sent when it next syncs, see filesCreate in lib/core/. -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import FieldErrors from "../lib/FieldErrors.svelte";
   import { FormError, filesCreate } from "../lib/core/index.js";
   import { navigateToUrl } from "../lib/router.js";
   import { filesIndexUrl, filesShowUrl } from "../lib/routes.js";
+  import { Button, ErrorMessage, FileInput, Heading, Input, Label, Link } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   /** @type {File | null} */
   let file = $state(null);
@@ -47,29 +48,26 @@
   }
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>New file</h1>
+<Page>
+  <Heading level={1}>New file</Heading>
   <form onsubmit={save} class="flex flex-col gap-3">
-    <label class="flex flex-col gap-1">
-      <span>File</span>
-      <input type="file" class="file-input w-full" onchange={pick} disabled={busy} />
+    <Label text="File">
+      <FileInput onchange={pick} disabled={busy} />
       <FieldErrors {errors} fields={["content_type", "size"]} />
-    </label>
-    <label class="flex flex-col gap-1">
-      <span>Name</span>
-      <input type="text" class="input w-full" bind:value={name} disabled={busy} />
+    </Label>
+    <Label text="Name">
+      <Input bind:value={name} disabled={busy} />
       <FieldErrors {errors} fields={["name"]} />
-    </label>
+    </Label>
     {#if progress !== null}
       <progress class="progress w-full" value={progress} max="1"></progress>
     {/if}
     {#if error && Object.keys(errors).length === 0}
-      <p class="error">{error}</p>
+      <ErrorMessage message={error} />
     {/if}
     <div>
-      <button type="submit" class="btn btn-primary" disabled={busy || !file}>Add file</button>
+      <Button variant="primary" type="submit" disabled={busy || !file}>Add file</Button>
     </div>
   </form>
-  <a href={filesIndexUrl()}>Back to files</a>
-</main>
+  <Link href={filesIndexUrl()}>Back to files</Link>
+</Page>

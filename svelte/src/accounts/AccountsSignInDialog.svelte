@@ -2,6 +2,9 @@
      browser has the web's sign-in page and ends by showing a code, which
      the person pastes here, see docs/design/accounts-sign-in.md. -->
 <script>
+  import { Button, ErrorMessage, Heading, Input, Text } from "../lib/components/index.js";
+  import Dialog from "../lib/Dialog.svelte";
+  import DialogActions from "../lib/DialogActions.svelte";
   /**
    * @typedef {Object} Props
    * @property {{email: string | null} | null} pending the sign-in waiting; the dialog is open while set
@@ -34,29 +37,25 @@
   }
 </script>
 
-<dialog bind:this={dialog} class="modal" onclose={() => pending && oncancel()}>
-  <div class="modal-box flex flex-col gap-3">
-    {#if pending}
-      <h2>Finish signing in in your browser</h2>
-      <p>
-        {#if pending.email}
-          The sign-in page for <strong>{pending.email}</strong> opened in your browser.
-        {:else}
-          The sign-in page opened in your browser.
-        {/if}
-        When it shows a code, paste it here.
-      </p>
-      <form onsubmit={submit} class="flex flex-col gap-3">
-        <input bind:value={code} type="text" autocomplete="off" class="input w-full" aria-label="Code from the browser" placeholder="Code from the browser" required />
-        {#if error}
-          <p class="error">{error}</p>
-        {/if}
-        <div class="flex flex-wrap justify-end gap-2">
-          <button type="button" class="btn btn-sm btn-ghost" onclick={oncancel} disabled={busy}>Cancel</button>
-          <button type="button" class="btn btn-sm" onclick={onopenbrowser} disabled={busy}>Open the browser again</button>
-          <button type="submit" class="btn btn-sm btn-primary" disabled={busy}>Finish</button>
-        </div>
-      </form>
-    {/if}
-  </div>
-</dialog>
+<Dialog bind:element={dialog} onclose={() => pending && oncancel()}>
+  {#if pending}
+    <Heading>Finish signing in in your browser</Heading>
+    <Text>
+      {#if pending.email}
+        The sign-in page for <strong>{pending.email}</strong> opened in your browser.
+      {:else}
+        The sign-in page opened in your browser.
+      {/if}
+      When it shows a code, paste it here.
+    </Text>
+    <form onsubmit={submit} class="flex flex-col gap-3">
+      <Input bind:value={code} autocomplete="off" aria-label="Code from the browser" placeholder="Code from the browser" required />
+      <ErrorMessage message={error} />
+      <DialogActions>
+        <Button size="sm" variant="ghost" onclick={oncancel} disabled={busy}>Cancel</Button>
+        <Button size="sm" onclick={onopenbrowser} disabled={busy}>Open the browser again</Button>
+        <Button size="sm" variant="primary" type="submit" disabled={busy}>Finish</Button>
+      </DialogActions>
+    </form>
+  {/if}
+</Dialog>

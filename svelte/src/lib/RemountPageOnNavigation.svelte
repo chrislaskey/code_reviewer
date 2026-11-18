@@ -6,12 +6,13 @@
   import { searchParams } from "sv-router";
   import { pageLoadError } from "./page_load_error.svelte.js";
   import { pathParams } from "./router.js";
+  import { Alert } from "./components/index.js";
 
   let { children } = $props();
 </script>
 
 {#if pageLoadError.message}
-  <div role="alert" class="alert alert-error m-4">{pageLoadError.message}</div>
+  <Alert tone="error" role="alert" class="m-4">{pageLoadError.message}</Alert>
 {/if}
 {#key `${JSON.stringify(pathParams())}?${searchParams.toString()}`}
   {@render children()}

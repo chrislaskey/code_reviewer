@@ -8,7 +8,6 @@
      from. See docs/design/purchasing.md, P1, P2 and P4, and
      docs/design/purchasing-phones.md, M1, M4 and M5. -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import PublicPagesLinks from "../lib/PublicPagesLinks.svelte";
   import AccountsNeeded from "./AccountsNeeded.svelte";
   import {
@@ -27,6 +26,8 @@
   } from "../lib/routes.js";
   import { priceFormat } from "./money.js";
   import { storeManagedWhere, storeName, storePriceFormat } from "./stores.js";
+  import { Button, ErrorMessage, Heading, Link, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   const id = pathParams().id;
   let product = $state();
@@ -100,19 +101,16 @@
   }
 </script>
 
-<main class="page">
-  <AppNav />
+<Page>
 
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+  <ErrorMessage message={error} />
   {#if product}
-    <h1>{product.name}</h1>
+    <Heading level={1}>{product.name}</Heading>
     {#if product.description}
-      <p>{product.description}</p>
+      <Text>{product.description}</Text>
     {/if}
     {#if product.free_days}
-      <p class="muted">The first {product.free_days} days are free.</p>
+      <Text tone="muted">The first {product.free_days} days are free.</Text>
     {/if}
     {#if currentUser && currentUser.kind !== "full"}
       <ul>
@@ -123,60 +121,58 @@
       <AccountsNeeded kind={currentUser.kind} />
     {:else if product.kind === "plan" && currentUser?.plan}
       {@const plan = currentUser.plan}
-      <p>You are on {plan.product_name}.</p>
+      <Text>You are on {plan.product_name}.</Text>
       {#if plan.store !== store}
-        <p class="muted">It was bought in {storeName(plan.store)}: manage it {storeManagedWhere(plan.store)}.</p>
+        <Text tone="muted">It was bought in {storeName(plan.store)}: manage it {storeManagedWhere(plan.store)}.</Text>
       {:else if plan.cancel_at_period_end}
-        <p class="muted">It ends with this period. Resume it on its page to switch.</p>
+        <Text tone="muted">It ends with this period. Resume it on its page to switch.</Text>
       {:else}
         <div class="flex flex-wrap gap-2">
           {#each product.prices as price (price.id)}
             {#if price.id !== plan.price_id}
-              <button
-                type="button"
-                class="btn btn-primary btn-sm"
+              <Button variant="primary" size="sm"
                 disabled={buying}
                 onclick={() => (store === "stripe" ? planSwitch(price.id) : storeBuy(price.id))}
               >
                 Switch · {storePriceFormat(price, priceFormat)}
-              </button>
+              </Button>
             {/if}
           {/each}
         </div>
         {#if store === "stripe"}
-          <p class="muted">A dearer plan, or yearly, starts now with the difference charged; a cheaper one, or monthly, starts when this period ends.</p>
+          <Text tone="muted">A dearer plan, or yearly, starts now with the difference charged; a cheaper one, or monthly, starts when this period ends.</Text>
         {:else}
-          <p class="muted">{storeName(store)} decides when the new plan starts: an upgrade at once, a downgrade at the renewal.</p>
+          <Text tone="muted">{storeName(store)} decides when the new plan starts: an upgrade at once, a downgrade at the renewal.</Text>
         {/if}
       {/if}
-      <p><a href={accountsSubscriptionsShowUrl(plan.subscription_id)} class="link">See your plan</a></p>
+      <Text><Link href={accountsSubscriptionsShowUrl(plan.subscription_id)}>See your plan</Link></Text>
     {:else if product.owned && !product.is_repeatable}
-      <p>Owned</p>
+      <Text>Owned</Text>
     {:else}
       {#if product.owned}
-        <p class="muted">You have this. You can buy it again.</p>
+        <Text tone="muted">You have this. You can buy it again.</Text>
       {/if}
       <div class="flex flex-wrap gap-2">
         {#each product.prices as price (price.id)}
-          <button type="button" class="btn btn-primary btn-sm" disabled={buying} onclick={() => buy(price.id)}>
+          <Button variant="primary" size="sm" disabled={buying} onclick={() => buy(price.id)}>
             Buy · {storePriceFormat(price, priceFormat)}
-          </button>
+          </Button>
         {/each}
       </div>
       {#if pending}
-        <p class="muted">Waiting for approval. It appears here once {storeName(store)} confirms it.</p>
+        <Text tone="muted">Waiting for approval. It appears here once {storeName(store)} confirms it.</Text>
       {/if}
     {/if}
     {#if store !== "stripe" && product.kind === "plan"}
-      <p class="muted text-sm">
+      <Text tone="muted" size="sm">
         {product.name}: an auto-renewing subscription, renewed each {product.prices
           .map((price) => price.store_period ?? price.interval)
           .filter(Boolean)
           .join(" or ")} at the price shown until you cancel it in {storeName(store)}.
         By buying you accept the <PublicPagesLinks />.
-      </p>
+      </Text>
     {/if}
   {/if}
 
-  <a href={accountsProductsIndexUrl()}>Back to plans and products</a>
-</main>
+  <Link href={accountsProductsIndexUrl()}>Back to plans and products</Link>
+</Page>

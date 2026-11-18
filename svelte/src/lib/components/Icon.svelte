@@ -1,4 +1,4 @@
-<!-- A heroicon by its `hero-*` class, see ../../vendor/heroicons.js. -->
+<!-- A heroicon by its `hero-*` class, see ../../../vendor/heroicons.js. -->
 <script>
   /**
    * @typedef {Object} Props

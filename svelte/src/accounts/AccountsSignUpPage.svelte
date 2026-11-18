@@ -4,13 +4,14 @@
      device with ?challenge=, it ends in a code for the device instead;
      the email is filled in from ?email=. -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import PublicPagesLinks from "../lib/PublicPagesLinks.svelte";
   import { accountsSignUp, accountsTrialGet } from "../lib/core/index.js";
   import { accountsSignInUrl, accountsTrialUrl } from "../lib/routes.js";
   import AccountsForm from "./AccountsForm.svelte";
   import AccountsSignInSteps from "./AccountsSignInSteps.svelte";
   import { KEEP_SIGNED_IN_CHECKED } from "./keep_signed_in.js";
+  import { Heading, Link, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   const query = new URLSearchParams(window.location.search);
   const challenge = query.get("challenge") ?? "";
@@ -38,20 +39,19 @@
   }
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>Sign up</h1>
+<Page>
+  <Heading level={1}>Sign up</Heading>
   {#if challenge}
-    <p class="muted">Signing up for the app on your device.</p>
+    <Text tone="muted">Signing up for the app on your device.</Text>
   {/if}
   {#if pending}
     <AccountsSignInSteps {email} {pending} {challenge} {keepSignedIn} onstartover={() => (pending = "")} />
   {:else}
     <AccountsForm bind:email bind:name withName bind:keepSignedIn withKeepSignedIn={!challenge} submitText="Sign up" {error} {busy} onsubmit={signUp} />
-    <p class="muted">By signing up you accept the <PublicPagesLinks />.</p>
-    <p class="muted">Already have an account? <a href={accountsSignInUrl(email || undefined)} class="link">Sign in</a></p>
+    <Text tone="muted">By signing up you accept the <PublicPagesLinks />.</Text>
+    <Text tone="muted">Already have an account? <Link href={accountsSignInUrl(email || undefined)}>Sign in</Link></Text>
     {#if trialAvailable}
-      <p class="muted">Just looking? <a href={accountsTrialUrl()} class="link">Try it without an account</a></p>
+      <Text tone="muted">Just looking? <Link href={accountsTrialUrl()}>Try it without an account</Link></Text>
     {/if}
   {/if}
-</main>
+</Page>

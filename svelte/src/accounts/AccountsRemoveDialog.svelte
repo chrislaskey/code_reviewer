@@ -3,6 +3,9 @@
      remove anyway. A local user's is the only copy, and says so. -->
 <script>
   import { conflictsIndexUrl } from "../lib/routes.js";
+  import { Button, Heading, Text } from "../lib/components/index.js";
+  import Dialog from "../lib/Dialog.svelte";
+  import DialogActions from "../lib/DialogActions.svelte";
 
   /**
    * @typedef {Object} Props
@@ -29,40 +32,38 @@
   const counted = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 </script>
 
-<dialog bind:this={dialog} class="modal" onclose={oncancel}>
-  <div class="modal-box flex flex-col gap-3">
-    {#if account}
-      <h2>Remove {account.local ? "the account that is only on this device" : account.email}?</h2>
-      {#if account.local}
-        <p>
-          <strong>This is the only copy.</strong> Everything in this account is on this device alone and is deleted
-          with it. This cannot be undone. To keep it, sign up or sign in first and move it into your account.
-        </p>
-      {:else if loss}
-        <ul class="list-disc pl-5">
-          {#if loss.pending > 0}
-            <li>{counted(loss.pending, "change has", "changes have")} not reached the server yet.</li>
-          {/if}
-          {#if loss.conflicts > 0}
-            <li>{counted(loss.conflicts, "change was", "changes were")} not kept by the server.</li>
-          {/if}
-        </ul>
-        <p>Removing the account drops them from this device.</p>
-      {:else}
-        <p>
-          Any data stored on this device for this account is removed. What was synced stays on the server and on other
-          devices, and signing in again later downloads it to this device again.
-        </p>
-      {/if}
-      <div class="flex flex-wrap justify-end gap-2">
-        {#if loss && account.active}
-          <a href={conflictsIndexUrl()} class="btn btn-sm" onclick={oncancel}>View changes</a>
+<Dialog bind:element={dialog} onclose={oncancel}>
+  {#if account}
+    <Heading>Remove {account.local ? "the account that is only on this device" : account.email}?</Heading>
+    {#if account.local}
+      <Text>
+        <strong>This is the only copy.</strong> Everything in this account is on this device alone and is deleted
+        with it. This cannot be undone. To keep it, sign up or sign in first and move it into your account.
+      </Text>
+    {:else if loss}
+      <ul class="list-disc pl-5">
+        {#if loss.pending > 0}
+          <li>{counted(loss.pending, "change has", "changes have")} not reached the server yet.</li>
         {/if}
-        <button type="button" class="btn btn-sm btn-ghost" onclick={oncancel} disabled={busy}>Keep</button>
-        <button type="button" class="btn btn-sm btn-error" onclick={() => onremove(loss !== null)} disabled={busy}>
-          {account.local ? "Delete it all" : loss ? "Remove anyway" : "Remove from device"}
-        </button>
-      </div>
+        {#if loss.conflicts > 0}
+          <li>{counted(loss.conflicts, "change was", "changes were")} not kept by the server.</li>
+        {/if}
+      </ul>
+      <Text>Removing the account drops them from this device.</Text>
+    {:else}
+      <Text>
+        Any data stored on this device for this account is removed. What was synced stays on the server and on other
+        devices, and signing in again later downloads it to this device again.
+      </Text>
     {/if}
-  </div>
-</dialog>
+    <DialogActions>
+      {#if loss && account.active}
+        <Button size="sm" href={conflictsIndexUrl()} onclick={oncancel}>View changes</Button>
+      {/if}
+      <Button size="sm" variant="ghost" onclick={oncancel} disabled={busy}>Keep</Button>
+      <Button size="sm" variant="danger" onclick={() => onremove(loss !== null)} disabled={busy}>
+        {account.local ? "Delete it all" : loss ? "Remove anyway" : "Remove from device"}
+      </Button>
+    </DialogActions>
+  {/if}
+</Dialog>

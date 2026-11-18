@@ -3,7 +3,6 @@
      did not keep, each to reapply, or to try again when the server
      refused it outright, or let go -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import {
     conflictsLetGo,
     conflictsList,
@@ -13,6 +12,8 @@
     pendingChangesList,
   } from "../lib/core/index.js";
   import { postsIndexUrl } from "../lib/routes.js";
+  import { Button, ErrorMessage, Heading, Link, Panel, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   let pending = $state([]);
   let conflicts = $state([]);
@@ -44,70 +45,67 @@
   load();
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>Changes not on the server</h1>
+<Page>
+  <Heading level={1}>Changes not on the server</Heading>
 
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+  <ErrorMessage message={error} />
 
   {#if pending.length === 0 && conflicts.length === 0 && !error}
-    <p class="muted">Every change reached the server.</p>
+    <Text tone="muted">Every change reached the server.</Text>
   {/if}
 
   {#if pending.length > 0}
-    <h2>Waiting to reach the server</h2>
-    <ul class="posts">
+    <Heading>Waiting to reach the server</Heading>
+    <ul class="flex flex-col gap-3">
       {#each pending as change (change.id)}
-        <li class="post">
-          <p class="muted">{change.about ?? change.table} · {change.kind} · {change.made_at}</p>
+        <Panel as="li">
+          <Text tone="muted">{change.about ?? change.table} · {change.kind} · {change.made_at}</Text>
           {#each Object.entries(change.changes) as [name, value] (name)}
-            <p><strong>{name}</strong></p>
-            <p class="whitespace-pre-wrap">{shown(value)}</p>
+            <Text><strong>{name}</strong></Text>
+            <Text class="whitespace-pre-wrap">{shown(value)}</Text>
           {/each}
-        </li>
+        </Panel>
       {/each}
     </ul>
   {/if}
 
   {#if conflicts.length > 0}
-    <h2>Not kept by the server</h2>
+    <Heading>Not kept by the server</Heading>
   {/if}
-  <ul class="posts">
+  <ul class="flex flex-col gap-3">
     {#each conflicts as conflict (conflict.id)}
-      <li class="post">
-        <p class="muted">{conflict.about ?? "Something that is gone"} · {conflict.made_at}</p>
+      <Panel as="li">
+        <Text tone="muted">{conflict.about ?? "Something that is gone"} · {conflict.made_at}</Text>
         {#if conflict.reason}
-          <p class="error text-sm">{conflict.reason}</p>
+          <Text tone="error" size="sm">{conflict.reason}</Text>
         {/if}
         {#if conflict.resolve === "try_again"}
-          <p>The server did not take this. It is still on this device.</p>
+          <Text>The server did not take this. It is still on this device.</Text>
         {:else}
           {#each conflict.fields as field (field.name)}
-            <p><strong>Your change</strong></p>
-            <p class="whitespace-pre-wrap">{shown(field.yours)}</p>
-            <p><strong>Now on the server</strong></p>
-            <p class="whitespace-pre-wrap">{shown(field.now)}</p>
+            <Text><strong>Your change</strong></Text>
+            <Text class="whitespace-pre-wrap">{shown(field.yours)}</Text>
+            <Text><strong>Now on the server</strong></Text>
+            <Text class="whitespace-pre-wrap">{shown(field.now)}</Text>
           {/each}
         {/if}
         <div class="flex gap-2">
           {#if conflict.resolve === "reapply"}
-            <button type="button" class="btn btn-sm" onclick={() => resolveThen(() => conflictsReapply(conflict.id))}>
+            <Button size="sm" onclick={() => resolveThen(() => conflictsReapply(conflict.id))}>
               Reapply
-            </button>
+            </Button>
           {:else if conflict.resolve === "try_again"}
-            <button type="button" class="btn btn-sm" onclick={() => resolveThen(() => conflictsTryAgain(conflict.id))}>
+            <Button size="sm" onclick={() => resolveThen(() => conflictsTryAgain(conflict.id))}>
               Try again
-            </button>
+            </Button>
           {/if}
-          <button type="button" class="btn btn-sm btn-ghost" onclick={() => resolveThen(() => conflictsLetGo(conflict.id))}>
+          <Button size="sm" variant="ghost" onclick={() => resolveThen(() => conflictsLetGo(conflict.id))}>
             Let it go
-          </button>
+          </Button>
         </div>
-      </li>
+      </Panel>
     {/each}
   </ul>
 
-  <a href={postsIndexUrl()}>Back to posts</a>
-</main>
+  <Link href={postsIndexUrl()}>Back to posts</Link>
+</Page>

@@ -1,11 +1,12 @@
 <!-- One of the signed-in person's purchases, at /accounts/purchases/:id.
      The receipt is the email Stripe sent. See docs/design/purchasing.md, P5. -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import { accountsPurchasesGet } from "../lib/core/index.js";
   import { pathParams } from "../lib/router.js";
   import { accountsPurchasesIndexUrl } from "../lib/routes.js";
   import { moneyFormat } from "./money.js";
+  import { ErrorMessage, Heading, Link, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   const id = pathParams().id;
   let purchase = $state();
@@ -17,21 +18,18 @@
   );
 </script>
 
-<main class="page">
-  <AppNav />
+<Page>
 
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+  <ErrorMessage message={error} />
   {#if purchase}
-    <h1>{purchase.product_name}</h1>
-    <p>{moneyFormat(purchase.amount, purchase.currency)}, tax included</p>
-    <p class="muted">Bought {new Date(purchase.inserted_at).toLocaleString()}</p>
+    <Heading level={1}>{purchase.product_name}</Heading>
+    <Text>{moneyFormat(purchase.amount, purchase.currency)}, tax included</Text>
+    <Text tone="muted">Bought {new Date(purchase.inserted_at).toLocaleString()}</Text>
     {#if purchase.refunded_at}
-      <p>Refunded {new Date(purchase.refunded_at).toLocaleString()}</p>
+      <Text>Refunded {new Date(purchase.refunded_at).toLocaleString()}</Text>
     {/if}
-    <p class="muted">The receipt is in the email sent when you paid.</p>
+    <Text tone="muted">The receipt is in the email sent when you paid.</Text>
   {/if}
 
-  <a href={accountsPurchasesIndexUrl()}>Back to purchases</a>
-</main>
+  <Link href={accountsPurchasesIndexUrl()}>Back to purchases</Link>
+</Page>

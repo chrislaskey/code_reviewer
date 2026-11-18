@@ -9,6 +9,7 @@
   import { currentUserForget } from "./current_user.js";
   import { navigateToUrl } from "./router.js";
   import { accountsIndexUrl, conflictsIndexUrl } from "./routes.js";
+  import { Badge, Button, Link, Text } from "./components/index.js";
 
   let status = $state(null);
   let busy = $state(false);
@@ -59,29 +60,29 @@
 {#if status && status.signed_in && !status.local}
   <div class="flex flex-wrap items-center gap-3 text-sm">
     {#if status.offline}
-      <span class="badge badge-warning badge-sm">Working offline</span>
+      <Badge tone="warning">Working offline</Badge>
     {/if}
     {#if status.conflicts > 0}
-      <a href={conflictsIndexUrl()} class="link text-warning">
+      <Link tone="warning" href={conflictsIndexUrl()}>
         {status.conflicts}
         {status.conflicts === 1 ? "change was" : "changes were"} not saved on the server
-      </a>
+      </Link>
     {/if}
     {#if status.pending > 0}
-      <span class="muted">{status.pending} waiting to sync</span>
+      <Text as="span" tone="muted">{status.pending} waiting to sync</Text>
     {/if}
     {#if status.offline}
-      <button type="button" class="btn btn-xs btn-ghost" onclick={() => doThen(() => syncSetOffline(false))} disabled={busy}>
+      <Button size="xs" variant="ghost" onclick={() => doThen(() => syncSetOffline(false))} disabled={busy}>
         Go online
-      </button>
+      </Button>
     {:else}
-      <button type="button" class="btn btn-xs btn-ghost" onclick={() => doThen(syncRun)} disabled={busy}>Sync now</button>
-      <button type="button" class="btn btn-xs btn-ghost" onclick={() => doThen(() => syncSetOffline(true))} disabled={busy}>
+      <Button size="xs" variant="ghost" onclick={() => doThen(syncRun)} disabled={busy}>Sync now</Button>
+      <Button size="xs" variant="ghost" onclick={() => doThen(() => syncSetOffline(true))} disabled={busy}>
         Work offline
-      </button>
+      </Button>
     {/if}
     {#if error}
-      <span class="error">{error}</span>
+      <Text as="span" tone="error">{error}</Text>
     {/if}
   </div>
 {/if}

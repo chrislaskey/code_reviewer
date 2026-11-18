@@ -3,72 +3,135 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Plural-Forms: nplurals=2; plural=(n!=1);\n"
 
-#: src/posts/PostsForm.svelte:37
-#: src/posts/PostsShowPage.svelte:35
+#: src/posts/PostsForm.svelte:46
+#: src/posts/PostsShowPage.svelte:37
 msgid "Post"
 msgstr ""
 
-#: src/posts/PostsIndexPage.svelte:28
-#: src/posts/PostsShowPage.svelte:39
+#: src/posts/PostsIndexPage.svelte:30
+#: src/posts/PostsShowPage.svelte:41
 #, javascript-format
 msgid "in ${ communityNames }"
 msgstr ""
 
-#: src/posts/PostsShowPage.svelte:42
+#: src/posts/PostsShowPage.svelte:44
 msgid "Edit"
 msgstr ""
 
-#: src/posts/PostsShowPage.svelte:44
+#: src/posts/PostsShowPage.svelte:46
 msgid "Delete"
 msgstr ""
 
-#: src/posts/PostsNewPage.svelte:30
-#: src/posts/PostsShowPage.svelte:46
+#: src/posts/PostsNewPage.svelte:32
+#: src/posts/PostsShowPage.svelte:48
 msgid "Back to posts"
 msgstr ""
 
-#: src/posts/PostsShowPage.svelte:23
+#: src/posts/PostsShowPage.svelte:24
 msgid "Delete this post?"
 msgstr ""
 
-#: src/posts/PostsIndexPage.svelte:23
-#: src/posts/PostsNewPage.svelte:26
+#: src/posts/PostsIndexPage.svelte:25
+#: src/posts/PostsNewPage.svelte:28
 msgid "New post"
 msgstr ""
 
-#: src/posts/PostsIndexPage.svelte:21
+#: src/lib/AppNav.svelte:38
+#: src/posts/PostsIndexPage.svelte:23
 msgid "Posts"
 msgstr ""
 
-#: src/posts/PostsIndexPage.svelte:25
+#: src/posts/PostsIndexPage.svelte:27
 msgid "No posts yet."
 msgstr ""
 
-#: src/posts/PostsIndexPage.svelte:31
+#: src/posts/PostsIndexPage.svelte:33
 msgid "Show"
 msgstr ""
 
-#: src/posts/PostsForm.svelte:38
+#: src/posts/PostsForm.svelte:47
 msgid "What's on your mind?"
 msgstr ""
 
-#: src/posts/PostsForm.svelte:39
+#: src/posts/PostsForm.svelte:48
 msgid "In"
 msgstr ""
 
-#: src/posts/PostsEditPage.svelte:41
+#: src/posts/PostsEditPage.svelte:43
 msgid "Edit post"
 msgstr ""
 
-#: src/posts/PostsEditPage.svelte:42
+#: src/posts/PostsEditPage.svelte:44
 msgid "Save"
 msgstr ""
 
-#: src/posts/PostsEditPage.svelte:46
+#: src/posts/PostsEditPage.svelte:48
 msgid "Back to the post"
 msgstr ""
 
-#: src/posts/PostsNewPage.svelte:27
+#: src/lib/ThemeMenu.svelte:21
+#, javascript-format
+msgid "Theme: ${ current }"
+msgstr ""
+
+#: src/lib/BottomBar.svelte:40
+#: src/lib/ThemeMenu.svelte:22
+msgid "Theme"
+msgstr ""
+
+#: src/lib/BottomBar.svelte:32
+msgid "Close menu"
+msgstr ""
+
+#: src/lib/BottomBar.svelte:34
+#: src/lib/BottomBar.svelte:56
+msgid "Menu"
+msgstr ""
+
+#: src/lib/AppNav.svelte:80
+#: src/lib/BottomBar.svelte:42
+msgid "Main"
+msgstr ""
+
+#: src/lib/BottomBar.svelte:49
+msgid "Back"
+msgstr ""
+
+#: src/lib/BottomBar.svelte:52
+msgid "Forward"
+msgstr ""
+
+#: src/lib/AppNav.svelte:35
+#. * @type {Link[]} 
+msgid "Home"
+msgstr ""
+
+#: src/lib/AppNav.svelte:39
+#. * @type {Link[]} 
+msgid "Files"
+msgstr ""
+
+#: src/lib/AppNav.svelte:40
+#. * @type {Link[]} 
+msgid "Communities"
+msgstr ""
+
+#: src/lib/AppNav.svelte:41
+#. * @type {Link[]} 
+msgid "Support"
+msgstr ""
+
+#: src/lib/AppNav.svelte:42
+#. * @type {Link[]} 
+msgid "Forum"
+msgstr ""
+
+#: src/lib/AppNav.svelte:46
+#. * @type {Link[]} 
+msgid "Ops"
+msgstr ""
+
+#: src/posts/PostsNewPage.svelte:29
 msgctxt "verb"
 msgid "Post"
 msgstr ""

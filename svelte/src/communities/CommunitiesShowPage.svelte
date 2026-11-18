@@ -1,12 +1,13 @@
 <!-- One community, at /communities/:id, to join or leave, and for a
      member to edit or delete -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import { communitiesDelete, communitiesGet, onSynced } from "../lib/core/index.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { communitiesEditUrl, communitiesIndexUrl } from "../lib/routes.js";
   import CommunitiesDeleteDialog from "./CommunitiesDeleteDialog.svelte";
   import CommunitiesMembershipButton from "./CommunitiesMembershipButton.svelte";
+  import { Button, ErrorMessage, Heading, Link, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   const id = pathParams().id;
   let shown = $state();
@@ -41,20 +42,17 @@
   load();
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>{shown ? shown.community.name : "Community"}</h1>
+<Page>
+  <Heading level={1}>{shown ? shown.community.name : "Community"}</Heading>
 
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+  <ErrorMessage message={error} />
   {#if shown}
-    <p class="muted">
+    <Text tone="muted">
       Created {shown.community.inserted_at}
       {#if shown.membership}
         · you are a member
       {/if}
-    </p>
+    </Text>
     <div class="flex flex-wrap gap-2">
       <CommunitiesMembershipButton
         communityId={id}
@@ -63,8 +61,8 @@
         onerror={(problem) => (error = problem)}
       />
       {#if shown.membership}
-        <a href={communitiesEditUrl(id)} class="btn btn-sm">Edit</a>
-        <button type="button" class="btn btn-sm btn-ghost" onclick={() => (deleting = true)}>Delete</button>
+        <Button size="sm" href={communitiesEditUrl(id)}>Edit</Button>
+        <Button size="sm" variant="ghost" onclick={() => (deleting = true)}>Delete</Button>
       {/if}
     </div>
     <CommunitiesDeleteDialog
@@ -75,5 +73,5 @@
     />
   {/if}
 
-  <a href={communitiesIndexUrl()}>Back to communities</a>
-</main>
+  <Link href={communitiesIndexUrl()}>Back to communities</Link>
+</Page>

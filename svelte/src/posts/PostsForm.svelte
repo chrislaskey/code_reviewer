@@ -5,6 +5,7 @@
 <script>
   import { t } from "ttag";
   import { communitiesList } from "../lib/core/index.js";
+  import { Button, Checkbox, ErrorMessage, Text, Textarea } from "../lib/components/index.js";
 
   /**
    * @typedef {Object} Props
@@ -30,6 +31,14 @@
     }
   }
 
+  /**
+   * @param {string} communityId
+   * @param {boolean} chosen
+   */
+  function communityChoose(communityId, chosen) {
+    communityIds = chosen ? [...communityIds, communityId] : communityIds.filter((id) => id !== communityId);
+  }
+
   function submit(event) {
     event.preventDefault();
     onsubmit();
@@ -39,23 +48,22 @@
 </script>
 
 <form onsubmit={submit} class="flex flex-col gap-3">
-  <textarea bind:value={text} rows="4" class="textarea w-full" aria-label={t`Post`} placeholder={t`What's on your mind?`} maxlength="10000"
-  ></textarea>
+  <Textarea bind:value={text} rows="4" aria-label={t`Post`} placeholder={t`What's on your mind?`} maxlength="10000" />
   {#if mine.length > 0}
     <fieldset class="flex flex-wrap gap-3">
-      <legend class="muted">{t`In`}</legend>
+      <Text as="legend" tone="muted">{t`In`}</Text>
       {#each mine as community (community.id)}
-        <label class="flex items-center gap-1">
-          <input type="checkbox" class="checkbox checkbox-sm" value={community.id} bind:group={communityIds} />
+        <Checkbox
+          checked={communityIds.includes(community.id)}
+          onchange={(event) => communityChoose(community.id, event.currentTarget.checked)}
+        >
           {community.name}
-        </label>
+        </Checkbox>
       {/each}
     </fieldset>
   {/if}
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+  <ErrorMessage message={error} />
   <div>
-    <button type="submit" class="btn btn-primary" disabled={busy}>{submitText}</button>
+    <Button variant="primary" type="submit" disabled={busy}>{submitText}</Button>
   </div>
 </form>

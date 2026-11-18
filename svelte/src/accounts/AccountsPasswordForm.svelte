@@ -2,6 +2,7 @@
      a new one in place of a forgotten one, or, at a first sign-in, a
      password to make or skip. -->
 <script>
+  import { Button, ErrorMessage, Heading, Input, Link, Text } from "../lib/components/index.js";
   /**
    * @typedef {Object} Props
    * @property {boolean} isNew a password to make, which may be skipped
@@ -29,36 +30,33 @@
 
 <form onsubmit={submit} class="flex flex-col gap-3">
   {#if isNew}
-    <h2>Create a password</h2>
-    <p>A password is optional. With one, signing in asks for it after the emailed code. You can make one later from your account.</p>
+    <Heading>Create a password</Heading>
+    <Text>A password is optional. With one, signing in asks for it after the emailed code. You can make one later from your account.</Text>
   {:else if resetting}
-    <h2>Reset your password</h2>
-    <p>The code proved this is your email. Choose a new password to finish signing in; the old one stops working.</p>
+    <Heading>Reset your password</Heading>
+    <Text>The code proved this is your email. Choose a new password to finish signing in; the old one stops working.</Text>
   {:else}
-    <p>Enter your password to finish.</p>
+    <Text>Enter your password to finish.</Text>
   {/if}
-  <input
+  <Input
     bind:value={password}
     type="password"
     autocomplete={making ? "new-password" : "current-password"}
     minlength={making ? 12 : undefined}
-    class="input w-full"
     aria-label="Password"
     placeholder={making ? "Password, 12 characters or more" : "Password"}
     required
   />
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+  <ErrorMessage message={error} />
   <div class="flex flex-wrap items-center gap-3">
-    <button type="submit" class="btn btn-primary" disabled={busy}>{isNew ? "Create password" : resetting ? "Reset password" : "Continue"}</button>
+    <Button variant="primary" type="submit" disabled={busy}>{isNew ? "Create password" : resetting ? "Reset password" : "Continue"}</Button>
     {#if isNew}
-      <button type="button" class="btn" onclick={onskip} disabled={busy} data-skip>Skip</button>
+      <Button onclick={onskip} disabled={busy} data-skip>Skip</Button>
     {:else}
       {#if onforgot && !resetting}
-        <button type="button" class="link text-sm" onclick={onforgot} disabled={busy}>Forgot your password?</button>
+        <Link size="sm" onclick={onforgot} disabled={busy}>Forgot your password?</Link>
       {/if}
-      <button type="button" class="link text-sm" onclick={onstartover} disabled={busy}>Start over</button>
+      <Link size="sm" onclick={onstartover} disabled={busy}>Start over</Link>
     {/if}
   </div>
 </form>

@@ -4,12 +4,13 @@
      a code for the device instead, see docs/design/accounts-sign-in.md.
      The email is filled in from ?email=. -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import { accountsSignIn, accountsTrialGet } from "../lib/core/index.js";
   import { accountsSignUpUrl, accountsTrialUrl } from "../lib/routes.js";
   import AccountsForm from "./AccountsForm.svelte";
   import AccountsSignInSteps from "./AccountsSignInSteps.svelte";
   import { KEEP_SIGNED_IN_CHECKED } from "./keep_signed_in.js";
+  import { Heading, Link, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   const query = new URLSearchParams(window.location.search);
   const challenge = query.get("challenge") ?? "";
@@ -36,19 +37,18 @@
   }
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>Sign in</h1>
+<Page>
+  <Heading level={1}>Sign in</Heading>
   {#if challenge}
-    <p class="muted">Signing in for the app on your device.</p>
+    <Text tone="muted">Signing in for the app on your device.</Text>
   {/if}
   {#if pending}
     <AccountsSignInSteps {email} {pending} {challenge} {keepSignedIn} onstartover={() => (pending = "")} />
   {:else}
     <AccountsForm bind:email bind:keepSignedIn withKeepSignedIn={!challenge} submitText="Sign in" {error} {busy} onsubmit={signIn} />
-    <p class="muted">New here? <a href={accountsSignUpUrl(email || undefined)} class="link">Sign up</a></p>
+    <Text tone="muted">New here? <Link href={accountsSignUpUrl(email || undefined)}>Sign up</Link></Text>
     {#if trialAvailable}
-      <p class="muted">Just looking? <a href={accountsTrialUrl()} class="link">Try it without an account</a></p>
+      <Text tone="muted">Just looking? <Link href={accountsTrialUrl()}>Try it without an account</Link></Text>
     {/if}
   {/if}
-</main>
+</Page>

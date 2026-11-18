@@ -6,11 +6,12 @@
      user has no account; removing the device's data is the accounts
      list's. -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import { accountsDeletionsCodeCreate, accountsDeletionsCreate, hasDeviceAccounts } from "../lib/core/index.js";
   import { currentUserForget, currentUserLoad } from "../lib/current_user.js";
   import { navigateToUrl } from "../lib/router.js";
   import { PUBLIC_HOME_PATH, accountsIndexUrl, accountsSettingsUrl } from "../lib/routes.js";
+  import { Button, ErrorMessage, Heading, Input, Link, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   /** Where each store's own subscriptions page is, to cancel a plan there. */
   const STORE_SUBSCRIPTIONS_URLS = {
@@ -62,59 +63,55 @@
   }
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>Delete my account</h1>
+<Page>
+  <Heading level={1}>Delete my account</Heading>
   {#if currentUser?.kind === "local"}
-    <p>This account is only on this device, with nothing on the server to delete.</p>
-    <p>To remove it and its data, remove it from <a href={accountsIndexUrl()} class="link">this device's accounts</a>.</p>
+    <Text>This account is only on this device, with nothing on the server to delete.</Text>
+    <Text>To remove it and its data, remove it from <Link href={accountsIndexUrl()}>this device's accounts</Link>.</Text>
   {:else if currentUser}
-    <p>
+    <Text>
       Deleting your account deletes everything you made, in every community and on every device, and your
       purchases. It cannot be undone.
-    </p>
+    </Text>
     {#if currentUser.plan?.store === "stripe"}
-      <p class="text-warning">Your plan, {currentUser.plan.product_name}, ends now, with no refund.</p>
+      <Text tone="warning">Your plan, {currentUser.plan.product_name}, ends now, with no refund.</Text>
     {:else if currentUser.plan?.store === "app_store" || currentUser.plan?.store === "play_store"}
       {@const store = currentUser.plan.store === "app_store" ? "Apple" : "Google Play"}
-      <p class="text-warning">
+      <Text tone="warning">
         Your plan, {currentUser.plan.product_name}, is billed by {store} until you cancel it there. Deleting your
         account does not cancel it.
-        <a href={STORE_SUBSCRIPTIONS_URLS[currentUser.plan.store]} class="link" target="_blank" rel="noopener">
+        <Link href={STORE_SUBSCRIPTIONS_URLS[currentUser.plan.store]} target="_blank" rel="noopener">
           Manage it in {currentUser.plan.store === "app_store" ? "the App Store" : "Google Play"}
-        </a>
-      </p>
+        </Link>
+      </Text>
     {/if}
     <form onsubmit={deleteAccount} class="flex flex-col gap-3">
       {#if currentUser.kind === "full"}
-        <p>We email you a code to make sure it is you.</p>
+        <Text>We email you a code to make sure it is you.</Text>
         <div>
-          <button type="button" class="btn" onclick={sendCode} disabled={busy}>{codeSent ? "Send a new code" : "Send code"}</button>
+          <Button onclick={sendCode} disabled={busy}>{codeSent ? "Send a new code" : "Send code"}</Button>
         </div>
         {#if codeSent}
-          <p class="muted">A code is on its way to {currentUser.email}. It expires in ten minutes.</p>
-          <input
+          <Text tone="muted">A code is on its way to {currentUser.email}. It expires in ten minutes.</Text>
+          <Input
             bind:value={code}
             inputmode="numeric"
             autocomplete="one-time-code"
-            class="input w-full"
             aria-label="Code"
             placeholder="The code from the email"
             required
           />
         {/if}
       {/if}
-      {#if error}
-        <p class="error">{error}</p>
-      {/if}
+      <ErrorMessage message={error} />
       <div class="flex flex-wrap items-center gap-3">
         {#if currentUser.kind === "trial" || codeSent}
-          <button type="submit" class="btn btn-error" disabled={busy}>Delete my account</button>
+          <Button variant="danger" type="submit" disabled={busy}>Delete my account</Button>
         {/if}
-        <a href={accountsSettingsUrl()} class="link text-sm">Back to account</a>
+        <Link size="sm" href={accountsSettingsUrl()}>Back to account</Link>
       </div>
     </form>
   {:else if error}
-    <p class="error">{error}</p>
+    <ErrorMessage message={error} />
   {/if}
-</main>
+</Page>

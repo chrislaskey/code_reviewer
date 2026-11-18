@@ -3,6 +3,7 @@
 <script>
   import { homeUrl } from "../lib/routes.js";
   import { opsCurrentStaffGet } from "./api.js";
+  import { ErrorMessage, Heading, Link, Text } from "../lib/components/index.js";
 
   /** @type {{user_id: string, inserted_at: string} | null} */
   let staff = $state(null);
@@ -18,12 +19,12 @@
   <nav class="flex flex-wrap items-center gap-4">
     <span class="font-semibold">Ops</span>
     <span class="grow"></span>
-    <a href={homeUrl()} class="link">Back to the app</a>
+    <Link href={homeUrl()}>Back to the app</Link>
   </nav>
-  <h1>Ops</h1>
+  <Heading level={1}>Ops</Heading>
   {#if error}
-    <p class="error">{error}</p>
+    <ErrorMessage message={error} />
   {:else if staff}
-    <p class="muted">Nothing here yet.</p>
+    <Text tone="muted">Nothing here yet.</Text>
   {/if}
 </main>

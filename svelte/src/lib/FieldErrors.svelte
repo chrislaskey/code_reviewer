@@ -2,6 +2,7 @@
      they belong to, as Phoenix's <.error> is: `errors` is a FormError's,
      and `fields` the names whose messages show here. -->
 <script>
+  import { Text } from "./components/index.js";
   /**
    * @typedef {Object} Props
    * @property {Record<string, string[]>} errors
@@ -15,5 +16,5 @@
 </script>
 
 {#each messages as message (message)}
-  <p class="error text-sm">{message}</p>
+  <Text tone="error" size="sm">{message}</Text>
 {/each}

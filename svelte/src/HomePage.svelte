@@ -1,14 +1,14 @@
 <!-- The app's home page, at /home -->
 <script>
-  import AppNav from "./lib/AppNav.svelte";
   import { postsIndexUrl } from "./lib/routes.js";
+  import { Heading, Link, Text } from "./lib/components/index.js";
+  import Page from "./lib/Page.svelte";
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>Starter Pack</h1>
-  <p>
+<Page>
+  <Heading level={1}>Starter Pack</Heading>
+  <Text>
     The same pages on the web, on the desktop and on a phone, over the same Rust application.
-    Sign in, then start with the <a href={postsIndexUrl()}>posts</a>.
-  </p>
-</main>
+    Sign in, then start with the <Link href={postsIndexUrl()}>posts</Link>.
+  </Text>
+</Page>

@@ -4,12 +4,13 @@
      with Restore purchases, as Apple asks. See docs/design/purchasing.md,
      P1, and docs/design/purchasing-phones.md, M2. -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import { accountsProductsList, accountsStoreTransactionsRestore } from "../lib/core/index.js";
   import { currentUserReload } from "../lib/current_user.js";
   import { accountsProductsShowUrl } from "../lib/routes.js";
   import { priceFormat } from "./money.js";
   import { storePriceFormat } from "./stores.js";
+  import { Button, ErrorMessage, Heading, Link, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   let products = $state([]);
   let loaded = $state(false);
@@ -43,38 +44,35 @@
   );
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>Plans and products</h1>
+<Page>
+  <Heading level={1}>Plans and products</Heading>
 
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+  <ErrorMessage message={error} />
   {#if loaded && products.length === 0}
-    <p class="muted">Nothing is for sale yet.</p>
+    <Text tone="muted">Nothing is for sale yet.</Text>
   {/if}
 
   <ul class="flex flex-col gap-4">
     {#each products as product (product.id)}
       <li>
-        <h2><a href={accountsProductsShowUrl(product.id)} class="link">{product.name}</a></h2>
+        <Heading><Link href={accountsProductsShowUrl(product.id)}>{product.name}</Link></Heading>
         {#if product.description}
-          <p>{product.description}</p>
+          <Text>{product.description}</Text>
         {/if}
-        <p class="muted">
+        <Text tone="muted">
           {product.kind === "plan" ? "Plan" : "One-time"} ·
           {product.prices.map((price) => storePriceFormat(price, priceFormat)).join(" or ")}
-        </p>
+        </Text>
       </li>
     {/each}
   </ul>
 
   {#if store === "app_store"}
     <div class="mt-6 flex flex-wrap items-center gap-3">
-      <button type="button" class="btn btn-sm" disabled={restoring} onclick={restore}>Restore purchases</button>
+      <Button size="sm" disabled={restoring} onclick={restore}>Restore purchases</Button>
       {#if restored}
-        <span class="muted">{restored}</span>
+        <Text as="span" tone="muted">{restored}</Text>
       {/if}
     </div>
   {/if}
-</main>
+</Page>

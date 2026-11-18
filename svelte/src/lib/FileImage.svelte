@@ -5,6 +5,7 @@
      with the network off, shows `missing` instead. -->
 <script>
   import { animationsOn, onAnimationsChanged } from "./animations.js";
+  import { Text } from "./components/index.js";
 
   /**
    * @typedef {Object} Props
@@ -39,7 +40,7 @@
 </script>
 
 {#if failed}
-  <span class="muted">{missing}</span>
+  <Text as="span" tone="muted">{missing}</Text>
 {:else if moving}
   <img {src} {alt} class={className} onerror={() => (failed = true)} />
 {:else}

@@ -5,7 +5,6 @@
      device can. -->
 <script>
   import AnimationsToggle from "../lib/AnimationsToggle.svelte";
-  import AppNav from "../lib/AppNav.svelte";
   import FileImage from "../lib/FileImage.svelte";
   import {
     filesContentUrl,
@@ -20,6 +19,8 @@
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { conflictsIndexUrl, filesEditUrl, filesIndexUrl } from "../lib/routes.js";
   import { fileSize } from "./file_size.js";
+  import { Button, ErrorMessage, Heading, Link, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   const id = pathParams().id;
   let shown = $state();
@@ -72,27 +73,24 @@
   load();
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>{shown ? shown.file.name : "File"}</h1>
+<Page>
+  <Heading level={1}>{shown ? shown.file.name : "File"}</Heading>
 
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+  <ErrorMessage message={error} />
   {#if shown}
-    <p class="muted">
+    <Text tone="muted">
       {shown.file.content_type} · {fileSize(shown.file.size)} · {shown.file.inserted_at}
       {#if shown.state === "waiting"}
         · waiting to upload
       {:else if shown.state === "refused"}
         · not saved on the server
       {/if}
-    </p>
+    </Text>
     {#if shown.error}
-      <p class="error text-sm">{shown.error}</p>
+      <Text tone="error" size="sm">{shown.error}</Text>
     {/if}
     {#if shown.state === "refused"}
-      <p><a href={conflictsIndexUrl()} class="link">Try again or let it go</a></p>
+      <Text><Link href={conflictsIndexUrl()}>Try again or let it go</Link></Text>
     {/if}
 
     {#if shown.shown_as === "image"}
@@ -101,7 +99,7 @@
         <button type="button" class="cursor-copy self-start text-left" title="Copy to the clipboard" onclick={copy}>
           <FileImage src={filesContentUrl(id)} alt={shown.file.name} class="file-shown" />
         </button>
-        <p class="muted">{copied ? "Copied" : "Click the image to copy it"}</p>
+        <Text tone="muted">{copied ? "Copied" : "Click the image to copy it"}</Text>
       {:else}
         <div>
           <FileImage src={filesContentUrl(id)} alt={shown.file.name} class="file-shown" />
@@ -112,20 +110,20 @@
     {:else if shown.shown_as === "pdf"}
       <iframe src={filesContentUrl(id)} title={shown.file.name} class="file-shown"></iframe>
     {:else}
-      <p class="muted">This kind of file is not shown here.</p>
+      <Text tone="muted">This kind of file is not shown here.</Text>
     {/if}
 
     <div class="flex flex-wrap items-center gap-2">
       {#if canDownload}
-        <button type="button" class="btn btn-sm" onclick={download}>Download</button>
+        <Button size="sm" onclick={download}>Download</Button>
       {/if}
-      <a href={filesEditUrl(id)} class="btn btn-sm">Rename</a>
-      <button type="button" class="btn btn-sm btn-ghost" onclick={remove}>Delete</button>
+      <Button size="sm" href={filesEditUrl(id)}>Rename</Button>
+      <Button size="sm" variant="ghost" onclick={remove}>Delete</Button>
       {#if saved}
-        <span class="muted">{saved}</span>
+        <Text as="span" tone="muted">{saved}</Text>
       {/if}
     </div>
   {/if}
 
-  <a href={filesIndexUrl()}>Back to files</a>
-</main>
+  <Link href={filesIndexUrl()}>Back to files</Link>
+</Page>

@@ -2,9 +2,10 @@
      those in their communities -->
 <script>
   import { t } from "ttag";
-  import AppNav from "../lib/AppNav.svelte";
   import { onSynced, postsList } from "../lib/core/index.js";
   import { postsNewUrl, postsShowUrl } from "../lib/routes.js";
+  import { Button, ErrorMessage, Heading, Link, Panel, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   let posts = $state([]);
   let error = $state("");
@@ -21,34 +22,31 @@
   load();
 </script>
 
-<main class="page">
-  <AppNav />
-  <div class="flex items-center justify-between">
-    <h1>{t`Posts`}</h1>
-    <a href={postsNewUrl()} class="btn btn-primary btn-sm">{t`New post`}</a>
+<Page>
+  <div class="flex items-center justify-between gap-4">
+    <Heading level={1}>{t`Posts`}</Heading>
+    <Button variant="primary" size="sm" href={postsNewUrl()}>{t`New post`}</Button>
   </div>
 
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+  <ErrorMessage message={error} />
 
   {#if posts.length === 0 && !error}
-    <p class="muted">{t`No posts yet.`}</p>
+    <Text tone="muted">{t`No posts yet.`}</Text>
   {/if}
 
-  <ul class="posts">
+  <ul class="flex flex-col gap-3">
     {#each posts as { post, owner, communities } (post.id)}
-      <li class="post">
-        <p class="muted">
+      <Panel as="li">
+        <Text tone="muted">
           {owner.name} · {post.inserted_at}
           {#if communities.length > 0}
             {@const communityNames = communities.map((community) => community.name).join(", ")}
             · {t`in ${communityNames}`}
           {/if}
-        </p>
-        <p class="whitespace-pre-wrap">{post.body}</p>
-        <a href={postsShowUrl(post.id)}>{t`Show`}</a>
-      </li>
+        </Text>
+        <Text class="whitespace-pre-wrap">{post.body}</Text>
+        <Link href={postsShowUrl(post.id)}>{t`Show`}</Link>
+      </Panel>
     {/each}
   </ul>
-</main>
+</Page>

@@ -1,107 +1,104 @@
-<!-- The links between the pages, the current community to switch, the
-     other apps (support, the forum, and ops for staff on the web), who
-     is signed in, by their email, a link to their account, with Sign
-     out, or Sign in and Sign up on the web and Accounts in the app, the
-     theme menu, and inside the app the sync status. A local user has no
-     email and no sign-out: "On this device only", to their profile. A
-     trial user sees the trial's banner above every page, and has no
-     sign-out either, having nothing to sign back in with. -->
+<!-- The app's navigation: a gutter down the window's left edge with a tab
+     per part of the app, the open one joined to the page like a file
+     folder's tab, and the theme menu as a tile at the bottom. On the
+     desktop the macOS window controls sit at its top, and its empty parts
+     drag the window. On small windows the gutter is hidden and BottomBar
+     takes its place. A visitor sees Home only; staff on the web see Ops,
+     another entry, which the router leaves to the browser (`target`).
+     The open tab is the one whose path the page's starts with. -->
 <script>
-  import AccountsPaymentFailedBanner from "../accounts/AccountsPaymentFailedBanner.svelte";
-  import AccountsTrialBanner from "../accounts/AccountsTrialBanner.svelte";
-  import CurrentCommunityMenu from "./CurrentCommunityMenu.svelte";
-  import SyncStatus from "./SyncStatus.svelte";
+  import { t } from "ttag";
+  import BottomBar from "./BottomBar.svelte";
+  import Icon from "./components/Icon.svelte";
   import ThemeMenu from "./ThemeMenu.svelte";
-  import { accountsSignOut, hasDeviceAccounts } from "./core/index.js";
-  import { currentUserForget, currentUserLoad } from "./current_user.js";
-  import { navigateToUrl } from "./router.js";
+  import { currentUserLoad } from "./current_user.js";
+  import { folderTabPath } from "./folder_tab.js";
+  import { currentPathname } from "./router.js";
   import {
-    accountsIndexUrl,
-    accountsSettingsUrl,
-    accountsSignInUrl,
-    accountsSignUpUrl,
     communitiesIndexUrl,
     filesIndexUrl,
     forumIndexUrl,
     homeUrl,
     opsHomeUrl,
     postsIndexUrl,
-    profileEditUrl,
     supportIndexUrl,
   } from "./routes.js";
 
+  /** @typedef {{ id: string, label: string, icon: string, href: string, target?: string }} Link */
+
   /** @type {import("./current_user.js").User | null} */
   let currentUser = $state(null);
-  let busy = $state(false);
-  let error = $state("");
 
-  currentUserLoad().then(
-    (user) => (currentUser = user),
-    () => (currentUser = null),
+  // Asked again on every page, so a sign-in or a sign-out shows here.
+  $effect(() => {
+    currentPathname();
+    currentUserLoad().then(
+      (user) => (currentUser = user),
+      () => (currentUser = null),
+    );
+  });
+
+  /** @type {Link[]} */
+  let links = $derived([
+    { id: "home", label: t`Home`, icon: "hero-home", href: homeUrl() },
+    ...(currentUser
+      ? [
+          { id: "posts", label: t`Posts`, icon: "hero-document-text", href: postsIndexUrl() },
+          { id: "files", label: t`Files`, icon: "hero-folder", href: filesIndexUrl() },
+          { id: "communities", label: t`Communities`, icon: "hero-user-group", href: communitiesIndexUrl() },
+          { id: "support", label: t`Support`, icon: "hero-lifebuoy", href: supportIndexUrl() },
+          { id: "forum", label: t`Forum`, icon: "hero-chat-bubble-left-right", href: forumIndexUrl() },
+        ]
+      : []),
+    ...(currentUser?.is_staff
+      ? [{ id: "ops", label: t`Ops`, icon: "hero-wrench-screwdriver", href: opsHomeUrl(), target: "_self" }]
+      : []),
+  ]);
+
+  let current = $derived(
+    links.find(({ href }) => currentPathname() === href || currentPathname().startsWith(`${href}/`))?.id ?? "",
   );
 
-  async function signOut() {
-    error = "";
-    busy = true;
-    try {
-      await accountsSignOut();
-      currentUserForget();
-      await navigateToUrl(hasDeviceAccounts ? accountsIndexUrl() : accountsSignInUrl());
-    } catch (problem) {
-      error = String(problem);
-    } finally {
-      busy = false;
-    }
-  }
+  /* The shape spills this far under the page, so the two never show a seam;
+     it is clipped there, so it never covers the page. */
+  const OVERLAP = 2;
+  const CORNER_RADIUS = 10;
+  const FEET_RADIUS = 10;
+
+  let width = $state(0);
+  let height = $state(0);
+  /** @type {Record<string, HTMLElement>} */
+  let tiles = $state({});
+
+  // Measured again whenever the gutter is, or the open tab changes.
+  let shape = $derived.by(() => {
+    if (height === 0) return "";
+    const tile = tiles[current];
+    const tab = tile ? { left: tile.offsetLeft, top: tile.offsetTop, bottom: tile.offsetTop + tile.offsetHeight } : null;
+    return folderTabPath({
+      width: width + OVERLAP,
+      height,
+      edge: width,
+      tab,
+      cornerRadius: CORNER_RADIUS,
+      feetRadius: FEET_RADIUS,
+    });
+  });
 </script>
 
-{#if currentUser?.kind === "trial" && currentUser.trial_expires_at}
-  <AccountsTrialBanner trialExpiresAt={currentUser.trial_expires_at} />
-{/if}
-{#if currentUser?.payment_failed_subscription_id}
-  <AccountsPaymentFailedBanner subscriptionId={currentUser.payment_failed_subscription_id} />
-{/if}
-<nav class="flex flex-wrap items-center gap-4">
-  <a href={homeUrl()} class="link">Home</a>
-  {#if currentUser}
-    <CurrentCommunityMenu />
-    <a href={postsIndexUrl()} class="link">Posts</a>
-    <a href={filesIndexUrl()} class="link">Files</a>
-    <a href={communitiesIndexUrl()} class="link">Communities</a>
-    <a href={profileEditUrl()} class="link">Profile</a>
-    <a href={supportIndexUrl()} class="link">Support</a>
-    <a href={forumIndexUrl()} class="link">Forum</a>
-    {#if currentUser.is_staff}
-      <!-- target, so the router leaves the link to the browser: ops is another entry -->
-      <a href={opsHomeUrl()} target="_self" class="link">Ops</a>
-    {/if}
-  {/if}
-  <span class="grow"></span>
-  {#if currentUser}
-    {#if currentUser.kind === "local"}
-      <a href={profileEditUrl()} class="link text-sm">On this device only</a>
-    {:else if currentUser.kind === "trial"}
-      <a href={accountsSignUpUrl("")} class="link text-sm">Trial</a>
-    {:else}
-      <a href={accountsSettingsUrl()} class="link text-sm">{currentUser.email}</a>
-    {/if}
-    {#if hasDeviceAccounts}
-      <a href={accountsIndexUrl()} class="link text-sm">Accounts</a>
-    {/if}
-    {#if currentUser.kind === "full"}
-      <button type="button" class="btn btn-ghost btn-sm" onclick={signOut} disabled={busy}>Sign out</button>
-    {/if}
-  {:else if hasDeviceAccounts}
-    <a href={accountsIndexUrl()} class="link">Accounts</a>
-  {:else}
-    <a href={accountsSignInUrl()} class="link">Sign in</a>
-    <a href={accountsSignUpUrl()} class="link">Sign up</a>
-  {/if}
+<nav class="app-gutter" aria-label={t`Main`} bind:clientWidth={width} bind:clientHeight={height}>
+  <svg class="tab-shape" width={width + OVERLAP} {height} style="clip-path: inset(0 {OVERLAP}px 0 0)" aria-hidden="true">
+    <path d={shape} />
+  </svg>
+  <div class="gutter-top" data-tauri-drag-region></div>
+  {#each links as link (link.id)}
+    <a href={link.href} target={link.target} class="tile" class:current={current === link.id} bind:this={tiles[link.id]}>
+      <Icon name={link.icon} class="tile-icon" />
+      {link.label}
+    </a>
+  {/each}
+  <div class="spacer" data-tauri-drag-region></div>
   <ThemeMenu />
 </nav>
-{#if error}
-  <p class="error">{error}</p>
-{/if}
-{#if currentUser}
-  <SyncStatus />
-{/if}
+
+<BottomBar {links} {current} />

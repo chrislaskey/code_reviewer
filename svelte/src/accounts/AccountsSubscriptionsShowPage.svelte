@@ -9,7 +9,6 @@
      docs/design/purchasing.md, P6 to P9, and
      docs/design/purchasing-phones.md, M4 and M5. -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import {
     accountsStoreGet,
     accountsSubscriptionsGet,
@@ -23,6 +22,8 @@
   import { priceFormat } from "./money.js";
   import { storeManagedWhere, storeName } from "./stores.js";
   import { subscriptionStatusSay } from "./subscription_status.js";
+  import { Button, ErrorMessage, Heading, Link, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   const id = pathParams().id;
   let subscription = $state();
@@ -98,61 +99,58 @@
 
 <svelte:window onfocus={onFocus} />
 
-<main class="page">
-  <AppNav />
+<Page>
 
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+  <ErrorMessage message={error} />
   {#if subscription}
     {@const ended = Boolean(subscription.ended_at) || subscription.status === "canceled"}
-    <h1>{subscription.product_name}</h1>
-    <p>{priceFormat(subscription.price)}</p>
-    <p>{subscriptionStatusSay(subscription.status)}</p>
+    <Heading level={1}>{subscription.product_name}</Heading>
+    <Text>{priceFormat(subscription.price)}</Text>
+    <Text>{subscriptionStatusSay(subscription.status)}</Text>
     {#if subscription.ended_at}
-      <p class="muted">Ended {day(subscription.ended_at)}</p>
+      <Text tone="muted">Ended {day(subscription.ended_at)}</Text>
     {:else if subscription.current_period_end && subscription.cancel_at_period_end}
-      <p class="muted">Ends {day(subscription.current_period_end)}</p>
+      <Text tone="muted">Ends {day(subscription.current_period_end)}</Text>
     {:else if subscription.current_period_end && subscription.gives_plan}
-      <p class="muted">Renews {day(subscription.current_period_end)}</p>
+      <Text tone="muted">Renews {day(subscription.current_period_end)}</Text>
     {/if}
     {#if subscription.scheduled_price && subscription.scheduled_at}
-      <p>Changes to {priceFormat(subscription.scheduled_price)} on {day(subscription.scheduled_at)}.</p>
+      <Text>Changes to {priceFormat(subscription.scheduled_price)} on {day(subscription.scheduled_at)}.</Text>
     {/if}
 
     {#if inBrowser && subscription.store === "stripe"}
-      <p class="muted">Stripe's page is open in your browser. This page updates when you come back.</p>
+      <Text tone="muted">Stripe's page is open in your browser. This page updates when you come back.</Text>
     {/if}
     {#if !ended && subscription.store !== here}
-      <p class="muted">Bought in {storeName(subscription.store)}: manage it {storeManagedWhere(subscription.store)}.</p>
+      <Text tone="muted">Bought in {storeName(subscription.store)}: manage it {storeManagedWhere(subscription.store)}.</Text>
     {:else if !ended && subscription.store !== "stripe"}
       <div class="flex flex-wrap gap-2">
-        <a href={accountsProductsShowUrl(subscription.product_id)} class="btn btn-sm">Switch</a>
-        <button type="button" class="btn btn-sm" onclick={manage}>Manage in {storeName(subscription.store)}</button>
+        <Button size="sm" href={accountsProductsShowUrl(subscription.product_id)}>Switch</Button>
+        <Button size="sm" onclick={manage}>Manage in {storeName(subscription.store)}</Button>
       </div>
     {:else if !ended}
       <div class="flex flex-wrap gap-2">
         {#if subscription.scheduled_price}
-          <button type="button" class="btn btn-sm" disabled={busy} onclick={() => update({ action: "switch_undo" })}>
+          <Button size="sm" disabled={busy} onclick={() => update({ action: "switch_undo" })}>
             Keep {priceFormat(subscription.price)}
-          </button>
+          </Button>
         {/if}
         {#if subscription.cancel_at_period_end}
-          <button type="button" class="btn btn-primary btn-sm" disabled={busy} onclick={() => update({ action: "resume" })}>
+          <Button variant="primary" size="sm" disabled={busy} onclick={() => update({ action: "resume" })}>
             Resume
-          </button>
+          </Button>
         {:else if subscription.gives_plan}
-          <a href={accountsProductsShowUrl(subscription.product_id)} class="btn btn-sm">Switch</a>
-          <button type="button" class="btn btn-ghost btn-sm" disabled={busy} onclick={() => update({ action: "cancel" })}>
+          <Button size="sm" href={accountsProductsShowUrl(subscription.product_id)}>Switch</Button>
+          <Button variant="ghost" size="sm" disabled={busy} onclick={() => update({ action: "cancel" })}>
             Cancel at the end of this period
-          </button>
+          </Button>
         {/if}
-        <button type="button" class="btn btn-sm" disabled={busy} onclick={portal}>
+        <Button size="sm" disabled={busy} onclick={portal}>
           {subscription.gives_plan ? "Card and invoices" : "Update your card"}
-        </button>
+        </Button>
       </div>
     {/if}
   {/if}
 
-  <a href={accountsSubscriptionsIndexUrl()}>Back to plans</a>
-</main>
+  <Link href={accountsSubscriptionsIndexUrl()}>Back to plans</Link>
+</Page>

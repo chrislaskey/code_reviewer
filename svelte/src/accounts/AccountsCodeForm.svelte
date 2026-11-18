@@ -1,6 +1,7 @@
 <!-- The second step of a sign-up or a sign-in: the six-digit code that
      was emailed, and the error the attempt came back with. -->
 <script>
+  import { Button, ErrorMessage, Input, Link, Text } from "../lib/components/index.js";
   /**
    * @typedef {Object} Props
    * @property {string} email where the code went
@@ -23,27 +24,23 @@
 </script>
 
 <form onsubmit={submit} class="flex flex-col gap-3">
-  <p>We sent a code to <strong>{email}</strong>. Enter it to finish; it expires in ten minutes.</p>
-  <input
+  <Text>We sent a code to <strong>{email}</strong>. Enter it to finish; it expires in ten minutes.</Text>
+  <Input
     bind:value={code}
-    type="text"
     inputmode="numeric"
     autocomplete="one-time-code"
     pattern="[0-9 ]*"
-    class="input w-full"
     aria-label="Code"
     placeholder="Code"
     required
   />
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+  <ErrorMessage message={error} />
   {#if resent}
-    <p class="muted text-sm">A new code is on its way; the old one no longer works.</p>
+    <Text tone="muted" size="sm">A new code is on its way; the old one no longer works.</Text>
   {/if}
   <div class="flex flex-wrap items-center gap-3">
-    <button type="submit" class="btn btn-primary" disabled={busy}>Continue</button>
-    <button type="button" class="link text-sm" onclick={onresend} disabled={busy}>Send a new code</button>
-    <button type="button" class="link text-sm" onclick={onstartover} disabled={busy}>Start over</button>
+    <Button variant="primary" type="submit" disabled={busy}>Continue</Button>
+    <Link size="sm" onclick={onresend} disabled={busy}>Send a new code</Link>
+    <Link size="sm" onclick={onstartover} disabled={busy}>Start over</Link>
   </div>
 </form>

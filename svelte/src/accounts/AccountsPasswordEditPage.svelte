@@ -3,9 +3,10 @@
      asked for after the emailed code at a sign-in once the account has
      one. The server keeps it, so in the app this needs a connection. -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import { accountsPasswordUpdate, accountsSecondFactors } from "../lib/core/index.js";
   import { accountsSettingsUrl } from "../lib/routes.js";
+  import { Button, ErrorMessage, Heading, Input, Link, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   /** Whether the account has a password; null until the server answered. */
   let hasPassword = $state(/** @type {boolean | null} */ (null));
@@ -40,39 +41,35 @@
   }
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>{hasPassword ? "Change password" : "Create a password"}</h1>
+<Page>
+  <Heading level={1}>{hasPassword ? "Change password" : "Create a password"}</Heading>
   {#if hasPassword !== null}
     <form onsubmit={save} class="flex flex-col gap-3">
       {#if hasPassword}
-        <input bind:value={current} type="password" autocomplete="current-password" class="input w-full" aria-label="Current password" placeholder="Current password" required />
-        <p class="muted text-sm">Forgot it? Sign out and sign in again; the password step offers a reset when this app allows one.</p>
+        <Input bind:value={current} type="password" autocomplete="current-password" aria-label="Current password" placeholder="Current password" required />
+        <Text tone="muted" size="sm">Forgot it? Sign out and sign in again; the password step offers a reset when this app allows one.</Text>
       {:else}
-        <p>A password is optional. With one, signing in asks for it after the emailed code.</p>
+        <Text>A password is optional. With one, signing in asks for it after the emailed code.</Text>
       {/if}
-      <input
+      <Input
         bind:value={password}
         type="password"
         autocomplete="new-password"
         minlength="12"
-        class="input w-full"
         aria-label="New password"
         placeholder="New password, 12 characters or more"
         required
       />
       {#if saved}
-        <p class="muted" data-saved>Your password is saved.</p>
+        <Text tone="muted" data-saved>Your password is saved.</Text>
       {/if}
-      {#if error}
-        <p class="error">{error}</p>
-      {/if}
+      <ErrorMessage message={error} />
       <div class="flex flex-wrap items-center gap-3">
-        <button type="submit" class="btn btn-primary" disabled={busy}>{hasPassword ? "Change password" : "Create password"}</button>
-        <a href={accountsSettingsUrl()} class="link text-sm">Back to account</a>
+        <Button variant="primary" type="submit" disabled={busy}>{hasPassword ? "Change password" : "Create password"}</Button>
+        <Link size="sm" href={accountsSettingsUrl()}>Back to account</Link>
       </div>
     </form>
   {:else if error}
-    <p class="error">{error}</p>
+    <ErrorMessage message={error} />
   {/if}
-</main>
+</Page>

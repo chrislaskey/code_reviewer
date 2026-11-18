@@ -4,6 +4,7 @@
      docs/design/accounts-local-and-trial-users.md. -->
 <script>
   import { accountsSignUpUrl } from "../lib/routes.js";
+  import { Alert, Button } from "../lib/components/index.js";
 
   /**
    * @typedef {Object} Props
@@ -36,7 +37,7 @@
   }
 </script>
 
-<div class="alert {left > 0 ? 'alert-warning' : 'alert-error'} flex flex-wrap items-center gap-3" role="status" data-trial-banner>
+<Alert tone={left > 0 ? "warning" : "error"} class="flex flex-wrap items-center gap-3" role="status" data-trial-banner>
   {#if left > 0}
     <span class="grow">This is a trial. Sign up within {timeLeft(left)} to keep what you make.</span>
   {:else}
@@ -45,5 +46,5 @@
       what you made.
     </span>
   {/if}
-  <a href={accountsSignUpUrl("")} class="btn btn-sm">Sign up</a>
-</div>
+  <Button size="sm" href={accountsSignUpUrl("")}>Sign up</Button>
+</Alert>

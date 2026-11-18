@@ -9,7 +9,7 @@
 // or a page's code does not load, the page says so above it rather than
 // going nowhere (page_load_error.svelte.js).
 import { Navigation, createRouter } from "sv-router";
-import RemountPageOnNavigation from "./RemountPageOnNavigation.svelte";
+import AppLayout from "./AppLayout.svelte";
 import { hasDeviceAccounts } from "./core/index.js";
 import { currentUserLoad } from "./current_user.js";
 import { pageLoadErrorClear, pageLoadErrorShow } from "./page_load_error.svelte.js";
@@ -54,7 +54,7 @@ import {
 } from "./routes.js";
 
 const { navigate, route } = createRouter({
-  layout: RemountPageOnNavigation,
+  layout: AppLayout,
   hooks: {
     async beforeLoad({ pathname }) {
       pageLoadErrorClear();
@@ -122,6 +122,11 @@ const { navigate, route } = createRouter({
  */
 export function pathParams() {
   return /** @type {Record<string, string>} */ (route.params);
+}
+
+/** The current page's path, such as `/posts/1`; reactive. */
+export function currentPathname() {
+  return route.pathname;
 }
 
 // The router types its paths; ours come from routes.js, so any path goes.

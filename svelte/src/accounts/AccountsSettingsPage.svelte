@@ -2,7 +2,6 @@
      the way to their password, and what they can buy, see
      docs/design/purchasing.md. -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import PublicPagesLinks from "../lib/PublicPagesLinks.svelte";
   import AccountsNeeded from "./AccountsNeeded.svelte";
   import { currentUserLoad } from "../lib/current_user.js";
@@ -13,6 +12,8 @@
     accountsPurchasesIndexUrl,
     accountsSubscriptionsIndexUrl,
   } from "../lib/routes.js";
+  import { Heading, Link, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   /** @type {import("../lib/current_user.js").User | null} */
   let currentUser = $state(null);
@@ -23,26 +24,25 @@
   );
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>Account</h1>
+<Page>
+  <Heading level={1}>Account</Heading>
   {#if currentUser && currentUser.kind !== "full"}
     <AccountsNeeded kind={currentUser.kind} />
     {#if currentUser.kind === "trial"}
-      <p><a href={accountsDeletionsNewUrl()} class="link">Delete my trial</a></p>
+      <Text><Link href={accountsDeletionsNewUrl()}>Delete my trial</Link></Text>
     {/if}
   {:else}
     {#if currentUser}
-      <p>{currentUser.email}</p>
+      <Text>{currentUser.email}</Text>
     {/if}
-    <p><a href={accountsPasswordEditUrl()} class="link">Password</a></p>
+    <Text><Link href={accountsPasswordEditUrl()}>Password</Link></Text>
     {#if currentUser?.plan}
-      <p>Your plan: {currentUser.plan.product_name}</p>
+      <Text>Your plan: {currentUser.plan.product_name}</Text>
     {/if}
-    <p><a href={accountsSubscriptionsIndexUrl()} class="link">Plans</a></p>
-    <p><a href={accountsProductsIndexUrl()} class="link">Plans and products for sale</a></p>
-    <p><a href={accountsPurchasesIndexUrl()} class="link">Purchases</a></p>
-    <p><a href={accountsDeletionsNewUrl()} class="link text-error">Delete my account</a></p>
+    <Text><Link href={accountsSubscriptionsIndexUrl()}>Plans</Link></Text>
+    <Text><Link href={accountsProductsIndexUrl()}>Plans and products for sale</Link></Text>
+    <Text><Link href={accountsPurchasesIndexUrl()}>Purchases</Link></Text>
+    <Text><Link tone="danger" href={accountsDeletionsNewUrl()}>Delete my account</Link></Text>
   {/if}
-  <p class="muted"><PublicPagesLinks /></p>
-</main>
+  <Text tone="muted"><PublicPagesLinks /></Text>
+</Page>

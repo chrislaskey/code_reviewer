@@ -1,11 +1,12 @@
 <!-- Renaming a file, at /files/:id/edit, the one thing about a file
      that changes; done, it shows the file -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import FieldErrors from "../lib/FieldErrors.svelte";
   import { FormError, filesGet, filesUpdate } from "../lib/core/index.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { filesShowUrl } from "../lib/routes.js";
+  import { Button, ErrorMessage, Heading, Input, Label, Link } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   const id = pathParams().id;
   let loaded = $state(false);
@@ -44,25 +45,23 @@
   load();
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>Rename file</h1>
+<Page>
+  <Heading level={1}>Rename file</Heading>
   {#if loaded}
     <form onsubmit={save} class="flex flex-col gap-3">
-      <label class="flex flex-col gap-1">
-        <span>Name</span>
-        <input type="text" class="input w-full" bind:value={name} disabled={busy} />
+      <Label text="Name">
+        <Input bind:value={name} disabled={busy} />
         <FieldErrors {errors} fields={["name"]} />
-      </label>
+      </Label>
       {#if error && Object.keys(errors).length === 0}
-        <p class="error">{error}</p>
+        <ErrorMessage message={error} />
       {/if}
       <div>
-        <button type="submit" class="btn btn-primary" disabled={busy}>Save</button>
+        <Button variant="primary" type="submit" disabled={busy}>Save</Button>
       </div>
     </form>
   {:else if error}
-    <p class="error">{error}</p>
+    <ErrorMessage message={error} />
   {/if}
-  <a href={filesShowUrl(id)}>Back to the file</a>
-</main>
+  <Link href={filesShowUrl(id)}>Back to the file</Link>
+</Page>

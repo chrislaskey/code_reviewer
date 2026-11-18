@@ -3,7 +3,7 @@
      `app:set-theme` event the theme script in the page's <head> listens
      for (theme_script.js), then calls `onchoose`. -->
 <script>
-  import Icon from "./Icon.svelte";
+  import Icon from "./components/Icon.svelte";
   import { THEMES, currentTheme } from "./themes.js";
 
   /**

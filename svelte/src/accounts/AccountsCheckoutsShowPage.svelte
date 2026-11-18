@@ -5,7 +5,6 @@
      page asks again when the app has the focus. See
      docs/design/purchasing.md, P3. -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import { accountsCheckoutsGet, hasDeviceAccounts } from "../lib/core/index.js";
   import { currentUserReload } from "../lib/current_user.js";
   import { pathParams } from "../lib/router.js";
@@ -14,6 +13,8 @@
     accountsPurchasesShowUrl,
     accountsSubscriptionsIndexUrl,
   } from "../lib/routes.js";
+  import { ErrorMessage, Heading, Link, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   const ASK_AGAIN_MS = 3000;
   const ASK_AT_MOST = 40;
@@ -50,34 +51,31 @@
 
 <svelte:window onfocus={onFocus} />
 
-<main class="page">
-  <AppNav />
-  <h1>Checkout</h1>
+<Page>
+  <Heading level={1}>Checkout</Heading>
 
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+  <ErrorMessage message={error} />
   {#if checkout}
     {#if checkout.status === "paid"}
-      <p>Thank you. {checkout.product_name} is yours.</p>
+      <Text>Thank you. {checkout.product_name} is yours.</Text>
       {#if checkout.purchase_id}
-        <p><a href={accountsPurchasesShowUrl(checkout.purchase_id)} class="link">See the purchase</a></p>
+        <Text><Link href={accountsPurchasesShowUrl(checkout.purchase_id)}>See the purchase</Link></Text>
       {:else if checkout.kind === "plan"}
-        <p><a href={accountsSubscriptionsIndexUrl()} class="link">See your plan</a></p>
+        <Text><Link href={accountsSubscriptionsIndexUrl()}>See your plan</Link></Text>
       {/if}
     {:else if checkout.status === "processing"}
-      <p>Your payment for {checkout.product_name} is processing. This page updates when it is done.</p>
+      <Text>Your payment for {checkout.product_name} is processing. This page updates when it is done.</Text>
     {:else if checkout.status === "open" && hasDeviceAccounts}
-      <p>Finish paying for {checkout.product_name} in your browser. This page updates when you come back.</p>
+      <Text>Finish paying for {checkout.product_name} in your browser. This page updates when you come back.</Text>
     {:else if checkout.status === "open"}
-      <p>{checkout.product_name} is not paid yet.</p>
-      <p><a href={accountsProductsShowUrl(checkout.product_id)} class="link">Back to {checkout.product_name}</a></p>
+      <Text>{checkout.product_name} is not paid yet.</Text>
+      <Text><Link href={accountsProductsShowUrl(checkout.product_id)}>Back to {checkout.product_name}</Link></Text>
     {:else}
-      <p>
+      <Text>
         {checkout.status === "failed" ? "The payment did not go through" : "This checkout expired"}, and
         nothing was charged.
-      </p>
-      <p><a href={accountsProductsShowUrl(checkout.product_id)} class="link">Try again</a></p>
+      </Text>
+      <Text><Link href={accountsProductsShowUrl(checkout.product_id)}>Try again</Link></Text>
     {/if}
   {/if}
-</main>
+</Page>

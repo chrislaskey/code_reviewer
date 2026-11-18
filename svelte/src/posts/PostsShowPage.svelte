@@ -1,11 +1,12 @@
 <!-- One post, at /posts/:id, with its Edit and Delete for its owner -->
 <script>
   import { t } from "ttag";
-  import AppNav from "../lib/AppNav.svelte";
   import { onSynced, postsDelete, postsGet } from "../lib/core/index.js";
   import { currentUserLoad } from "../lib/current_user.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { postsEditUrl, postsIndexUrl } from "../lib/routes.js";
+  import { Button, ErrorMessage, Heading, Link, Panel, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   const id = pathParams().id;
   let shown = $state();
@@ -34,31 +35,28 @@
   load();
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>{t`Post`}</h1>
+<Page>
+  <Heading level={1}>{t`Post`}</Heading>
 
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+  <ErrorMessage message={error} />
   {#if shown}
-    <article class="post">
-      <p class="muted">
+    <Panel as="article">
+      <Text tone="muted">
         {shown.owner.name} · {shown.post.inserted_at}
         {#if shown.communities.length > 0}
           {@const communityNames = shown.communities.map((community) => community.name).join(", ")}
           · {t`in ${communityNames}`}
         {/if}
-      </p>
-      <p class="whitespace-pre-wrap">{shown.post.body}</p>
-    </article>
+      </Text>
+      <Text class="whitespace-pre-wrap">{shown.post.body}</Text>
+    </Panel>
     {#if currentUser && shown.post.user_id === currentUser.id}
       <div class="flex gap-2">
-        <a href={postsEditUrl(shown.post.id)} class="btn btn-sm">{t`Edit`}</a>
-        <button type="button" class="btn btn-sm btn-ghost" onclick={remove}>{t`Delete`}</button>
+        <Button size="sm" href={postsEditUrl(shown.post.id)}>{t`Edit`}</Button>
+        <Button size="sm" variant="ghost" onclick={remove}>{t`Delete`}</Button>
       </div>
     {/if}
   {/if}
 
-  <a href={postsIndexUrl()}>{t`Back to posts`}</a>
-</main>
+  <Link href={postsIndexUrl()}>{t`Back to posts`}</Link>
+</Page>

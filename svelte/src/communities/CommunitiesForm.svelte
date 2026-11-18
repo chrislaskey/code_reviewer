@@ -2,6 +2,7 @@
      bound to the page's `name`, with the messages a write came back with. -->
 <script>
   import FieldErrors from "../lib/FieldErrors.svelte";
+  import { Button, ErrorMessage, Input, Label } from "../lib/components/index.js";
 
   /**
    * @typedef {Object} Props
@@ -24,15 +25,14 @@
 </script>
 
 <form onsubmit={submit} class="flex flex-col gap-3">
-  <label class="flex flex-col gap-1">
-    <span>Name</span>
-    <input type="text" class="input w-full" bind:value={name} maxlength="80" disabled={busy} />
+  <Label text="Name">
+    <Input bind:value={name} maxlength="80" disabled={busy} />
     <FieldErrors {errors} fields={["name"]} />
-  </label>
+  </Label>
   {#if error && Object.keys(errors).length === 0}
-    <p class="error">{error}</p>
+    <ErrorMessage message={error} />
   {/if}
   <div>
-    <button type="submit" class="btn btn-primary" disabled={busy}>{submitText}</button>
+    <Button variant="primary" type="submit" disabled={busy}>{submitText}</Button>
   </div>
 </form>

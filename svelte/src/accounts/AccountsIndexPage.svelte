@@ -7,7 +7,6 @@
      up or in, they are asked whether what they made moves into the
      account, see docs/design/accounts-local-and-trial-users.md. -->
 <script>
-  import AppNav from "../lib/AppNav.svelte";
   import {
     accountsSignInCancel,
     accountsSignInFinish,
@@ -28,6 +27,8 @@
   import AccountsMoveDialog from "./AccountsMoveDialog.svelte";
   import AccountsRemoveDialog from "./AccountsRemoveDialog.svelte";
   import AccountsSignInDialog from "./AccountsSignInDialog.svelte";
+  import { Badge, Button, ErrorMessage, Heading, Panel, Text } from "../lib/components/index.js";
+  import Page from "../lib/Page.svelte";
 
   /** @typedef {{user_id: string, email: string, signed_in: boolean, local: boolean, active: boolean, last_active_at: string}} DeviceAccount */
 
@@ -172,52 +173,49 @@
   load();
 </script>
 
-<main class="page">
-  <AppNav />
-  <h1>Accounts on this device</h1>
+<Page>
+  <Heading level={1}>Accounts on this device</Heading>
   {#if accountDeleted}
-    <p class="muted">This account was deleted, and removed from this device.</p>
+    <Text tone="muted">This account was deleted, and removed from this device.</Text>
   {/if}
 
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+  <ErrorMessage message={error} />
 
   {#if accounts.length === 0 && !error}
-    <p class="muted">No account yet.</p>
+    <Text tone="muted">No account yet.</Text>
   {/if}
 
-  <ul class="posts">
+  <ul class="flex flex-col gap-3">
     {#each accounts as account (account.user_id)}
-      <li class="post flex flex-wrap items-center gap-3">
+      <Panel as="li" layout="row" class="flex-wrap">
         <span class="grow">{account.local ? "On this device only" : account.email}</span>
         {#if account.local}
-          <button type="button" class="btn btn-sm btn-primary" onclick={() => openBrowser(null)} disabled={busy}>
+          <Button size="sm" variant="primary" onclick={() => openBrowser(null)} disabled={busy}>
             Sign up or sign in
-          </button>
+          </Button>
         {/if}
         {#if account.active}
-          <span class="badge badge-primary badge-sm">Active</span>
+          <Badge tone="primary">Active</Badge>
         {:else if account.signed_in}
-          <button type="button" class="btn btn-sm" onclick={() => switchTo(account)} disabled={busy}>Switch</button>
+          <Button size="sm" onclick={() => switchTo(account)} disabled={busy}>Switch</Button>
         {:else}
-          <span class="badge badge-ghost badge-sm">Signed out</span>
-          <button type="button" class="btn btn-sm" onclick={() => openBrowser(account.email)} disabled={busy}>Sign in</button>
+          <Badge tone="ghost">Signed out</Badge>
+          <Button size="sm" onclick={() => openBrowser(account.email)} disabled={busy}>Sign in</Button>
         {/if}
-        <button type="button" class="btn btn-sm btn-ghost" onclick={() => ((loss = null), (removing = account))} disabled={busy}>
+        <Button size="sm" variant="ghost" onclick={() => ((loss = null), (removing = account))} disabled={busy}>
           Remove from device
-        </button>
-      </li>
+        </Button>
+      </Panel>
     {/each}
   </ul>
 
   <div class="flex flex-wrap items-center gap-3">
-    <button type="button" class="btn btn-sm" onclick={() => openBrowser(null)} disabled={busy}>
+    <Button size="sm" onclick={() => openBrowser(null)} disabled={busy}>
       {accounts.length === 0 ? "Sign up or sign in" : "Add account"}
-    </button>
+    </Button>
     {#if canSkip}
-      <button type="button" class="btn btn-sm btn-ghost" onclick={skip} disabled={busy} data-skip>Skip</button>
-      <span class="muted text-sm">Use the app on this device only, with no account. You can sign up later.</span>
+      <Button size="sm" variant="ghost" onclick={skip} disabled={busy} data-skip>Skip</Button>
+      <Text as="span" tone="muted" size="sm">Use the app on this device only, with no account. You can sign up later.</Text>
     {/if}
   </div>
 
@@ -245,4 +243,4 @@
     onremove={remove}
     oncancel={() => ((removing = null), (loss = null))}
   />
-</main>
+</Page>

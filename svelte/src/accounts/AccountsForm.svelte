@@ -2,6 +2,7 @@
      field on Sign up, the choice to stay signed in on this browser, and
      the error the attempt came back with. -->
 <script>
+  import { Button, Checkbox, ErrorMessage, Input, Text } from "../lib/components/index.js";
   /**
    * @typedef {Object} Props
    * @property {string} email
@@ -26,20 +27,15 @@
 
 <form onsubmit={submit} class="flex flex-col gap-3">
   {#if withName}
-    <input bind:value={name} type="text" autocomplete="name" class="input w-full" aria-label="Name" placeholder="Name" maxlength="80" required />
+    <Input bind:value={name} autocomplete="name" aria-label="Name" placeholder="Name" maxlength="80" required />
   {/if}
-  <input bind:value={email} type="email" autocomplete="email" class="input w-full" aria-label="Email" placeholder="Email" required />
+  <Input bind:value={email} type="email" autocomplete="email" aria-label="Email" placeholder="Email" required />
   {#if withKeepSignedIn}
-    <label class="flex items-center gap-2 text-sm">
-      <input bind:checked={keepSignedIn} type="checkbox" />
-      Keep me signed in on this browser
-    </label>
+    <Checkbox bind:checked={keepSignedIn} size="sm">Keep me signed in on this browser</Checkbox>
   {/if}
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
-  <p class="muted text-sm">We will email you a code to continue.</p>
+  <ErrorMessage message={error} />
+  <Text tone="muted" size="sm">We will email you a code to continue.</Text>
   <div>
-    <button type="submit" class="btn btn-primary" disabled={busy}>{submitText}</button>
+    <Button variant="primary" type="submit" disabled={busy}>{submitText}</Button>
   </div>
 </form>
