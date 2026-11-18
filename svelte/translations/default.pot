@@ -36,7 +36,7 @@ msgstr ""
 msgid "New post"
 msgstr ""
 
-#: src/lib/AppNav.svelte:38
+#: src/lib/AppNav.svelte:28
 #: src/posts/PostsIndexPage.svelte:23
 msgid "Posts"
 msgstr ""
@@ -79,6 +79,56 @@ msgstr ""
 msgid "Theme"
 msgstr ""
 
+#: src/lib/SyncMenu.svelte:55
+msgid "Sync"
+msgstr ""
+
+#: src/lib/SyncMenu.svelte:56
+msgid "Offline"
+msgstr ""
+
+#: src/lib/SyncMenu.svelte:57
+#, javascript-format
+msgid "${ status.conflicts } not saved"
+msgstr ""
+
+#: src/lib/SyncMenu.svelte:58
+#, javascript-format
+msgid "${ status.pending } waiting"
+msgstr ""
+
+#: src/lib/SyncMenu.svelte:61
+msgid "Working offline"
+msgstr ""
+
+#: src/lib/SyncMenu.svelte:64
+#, javascript-format
+msgid "${ status.conflicts } change was not saved on the server"
+msgid_plural "${ status.conflicts } changes were not saved on the server"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/lib/SyncMenu.svelte:69
+#, javascript-format
+msgid "${ status.pending } waiting to sync"
+msgstr ""
+
+#: src/lib/SyncMenu.svelte:70
+msgid "Everything is synced"
+msgstr ""
+
+#: src/lib/SyncMenu.svelte:74
+msgid "Go online"
+msgstr ""
+
+#: src/lib/SyncMenu.svelte:77
+msgid "Sync now"
+msgstr ""
+
+#: src/lib/SyncMenu.svelte:80
+msgid "Work offline"
+msgstr ""
+
 #: src/lib/BottomBar.svelte:32
 msgid "Close menu"
 msgstr ""
@@ -88,47 +138,96 @@ msgstr ""
 msgid "Menu"
 msgstr ""
 
-#: src/lib/AppNav.svelte:80
+#: src/lib/AppNav.svelte:70
 #: src/lib/BottomBar.svelte:42
 msgid "Main"
 msgstr ""
 
+#: src/lib/AppHeader.svelte:19
+#: src/lib/AppHeader.svelte:20
 #: src/lib/BottomBar.svelte:49
 msgid "Back"
 msgstr ""
 
+#: src/lib/AppHeader.svelte:23
+#: src/lib/AppHeader.svelte:24
 #: src/lib/BottomBar.svelte:52
 msgid "Forward"
 msgstr ""
 
-#: src/lib/AppNav.svelte:35
+#: src/lib/AppNav.svelte:25
 #. * @type {Link[]} 
 msgid "Home"
 msgstr ""
 
-#: src/lib/AppNav.svelte:39
+#: src/lib/AppNav.svelte:29
 #. * @type {Link[]} 
 msgid "Files"
 msgstr ""
 
-#: src/lib/AppNav.svelte:40
+#: src/lib/AppNav.svelte:30
 #. * @type {Link[]} 
 msgid "Communities"
 msgstr ""
 
-#: src/lib/AppNav.svelte:41
+#: src/lib/AppNav.svelte:31
 #. * @type {Link[]} 
 msgid "Support"
 msgstr ""
 
-#: src/lib/AppNav.svelte:42
+#: src/lib/AppNav.svelte:32
 #. * @type {Link[]} 
 msgid "Forum"
 msgstr ""
 
-#: src/lib/AppNav.svelte:46
+#: src/lib/AppNav.svelte:36
 #. * @type {Link[]} 
 msgid "Ops"
+msgstr ""
+
+#: src/lib/AccountMenu.svelte:45
+msgid "Account"
+msgstr ""
+
+#: src/lib/AccountMenu.svelte:48
+msgid "Trial"
+msgstr ""
+
+#: src/lib/AccountMenu.svelte:49
+msgid "Sign up to keep what you make."
+msgstr ""
+
+#: src/lib/AccountMenu.svelte:51
+msgid "On this device only"
+msgstr ""
+
+#: src/lib/AccountMenu.svelte:54
+#: src/lib/AccountMenu.svelte:73
+msgid "Sign up"
+msgstr ""
+
+#: src/lib/AccountMenu.svelte:57
+msgid "Profile"
+msgstr ""
+
+#: src/lib/AccountMenu.svelte:60
+msgid "Account settings"
+msgstr ""
+
+#: src/lib/AccountMenu.svelte:63
+msgid "Switch account"
+msgstr ""
+
+#: src/lib/AccountMenu.svelte:66
+msgid "Sign out"
+msgstr ""
+
+#: src/lib/AccountMenu.svelte:69
+msgid "Accounts"
+msgstr ""
+
+#: src/lib/AccountMenu.svelte:71
+msgid "Sign in"
 msgstr ""
 
 #: src/posts/PostsNewPage.svelte:29

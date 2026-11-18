@@ -1,8 +1,8 @@
 <!-- The app's navigation: a gutter down the window's left edge with a tab
      per part of the app, the open one joined to the page like a file
-     folder's tab, and the theme menu as a tile at the bottom. On the
-     desktop the macOS window controls sit at its top, and its empty parts
-     drag the window. On small windows the gutter is hidden and BottomBar
+     folder's tab, and the theme menu as a tile at the bottom, below the
+     app's header (AppHeader). On the desktop its empty parts drag the
+     window. On small windows the gutter is hidden and BottomBar
      takes its place. A visitor sees Home only; staff on the web see Ops,
      another entry, which the router leaves to the browser (`target`).
      The open tab is the one whose path the page's starts with. -->
@@ -11,7 +11,6 @@
   import BottomBar from "./BottomBar.svelte";
   import Icon from "./components/Icon.svelte";
   import ThemeMenu from "./ThemeMenu.svelte";
-  import { currentUserLoad } from "./current_user.js";
   import { folderTabPath } from "./folder_tab.js";
   import { currentPathname } from "./router.js";
   import {
@@ -26,17 +25,8 @@
 
   /** @typedef {{ id: string, label: string, icon: string, href: string, target?: string }} Link */
 
-  /** @type {import("./current_user.js").User | null} */
-  let currentUser = $state(null);
-
-  // Asked again on every page, so a sign-in or a sign-out shows here.
-  $effect(() => {
-    currentPathname();
-    currentUserLoad().then(
-      (user) => (currentUser = user),
-      () => (currentUser = null),
-    );
-  });
+  /** @type {{ currentUser: import("./current_user.js").User | null }} */
+  let { currentUser } = $props();
 
   /** @type {Link[]} */
   let links = $derived([
@@ -90,7 +80,7 @@
   <svg class="tab-shape" width={width + OVERLAP} {height} style="clip-path: inset(0 {OVERLAP}px 0 0)" aria-hidden="true">
     <path d={shape} />
   </svg>
-  <div class="gutter-top" data-tauri-drag-region></div>
+  <div class="gutter-top"></div>
   {#each links as link (link.id)}
     <a href={link.href} target={link.target} class="tile" class:current={current === link.id} bind:this={tiles[link.id]}>
       <Icon name={link.icon} class="tile-icon" />

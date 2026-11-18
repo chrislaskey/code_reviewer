@@ -15,6 +15,12 @@
   --title-bar-height: 28px;
   --page-inset-top: 0px;
   --page-inset-bottom: 0px;
+  /* The app's header across the window's top (AppHeader), below a phone's
+     status bar; on the desktop the window controls sit inside it, at its
+     left, see `trafficLightPosition` in tauri.conf.json. */
+  --app-header-height: 44px;
+  --app-header-inset-top: var(--page-inset-top);
+  --window-controls-width: 0px;
   /* The navigation gutter down the window's left edge (AppNav): half a
      shade darker than the page, which sits on top of it with the open
      tab. On small windows the bar along the bottom (BottomBar) takes its
@@ -34,6 +40,8 @@
 
 [data-app="desktop"] {
   --page-inset-top: var(--title-bar-height);
+  --app-header-inset-top: 0px;
+  --window-controls-width: 84px;
 }
 
 [data-app="mobile"] {
@@ -77,9 +85,10 @@ body {
   }
 }
 
-/* The app's pages (AppLayout), clear of the gutter and the bottom bar;
-   the body already keeps clear of the home indicator in the app. */
+/* The app's pages (AppLayout), clear of the header, the gutter and the
+   bottom bar; the body already keeps clear of the window chrome. */
 .app-layout {
+  padding-top: calc(var(--app-header-inset-top) + var(--app-header-height) - var(--page-inset-top));
   padding-left: var(--gutter-width);
   padding-bottom: max(0px, var(--bottom-bar-height) - var(--page-inset-bottom));
 }
@@ -98,11 +107,85 @@ body {
   margin: 0;
 }
 
-/* The navigation gutter (AppNav): fixed down the window's left edge, so
-   it stays put while the page scrolls. */
+/* A banner above every page, such as the trial's (AppLayout). */
+.app-banner {
+  padding: 1rem 1.5rem 0;
+}
+
+/* The app's header (AppHeader): fixed across the window's top in the
+   gutter's colour, above the title bar's strip; its items start where the
+   page does, clear of the window controls, and a hairline parts it from
+   the page. */
+.app-header {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 21;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: calc(var(--app-header-inset-top) + var(--app-header-height));
+  padding: var(--app-header-inset-top) 0.75rem 0
+    calc(max(var(--gutter-width), var(--window-controls-width)) + 0.75rem);
+  background: var(--gutter-bg);
+}
+
+.app-header::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 var(--gutter-width);
+  height: 1px;
+  background: var(--gutter-ring);
+  pointer-events: none;
+}
+
+/* Back and Forward, only in the desktop app, which has no browser's
+   buttons; on small windows they are the bottom bar's. */
+.app-header-history {
+  display: none;
+}
+
+[data-app="desktop"] .app-header-history {
+  display: flex;
+  gap: 2px;
+}
+
+@media (width < 40rem) {
+  [data-app="desktop"] .app-header-history {
+    display: none;
+  }
+}
+
+/* A header menu's panel (HeaderMenu), below its button, at its right. */
+.header-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  width: 17rem;
+  padding: 0.25rem;
+  border-radius: var(--radius-box);
+  background: var(--color-base-100);
+  box-shadow: var(--raised-shadow);
+}
+
+/* The person's initials in place of an avatar (AccountMenu). */
+.avatar-initials {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--color-primary) 18%, transparent);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* The navigation gutter (AppNav): fixed down the window's left edge below
+   the header, so it stays put while the page scrolls. */
 .app-gutter {
   position: fixed;
-  inset: 0 auto 0 0;
+  inset: calc(var(--app-header-inset-top) + var(--app-header-height)) auto 0 0;
   z-index: 20;
   display: flex;
   flex-direction: column;
@@ -117,11 +200,10 @@ body {
   }
 }
 
-/* Above the tabs, the page's top padding, and room for the macOS window
-   controls on the desktop and the status bar on a tablet. */
+/* Above the tabs, the page's top padding. */
 .app-gutter .gutter-top {
   flex-shrink: 0;
-  height: calc(var(--page-inset-top) + 1.5rem);
+  height: 1.5rem;
 }
 
 /* The page's edge and the open tab as one shape, so one shadow follows the

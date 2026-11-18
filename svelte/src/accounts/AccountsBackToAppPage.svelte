@@ -7,7 +7,7 @@
   import Page from "../lib/Page.svelte";
 </script>
 
-<Page topBar={false}>
+<Page>
   <Heading level={1}>All done here</Heading>
   <Text>Go back to the app. It shows what changed when you do.</Text>
   <Text tone="muted">You can close this tab.</Text>
