@@ -26,6 +26,7 @@ const CONTENT_REDIRECT_SECONDS: u64 = files::DOWNLOAD_URL_LIFETIME.as_secs() - 5
 #[derive(Deserialize)]
 pub struct FileFields {
     pub name: String,
+    pub community_ids: Vec<Uuid>,
 }
 
 #[derive(Deserialize)]
@@ -75,7 +76,7 @@ pub async fn update(
     Json(fields): Json<FileFields>,
 ) -> Result<Json<File>, ApiError> {
     Ok(Json(
-        files::update(&deployment, &user, id, &fields.name).await?,
+        files::update(&deployment, &user, id, &fields.name, &fields.community_ids).await?,
     ))
 }
 

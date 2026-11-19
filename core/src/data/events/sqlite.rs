@@ -271,6 +271,7 @@ pub async fn delete_of_missing_rows(connection: &mut SqliteConnection) -> Result
         "DELETE FROM app_events WHERE
            (table_name = 'app_posts' AND row_id NOT IN (SELECT id FROM app_posts))
            OR (table_name = 'app_files' AND row_id NOT IN (SELECT id FROM app_files))
+           OR (table_name = 'app_files_communities' AND row_id NOT IN (SELECT id FROM app_files_communities))
            OR (table_name = 'app_posts_communities' AND row_id NOT IN (SELECT id FROM app_posts_communities))
            OR (table_name = 'app_users_communities' AND row_id NOT IN (SELECT id FROM app_users_communities))
            OR (table_name = 'app_communities' AND row_id NOT IN (SELECT id FROM app_communities))

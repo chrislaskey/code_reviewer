@@ -23,6 +23,7 @@ pub(crate) mod credentials;
 pub(crate) mod device_settings;
 pub(crate) mod events;
 pub(crate) mod files;
+pub(crate) mod files_communities;
 pub(crate) mod jobs;
 pub(crate) mod local_users;
 pub(crate) mod memberships;

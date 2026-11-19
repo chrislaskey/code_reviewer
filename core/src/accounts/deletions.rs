@@ -2,15 +2,17 @@
 //! `docs/design/accounts-delete.md`. A full user asks for a code,
 //! `code_create`, which is mailed as a sign-in's is, and gives it back
 //! to `create`, which deletes everything of theirs in one transaction:
-//! their posts, files and memberships, and a community nobody else is
-//! in, each soft-deleted as an event in their name, so every device
-//! that pulled a row sees it go; their user, named "Deleted user"; their
-//! staff row; and their account, so sign-in finds it no longer and a
-//! token of theirs is answered `410`. Then, outside the transaction, a
-//! Stripe plan is ended at once and the customer deleted, the bytes of
-//! their files and pictures are deleted, and they are mailed; a failure
-//! there is logged and left to the daily jobs. The purge removes the
-//! rows 90 days later.
+//! their posts and memberships, and a community nobody else is in, each
+//! soft-deleted as an event in their name, so every device that pulled
+//! a row sees it go; their user, named "Deleted user"; their staff row;
+//! and their account, so sign-in finds it no longer and a token of
+//! theirs is answered `410`. Their files belong to their communities:
+//! those in a community deleted with them go with it, the rest stay,
+//! see `files_communities`. Then, outside the transaction, a Stripe plan
+//! is ended at once and the customer deleted, their pictures are
+//! deleted, and they are mailed; a failure there is logged and left to
+//! the daily jobs. The purge removes the rows 90 days later, and the
+//! sweep the bytes of the files deleted.
 //!
 //! A trial user needs no code, having no real email, and goes outright,
 //! as their trial would. A local user has no account on the server.
@@ -19,7 +21,6 @@
 use crate::data::accounts_subscriptions as accounts_subscriptions_records;
 #[cfg(any(feature = "stripe", test))]
 use crate::data::accounts_users as accounts_users_records;
-use crate::data::files as files_records;
 use crate::data::memberships as memberships_records;
 use crate::data::ops_staff as ops_staff_records;
 use thiserror::Error;
@@ -31,7 +32,6 @@ use crate::communities::{self, CommunityError};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::events::{Answer, AnswerStatus, Event, Fields};
-use crate::files::{self, FileError};
 use crate::mailer::{MailError, Mailer};
 use crate::memberships::{self, MembershipError};
 use crate::posts::{self, PostError};
@@ -54,8 +54,6 @@ pub enum DeletionError {
     AccountUser(#[from] AccountUserError),
     #[error(transparent)]
     Post(#[from] PostError),
-    #[error(transparent)]
-    File(#[from] FileError),
     #[error(transparent)]
     Membership(#[from] MembershipError),
     #[error(transparent)]
@@ -146,10 +144,6 @@ async fn delete_in(tx: &mut Transaction, user: &User) -> Result<(), DeletionErro
     for post in crate::data::posts::list(tx, crate::data::posts::Filter::OwnedBy(user.id)).await? {
         let event = deleted_event(posts::TABLE, post.id, post.version);
         refused_unless_applied(&posts::apply_in(tx, role, user, &event).await?.answer)?;
-    }
-    for file in files_records::list(&mut *tx, user.id).await? {
-        let event = deleted_event(files::TABLE, file.id, file.version);
-        refused_unless_applied(&files::apply_in(tx, role, user, &event, true).await?.answer)?;
     }
     for membership in
         memberships_records::list(&mut *tx, memberships_records::Filter::User(user.id)).await?
@@ -293,13 +287,10 @@ async fn stripe_end(deployment: &Deployment, left: StripeLeft) {
     }
 }
 
-/// Step 8: the bytes of their files and their pictures deleted now; a
-/// failure is logged, and the sweeps take what no live row points at.
+/// Step 8: their pictures deleted now; a failure is logged, and the
+/// sweep takes what no live row points at.
 #[cfg(feature = "object-storage")]
 async fn bucket_empty(deployment: &Deployment, user_id: Uuid) {
-    if let Err(error) = files::delete_bytes_of_user(deployment, user_id).await {
-        tracing::warn!("could not delete the files of {user_id}: {error}");
-    }
     if let Err(error) = crate::avatars::delete_of_user(deployment, user_id).await {
         tracing::warn!("could not delete the pictures of {user_id}: {error}");
     }
@@ -428,6 +419,80 @@ mod tests {
             assert!(mail.subject.contains("No "), "no account to sign in to");
             let again = signed_up_for_a_device(&server, "alice@example.com").await;
             assert_ne!(again.user.id, alice.user.id, "a new account");
+        })
+        .await;
+    }
+
+    #[cfg(feature = "object-storage")]
+    #[tokio::test]
+    async fn deletions_create_leaves_the_files_of_communities_with_other_members() {
+        use crate::files::tests::{new_file, server as server_with_bucket};
+        use crate::files::{self, FileNew};
+
+        with_each_database(|database| async move {
+            let (server, storage) = server_with_bucket(database);
+            let mailer = Mailer::memory();
+            let alice = signed_up_for_a_device(&server, "alice@example.com").await;
+            let bob = signed_up_for_a_device(&server, "bob@example.com").await;
+            let shared = communities::create(&server, &alice.user, "Shared")
+                .await
+                .expect("a community");
+            memberships::join(&server, &bob.user, shared.id)
+                .await
+                .expect("joined");
+            let personal = memberships::list_mine(&server, &alice.user)
+                .await
+                .expect("the memberships")
+                .into_iter()
+                .map(|membership| membership.community_id)
+                .find(|id| *id != shared.id)
+                .expect("alice's own community");
+            let mut created = Vec::new();
+            for (name, community_id) in [("shared.txt", shared.id), ("private.txt", personal)] {
+                let new = FileNew {
+                    community_ids: vec![community_id],
+                    ..new_file(name, b"bytes", community_id)
+                };
+                storage
+                    .put(
+                        &files::storage_key(alice.user.id, new.id),
+                        b"bytes".to_vec(),
+                    )
+                    .await
+                    .expect("the upload");
+                created.push(
+                    files::create(&server, &alice.user, &new)
+                        .await
+                        .expect("a file"),
+                );
+            }
+
+            let code = code_mailed(&server, &mailer, &alice).await;
+            create(&server, &mailer, &alice.user, Some(&code))
+                .await
+                .expect("deleted");
+
+            let shown = files::get(&server, &bob.user, created[0].id)
+                .await
+                .expect("the community keeps it");
+            assert_eq!(shown.creator, None);
+            let mut tx = server.begin().await.expect("a transaction");
+            let private = files::get_in(&mut tx, created[1].id)
+                .await
+                .expect("read")
+                .expect("kept until the purge");
+            tx.commit().await.expect("committed");
+            assert!(private.deleted_at.is_some(), "it went with her community");
+            for file in &created {
+                assert!(
+                    storage
+                        .size(&files::storage_key(alice.user.id, file.id))
+                        .await
+                        .expect("looked")
+                        .is_some(),
+                    "the bytes go by the sweep, not by person"
+                );
+            }
         })
         .await;
     }

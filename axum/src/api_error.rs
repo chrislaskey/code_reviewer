@@ -28,6 +28,7 @@ use app_core::current_community::CurrentCommunityError;
 use app_core::events::RecordError;
 use app_core::field_errors::FieldErrors;
 use app_core::files::FileError;
+use app_core::files_communities::FileCommunityError;
 use app_core::memberships::MembershipError;
 use app_core::posts::PostError;
 use app_core::posts_communities::PostCommunityError;
@@ -105,6 +106,29 @@ impl ApiError {
             PostCommunityError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         ApiError::new(status, error.to_string())
+    }
+}
+
+impl ApiError {
+    fn from_file_community(error: &FileCommunityError) -> ApiError {
+        let status = match error {
+            FileCommunityError::UnknownFile { .. } | FileCommunityError::NotFound { .. } => {
+                StatusCode::NOT_FOUND
+            }
+            FileCommunityError::NotAMember { .. } => StatusCode::FORBIDDEN,
+            FileCommunityError::Invalid(_) | FileCommunityError::Rejected(_) => {
+                StatusCode::UNPROCESSABLE_ENTITY
+            }
+            FileCommunityError::Record(error) => return ApiError::from_record(error),
+            FileCommunityError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        ApiError::new(status, error.to_string())
+    }
+}
+
+impl From<FileCommunityError> for ApiError {
+    fn from(error: FileCommunityError) -> Self {
+        ApiError::from_file_community(&error)
     }
 }
 
@@ -240,7 +264,7 @@ impl From<FileError> for ApiError {
             FileError::Invalid(field_errors) => return ApiError::from_field_errors(field_errors),
             FileError::NotFound { .. } => StatusCode::NOT_FOUND,
             FileError::Record(error) => return ApiError::from_record(&error),
-            FileError::NotOwner => StatusCode::FORBIDDEN,
+            FileError::Community(error) => return ApiError::from_file_community(&error),
             FileError::NotUploaded | FileError::Rejected(_) | FileError::Malformed(_) => {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
@@ -291,7 +315,6 @@ impl From<DeletionError> for ApiError {
             DeletionError::User(error) => return error.into(),
             DeletionError::AccountUser(error) => return error.into(),
             DeletionError::Post(error) => return error.into(),
-            DeletionError::File(error) => return error.into(),
             DeletionError::Membership(error) => return error.into(),
             DeletionError::Community(error) => return error.into(),
             // Never 401, which a device takes for a sign-out
@@ -355,6 +378,7 @@ impl From<SyncError> for ApiError {
             SyncError::Post(error) => error.into(),
             SyncError::PostCommunity(error) => error.into(),
             SyncError::File(error) => error.into(),
+            SyncError::FileCommunity(error) => error.into(),
             SyncError::Community(error) => error.into(),
             SyncError::Membership(error) => error.into(),
             SyncError::User(error) => error.into(),

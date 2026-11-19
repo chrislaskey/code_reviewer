@@ -381,7 +381,7 @@ export function postsDelete(id) {
 /** @param {string} id */
 const filePath = (id) => `/api/files/${encodeURIComponent(id)}`;
 
-/** The user's files, each `{file, shown_as, state, error}`. */
+/** The files the user sees, each `{file, creator, communities, shown_as, state, error}`. */
 export function filesList() {
   return send("GET", "/api/files");
 }
@@ -392,24 +392,32 @@ export function filesGet(id) {
 }
 
 /**
- * Adds the file the person picked: its bytes go straight to object
+ * Creates the file the person picked: its bytes go straight to object
  * storage, then the server writes its row; answers the file.
  * @param {File} file
  * @param {string} name
+ * @param {string[]} communityIds the communities the file is in, one at least
  * @param {(fraction: number) => void} [onProgress] from 0 to 1
  */
-export async function filesCreate(file, name, onProgress) {
+export async function filesCreate(file, name, communityIds, onProgress) {
   const upload = await send("POST", "/api/files/upload", { content_type: file.type, size: file.size });
   if (!upload.uploaded) await putFile(upload, file, onProgress);
-  return send("POST", "/api/files", { id: upload.id, name, content_type: upload.content_type, size: file.size });
+  return send("POST", "/api/files", {
+    id: upload.id,
+    name,
+    content_type: upload.content_type,
+    size: file.size,
+    community_ids: communityIds,
+  });
 }
 
 /**
  * @param {string} id
  * @param {string} name
+ * @param {string[]} communityIds its communities among the user's, exactly
  */
-export function filesUpdate(id, name) {
-  return send("PUT", filePath(id), { name });
+export function filesUpdate(id, name, communityIds) {
+  return send("PUT", filePath(id), { name, community_ids: communityIds });
 }
 
 /** @param {string} id */

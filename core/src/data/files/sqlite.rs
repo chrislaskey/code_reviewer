@@ -1,6 +1,6 @@
 //! The `app_files` table. Ids are UUIDv7 text, so the file reads well in
 //! the sqlite3 shell; the row type here turns them into `File`'s `Uuid`.
-//! A user sees the files they own.
+//! A user sees a file in a community they are a live member of.
 
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, SqliteConnection};
@@ -13,7 +13,7 @@ use crate::sync::Cursor;
 #[derive(FromRow)]
 struct FileRow {
     id: Hyphenated,
-    user_id: Hyphenated,
+    created_by_id: Hyphenated,
     name: String,
     content_type: String,
     size: i64,
@@ -29,7 +29,7 @@ impl From<FileRow> for File {
     fn from(row: FileRow) -> File {
         File {
             id: row.id.into_uuid(),
-            user_id: row.user_id.into_uuid(),
+            created_by_id: row.created_by_id.into_uuid(),
             name: row.name,
             content_type: row.content_type,
             size: u64::try_from(row.size).unwrap_or_default(),
@@ -44,11 +44,20 @@ impl From<FileRow> for File {
 }
 
 macro_rules! select {
-    ($rest:literal) => {
+    ($($rest:expr),+ $(,)?) => {
         concat!(
-            "SELECT id, user_id, name, content_type, size, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id FROM app_files ",
-            $rest
+            "SELECT id, created_by_id, name, content_type, size, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id FROM app_files ",
+            $($rest),+
         )
+    };
+}
+
+/// The files the user, `$1`, sees: those with a live row in a community
+/// they are a live member of.
+macro_rules! visible_to {
+    () => {
+        "id IN (SELECT fc.file_id FROM app_files_communities fc
+            WHERE fc.deleted_at IS NULL AND fc.community_id IN (SELECT community_id FROM app_users_communities WHERE user_id = $1 AND deleted_at IS NULL))"
     };
 }
 
@@ -56,13 +65,15 @@ fn size_of(file: &File) -> i64 {
     i64::try_from(file.size).unwrap_or(i64::MAX)
 }
 
-/// The user's files, not deleted, newest first.
-pub async fn list_owned(
+/// The files the user sees, not deleted, newest first.
+pub async fn list_visible(
     connection: &mut SqliteConnection,
     user_id: Uuid,
 ) -> Result<Vec<File>, sqlx::Error> {
     let rows: Vec<FileRow> = sqlx::query_as(select!(
-        "WHERE deleted_at IS NULL AND user_id = $1 ORDER BY inserted_at DESC, id DESC"
+        "WHERE deleted_at IS NULL AND ",
+        visible_to!(),
+        " ORDER BY inserted_at DESC, id DESC"
     ))
     .bind(user_id.hyphenated())
     .fetch_all(connection)
@@ -70,7 +81,40 @@ pub async fn list_owned(
     Ok(rows.into_iter().map(File::from).collect())
 }
 
-/// The row by its id, deleted or not, whoever owns it.
+/// The file by its id if the user sees it, not deleted.
+pub async fn get_visible(
+    connection: &mut SqliteConnection,
+    user_id: Uuid,
+    id: Uuid,
+) -> Result<Option<File>, sqlx::Error> {
+    let row: Option<FileRow> = sqlx::query_as(select!(
+        "WHERE id = $2 AND deleted_at IS NULL AND ",
+        visible_to!()
+    ))
+    .bind(user_id.hyphenated())
+    .bind(id.hyphenated())
+    .fetch_optional(connection)
+    .await?;
+    Ok(row.map(File::from))
+}
+
+/// The ids of the files on this database the user does not see: what a
+/// device prunes.
+pub async fn list_invisible_ids(
+    connection: &mut SqliteConnection,
+    user_id: Uuid,
+) -> Result<Vec<Uuid>, sqlx::Error> {
+    let rows: Vec<(Hyphenated,)> = sqlx::query_as(concat!(
+        "SELECT id FROM app_files WHERE NOT ",
+        visible_to!()
+    ))
+    .bind(user_id.hyphenated())
+    .fetch_all(connection)
+    .await?;
+    Ok(rows.into_iter().map(|(id,)| id.into_uuid()).collect())
+}
+
+/// The row by its id, deleted or not, whoever sees it.
 pub async fn get(connection: &mut SqliteConnection, id: Uuid) -> Result<Option<File>, sqlx::Error> {
     let row: Option<FileRow> = sqlx::query_as(select!("WHERE id = $1"))
         .bind(id.hyphenated())
@@ -79,23 +123,23 @@ pub async fn get(connection: &mut SqliteConnection, id: Uuid) -> Result<Option<F
     Ok(row.map(File::from))
 }
 
-/// Every row's id and owner, with whether it is deleted: what the
+/// Every row's id and creator, with whether it is deleted: what the
 /// bytes kept for the rows are checked against.
 pub async fn list_ids(
     connection: &mut SqliteConnection,
 ) -> Result<Vec<(Uuid, Uuid, bool)>, sqlx::Error> {
     let rows: Vec<(Hyphenated, Hyphenated, bool)> =
-        sqlx::query_as("SELECT id, user_id, deleted_at IS NOT NULL FROM app_files")
+        sqlx::query_as("SELECT id, created_by_id, deleted_at IS NOT NULL FROM app_files")
             .fetch_all(connection)
             .await?;
     Ok(rows
         .into_iter()
-        .map(|(id, user_id, deleted)| (id.into_uuid(), user_id.into_uuid(), deleted))
+        .map(|(id, created_by_id, deleted)| (id.into_uuid(), created_by_id.into_uuid(), deleted))
         .collect())
 }
 
-/// The user's rows the server wrote after the cursor, in cursor order,
-/// deleted or not: a page of a pull.
+/// The rows the server wrote after the cursor that the user sees, in
+/// cursor order: a page of a pull.
 pub async fn list_synced_after(
     connection: &mut SqliteConnection,
     user_id: Uuid,
@@ -103,8 +147,9 @@ pub async fn list_synced_after(
     limit: usize,
 ) -> Result<Vec<File>, sqlx::Error> {
     let rows: Vec<FileRow> = sqlx::query_as(select!(
-        "WHERE last_synced_at IS NOT NULL AND (last_synced_at, id) > ($2, $3) AND user_id = $1
-         ORDER BY last_synced_at, id LIMIT $4"
+        "WHERE last_synced_at IS NOT NULL AND (last_synced_at, id) > ($2, $3) AND ",
+        visible_to!(),
+        " ORDER BY last_synced_at, id LIMIT $4"
     ))
     .bind(user_id.hyphenated())
     .bind(after.last_synced_at)
@@ -117,11 +162,11 @@ pub async fn list_synced_after(
 
 pub async fn insert(connection: &mut SqliteConnection, file: &File) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_files (id, user_id, name, content_type, size, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
+        "INSERT INTO app_files (id, created_by_id, name, content_type, size, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
     )
     .bind(file.id.hyphenated())
-    .bind(file.user_id.hyphenated())
+    .bind(file.created_by_id.hyphenated())
     .bind(&file.name)
     .bind(&file.content_type)
     .bind(size_of(file))
@@ -157,16 +202,16 @@ pub async fn update(connection: &mut SqliteConnection, file: &File) -> Result<bo
 /// Writes the server's row over the device's, or inserts it.
 pub async fn upsert(connection: &mut SqliteConnection, file: &File) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_files (id, user_id, name, content_type, size, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
+        "INSERT INTO app_files (id, created_by_id, name, content_type, size, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT (id) DO UPDATE SET
-           user_id = excluded.user_id, name = excluded.name, content_type = excluded.content_type,
+           created_by_id = excluded.created_by_id, name = excluded.name, content_type = excluded.content_type,
            size = excluded.size, inserted_at = excluded.inserted_at, updated_at = excluded.updated_at,
            version = excluded.version, last_synced_at = excluded.last_synced_at,
            deleted_at = excluded.deleted_at, deleted_by_id = excluded.deleted_by_id",
     )
     .bind(file.id.hyphenated())
-    .bind(file.user_id.hyphenated())
+    .bind(file.created_by_id.hyphenated())
     .bind(&file.name)
     .bind(&file.content_type)
     .bind(size_of(file))

@@ -27,6 +27,7 @@ use crate::sync::{self, SyncServer};
 const FREE_NAME_TRIES: u32 = 1000;
 const FILE_NAME_HEADER: &str = "x-file-name";
 const FILE_CONTENT_TYPE_HEADER: &str = "x-file-content-type";
+const FILE_COMMUNITY_IDS_HEADER: &str = "x-file-community-ids";
 
 impl From<FileError> for FormError {
     fn from(error: FileError) -> FormError {
@@ -56,9 +57,10 @@ pub async fn files_get(
         .map_err(|error| error.to_string())
 }
 
-/// Adds the file the person picked: its bytes are the command's raw
-/// body, its name, percent-encoded, and its content type are headers.
-/// The file is kept on this device and sent by the next sync.
+/// Creates the file the person picked: its bytes are the command's raw
+/// body; its name, percent-encoded, its content type and its
+/// communities' ids, joined by commas, are headers. The file is kept on
+/// this device and sent by the next sync.
 #[tauri::command]
 pub async fn files_create(
     app: AppHandle,
@@ -78,12 +80,19 @@ pub async fn files_create(
             .unwrap_or_default()
     };
     let name = percent_decode_str(header(FILE_NAME_HEADER)).decode_utf8_lossy();
+    let community_ids = header(FILE_COMMUNITY_IDS_HEADER)
+        .split(',')
+        .filter(|id| !id.is_empty())
+        .map(Uuid::parse_str)
+        .collect::<Result<Vec<Uuid>, _>>()
+        .map_err(|error| FormError::from(error.to_string()))?;
     let (deployment, user) = signed_in(&device).await?;
     let file = files::create_with_bytes(
         &deployment,
         &user,
         &name,
         header(FILE_CONTENT_TYPE_HEADER),
+        &community_ids,
         bytes,
     )
     .await?;
@@ -97,9 +106,10 @@ pub async fn files_update(
     device: State<'_, DeviceAccounts>,
     id: Uuid,
     name: String,
+    community_ids: Vec<Uuid>,
 ) -> Result<File, FormError> {
     let (deployment, user) = signed_in(&device).await?;
-    let file = files::update(&deployment, &user, id, &name).await?;
+    let file = files::update(&deployment, &user, id, &name, &community_ids).await?;
     sync::spawn(app);
     Ok(file)
 }

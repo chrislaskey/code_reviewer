@@ -7,6 +7,7 @@ pub mod conflicts;
 pub mod current_community;
 pub mod events;
 pub mod files;
+pub mod files_communities;
 pub mod local_users;
 pub mod memberships;
 pub mod pending_changes;

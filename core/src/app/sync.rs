@@ -6,8 +6,8 @@
 //! stands for. A device does one sync with `run`: it pushes its pending
 //! events through a `Transport` with its token, applies the answers,
 //! pulls pages from its cursor, backfills each community it has just
-//! joined, and prunes the posts it can no longer see. A file added on
-//! the device is held back from the push until its bytes are in the
+//! joined, and prunes the posts and files it can no longer see. A file
+//! created on the device is held back from the push until its bytes are in the
 //! server's bucket, which the sync sends last, see `files` and
 //! `docs/design/offline-files-decisions.md`. The transport is HTTP in
 //! the apps, behind the `sync-http` feature, and the server's own
@@ -36,6 +36,7 @@ use crate::deployment::{Deployment, now};
 use crate::device_settings::{self, DeviceSettingsError, WORK_OFFLINE};
 use crate::events::{self, Answer, AnswerStatus, Event, EventKind, EventStatus, StoredEvent};
 use crate::files::{self, File, FileError, FileUpload, FileUploadNew};
+use crate::files_communities::{self, FileCommunity, FileCommunityError};
 use crate::memberships::{self, Membership, MembershipError};
 use crate::posts::{self, Post, PostError};
 use crate::posts_communities::{self, PostCommunity, PostCommunityError};
@@ -159,6 +160,8 @@ pub enum SyncError {
     #[error(transparent)]
     File(#[from] FileError),
     #[error(transparent)]
+    FileCommunity(#[from] FileCommunityError),
+    #[error(transparent)]
     Community(#[from] CommunityError),
     #[error(transparent)]
     Membership(#[from] MembershipError),
@@ -205,6 +208,9 @@ pub async fn push(
             memberships::TABLE => memberships::apply_event(deployment, user, event).await?,
             posts::TABLE => posts::apply_event(deployment, user, event).await?,
             files::TABLE => files::apply_event(deployment, user, event).await?,
+            files_communities::TABLE => {
+                files_communities::apply_event(deployment, user, event).await?
+            }
             posts_communities::TABLE => {
                 posts_communities::apply_event(deployment, user, event).await?
             }
@@ -283,6 +289,12 @@ pub async fn pull(
             .into_iter()
             .map(SyncedRow::File),
     );
+    rows.extend(
+        files_communities::list_synced_after(&mut tx, user, &after, limit)
+            .await?
+            .into_iter()
+            .map(SyncedRow::FileCommunity),
+    );
     let mut page = page_of(&mut tx, rows, limit).await?;
     tx.commit().await?;
     page.purge_horizon = purge_horizon;
@@ -297,9 +309,9 @@ pub async fn pull(
     Ok(page)
 }
 
-/// Answers a backfill from the user: every post in the community, as
-/// its live rows there after the cursor, each with the rows it points
-/// at. The user must be in the community.
+/// Answers a backfill from the user: every post and file in the
+/// community, as their live rows there after the cursor, each with the
+/// rows it points at. The user must be in the community.
 pub async fn backfill(
     deployment: &Deployment,
     user: &User,
@@ -316,7 +328,7 @@ pub async fn backfill(
             community_id: request.community_id,
         });
     }
-    let rows: Vec<SyncedRow> = posts_communities::list_live_of_community_after(
+    let mut rows: Vec<SyncedRow> = posts_communities::list_live_of_community_after(
         &mut tx,
         request.community_id,
         &after,
@@ -326,6 +338,17 @@ pub async fn backfill(
     .into_iter()
     .map(SyncedRow::PostCommunity)
     .collect();
+    rows.extend(
+        files_communities::list_live_of_community_after(
+            &mut tx,
+            request.community_id,
+            &after,
+            limit,
+        )
+        .await?
+        .into_iter()
+        .map(SyncedRow::FileCommunity),
+    );
     let page = page_of(&mut tx, rows, limit).await?;
     tx.commit().await?;
     Ok(page)
@@ -339,6 +362,7 @@ enum SyncedRow {
     Post(Post),
     PostCommunity(PostCommunity),
     File(File),
+    FileCommunity(FileCommunity),
 }
 
 impl SyncedRow {
@@ -350,6 +374,7 @@ impl SyncedRow {
             SyncedRow::Post(row) => (row.last_synced_at, row.id),
             SyncedRow::PostCommunity(row) => (row.last_synced_at, row.id),
             SyncedRow::File(row) => (row.last_synced_at, row.id),
+            SyncedRow::FileCommunity(row) => (row.last_synced_at, row.id),
         };
         Cursor {
             last_synced_at: last_synced_at.unwrap_or(DateTime::<Utc>::UNIX_EPOCH),
@@ -365,6 +390,7 @@ impl SyncedRow {
             SyncedRow::Post(row) => posts::table_row(row)?,
             SyncedRow::PostCommunity(row) => posts_communities::table_row(row)?,
             SyncedRow::File(row) => files::table_row(row)?,
+            SyncedRow::FileCommunity(row) => files_communities::table_row(row)?,
         })
     }
 }
@@ -392,8 +418,11 @@ async fn page_of(
 /// The rows on the wire, each after the rows it points at, so a device
 /// with foreign keys can write them in order: a membership after its
 /// user and community, a post after its owner, a post's community row
-/// after the post, the community and the membership it was added under.
-/// A row brought along for another is sent once.
+/// after the post, the community and the membership it was added under,
+/// a file's live community row after the file and the community. A row
+/// taken out of a community brings no file along: the user may not see
+/// it any more, and a device without the file skips the row. A row
+/// brought along for another is sent once.
 async fn with_parents(
     tx: &mut Transaction,
     rows: Vec<SyncedRow>,
@@ -409,8 +438,19 @@ async fn with_parents(
             SyncedRow::Post(post) => {
                 send_user(tx, &mut out, &mut sent, post.user_id).await?;
             }
-            SyncedRow::File(file) => {
-                send_user(tx, &mut out, &mut sent, file.user_id).await?;
+            SyncedRow::FileCommunity(row) => {
+                if row.deleted_at.is_none()
+                    && let Some(file) = files::get_in(tx, row.file_id).await?
+                {
+                    send(
+                        &mut out,
+                        &mut sent,
+                        files::TABLE,
+                        file.id,
+                        SyncedRow::File(file),
+                    )?;
+                }
+                send_community(tx, &mut out, &mut sent, row.community_id).await?;
             }
             SyncedRow::PostCommunity(row) => {
                 if let Some(post) = posts::get_in(tx, row.post_id).await? {
@@ -435,7 +475,7 @@ async fn with_parents(
                     )?;
                 }
             }
-            SyncedRow::User(_) | SyncedRow::Community(_) => {}
+            SyncedRow::User(_) | SyncedRow::Community(_) | SyncedRow::File(_) => {}
         }
         let (table, id) = match &row {
             SyncedRow::User(user) => (users::TABLE, user.id),
@@ -444,6 +484,7 @@ async fn with_parents(
             SyncedRow::Post(post) => (posts::TABLE, post.id),
             SyncedRow::PostCommunity(row) => (posts_communities::TABLE, row.id),
             SyncedRow::File(file) => (files::TABLE, file.id),
+            SyncedRow::FileCommunity(row) => (files_communities::TABLE, row.id),
         };
         send(&mut out, &mut sent, table, id, row)?;
     }
@@ -508,7 +549,8 @@ fn table_rank(table: &str) -> usize {
         posts::TABLE => 3,
         posts_communities::TABLE => 4,
         files::TABLE => 5,
-        _ => 6,
+        files_communities::TABLE => 6,
+        _ => 7,
     }
 }
 
@@ -666,7 +708,7 @@ impl Transport for InProcess<'_> {
             .map_err(refused_file)?;
         let bytes = files::bucket(self.server)
             .map_err(refused_file)?
-            .get(&files::storage_key(shown.file.user_id, id))
+            .get(&files::storage_key(shown.file.created_by_id, id))
             .await
             .map_err(|error| SyncError::Transport(error.to_string()))?;
         tokio::fs::write(path, bytes)
@@ -1112,14 +1154,15 @@ pub struct Report {
     pub rejected: usize,
     /// Files whose bytes this sync sent to the server's bucket.
     pub uploaded: usize,
-    /// Files' bytes removed from the device: of files deleted, and
-    /// leftovers no file points at.
+    /// Files' bytes removed from the device: of files deleted or no
+    /// longer seen, and leftovers no file points at.
     pub cleaned: usize,
     /// Rows received by the pull.
     pub pulled: usize,
     /// Rows received by the backfills of communities just joined.
     pub backfilled: usize,
-    /// Posts removed from the device because its user no longer sees them.
+    /// Posts and files removed from the device because its user no longer
+    /// sees them.
     pub pruned: u64,
     /// The device was away longer than the server keeps deletions, so it
     /// dropped its rows and pulled from nothing; its events were kept.
@@ -1205,7 +1248,7 @@ pub async fn run<T: Transport>(
             report.push_error = Some(error.to_string());
         }
     }
-    report.cleaned = files::delete_unreferenced_on_device(deployment, now()).await?;
+    report.cleaned += files::delete_unreferenced_on_device(deployment, now()).await?;
     report.pending = status(deployment).await?.pending;
     Ok(report)
 }
@@ -1236,7 +1279,8 @@ pub async fn set_offline(deployment: &Deployment, offline: bool) -> Result<(), S
 }
 
 /// Pushes the pending events and applies the answers, leaving out the
-/// events of the files held back, whose bytes the server does not have:
+/// events of the files held back, whose bytes the server does not have,
+/// and of their rows in communities:
 /// oldest first, `PUSH_BATCH` events or `PUSH_BATCH_BYTES` a request,
 /// whichever is fewer, each request's answers applied before the next
 /// is sent, so a push cut short has kept what the server already
@@ -1258,9 +1302,7 @@ async fn push_pending<T: Transport>(
         let mut tx = deployment.begin().await?;
         let mut batch = events::pending(&mut tx).await?;
         tx.commit().await?;
-        batch.retain(|stored| {
-            stored.event.table != files::TABLE || !held_back.contains(&stored.event.row_id)
-        });
+        batch.retain(|stored| !held_back.contains(&stored.event.row_id));
         let waiting =
             waiting.get_or_insert_with(|| batch.iter().map(|stored| stored.event.id).collect());
         batch.retain(|stored| waiting.contains(&stored.event.id));
@@ -1508,12 +1550,25 @@ async fn backfill_pending<T: Transport>(
     Ok(())
 }
 
-/// Removes the posts the user no longer sees: a community left, a post
-/// taken out of one, the rows brought along for a removal.
+/// Removes the posts and files the user no longer sees: a community
+/// left, a post or file taken out of one, the rows brought along for a
+/// removal.
 async fn prune(deployment: &Deployment, user: &User, report: &mut Report) -> Result<(), SyncError> {
     let mut tx = deployment.begin().await?;
-    report.pruned = posts::prune(&mut tx, user).await?;
+    let posts_pruned = posts::prune(&mut tx, user).await?;
+    let files_pruned = files::prune(&mut tx, user).await?;
     tx.commit().await?;
+    report.pruned = posts_pruned + files_pruned.len() as u64;
+    for id in files_pruned {
+        // A deployment with no folder has no bytes to remove
+        let Ok(path) = files::local_path(deployment, id) else {
+            break;
+        };
+        if tokio::fs::try_exists(&path).await.unwrap_or(false) {
+            files::delete_local_copy(deployment, id).await?;
+            report.cleaned += 1;
+        }
+    }
     Ok(())
 }
 
@@ -1542,6 +1597,7 @@ async fn apply_row(tx: &mut Transaction, user: &User, row: &TableRow) -> Result<
         posts::TABLE => Ok(posts::apply_server_row(tx, &row.row).await?),
         posts_communities::TABLE => Ok(posts_communities::apply_server_row(tx, &row.row).await?),
         files::TABLE => Ok(files::apply_server_row(tx, &row.row).await?),
+        files_communities::TABLE => Ok(files_communities::apply_server_row(tx, &row.row).await?),
         other => Err(SyncError::Malformed(format!(
             "a row of an unknown table '{other}'"
         ))),
@@ -1555,6 +1611,7 @@ async fn delete_row(tx: &mut Transaction, table: &str, id: Uuid) -> Result<(), S
         posts::TABLE => Ok(posts::delete_row(tx, id).await?),
         posts_communities::TABLE => Ok(posts_communities::delete_row(tx, id).await?),
         files::TABLE => Ok(files::delete_row(tx, id).await?),
+        files_communities::TABLE => Ok(files_communities::delete_row(tx, id).await?),
         other => Err(SyncError::Malformed(format!(
             "a row of an unknown table '{other}'"
         ))),
@@ -3528,7 +3585,7 @@ pub(crate) mod tests {
             .expect("signed in on b");
 
         let bytes: Vec<u8> = (0..300_000u32).map(|n| (n % 251) as u8).collect();
-        let file = files::create_with_bytes(&a, &alice, "over http.bin", "", &bytes)
+        let file = files::tests::with_bytes(&a, &alice, "over http.bin", "", &bytes)
             .await
             .expect("a file");
         let report = run(&a, &server).await.expect("a sync");

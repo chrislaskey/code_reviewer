@@ -7,8 +7,6 @@ device the first time it shows the file, with a limit of tries, refused
 files kept for the person, and the cleanups on both sides. Left for
 later, on purpose:
 
-- **Communities for files**, by the join table posts use, with the
-  backfill and the prune that come with visibility.
 - **Replacing a file's content.** The bytes are fixed today; replacing
   them needs a key per content and a stored key that merges like a
   field.
@@ -32,8 +30,15 @@ later, on purpose:
   URI from a FileProvider, in a small Kotlin plugin.
 - **Thumbnails.** The index shows each image whole, scaled down by the
   page, so it fetches every image's full bytes.
-- **A checksum.** The server checks a file's size only.
+- **Bytes stored once for many files.** Files with the same checksum
+  each keep their own bytes today. To store them once, safely:
+  - Every client uploads its bytes, under its own prefix as today. The
+    server never skips an upload because a client names a checksum it
+    already has: that would answer anyone whether a file exists in the
+    deployment, and give a row to a client that never held the bytes.
+  - Once the bucket has checked the bytes, the server moves them to
+    `blobs/<sha256>` when no blob is there and deletes the copy, then
+    the row names the blob. This saves storage, not the upload.
+  - The key is the row's checksum, not its creator and id, and the
+    sweep deletes a blob no live row names.
 - **A file attached to a post.**
-- **Deleting an account's files at once.** There is no deleting an
-  account yet; when there is, it deletes the prefix `files/<owner id>/`
-  without waiting for the sweep.

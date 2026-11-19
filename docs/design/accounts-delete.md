@@ -52,10 +52,11 @@ device has had 90 days to see it.
    account.
 2. **The user**: `app_users` soft-deleted, name cleared to "Deleted
    user", picture removed.
-3. **Their content**: every post and file they made, and every
-   membership of theirs, soft-deleted. A community whose only live
-   member was them, their `Personal` one at least, is soft-deleted with
-   its links.
+3. **Their content**: every post they made, and every membership of
+   theirs, soft-deleted. A community whose only live member was them,
+   their `Personal` one at least, is soft-deleted with its links, and
+   with every file only it had. Their other files belong to communities
+   with other members and stay, see `files-communities.md`.
 4. **As events**: each soft delete is an ordinary update event in the
    user's name, applied through the resource's `apply_event`, so the
    log and the pull treat it like the person deleting each row by hand.
@@ -73,9 +74,8 @@ our database:
    keeps the payments and invoices, and a charge can still be refunded
    from the dashboard. The webhooks that follow find the rows, still
    there until the purge, and change nothing that matters.
-8. **The bucket**: their files' bytes and their picture deleted at
-   once, as `offline-files.md` already says ("Deleting an account
-   deletes its prefix at once").
+8. **The bucket**: their picture deleted at once. Their files' bytes
+   stay for the files that stay; the sweep takes the others'.
 9. **A mail**: "Your account was deleted", to the address it had.
 
 If step 7 or 8 fails the delete still stands; the daily

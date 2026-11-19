@@ -1,14 +1,17 @@
-//! Files: a file a person added, as a row that syncs like a post and
-//! bytes kept apart from it, see `docs/design/offline-files-decisions.md`.
-//! The row holds the name, the content type and the size; the bytes are
-//! in the server's bucket at `files/<owner id>/<file id>` and, on a
-//! device, in the account's folder under the file's id, see
-//! `deployment::FileStore`. The bytes never change: an update changes
-//! the name only. Only its owner sees a file.
+//! Files: a file in communities, as a row that syncs like a post and
+//! bytes kept apart from it, see `docs/design/offline-files-decisions.md`
+//! and `docs/design/files-communities.md`. The row holds the name, the
+//! content type and the size; the bytes are in the server's bucket at
+//! `files/<creator id>/<file id>` and, on a device, in the account's
+//! folder under the file's id, see `deployment::FileStore`. The bytes
+//! never change: an update changes the name only. A file belongs to its
+//! communities, `files_communities`: a live member of one sees it, and
+//! it lives as long as it is in one.
 //!
 //! Every write is an event applied by `apply_event`, as a post's is.
-//! What differs is the create: the server writes the row only once the
-//! file is in its bucket, and answers `file_not_uploaded` until then.
+//! What differs is the create: it carries the file's communities, and
+//! the server writes the rows only once the file is in its bucket, and
+//! answers `file_not_uploaded` until then.
 //! On the web the page asks `create_upload` where to PUT the bytes,
 //! sends them, then creates the row. A device keeps the bytes itself,
 //! `create_with_bytes`, and the file waits there, its create pending,
@@ -22,6 +25,7 @@
 //! of each sync.
 
 use crate::data::files as files_records;
+use crate::data::memberships as memberships_records;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -32,6 +36,7 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::communities::{self, Community};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, FileStore, Role, now};
 use crate::device_settings::{self, WORK_OFFLINE};
@@ -39,6 +44,7 @@ use crate::events::{
     self, Answer, AnswerStatus, Conflicts, Event, EventKind, EventStatus, Fields, StoredEvent,
 };
 use crate::field_errors::FieldErrors;
+use crate::files_communities::{self, FileCommunityError, FileCommunityNew};
 #[cfg(feature = "object-storage")]
 use crate::storage::{Storage, StorageError};
 use crate::sync::{Cursor, SyncError, TableRow, Transport};
@@ -66,11 +72,13 @@ pub const BYTES_GONE: &str = "the file's bytes are no longer on this device";
 /// Why the server leaves a create pending: the bytes are not in its
 /// bucket yet, so the device sends them and pushes again.
 pub const FILE_NOT_UPLOADED: &str = "file_not_uploaded";
-/// The fields an event may set when it creates a file.
-const CREATE_FIELDS: &[&str] = &["name", "content_type", "size"];
-/// The fields an event may change on a file.
-const UPDATE_FIELDS: &[&str] = &["name", "deleted_at"];
-/// Where files go in the bucket: `files/<owner id>/<file id>`.
+/// The fields an event may set when it creates a file: `communities` is
+/// the rows of its first communities, written with it.
+const CREATE_FIELDS: &[&str] = &["name", "content_type", "size", "communities"];
+/// The fields an event may change on a file. A file is deleted by
+/// taking it out of its last community, see `files_communities`.
+const UPDATE_FIELDS: &[&str] = &["name"];
+/// Where files go in the bucket: `files/<creator id>/<file id>`.
 const KEY_PREFIX: &str = "files";
 /// Bytes no row points at are removed once they are older than this,
 /// in the bucket and on a device: an upload whose row never came, bytes
@@ -88,7 +96,8 @@ pub const DOWNLOAD_URL_LIFETIME: std::time::Duration = std::time::Duration::from
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct File {
     pub id: Uuid,
-    pub user_id: Uuid,
+    /// Who created it: a record, not an owner, see `files_communities`.
+    pub created_by_id: Uuid,
     pub name: String,
     pub content_type: String,
     /// In bytes.
@@ -109,7 +118,7 @@ pub struct File {
 pub enum FileState {
     /// The server has the row and the bytes.
     Synced,
-    /// Added on this device, not yet on the server; every sync tries.
+    /// Created on this device, not yet on the server; every sync tries.
     Waiting,
     /// The server will not take it; it stays on this device until the
     /// person tries again or lets it go.
@@ -145,10 +154,16 @@ impl ShownAs {
 }
 
 /// A file as the pages show it: with how its bytes are shown, its
-/// state, and why the last try to send it failed or why it was refused.
+/// state, why the last try to send it failed or why it was refused, who
+/// created it while the user sees them, and its communities among the
+/// user's.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileWithState {
     pub file: File,
+    /// None once the creator is no longer in a community of the file's
+    /// that the user is in.
+    pub creator: Option<User>,
+    pub communities: Vec<Community>,
     pub shown_as: ShownAs,
     pub state: FileState,
     pub error: Option<String>,
@@ -163,8 +178,8 @@ pub struct FilesCache {
     pub bytes: u64,
 }
 
-/// A file to add: what the person picked, under the id its bytes are
-/// already kept under.
+/// A file to create: what the person picked, under the id its bytes
+/// are already kept under, in the communities chosen.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Validate)]
 pub struct FileNew {
     #[garde(skip)]
@@ -175,6 +190,9 @@ pub struct FileNew {
     pub content_type: String,
     #[garde(custom(is_file_size))]
     pub size: u64,
+    /// One at least, checked with the user's memberships.
+    #[garde(skip)]
+    pub community_ids: Vec<Uuid>,
 }
 
 /// A file whose bytes are about to be sent to the bucket. A device
@@ -207,8 +225,6 @@ pub enum FileError {
     NotFound { id: Uuid },
     #[error("{0}")]
     Invalid(FieldErrors),
-    #[error("only the owner can change a file")]
-    NotOwner,
     #[error("the file did not arrive; try again")]
     NotUploaded,
     #[error("the change was refused: {0}")]
@@ -223,6 +239,8 @@ pub enum FileError {
     Io(#[from] std::io::Error),
     #[error("the file is not on this device")]
     NotOnDevice,
+    #[error(transparent)]
+    Community(#[from] FileCommunityError),
     #[error(transparent)]
     Sync(Box<SyncError>),
     #[cfg(feature = "object-storage")]
@@ -246,48 +264,65 @@ impl From<serde_json::Error> for FileError {
     }
 }
 
-/// The user's files, not deleted, newest first, each with its state.
+/// The files the user sees, not deleted, newest first, each with its
+/// state, creator and communities.
 pub async fn list(deployment: &Deployment, user: &User) -> Result<Vec<FileWithState>, FileError> {
     let mut tx = deployment.begin().await?;
     let files = files_records::list(&mut tx, user.id).await?;
-    let listed = with_states(&mut tx, deployment.role, files).await?;
+    let listed = with_states(&mut tx, deployment.role, user, files).await?;
     tx.commit().await?;
     Ok(listed)
 }
 
-/// One file of the user's, by its id, unless deleted, with its state.
+/// One file the user sees, by its id, unless deleted, with its state,
+/// creator and communities.
 pub async fn get(
     deployment: &Deployment,
     user: &User,
     id: Uuid,
 ) -> Result<FileWithState, FileError> {
     let mut tx = deployment.begin().await?;
-    let file = get_own(&mut tx, user, id).await?;
-    let mut listed = with_states(&mut tx, deployment.role, vec![file]).await?;
+    let file = get_visible(&mut tx, user, id).await?;
+    let mut listed = with_states(&mut tx, deployment.role, user, vec![file]).await?;
     tx.commit().await?;
     listed.pop().ok_or(FileError::NotFound { id })
 }
 
-/// Writes the row of a file of the user's whose bytes are already kept
-/// under its id: in the bucket on the server, which refuses the row
-/// otherwise, in the account's folder on a device.
+/// Writes the row of a file the user creates, whose bytes are already
+/// kept under its id: in the bucket on the server, which refuses the row
+/// otherwise, in the account's folder on a device. It is in the
+/// communities chosen, each one the user is in.
 pub async fn create(
     deployment: &Deployment,
     user: &User,
     new: &FileNew,
 ) -> Result<File, FileError> {
     let new = new.checked()?;
+    checked_community_ids(&new.community_ids)?;
+    let communities: Vec<FileCommunityNew> = new
+        .community_ids
+        .iter()
+        .map(|community_id| FileCommunityNew {
+            id: Uuid::now_v7(),
+            community_id: *community_id,
+        })
+        .collect();
     let event = Event::create(
         TABLE,
         new.id,
-        fields(json!({ "name": new.name, "content_type": new.content_type, "size": new.size })),
+        fields(json!({
+            "name": new.name,
+            "content_type": new.content_type,
+            "size": new.size,
+            "communities": communities,
+        })),
         now(),
     );
     apply(deployment, user, &event).await?.file()
 }
 
-/// Adds a file on a device: keeps its bytes in the account's folder
-/// under a new id, then writes its row and queues its create, so the
+/// Creates a file on a device: keeps its bytes in the account's folder
+/// under a new id, then writes its rows and queues its create, so the
 /// file is there with the network off and the next sync sends it. The
 /// bytes go first: a crash in between leaves bytes without a row, which
 /// the cleanup removes, never a row without its bytes.
@@ -296,6 +331,7 @@ pub async fn create_with_bytes(
     user: &User,
     name: &str,
     content_type: &str,
+    community_ids: &[Uuid],
     bytes: &[u8],
 ) -> Result<File, FileError> {
     if deployment.role != Role::Device {
@@ -306,6 +342,7 @@ pub async fn create_with_bytes(
         name: name.to_string(),
         content_type: content_type.to_string(),
         size: bytes.len() as u64,
+        community_ids: community_ids.to_vec(),
     }
     .checked()?;
     let path = local_path(deployment, new.id)?;
@@ -319,56 +356,57 @@ pub async fn create_with_bytes(
     }
 }
 
-/// Writes a new name over the user's file.
+/// Writes a new name over a file the user sees, and makes its
+/// communities among the user's exactly these, one at least; its rows
+/// in other communities stay.
 pub async fn update(
     deployment: &Deployment,
     user: &User,
     id: Uuid,
     name: &str,
+    community_ids: &[Uuid],
 ) -> Result<File, FileError> {
     let name = checked_name(name)?;
+    checked_community_ids(community_ids)?;
     let mut tx = deployment.begin().await?;
-    let file = get_own(&mut tx, user, id).await?;
-    if file.name == name {
-        return Ok(file);
+    let mut file = get_visible(&mut tx, user, id).await?;
+    if file.name != name {
+        let event = Event::update(
+            TABLE,
+            id,
+            file.version,
+            fields(json!({ "name": file.name })),
+            fields(json!({ "name": name })),
+            now(),
+        );
+        file = apply_in(&mut tx, deployment.role, user, &event, true)
+            .await?
+            .file()?;
     }
-    let event = Event::update(
-        TABLE,
-        id,
-        file.version,
-        fields(json!({ "name": file.name })),
-        fields(json!({ "name": name })),
-        now(),
-    );
-    let applied = apply_in(&mut tx, deployment.role, user, &event, true).await?;
+    files_communities::set_in(&mut tx, deployment.role, user, id, community_ids).await?;
     tx.commit().await?;
-    applied.file()
+    Ok(file)
 }
 
-/// Deletes the user's file: a soft delete, so it syncs like any edit,
-/// and the bytes go after the row, by the sweep on the server and the
-/// cleanup on a device. A file on a device that never reached the
-/// server, waiting or refused, goes at once and whole, its row, its
-/// events and its bytes, and nothing is pushed.
+/// Takes a file the user sees out of every community of theirs it is
+/// in; the server deletes it when those were its last, and its bytes go
+/// after the row, by the sweep on the server and the cleanup on a
+/// device. A file on a device that never reached the server, waiting or
+/// refused, goes at once and whole, its rows, its events and its bytes,
+/// and nothing is pushed.
 pub async fn delete(deployment: &Deployment, user: &User, id: Uuid) -> Result<(), FileError> {
     let mut tx = deployment.begin().await?;
-    let file = get_own(&mut tx, user, id).await?;
+    get_visible(&mut tx, user, id).await?;
     if deployment.role == Role::Device && create_of(&mut tx, id).await?.is_some() {
         forget_in(&mut tx, id).await?;
         tx.commit().await?;
         return delete_local_copy(deployment, id).await;
     }
-    let event = Event::update(
-        TABLE,
-        id,
-        file.version,
-        fields(json!({ "deleted_at": null })),
-        fields(json!({ "deleted_at": now() })),
-        now(),
-    );
-    let applied = apply_in(&mut tx, deployment.role, user, &event, true).await?;
+    for row in files_communities::list_visible_of_files(&mut tx, user, &[id]).await? {
+        files_communities::delete_in(&mut tx, deployment.role, user, id, row.community_id).await?;
+    }
     tx.commit().await?;
-    applied.file().map(|_| ())
+    Ok(())
 }
 
 /// Applies an event of the user's to its file and answers it: what the
@@ -384,8 +422,8 @@ pub async fn apply_event(
 
 /// Answers where to PUT a file's bytes, or that the bucket already has
 /// them: on the server, which holds the bucket's keys. The file has no
-/// row yet, so what holds the user to their own files is the key's
-/// prefix.
+/// row yet, so what holds an upload to its creator is the key's prefix:
+/// nobody else writes or claims a file before its row exists.
 #[cfg(feature = "object-storage")]
 pub async fn create_upload(
     deployment: &Deployment,
@@ -425,8 +463,8 @@ pub async fn create_upload(
     })
 }
 
-/// A URL the user's file is read from for the next hour, signed by the
-/// server; as an attachment, the bucket answers it to be saved under
+/// A URL a file the user sees is read from for the next hour, signed by
+/// the server; as an attachment, the bucket answers it to be saved under
 /// the file's name instead of shown.
 #[cfg(feature = "object-storage")]
 pub async fn content_url(
@@ -437,12 +475,12 @@ pub async fn content_url(
 ) -> Result<String, FileError> {
     let storage = bucket(deployment)?;
     let mut tx = deployment.begin().await?;
-    let file = get_own(&mut tx, user, id).await?;
+    let file = get_visible(&mut tx, user, id).await?;
     tx.commit().await?;
     let content_disposition = as_attachment.then(|| attachment_named(&file.name));
     Ok(storage
         .download_url(
-            &storage_key(file.user_id, file.id),
+            &storage_key(file.created_by_id, file.id),
             DOWNLOAD_URL_LIFETIME,
             content_disposition.as_deref(),
         )
@@ -512,9 +550,10 @@ pub async fn ask_about_waiting<T: Transport>(
     Ok(waiting)
 }
 
-/// The files whose events are held back from the push: those waiting
+/// The rows whose events are held back from the push: the files waiting
 /// whose bytes the server does not have, and those it refused, whose
-/// later events, a rename say, it would answer by a row it never had.
+/// later events, a rename say, it would answer by a row it never had,
+/// and their rows in communities.
 pub async fn held_back(
     deployment: &Deployment,
     waiting: &[WaitingFile],
@@ -531,6 +570,19 @@ pub async fn held_back(
         .filter(|stored| stored.event.table == TABLE && stored.event.kind == EventKind::Create)
         .map(|stored| stored.event.row_id);
     held_back.extend(refused);
+    let mut rows = BTreeSet::new();
+    for stored in events::pending(&mut tx).await? {
+        if stored.event.table != files_communities::TABLE {
+            continue;
+        }
+        let row = files_communities::get_in(&mut tx, stored.event.row_id)
+            .await
+            .map_err(FileError::from)?;
+        if row.is_some_and(|row| held_back.contains(&row.file_id)) {
+            rows.insert(stored.event.row_id);
+        }
+    }
+    held_back.extend(rows);
     tx.commit().await?;
     Ok(held_back)
 }
@@ -622,7 +674,7 @@ pub async fn delete_unreferenced(
     let referenced: BTreeSet<String> = files_records::maintenance::list_ids(&mut tx)
         .await?
         .into_iter()
-        .map(|(id, user_id, _deleted)| storage_key(user_id, id))
+        .map(|(id, created_by_id, _deleted)| storage_key(created_by_id, id))
         .collect();
     tx.commit().await?;
 
@@ -639,28 +691,10 @@ pub async fn delete_unreferenced(
     Ok(report)
 }
 
-/// Deletes the bytes of every file of the user's from the bucket at
-/// once, for a deleted account, see `accounts::deletions`; how many. A
-/// server with no bucket has none.
-#[cfg(feature = "object-storage")]
-pub async fn delete_bytes_of_user(
-    deployment: &Deployment,
-    user_id: Uuid,
-) -> Result<usize, FileError> {
-    let FileStore::Bucket(storage) = &deployment.file_store else {
-        return Ok(0);
-    };
-    let files = storage.list(&format!("{KEY_PREFIX}/{user_id}")).await?;
-    for file in &files {
-        storage.delete(&file.key).await?;
-    }
-    Ok(files.len())
-}
-
 /// Removes from the account's folder the bytes no live row points at:
 /// those of a deleted row at once, and those of no row, or a fetch left
 /// half done, once they are older than `UNREFERENCED_DAYS`, since a
-/// file being added has its bytes there a moment before its row. That
+/// file being created has its bytes there a moment before its row. That
 /// covers a delete, a resync that dropped the rows, and a crash between
 /// the bytes and the row. How many went. A deployment with no folder
 /// has nothing to remove.
@@ -699,7 +733,7 @@ pub async fn delete_unreferenced_on_device(
     Ok(removed)
 }
 
-/// The copies on this device of the user's synced files.
+/// The copies on this device of the synced files the user sees.
 pub async fn cache_get(deployment: &Deployment, user: &User) -> Result<FilesCache, FileError> {
     let mut cache = FilesCache::default();
     for (_path, size) in cached(deployment, user).await? {
@@ -709,7 +743,7 @@ pub async fn cache_get(deployment: &Deployment, user: &User) -> Result<FilesCach
     Ok(cache)
 }
 
-/// Removes the copies on this device of the user's synced files, and
+/// Removes the copies on this device of the synced files the user sees, and
 /// answers what went. A waiting or refused file stays: its bytes are
 /// nowhere else.
 pub async fn cache_delete(deployment: &Deployment, user: &User) -> Result<FilesCache, FileError> {
@@ -722,7 +756,7 @@ pub async fn cache_delete(deployment: &Deployment, user: &User) -> Result<FilesC
     Ok(removed)
 }
 
-/// Where each synced file of the user's is on this device, with its
+/// Where each synced file the user sees is on this device, with its
 /// size, for those that are.
 async fn cached(deployment: &Deployment, user: &User) -> Result<Vec<(PathBuf, u64)>, FileError> {
     let mut cached = Vec::new();
@@ -748,9 +782,9 @@ pub fn table_row(file: &File) -> Result<TableRow, FileError> {
     })
 }
 
-/// Where a file's bytes are in the bucket.
-pub fn storage_key(user_id: Uuid, id: Uuid) -> String {
-    format!("{KEY_PREFIX}/{user_id}/{id}")
+/// Where a file's bytes are in the bucket, under its creator.
+pub fn storage_key(created_by_id: Uuid, id: Uuid) -> String {
+    format!("{KEY_PREFIX}/{created_by_id}/{id}")
 }
 
 /// Writes the server's row over the device's, unless an event of the
@@ -769,8 +803,8 @@ pub(crate) async fn delete_row(tx: &mut Transaction, id: Uuid) -> Result<(), Fil
     Ok(files_records::maintenance::delete(tx, id).await?)
 }
 
-/// A page of the user's rows the server wrote after the cursor, deleted
-/// or not.
+/// A page of the rows the user sees that the server wrote after the
+/// cursor.
 pub(crate) async fn list_synced_after(
     tx: &mut Transaction,
     user: &User,
@@ -780,14 +814,14 @@ pub(crate) async fn list_synced_after(
     Ok(files_records::replication::list_synced_after(tx, user.id, after, limit).await?)
 }
 
-/// The row by its id, deleted or not, whoever owns it.
+/// The row by its id, deleted or not, whoever sees it.
 pub(crate) async fn get_in(tx: &mut Transaction, id: Uuid) -> Result<Option<File>, FileError> {
     Ok(files_records::replication::get(tx, id).await?)
 }
 
-/// Where the bytes of the user's file are on this device, fetched from
-/// the server first when they are not there: the first time a device
-/// that did not add the file shows it. Fetched under a temporary name
+/// Where the bytes of a file the user sees are on this device, fetched
+/// from the server first when they are not there: the first time a
+/// device that did not create the file shows it. Fetched under a temporary name
 /// and renamed once whole, so a file at its path is never half there.
 /// Working offline, or with the server out of reach, a file not here
 /// is `NotOnDevice`.
@@ -798,7 +832,7 @@ pub async fn local_copy<T: Transport>(
     id: Uuid,
 ) -> Result<PathBuf, FileError> {
     let mut tx = deployment.begin().await?;
-    let file = get_own(&mut tx, user, id).await?;
+    let file = get_visible(&mut tx, user, id).await?;
     let offline: bool = device_settings::get(&mut tx, WORK_OFFLINE)
         .await
         .map_err(|error| FileError::Malformed(error.to_string()))?;
@@ -837,11 +871,72 @@ pub async fn local_copy<T: Transport>(
 }
 
 /// Removes the row and every event of a file that never reached the
-/// server, on a device; its bytes go once this is committed, see
-/// `delete_local_copy`.
+/// server, on a device, its rows in communities with it; its bytes go
+/// once this is committed, see `delete_local_copy`.
 pub(crate) async fn forget_in(tx: &mut Transaction, id: Uuid) -> Result<(), FileError> {
     events::delete_of_row(tx, TABLE, id).await?;
+    for row in files_communities_of(tx, id).await? {
+        events::delete_of_row(tx, files_communities::TABLE, row).await?;
+    }
     Ok(files_records::maintenance::delete(tx, id).await?)
+}
+
+/// The ids of the file's rows in communities with events on this
+/// device: those its create wrote, and those written since.
+async fn files_communities_of(tx: &mut Transaction, id: Uuid) -> Result<Vec<Uuid>, FileError> {
+    let mut rows = Vec::new();
+    for stored in events::list_of_table(tx, files_communities::TABLE).await? {
+        if let Some(row) = files_communities::get_in(tx, stored.event.row_id).await?
+            && row.file_id == id
+        {
+            rows.push(row.id);
+        }
+    }
+    Ok(rows)
+}
+
+/// Removes from a device every file its user no longer sees: a
+/// community left, a file taken out of theirs or deleted. A file whose
+/// create has not reached the server stays: its bytes are nowhere else.
+/// Answers the ids that went, whose bytes go once this is committed, see
+/// `delete_local_copy`.
+pub(crate) async fn prune(tx: &mut Transaction, user: &User) -> Result<Vec<Uuid>, FileError> {
+    let mut pruned = Vec::new();
+    for id in files_records::maintenance::list_invisible_ids(tx, user.id).await? {
+        if create_of(tx, id).await?.is_some() {
+            continue;
+        }
+        files_records::maintenance::delete(tx, id).await?;
+        pruned.push(id);
+    }
+    Ok(pruned)
+}
+
+/// Soft-deletes the file at the moment its last row in a community
+/// went: on the server it is gone; on a device it is in none of the
+/// user's, until a row from the server puts it back.
+pub(crate) async fn delete_with_last_community(
+    tx: &mut Transaction,
+    role: Role,
+    id: Uuid,
+    deleted_at: Option<DateTime<Utc>>,
+    deleted_by_id: Option<Uuid>,
+) -> Result<(), FileError> {
+    let Some(mut file) = get_in(tx, id).await? else {
+        return Ok(());
+    };
+    if file.deleted_at.is_some() {
+        return Ok(());
+    }
+    file.deleted_at = deleted_at;
+    file.deleted_by_id = deleted_by_id;
+    file.updated_at = now();
+    if role == Role::Server {
+        file.version += 1;
+        file.last_synced_at = Some(file.updated_at);
+    }
+    files_records::update(&mut *tx, AcceptedFile(&file)).await?;
+    Ok(())
 }
 
 /// Removes a file's bytes from this device, if they are there.
@@ -888,21 +983,24 @@ async fn create_of(tx: &mut Transaction, id: Uuid) -> Result<Option<StoredEvent>
         .find(|stored| stored.event.row_id == id && stored.event.kind == EventKind::Create))
 }
 
-/// The live file, if the user owns it; another user's is not found, as
-/// if it were not there.
-async fn get_own(tx: &mut Transaction, user: &User, id: Uuid) -> Result<File, FileError> {
+/// The live file, if the user sees it; one they do not see is not
+/// found, as if it were not there.
+async fn get_visible(tx: &mut Transaction, user: &User, id: Uuid) -> Result<File, FileError> {
     match files_records::get(tx, user.id, id).await? {
         Some(file) => Ok(file),
         _ => Err(FileError::NotFound { id }),
     }
 }
 
-/// The files with their states. On the server every file is synced; on
-/// a device a file whose create waits in the queue is waiting, and one
-/// whose create the server refused is refused.
+/// The files with their states, creators and communities among the
+/// user's. On the server every file is synced; on a device a file whose
+/// create waits in the queue is waiting, and one whose create the server
+/// refused is refused. A creator is shown while they are a live member
+/// of one of those communities, as the user sees them on a device.
 async fn with_states(
     tx: &mut Transaction,
     role: Role,
+    user: &User,
     files: Vec<File>,
 ) -> Result<Vec<FileWithState>, FileError> {
     let creates: Vec<StoredEvent> = match role {
@@ -913,9 +1011,51 @@ async fn with_states(
             .filter(|stored| stored.event.kind == EventKind::Create)
             .collect(),
     };
+    let file_ids: Vec<Uuid> = files.iter().map(|file| file.id).collect();
+    let rows = files_communities::list_visible_of_files(tx, user, &file_ids).await?;
+    let community_ids: BTreeSet<Uuid> = rows.iter().map(|row| row.community_id).collect();
+    let community_ids: Vec<Uuid> = community_ids.into_iter().collect();
+    let communities = communities::list_by_ids(tx, &community_ids)
+        .await
+        .map_err(|error| FileError::Malformed(error.to_string()))?;
+    let mut members: Vec<(Uuid, Uuid)> = Vec::new();
+    for community_id in &community_ids {
+        for membership in memberships_records::list(
+            &mut *tx,
+            memberships_records::Filter::Community(*community_id),
+        )
+        .await?
+        {
+            members.push((membership.community_id, membership.user_id));
+        }
+    }
+    let creator_ids: Vec<Uuid> = files.iter().map(|file| file.created_by_id).collect();
+    let creators = users::list_by_ids(tx, &creator_ids)
+        .await
+        .map_err(|error| FileError::Malformed(error.to_string()))?;
     Ok(files
         .into_iter()
         .map(|file| {
+            let file_rows: Vec<_> = rows.iter().filter(|row| row.file_id == file.id).collect();
+            let creator = creators
+                .iter()
+                .find(|creator| creator.id == file.created_by_id)
+                .filter(|creator| {
+                    file_rows
+                        .iter()
+                        .any(|row| members.contains(&(row.community_id, creator.id)))
+                })
+                .cloned();
+            let communities = file_rows
+                .iter()
+                .filter_map(|row| {
+                    communities
+                        .iter()
+                        .find(|community| community.id == row.community_id)
+                })
+                .filter(|community| community.deleted_at.is_none())
+                .cloned()
+                .collect();
             let create = creates.iter().find(|stored| stored.event.row_id == file.id);
             let (state, error) = match create {
                 Some(stored) if stored.status == EventStatus::Pending => {
@@ -927,6 +1067,8 @@ async fn with_states(
             FileWithState {
                 shown_as: ShownAs::of(&file.content_type),
                 file,
+                creator,
+                communities,
                 state,
                 error,
             }
@@ -997,9 +1139,10 @@ async fn bucket_size(_deployment: &Deployment, _key: &str) -> Result<Option<u64>
 }
 
 /// Applies the event in the transaction: checks the fields it changes
-/// and that the user owns the file, merges it into the row, writes the
-/// row, and then the role's part, the record of the answer on the server
-/// or the queue on a device. A create whose bytes are not `uploaded` is
+/// and that the user sees the file, or for a create that they are in
+/// each of its communities, merges it into the row, writes the row, and
+/// then the role's part, the record of the answer on the server or the
+/// queue on a device. A create whose bytes are not `uploaded` is
 /// answered `file_not_uploaded` and writes nothing.
 pub(crate) async fn apply_in(
     tx: &mut Transaction,
@@ -1031,9 +1174,9 @@ pub(crate) async fn apply_in(
     let now = now();
     match event.kind {
         EventKind::Create => {
-            if let Some(existing) = get_in(tx, event.row_id).await? {
-                // Another user's row is none of this user's business
-                let existing = (existing.user_id == user.id).then_some(existing);
+            if get_in(tx, event.row_id).await?.is_some() {
+                // A file the user does not see is none of their business
+                let existing = files_records::get(tx, user.id, event.row_id).await?;
                 return rejected(event, "exists", existing);
             }
             let (version, last_synced_at) = match role {
@@ -1042,7 +1185,7 @@ pub(crate) async fn apply_in(
             };
             let blank = File {
                 id: event.row_id,
-                user_id: user.id,
+                created_by_id: user.id,
                 name: String::new(),
                 content_type: String::new(),
                 size: 0,
@@ -1057,19 +1200,29 @@ pub(crate) async fn apply_in(
                 Ok(file) => file,
                 Err(error) => return rejected(event, format!("invalid: {error}"), None),
             };
+            let communities: Vec<FileCommunityNew> = match event
+                .changes
+                .get("communities")
+                .map(|value| serde_json::from_value(value.clone()))
+                .transpose()
+            {
+                Ok(communities) => communities.unwrap_or_default(),
+                Err(error) => return rejected(event, format!("invalid: {error}"), None),
+            };
+            if let Some(reason) = files_communities::refusal_of_new(tx, user, &communities).await? {
+                return rejected(event, reason, None);
+            }
             if !uploaded {
                 return rejected(event, FILE_NOT_UPLOADED, None);
             }
             files_records::create(&mut *tx, AcceptedFile(&file)).await?;
+            files_communities::create_with_file(tx, user, &file, &communities).await?;
             finish(tx, role, user, event, Conflicts::new(), file).await
         }
         EventKind::Update => {
-            let Some(file) = get_in(tx, event.row_id).await? else {
+            let Some(file) = files_records::get(tx, user.id, event.row_id).await? else {
                 return rejected(event, "unknown_file", None);
             };
-            if file.user_id != user.id {
-                return rejected(event, "not_owner", None);
-            }
             let (changes, conflicts) = events::merge(
                 &file.fields(UPDATE_FIELDS)?,
                 file.version,
@@ -1085,9 +1238,6 @@ pub(crate) async fn apply_in(
                     Err(error) => return rejected(event, format!("invalid: {error}"), Some(file)),
                 };
                 updated.updated_at = now;
-                if changes.contains_key("deleted_at") {
-                    updated.deleted_by_id = updated.deleted_at.map(|_| user.id);
-                }
                 if role == Role::Server {
                     updated.version += 1;
                     updated.last_synced_at = Some(now);
@@ -1152,6 +1302,7 @@ impl File {
             name: file.name.clone(),
             content_type: file.content_type.clone(),
             size: file.size,
+            community_ids: Vec::new(),
         }
         .checked()?;
         Ok(File {
@@ -1171,6 +1322,7 @@ impl FileNew {
             name: self.name.trim().to_string(),
             content_type: content_type_or_unknown(&self.content_type),
             size: self.size,
+            community_ids: self.community_ids.clone(),
         };
         FieldErrors::check(&checked).map_err(FileError::Invalid)?;
         Ok(checked)
@@ -1201,6 +1353,17 @@ fn checked_name(name: &str) -> Result<String, FileError> {
         FileError::Invalid(FieldErrors::one("name", error.message().to_string()))
     })?;
     Ok(name.to_string())
+}
+
+/// A file is in one community at least.
+fn checked_community_ids(community_ids: &[Uuid]) -> Result<(), FileError> {
+    if community_ids.is_empty() {
+        return Err(FileError::Invalid(FieldErrors::one(
+            "community_ids",
+            "needs a community".to_string(),
+        )));
+    }
+    Ok(())
 }
 
 /// The content type a browser gave, or the unknown one when it gave none.
@@ -1271,6 +1434,54 @@ pub(crate) mod tests {
     };
     use crate::{pending_changes, posts, users};
 
+    /// The user's own community on the deployment, made the first time.
+    pub(crate) async fn personal(deployment: &Deployment, user: &User) -> Uuid {
+        let mut tx = deployment.begin().await.expect("a transaction");
+        let mine = memberships_records::list(&mut tx, memberships_records::Filter::User(user.id))
+            .await
+            .expect("the memberships");
+        tx.commit().await.expect("committed");
+        match mine.first() {
+            Some(membership) => membership.community_id,
+            None => {
+                communities::create(deployment, user, "Personal")
+                    .await
+                    .expect("a community")
+                    .id
+            }
+        }
+    }
+
+    /// Creates a file on a device, in the user's own community there.
+    pub(crate) async fn with_bytes(
+        deployment: &Deployment,
+        user: &User,
+        name: &str,
+        content_type: &str,
+        bytes: &[u8],
+    ) -> Result<File, FileError> {
+        let community_id = personal(deployment, user).await;
+        create_with_bytes(deployment, user, name, content_type, &[community_id], bytes).await
+    }
+
+    /// Renames a file, leaving its communities as they are.
+    pub(crate) async fn rename(
+        deployment: &Deployment,
+        user: &User,
+        id: Uuid,
+        name: &str,
+    ) -> Result<File, FileError> {
+        let community_ids: Vec<Uuid> = match get(deployment, user, id).await {
+            Ok(shown) => shown
+                .communities
+                .iter()
+                .map(|community| community.id)
+                .collect(),
+            Err(_) => vec![Uuid::now_v7()],
+        };
+        update(deployment, user, id, name, &community_ids).await
+    }
+
     /// A server with a bucket in memory.
     pub(crate) fn server(database: Database) -> (Deployment, Storage) {
         let storage = Storage::memory();
@@ -1279,17 +1490,18 @@ pub(crate) mod tests {
         (deployment, storage)
     }
 
-    pub(crate) fn new_file(name: &str, bytes: &[u8]) -> FileNew {
+    pub(crate) fn new_file(name: &str, bytes: &[u8], community_id: Uuid) -> FileNew {
         FileNew {
             id: Uuid::now_v7(),
             name: name.to_string(),
             content_type: "text/plain".to_string(),
             size: bytes.len() as u64,
+            community_ids: vec![community_id],
         }
     }
 
-    /// A file of the user's on the server, its bytes put in the bucket
-    /// as an upload would have.
+    /// A file the user created on the server, in their own community,
+    /// its bytes put in the bucket as an upload would have.
     pub(crate) async fn uploaded(
         deployment: &Deployment,
         storage: &Storage,
@@ -1297,7 +1509,7 @@ pub(crate) mod tests {
         name: &str,
         bytes: &[u8],
     ) -> File {
-        let new = new_file(name, bytes);
+        let new = new_file(name, bytes, personal(deployment, user).await);
         storage
             .put(&storage_key(user.id, new.id), bytes.to_vec())
             .await
@@ -1426,7 +1638,7 @@ pub(crate) mod tests {
         let alice = users::tests::alice();
         let (device, folder) = device_with_folder(&alice, "a token").await;
 
-        let file = create_with_bytes(&device, &alice, " notes.txt ", "text/plain", b"some notes")
+        let file = with_bytes(&device, &alice, " notes.txt ", "text/plain", b"some notes")
             .await
             .expect("a file");
         assert_eq!(file.name, "notes.txt");
@@ -1438,7 +1650,7 @@ pub(crate) mod tests {
         assert_eq!(listed[0].file, file);
         assert_eq!(listed[0].state, FileState::Waiting);
 
-        let error = create_with_bytes(&device, &alice, "empty.txt", "text/plain", b"")
+        let error = with_bytes(&device, &alice, "empty.txt", "text/plain", b"")
             .await
             .expect_err("no bytes");
         assert!(matches!(error, FileError::Invalid(_)));
@@ -1455,10 +1667,10 @@ pub(crate) mod tests {
     async fn files_delete_of_a_waiting_file_on_a_device_leaves_nothing() {
         let alice = users::tests::alice();
         let (device, folder) = device_with_folder(&alice, "a token").await;
-        let file = create_with_bytes(&device, &alice, "notes.txt", "text/plain", b"x")
+        let file = with_bytes(&device, &alice, "notes.txt", "text/plain", b"x")
             .await
             .expect("a file");
-        update(&device, &alice, file.id, "renamed.txt")
+        rename(&device, &alice, file.id, "renamed.txt")
             .await
             .expect("renamed while waiting");
 
@@ -1607,7 +1819,7 @@ pub(crate) mod tests {
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let (a, _a_folder) = device_with_folder(&alice, &token).await;
             let (b, _b_folder) = device_with_folder(&alice, &token).await;
-            let file = create_with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
+            let file = with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
                 .await
                 .expect("a file");
             posts::create(&a, &alice, "a post beside it", &[])
@@ -1620,8 +1832,8 @@ pub(crate) mod tests {
                 .expect("a sync");
             assert_eq!(report.uploaded, 1);
             assert_eq!(
-                report.pushed, 2,
-                "the post, then the file once its bytes went"
+                report.pushed, 4,
+                "the community, its membership and the post, then the file once its bytes went"
             );
             assert_eq!(report.pending, 0);
             assert_eq!(report.push_error, None);
@@ -1657,7 +1869,7 @@ pub(crate) mod tests {
             let (b, b_folder) = device_with_folder(&alice, &token).await;
             let (bobs, _bobs_folder) = device_with_folder(&bob, &bobs_token).await;
             let transport = InProcess { server: &server };
-            let file = create_with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
+            let file = with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
                 .await
                 .expect("a file");
             sync::run(&a, &transport).await.expect("a sync");
@@ -1700,11 +1912,11 @@ pub(crate) mod tests {
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let (device, _folder) = device_with_folder(&alice, &token).await;
             let transport = InProcess { server: &server };
-            let synced = create_with_bytes(&device, &alice, "notes.txt", "text/plain", b"notes")
+            let synced = with_bytes(&device, &alice, "notes.txt", "text/plain", b"notes")
                 .await
                 .expect("a file");
             sync::run(&device, &transport).await.expect("a sync");
-            let waiting = create_with_bytes(&device, &alice, "more.txt", "text/plain", b"more")
+            let waiting = with_bytes(&device, &alice, "more.txt", "text/plain", b"more")
                 .await
                 .expect("a file");
 
@@ -1738,7 +1950,7 @@ pub(crate) mod tests {
             let (a, _a_folder) = device_with_folder(&alice, &token).await;
             let (b, b_folder) = device_with_folder(&alice, &token).await;
             let transport = InProcess { server: &server };
-            let file = create_with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
+            let file = with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
                 .await
                 .expect("a file");
             sync::run(&a, &transport).await.expect("a sync");
@@ -1769,13 +1981,13 @@ pub(crate) mod tests {
             let (server, storage) = server(database);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let (a, _folder) = device_with_folder(&alice, &token).await;
-            let lost = create_with_bytes(&a, &alice, "lost.txt", "text/plain", b"lost")
+            let lost = with_bytes(&a, &alice, "lost.txt", "text/plain", b"lost")
                 .await
                 .expect("a file");
-            let kept = create_with_bytes(&a, &alice, "kept.txt", "text/plain", b"kept")
+            let kept = with_bytes(&a, &alice, "kept.txt", "text/plain", b"kept")
                 .await
                 .expect("a file");
-            update(&a, &alice, lost.id, "renamed.txt")
+            rename(&a, &alice, lost.id, "renamed.txt")
                 .await
                 .expect("renamed while waiting");
             posts::create(&a, &alice, "a post", &[])
@@ -1787,7 +1999,10 @@ pub(crate) mod tests {
                 .await
                 .expect("a sync");
             assert_eq!(report.uploaded, 1);
-            assert_eq!(report.pushed, 2, "the post and the other file");
+            assert_eq!(
+                report.pushed, 4,
+                "the community, its membership, the post and the other file"
+            );
             assert_eq!(report.pending, 1, "its rename, held back with it");
             assert_eq!(in_bucket(&storage, &alice, kept.id).await, Some(4));
             assert_eq!(in_bucket(&storage, &alice, lost.id).await, None);
@@ -1824,7 +2039,7 @@ pub(crate) mod tests {
             let (server, storage) = server(database);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let (a, _folder) = device_with_folder(&alice, &token).await;
-            let file = create_with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
+            let file = with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
                 .await
                 .expect("a file");
             let transport = Faulty::new(&server);
@@ -1851,7 +2066,7 @@ pub(crate) mod tests {
             let (server, storage) = server(database);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let (a, _folder) = device_with_folder(&alice, &token).await;
-            let file = create_with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
+            let file = with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
                 .await
                 .expect("a file");
             let transport = Faulty::new(&server);
@@ -1876,7 +2091,7 @@ pub(crate) mod tests {
             let (server, _storage) = server(database);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let (a, _folder) = device_with_folder(&alice, &token).await;
-            let file = create_with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
+            let file = with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
                 .await
                 .expect("a file");
             let wrong = Faulty {
@@ -1906,7 +2121,7 @@ pub(crate) mod tests {
             let (server, _storage) = server(database);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let (a, _folder) = device_with_folder(&alice, &token).await;
-            let file = create_with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
+            let file = with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
                 .await
                 .expect("a file");
             let wrong = Faulty {
@@ -1976,7 +2191,7 @@ pub(crate) mod tests {
             let (server, _storage) = server(database);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let (a, _folder) = device_with_folder(&alice, &token).await;
-            let file = create_with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
+            let file = with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
                 .await
                 .expect("a file");
             posts::create(&a, &alice, "a post", &[])
@@ -2020,7 +2235,7 @@ pub(crate) mod tests {
             let (server, _storage) = server(database);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let (a, folder) = device_with_folder(&alice, &token).await;
-            let file = create_with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
+            let file = with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
                 .await
                 .expect("a file");
             let strict = Faulty {
@@ -2038,7 +2253,7 @@ pub(crate) mod tests {
             );
             assert_eq!(error.as_deref(), Some("size: is larger than 1 KB"));
             assert_eq!(sync::status(&a).await.expect("the status").conflicts, 1);
-            update(&a, &alice, file.id, "renamed.txt")
+            rename(&a, &alice, file.id, "renamed.txt")
                 .await
                 .expect("renamed while refused");
             sync::run(&a, &strict).await.expect("a sync");
@@ -2073,16 +2288,16 @@ pub(crate) mod tests {
             let (a, _a_folder) = device_with_folder(&alice, &token).await;
             let (b, _b_folder) = device_with_folder(&alice, &token).await;
             let transport = InProcess { server: &server };
-            let file = create_with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
+            let file = with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
                 .await
                 .expect("a file");
             sync::run(&a, &transport).await.expect("a sync");
             sync::run(&b, &transport).await.expect("a sync");
 
-            update(&a, &alice, file.id, "from a.txt")
+            rename(&a, &alice, file.id, "from a.txt")
                 .await
                 .expect("renamed on a");
-            update(&b, &alice, file.id, "from b.txt")
+            rename(&b, &alice, file.id, "from b.txt")
                 .await
                 .expect("renamed on b");
             sync::run(&a, &transport).await.expect("a sync");
@@ -2179,7 +2394,7 @@ pub(crate) mod tests {
             let (a, a_folder) = device_with_folder(&alice, &token).await;
             let (b, b_folder) = device_with_folder(&alice, &token).await;
             let transport = InProcess { server: &server };
-            let file = create_with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
+            let file = with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
                 .await
                 .expect("a file");
             sync::run(&a, &transport).await.expect("a sync");
@@ -2213,7 +2428,7 @@ pub(crate) mod tests {
     async fn files_delete_unreferenced_on_device_leaves_new_bytes_and_every_file_not_yet_synced() {
         let alice = users::tests::alice();
         let (device, folder) = device_with_folder(&alice, "a token").await;
-        let waiting = create_with_bytes(&device, &alice, "notes.txt", "text/plain", b"x")
+        let waiting = with_bytes(&device, &alice, "notes.txt", "text/plain", b"x")
             .await
             .expect("a file");
         let without_a_row = folder.path().join(Uuid::now_v7().hyphenated().to_string());
@@ -2246,7 +2461,11 @@ pub(crate) mod tests {
             let alice = users::create(&deployment, "alice@example.com", "Alice")
                 .await
                 .expect("a user");
-            let new = new_file("notes.txt", b"some notes");
+            let new = new_file(
+                "notes.txt",
+                b"some notes",
+                personal(&deployment, &alice).await,
+            );
 
             let error = create(&deployment, &alice, &new)
                 .await
@@ -2274,7 +2493,7 @@ pub(crate) mod tests {
                 .expect("the upload");
             let file = create(&deployment, &alice, &new).await.expect("a file");
             assert_eq!(file.id, new.id);
-            assert_eq!(file.user_id, alice.id);
+            assert_eq!(file.created_by_id, alice.id);
             assert_eq!(file.size, 10);
             assert_eq!(file.version, 1);
             let listed = list(&deployment, &alice).await.expect("the files");
@@ -2304,6 +2523,7 @@ pub(crate) mod tests {
                 name: "  ".to_string(),
                 content_type: "not a type".to_string(),
                 size: MAX_BYTES + 1,
+                community_ids: Vec::new(),
             };
             let error = create(&deployment, &alice, &wrong)
                 .await
@@ -2317,7 +2537,7 @@ pub(crate) mod tests {
 
             let untyped = FileNew {
                 content_type: String::new(),
-                ..new_file("data", b"x")
+                ..new_file("data", b"x", personal(&deployment, &alice).await)
             };
             storage
                 .put(&storage_key(alice.id, untyped.id), b"x".to_vec())
@@ -2332,7 +2552,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn files_list_and_get_show_a_user_their_own_files_only() {
+    async fn files_list_and_get_show_a_user_no_file_outside_their_communities() {
         with_each_database(|database| async move {
             let (deployment, storage) = server(database);
             let alice = users::create(&deployment, "alice@example.com", "Alice")
@@ -2360,7 +2580,7 @@ pub(crate) mod tests {
                 get(&deployment, &bob, second.id)
                     .await
                     .expect_err("not his"),
-                update(&deployment, &bob, second.id, "his.txt")
+                rename(&deployment, &bob, second.id, "his.txt")
                     .await
                     .expect_err("not his"),
                 delete(&deployment, &bob, second.id)
@@ -2385,17 +2605,17 @@ pub(crate) mod tests {
                 .expect("a user");
             let file = uploaded(&deployment, &storage, &alice, "before.txt", b"x").await;
 
-            let updated = update(&deployment, &alice, file.id, " after.txt ")
+            let updated = rename(&deployment, &alice, file.id, " after.txt ")
                 .await
                 .expect("renamed");
             assert_eq!(updated.name, "after.txt");
             assert_eq!(updated.version, 2);
             assert_eq!(updated.size, file.size);
-            let same = update(&deployment, &alice, file.id, "after.txt")
+            let same = rename(&deployment, &alice, file.id, "after.txt")
                 .await
                 .expect("unchanged");
             assert_eq!(same.version, 2);
-            let error = update(&deployment, &alice, file.id, " ")
+            let error = rename(&deployment, &alice, file.id, " ")
                 .await
                 .expect_err("blank");
             assert!(matches!(error, FileError::Invalid(_)));
@@ -2502,7 +2722,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn files_content_url_is_signed_for_the_owner() {
+    async fn files_content_url_is_signed_under_the_creator() {
         with_each_database(|database| async move {
             let (deployment, storage) = server(database);
             let alice = users::create(&deployment, "alice@example.com", "Alice")
@@ -2528,9 +2748,14 @@ pub(crate) mod tests {
         let alice = users::create(&deployment, "alice@example.com", "Alice")
             .await
             .expect("a user");
-        let error = create(&deployment, &alice, &new_file("notes.txt", b"x"))
-            .await
-            .expect_err("no bucket");
+        let community_id = personal(&deployment, &alice).await;
+        let error = create(
+            &deployment,
+            &alice,
+            &new_file("notes.txt", b"x", community_id),
+        )
+        .await
+        .expect_err("no bucket");
         assert!(matches!(error, FileError::NoFileStore));
     }
 }

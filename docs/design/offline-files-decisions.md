@@ -18,13 +18,13 @@ Built as written, in `core/src/app/files.rs`; what was left out is
   post, through events and versions. The bytes never change: create
   fixes them, update changes `name` only, replacing content is adding a
   new file. So a copy on a device is never out of date.
-- **Only its owner sees a file.** Communities come later, by the join
-  table posts use.
+- **A file belongs to its communities.** A live member of one sees it,
+  and it lives as long as it is in one, see `files-communities.md`.
 - **Any type, up to 25 MB**, one constant. The server checks the size
   and nothing else; the content type is the device's word.
 - **Private, in a bucket of their own**, `STORAGE_PRIVATE_BUCKET`, at
-  `files/<owner id>/<file id>`, a key worked out from the row and never
-  stored. Reading is through a download URL the server signs for a
+  `files/<creator id>/<file id>`, a key worked out from the row and
+  never stored. Reading is through a download URL the server signs for a
   user who sees the row. Pictures stay in the public bucket,
   `STORAGE_BUCKET`: public or private is a whole bucket's on most
   stores.
@@ -54,14 +54,15 @@ Built as written, in `core/src/app/files.rs`; what was left out is
 
 | Column | Meaning |
 | --- | --- |
-| `id` | UUIDv7 from the device that added it; the server's on the web |
-| `user_id` | the owner, as on a post |
+| `id` | UUIDv7 from the device that created it; the server's on the web |
+| `created_by_id` | who created it, with no foreign key, see `files-communities.md` |
 | `name` | what the person sees, editable |
 | `content_type` | from the file picked, fixed |
 | `size` | bytes, fixed |
 
-An event may set `name`, `content_type` and `size` on create, and
-change `name` and `deleted_at` on update. A name edited on two devices
+An event may set `name`, `content_type`, `size` and `communities`, the
+rows of its first communities, on create, and change `name` on update;
+a file is deleted when it is taken out of its last community. A name edited on two devices
 merges as a post's body does.
 
 ## On a device
@@ -95,7 +96,7 @@ which the cleanup removes, and never a row without a file.
 | Step | Who | What |
 | --- | --- | --- |
 | 1 | device, `files::ask_about_waiting` | for each pending create on `app_files`, asks `POST /api/files/upload` with `{id, content_type, size}` |
-| 2 | server | checks the size; looks at `files/<owner id>/<file id>`. There, of that size: `uploaded`. Otherwise a signed PUT URL, good for 10 minutes |
+| 2 | server | checks the size; looks at `files/<creator id>/<file id>`. There, of that size: `uploaded`. Otherwise a signed PUT URL, good for 10 minutes |
 | 3 | device | pushes every pending event except those of a file not answered `uploaded`, `files::held_back`; a rename waits with its create |
 | 4 | device | pulls, backfills, prunes, as ever |
 | 5 | device, `files::upload_waiting` | sends each waiting file's bytes from disk to its URL, as a stream, with a longer timeout than the sync's requests |
@@ -114,7 +115,8 @@ which the cleanup removes, and never a row without a file.
   changes who calls it and no data.
 - One PUT per file, started over if cut off. No checksum.
 - The file has no row on the server when its upload is asked for, so
-  the server holds the user to the key's prefix, their own.
+  the server holds the user to the key's prefix, their own: nobody else
+  writes or claims a file before its row exists.
 - The `Transport` trait carries the asking, the sending and the
   fetching (`files_create_upload`, `files_upload`, `files_download`),
   so tests run the exchange in one process against the in-memory
@@ -226,8 +228,9 @@ A delete is the soft delete, synced like any edit.
 - **In the bucket**, `files/` joins `avatars/` in the server's sweep,
   `files::delete_unreferenced`: a file with no row, a day old, is
   deleted. A deleted row keeps its file for the purge's 90 days.
-  Deleting an account, once there is such a thing, deletes its prefix
-  at once. The sweep runs daily after the avatars', see
+  Deleting an account deletes no file's bytes at once, since its files
+  may still be in other communities; the sweep takes those of the files
+  deleted with it. The sweep runs daily after the avatars', see
   `docs/design/jobs.md`.
 
 **A gap accepted.** A file uploaded whose push never came is swept

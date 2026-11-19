@@ -1,5 +1,6 @@
 //! The `app_files` table, the counterpart of `sqlite::files` with native
-//! uuid and timestamptz columns. A user sees the files they own.
+//! uuid and timestamptz columns. A user sees a file in a community they
+//! are a live member of.
 
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgConnection};
@@ -11,7 +12,7 @@ use crate::sync::Cursor;
 #[derive(FromRow)]
 struct FileRow {
     id: Uuid,
-    user_id: Uuid,
+    created_by_id: Uuid,
     name: String,
     content_type: String,
     size: i64,
@@ -27,7 +28,7 @@ impl From<FileRow> for File {
     fn from(row: FileRow) -> File {
         File {
             id: row.id,
-            user_id: row.user_id,
+            created_by_id: row.created_by_id,
             name: row.name,
             content_type: row.content_type,
             size: u64::try_from(row.size).unwrap_or_default(),
@@ -42,11 +43,20 @@ impl From<FileRow> for File {
 }
 
 macro_rules! select {
-    ($rest:literal) => {
+    ($($rest:expr),+ $(,)?) => {
         concat!(
-            "SELECT id, user_id, name, content_type, size, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id FROM app_files ",
-            $rest
+            "SELECT id, created_by_id, name, content_type, size, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id FROM app_files ",
+            $($rest),+
         )
+    };
+}
+
+/// The files the user, `$1`, sees: those with a live row in a community
+/// they are a live member of.
+macro_rules! visible_to {
+    () => {
+        "id IN (SELECT fc.file_id FROM app_files_communities fc
+            WHERE fc.deleted_at IS NULL AND fc.community_id IN (SELECT community_id FROM app_users_communities WHERE user_id = $1 AND deleted_at IS NULL))"
     };
 }
 
@@ -54,13 +64,15 @@ fn size_of(file: &File) -> i64 {
     i64::try_from(file.size).unwrap_or(i64::MAX)
 }
 
-/// The user's files, not deleted, newest first.
-pub async fn list_owned(
+/// The files the user sees, not deleted, newest first.
+pub async fn list_visible(
     connection: &mut PgConnection,
     user_id: Uuid,
 ) -> Result<Vec<File>, sqlx::Error> {
     let rows: Vec<FileRow> = sqlx::query_as(select!(
-        "WHERE deleted_at IS NULL AND user_id = $1 ORDER BY inserted_at DESC, id DESC"
+        "WHERE deleted_at IS NULL AND ",
+        visible_to!(),
+        " ORDER BY inserted_at DESC, id DESC"
     ))
     .bind(user_id)
     .fetch_all(connection)
@@ -68,7 +80,40 @@ pub async fn list_owned(
     Ok(rows.into_iter().map(File::from).collect())
 }
 
-/// The row by its id, deleted or not, whoever owns it.
+/// The file by its id if the user sees it, not deleted.
+pub async fn get_visible(
+    connection: &mut PgConnection,
+    user_id: Uuid,
+    id: Uuid,
+) -> Result<Option<File>, sqlx::Error> {
+    let row: Option<FileRow> = sqlx::query_as(select!(
+        "WHERE id = $2 AND deleted_at IS NULL AND ",
+        visible_to!()
+    ))
+    .bind(user_id)
+    .bind(id)
+    .fetch_optional(connection)
+    .await?;
+    Ok(row.map(File::from))
+}
+
+/// The ids of the files on this database the user does not see: what a
+/// device prunes.
+pub async fn list_invisible_ids(
+    connection: &mut PgConnection,
+    user_id: Uuid,
+) -> Result<Vec<Uuid>, sqlx::Error> {
+    let rows: Vec<(Uuid,)> = sqlx::query_as(concat!(
+        "SELECT id FROM app_files WHERE NOT ",
+        visible_to!()
+    ))
+    .bind(user_id)
+    .fetch_all(connection)
+    .await?;
+    Ok(rows.into_iter().map(|(id,)| id).collect())
+}
+
+/// The row by its id, deleted or not, whoever sees it.
 pub async fn get(connection: &mut PgConnection, id: Uuid) -> Result<Option<File>, sqlx::Error> {
     let row: Option<FileRow> = sqlx::query_as(select!("WHERE id = $1"))
         .bind(id)
@@ -77,18 +122,18 @@ pub async fn get(connection: &mut PgConnection, id: Uuid) -> Result<Option<File>
     Ok(row.map(File::from))
 }
 
-/// Every row's id and owner, with whether it is deleted: what the
+/// Every row's id and creator, with whether it is deleted: what the
 /// bytes kept for the rows are checked against.
 pub async fn list_ids(
     connection: &mut PgConnection,
 ) -> Result<Vec<(Uuid, Uuid, bool)>, sqlx::Error> {
-    sqlx::query_as("SELECT id, user_id, deleted_at IS NOT NULL FROM app_files")
+    sqlx::query_as("SELECT id, created_by_id, deleted_at IS NOT NULL FROM app_files")
         .fetch_all(connection)
         .await
 }
 
-/// The user's rows the server wrote after the cursor, in cursor order,
-/// deleted or not: a page of a pull.
+/// The rows the server wrote after the cursor that the user sees, in
+/// cursor order: a page of a pull.
 pub async fn list_synced_after(
     connection: &mut PgConnection,
     user_id: Uuid,
@@ -96,8 +141,9 @@ pub async fn list_synced_after(
     limit: usize,
 ) -> Result<Vec<File>, sqlx::Error> {
     let rows: Vec<FileRow> = sqlx::query_as(select!(
-        "WHERE last_synced_at IS NOT NULL AND (last_synced_at, id) > ($2, $3) AND user_id = $1
-         ORDER BY last_synced_at, id LIMIT $4"
+        "WHERE last_synced_at IS NOT NULL AND (last_synced_at, id) > ($2, $3) AND ",
+        visible_to!(),
+        " ORDER BY last_synced_at, id LIMIT $4"
     ))
     .bind(user_id)
     .bind(after.last_synced_at)
@@ -110,11 +156,11 @@ pub async fn list_synced_after(
 
 pub async fn insert(connection: &mut PgConnection, file: &File) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_files (id, user_id, name, content_type, size, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
+        "INSERT INTO app_files (id, created_by_id, name, content_type, size, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
     )
     .bind(file.id)
-    .bind(file.user_id)
+    .bind(file.created_by_id)
     .bind(&file.name)
     .bind(&file.content_type)
     .bind(size_of(file))
@@ -150,16 +196,16 @@ pub async fn update(connection: &mut PgConnection, file: &File) -> Result<bool, 
 /// Writes the server's row over the device's, or inserts it.
 pub async fn upsert(connection: &mut PgConnection, file: &File) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_files (id, user_id, name, content_type, size, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
+        "INSERT INTO app_files (id, created_by_id, name, content_type, size, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT (id) DO UPDATE SET
-           user_id = excluded.user_id, name = excluded.name, content_type = excluded.content_type,
+           created_by_id = excluded.created_by_id, name = excluded.name, content_type = excluded.content_type,
            size = excluded.size, inserted_at = excluded.inserted_at, updated_at = excluded.updated_at,
            version = excluded.version, last_synced_at = excluded.last_synced_at,
            deleted_at = excluded.deleted_at, deleted_by_id = excluded.deleted_by_id",
     )
     .bind(file.id)
-    .bind(file.user_id)
+    .bind(file.created_by_id)
     .bind(&file.name)
     .bind(&file.content_type)
     .bind(size_of(file))

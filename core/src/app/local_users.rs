@@ -34,6 +34,7 @@ use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::device_settings::{self, DeviceSettingsError, LOCAL_USER_MOVED, SIGNED_IN};
 use crate::events::{self, Event, Fields};
+use crate::files_communities::{self, FileCommunityNew};
 use crate::users::{self, SignedIn, User, UserError};
 use crate::{files, memberships, posts, posts_communities, tokens};
 
@@ -70,6 +71,8 @@ pub enum LocalUserError {
     Community(#[from] CommunityError),
     #[error(transparent)]
     DeviceSettings(#[from] DeviceSettingsError),
+    #[error(transparent)]
+    FileCommunity(#[from] files_communities::FileCommunityError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -297,16 +300,43 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
             );
         }
     }
-    for file in files_records::list(&mut *tx, user.id).await? {
+    let memberships =
+        memberships_records::list(&mut *tx, memberships_records::Filter::User(user.id)).await?;
+    let files = files_records::list(&mut *tx, user.id).await?;
+    let file_ids: Vec<Uuid> = files.iter().map(|file| file.id).collect();
+    let files_communities = files_communities::list_visible_of_files(tx, user, &file_ids).await?;
+    for file in files {
+        let rows: Vec<_> = files_communities
+            .iter()
+            .filter(|row| row.file_id == file.id)
+            .collect();
+        let parents: Vec<Uuid> = rows
+            .iter()
+            .flat_map(|row| {
+                let membership = memberships
+                    .iter()
+                    .find(|membership| membership.community_id == row.community_id)
+                    .map(|membership| membership.id);
+                [Some(row.community_id), membership].into_iter().flatten()
+            })
+            .collect();
+        let communities: Vec<FileCommunityNew> = rows
+            .iter()
+            .map(|row| FileCommunityNew {
+                id: row.id,
+                community_id: row.community_id,
+            })
+            .collect();
         add(
             files::TABLE,
             file.id,
             file.inserted_at,
-            &[],
+            &parents,
             json!({
                 "name": file.name,
                 "content_type": file.content_type,
                 "size": file.size,
+                "communities": communities,
             }),
         );
     }
@@ -381,7 +411,7 @@ mod tests {
             users::update(&device, &local, "Alice")
                 .await
                 .expect("renamed");
-            files::create_with_bytes(&device, &local, "notes.txt", "text/plain", b"notes")
+            files::tests::with_bytes(&device, &local, "notes.txt", "text/plain", b"notes")
                 .await
                 .expect("a file");
             assert_eq!(pending(&device).await, 0, "nothing is queued");
@@ -444,7 +474,7 @@ mod tests {
         posts::delete(device, local, deleted.id)
             .await
             .expect("deleted");
-        let file = files::create_with_bytes(device, local, "notes.txt", "text/plain", b"notes")
+        let file = files::tests::with_bytes(device, local, "notes.txt", "text/plain", b"notes")
             .await
             .expect("a file");
         Made {

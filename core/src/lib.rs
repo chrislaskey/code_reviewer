@@ -35,6 +35,6 @@ pub mod trial_users;
 
 // Preserve existing resource paths while grouping their implementations under app.
 pub use app::{
-    avatars, communities, conflicts, current_community, events, files, local_users, memberships,
-    pending_changes, posts, posts_communities, purge, sync, users,
+    avatars, communities, conflicts, current_community, events, files, files_communities,
+    local_users, memberships, pending_changes, posts, posts_communities, purge, sync, users,
 };

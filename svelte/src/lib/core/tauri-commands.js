@@ -315,7 +315,7 @@ export function postsUpdate(id, body, communityIds) {
   return invoke("posts_update", { id, body, communityIds });
 }
 
-/** The user's files on this device, each `{file, shown_as, state, error}`. */
+/** The files the user sees on this device, each `{file, creator, communities, shown_as, state, error}`. */
 export function filesList() {
   return invoke("files_list");
 }
@@ -328,9 +328,10 @@ export function filesGet(id) {
 /**
  * @param {string} id
  * @param {string} name
+ * @param {string[]} communityIds its communities among the user's, exactly
  */
-export function filesUpdate(id, name) {
-  return invokeForm("files_update", { id, name });
+export function filesUpdate(id, name, communityIds) {
+  return invokeForm("files_update", { id, name, communityIds });
 }
 
 /** @param {string} id */
@@ -339,16 +340,21 @@ export function filesDelete(id) {
 }
 
 /**
- * Adds the file the person picked: kept on this device at once, and
+ * Creates the file the person picked: kept on this device at once, and
  * sent to the server by the next sync; answers the file. The bytes are
- * the command's body, the name and the type its headers.
+ * the command's body, the name, the type and the communities its headers.
  * @param {File} file
  * @param {string} name
+ * @param {string[]} communityIds the communities the file is in, one at least
  * @param {(fraction: number) => void} [_onProgress] nothing to wait for here
  */
-export async function filesCreate(file, name, _onProgress) {
+export async function filesCreate(file, name, communityIds, _onProgress) {
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const headers = { "x-file-name": encodeURIComponent(name), "x-file-content-type": file.type };
+  const headers = {
+    "x-file-name": encodeURIComponent(name),
+    "x-file-content-type": file.type,
+    "x-file-community-ids": communityIds.join(","),
+  };
   try {
     return await invoke("files_create", bytes, { headers });
   } catch (problem) {

@@ -83,7 +83,7 @@ mod tests {
     fn file(name: &str, content_type: &str, updated_at: DateTime<Utc>) -> File {
         File {
             id: Uuid::from_u128(1),
-            user_id: Uuid::from_u128(1),
+            created_by_id: Uuid::from_u128(1),
             name: name.to_string(),
             content_type: content_type.to_string(),
             size: 2048,

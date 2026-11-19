@@ -16,6 +16,9 @@ pub async fn delete_deleted_before(
         "app_posts_communities" => {
             "DELETE FROM app_posts_communities WHERE deleted_at IS NOT NULL AND deleted_at < $1 AND last_synced_at < $1"
         }
+        "app_files_communities" => {
+            "DELETE FROM app_files_communities WHERE deleted_at IS NOT NULL AND deleted_at < $1 AND last_synced_at < $1"
+        }
         "app_files" => {
             "DELETE FROM app_files WHERE deleted_at IS NOT NULL AND deleted_at < $1 AND last_synced_at < $1"
         }

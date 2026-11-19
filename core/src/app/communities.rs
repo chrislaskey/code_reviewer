@@ -20,6 +20,7 @@ use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
 use crate::field_errors::FieldErrors;
+use crate::files_communities;
 use crate::memberships::{self, Membership, MembershipError};
 use crate::sync::{Cursor, TableRow};
 use crate::users::User;
@@ -407,6 +408,9 @@ pub(crate) async fn apply_in(
             communities_records::update(&mut *tx, AcceptedCommunity(&updated)).await?;
             if changes.contains_key("deleted_at") && updated.deleted_at.is_some() {
                 memberships::delete_with_community(tx, role, &updated).await?;
+                files_communities::delete_with_community(tx, role, &updated)
+                    .await
+                    .map_err(|error| CommunityError::Malformed(error.to_string()))?;
             }
             finish(tx, role, user, event, conflicts, updated).await
         }

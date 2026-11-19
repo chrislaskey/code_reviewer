@@ -19,18 +19,18 @@ macro_rules! query {
     };
 }
 
-/// Lists an owner's live files, newest first with an ID tie-breaker.
+/// Lists the live files the user sees, newest first with an ID tie-breaker.
 pub(crate) async fn list(tx: &mut Transaction, user_id: Uuid) -> Result<Vec<File>, sqlx::Error> {
-    query!(tx, list_owned(user_id))
+    query!(tx, list_visible(user_id))
 }
 
-/// Gets a live file owned by the acting user.
+/// Gets a live file the user sees.
 pub(crate) async fn get(
     tx: &mut Transaction,
     user_id: Uuid,
     id: Uuid,
 ) -> Result<Option<File>, sqlx::Error> {
-    Ok(query!(tx, get(id))?.filter(|file| file.deleted_at.is_none() && file.user_id == user_id))
+    query!(tx, get_visible(user_id, id))
 }
 
 /// Persists a row accepted by the resource workflow.
@@ -81,14 +81,22 @@ pub(crate) mod replication {
 pub(crate) mod maintenance {
     use super::*;
 
-    /// Lists row IDs, owners and deletion state for byte cleanup.
+    /// Lists row IDs, creators and deletion state for byte cleanup.
     pub(crate) async fn list_ids(
         tx: &mut Transaction,
     ) -> Result<Vec<(Uuid, Uuid, bool)>, sqlx::Error> {
         query!(tx, list_ids())
     }
 
-    /// Physically removes a refused or forgotten local file.
+    /// Lists the files on this database the user does not see, for a prune.
+    pub(crate) async fn list_invisible_ids(
+        tx: &mut Transaction,
+        user_id: Uuid,
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        query!(tx, list_invisible_ids(user_id))
+    }
+
+    /// Physically removes a refused, forgotten or pruned local file.
     pub(crate) async fn delete(tx: &mut Transaction, id: Uuid) -> Result<(), sqlx::Error> {
         query!(tx, delete_row(id))
     }

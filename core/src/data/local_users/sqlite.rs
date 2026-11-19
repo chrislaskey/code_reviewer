@@ -13,7 +13,8 @@ pub async fn give_rows_to_user(
     for statement in [
         "UPDATE app_users_communities SET user_id = $2 WHERE user_id = $1",
         "UPDATE app_posts SET user_id = $2 WHERE user_id = $1",
-        "UPDATE app_files SET user_id = $2 WHERE user_id = $1",
+        "UPDATE app_files SET created_by_id = $2 WHERE created_by_id = $1",
+        "UPDATE app_files_communities SET created_by_id = $2 WHERE created_by_id = $1",
         "UPDATE app_events SET user_id = $2 WHERE user_id = $1",
     ] {
         sqlx::query(statement)
@@ -31,6 +32,7 @@ pub async fn delete_deleted_rows(connection: &mut SqliteConnection) -> Result<()
     for statement in [
         "DELETE FROM app_posts_communities WHERE deleted_at IS NOT NULL",
         "DELETE FROM app_posts WHERE deleted_at IS NOT NULL",
+        "DELETE FROM app_files_communities WHERE deleted_at IS NOT NULL",
         "DELETE FROM app_files WHERE deleted_at IS NOT NULL",
         "DELETE FROM app_users_communities WHERE deleted_at IS NOT NULL",
         "DELETE FROM app_communities WHERE deleted_at IS NOT NULL",
@@ -55,7 +57,7 @@ pub async fn count_items(
 ) -> Result<i64, sqlx::Error> {
     let (count,): (i64,) = sqlx::query_as(
         "SELECT (SELECT COUNT(*) FROM app_posts WHERE user_id = $1 AND deleted_at IS NULL)
-              + (SELECT COUNT(*) FROM app_files WHERE user_id = $1 AND deleted_at IS NULL)",
+              + (SELECT COUNT(*) FROM app_files WHERE created_by_id = $1 AND deleted_at IS NULL)",
     )
     .bind(user_id.hyphenated())
     .fetch_one(connection)

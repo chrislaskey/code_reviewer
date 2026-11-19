@@ -1,8 +1,9 @@
-<!-- One file, at /files/:id: its bytes shown as the server says its
-     type is shown, an image in place, a text or PDF file in a frame,
-     anything else by its name and size; with Download, Rename and
-     Delete. A click on an image copies it to the clipboard, where the
-     device can. -->
+<!-- One file, at /files/:id: who created it and its communities among
+     the person's; its bytes shown as the server says its type is shown,
+     an image in place, a text or PDF file in a frame, anything else by
+     its name and size; with Download, Edit and Delete, which takes it
+     out of the person's communities. A click on an image copies it to
+     the clipboard, where the device can. -->
 <script>
   import AnimationsToggle from "../lib/AnimationsToggle.svelte";
   import FileImage from "../lib/FileImage.svelte";
@@ -60,7 +61,7 @@
   }
 
   async function remove() {
-    if (!confirm("Delete this file?")) return;
+    if (!confirm("Delete this file from your communities? A community you are not in keeps it.")) return;
     try {
       await filesDelete(id);
       await navigateToUrl(filesIndexUrl());
@@ -78,6 +79,11 @@
 
   <ErrorMessage message={error} />
   {#if shown}
+    <Text tone="muted">
+      {shown.creator ? shown.creator.name : "A former member"} · in {shown.communities
+        .map((community) => community.name)
+        .join(", ")}
+    </Text>
     <Text tone="muted">
       {shown.file.content_type} · {fileSize(shown.file.size)} · {shown.file.inserted_at}
       {#if shown.state === "waiting"}
@@ -117,7 +123,7 @@
       {#if canDownload}
         <Button size="sm" onclick={download}>Download</Button>
       {/if}
-      <Button size="sm" href={filesEditUrl(id)}>Rename</Button>
+      <Button size="sm" href={filesEditUrl(id)}>Edit</Button>
       <Button size="sm" variant="ghost" onclick={remove}>Delete</Button>
       {#if saved}
         <Text as="span" tone="muted">{saved}</Text>

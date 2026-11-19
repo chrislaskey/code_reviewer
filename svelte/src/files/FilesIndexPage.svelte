@@ -1,6 +1,7 @@
-<!-- The person's files, newest first, at /files: each with a small
-     picture when it is an image, its name, its size, and where it
-     stands when it is not on the server yet. A click opens its page. At
+<!-- The files in the person's communities, newest first, at /files:
+     each with a small picture when it is an image, its name, its size,
+     its communities, and where it stands when it is not on the server
+     yet. A click opens its page. At
      the bottom in the app, the copies kept on this device and a button
      that removes them. -->
 <script>
@@ -54,7 +55,7 @@
   {/if}
 
   <ul class="flex flex-col gap-3">
-    {#each files as { file, shown_as, state, error: problem } (file.id)}
+    {#each files as { file, communities, shown_as, state, error: problem } (file.id)}
       <Panel as="li" layout="row">
         <a href={filesShowUrl(file.id)} class="flex size-12 shrink-0 items-center justify-center">
           {#if shown_as === "image"}
@@ -63,7 +64,9 @@
         </a>
         <div class="flex min-w-0 grow flex-col">
           <Link class="truncate" href={filesShowUrl(file.id)}>{file.name}</Link>
-          <Text as="span" tone="muted">{fileSize(file.size)} · {file.inserted_at}</Text>
+          <Text as="span" tone="muted">
+            {fileSize(file.size)} · {file.inserted_at} · in {communities.map((community) => community.name).join(", ")}
+          </Text>
           {#if problem}
             <Text as="span" tone="error" size="sm">{problem}</Text>
           {/if}

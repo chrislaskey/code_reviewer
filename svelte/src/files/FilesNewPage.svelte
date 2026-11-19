@@ -1,18 +1,23 @@
-<!-- Adding a file, at /files/new: the person picks one and names it, its
-     own name to start; done, it shows the file. On the web the bytes go
-     straight to object storage; in the app they are kept on the device
-     and sent when it next syncs, see filesCreate in lib/core/. -->
+<!-- Creating a file, at /files/new: the person picks one, names it, its
+     own name to start, and picks its communities, their current one to
+     start; done, it shows the file. On the web the bytes go straight to
+     object storage; in the app they are kept on the device and sent when
+     it next syncs, see filesCreate in lib/core/. -->
 <script>
   import FieldErrors from "../lib/FieldErrors.svelte";
   import { FormError, filesCreate } from "../lib/core/index.js";
+  import { currentCommunityLoad } from "../lib/current_community.js";
   import { navigateToUrl } from "../lib/router.js";
   import { filesIndexUrl, filesShowUrl } from "../lib/routes.js";
   import { Button, ErrorMessage, FileInput, Heading, Input, Label, Link } from "../lib/components/index.js";
   import Page from "../lib/Page.svelte";
+  import FilesCommunitiesField from "./FilesCommunitiesField.svelte";
 
   /** @type {File | null} */
   let file = $state(null);
   let name = $state("");
+  /** @type {string[]} */
+  let communityIds = $state([]);
   /** @type {Record<string, string[]>} */
   let errors = $state({});
   let error = $state("");
@@ -36,8 +41,8 @@
     errors = {};
     error = "";
     try {
-      const added = await filesCreate(file, name, (fraction) => (progress = fraction));
-      await navigateToUrl(filesShowUrl(added.id));
+      const created = await filesCreate(file, name, communityIds, (fraction) => (progress = fraction));
+      await navigateToUrl(filesShowUrl(created.id));
     } catch (problem) {
       if (problem instanceof FormError) errors = problem.errors;
       error = problem instanceof Error ? problem.message : String(problem);
@@ -46,6 +51,17 @@
       progress = null;
     }
   }
+
+  async function load() {
+    try {
+      const current = await currentCommunityLoad();
+      if (current && communityIds.length === 0) communityIds = [current.id];
+    } catch {
+      // The person picks one
+    }
+  }
+
+  load();
 </script>
 
 <Page>
@@ -59,6 +75,7 @@
       <Input bind:value={name} disabled={busy} />
       <FieldErrors {errors} fields={["name"]} />
     </Label>
+    <FilesCommunitiesField bind:communityIds {errors} disabled={busy} />
     {#if progress !== null}
       <progress class="progress w-full" value={progress} max="1"></progress>
     {/if}
@@ -66,7 +83,7 @@
       <ErrorMessage message={error} />
     {/if}
     <div>
-      <Button variant="primary" type="submit" disabled={busy || !file}>Add file</Button>
+      <Button variant="primary" type="submit" disabled={busy || !file}>Create file</Button>
     </div>
   </form>
   <Link href={filesIndexUrl()}>Back to files</Link>

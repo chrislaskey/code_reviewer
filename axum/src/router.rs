@@ -1746,7 +1746,15 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert_eq!(upload["uploaded"], json!(false));
         let id = upload["id"].as_str().expect("an id").to_string();
-        let new = json!({ "id": id, "name": "notes.txt", "content_type": "text/plain", "size": bytes.len() });
+        let (_, communities) = get(&router, "/api/communities").await;
+        let community_id = communities[0]["community"]["id"].clone();
+        let new = json!({
+            "id": id,
+            "name": "notes.txt",
+            "content_type": "text/plain",
+            "size": bytes.len(),
+            "community_ids": [community_id],
+        });
 
         let (status, body) = send(&router, Method::POST, "/api/files", Some(new.clone())).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
@@ -1763,6 +1771,7 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert_eq!(listed[0]["file"], file);
         assert_eq!(listed[0]["state"], json!("synced"));
+        assert_eq!(listed[0]["communities"][0]["id"], community_id);
 
         let path = format!("/api/files/{id}");
         let (status, headers, _) = send_with(
@@ -1778,11 +1787,11 @@ mod tests {
         assert_eq!(headers[header::LOCATION], format!("memory:///{key}"));
         assert_eq!(headers[header::CACHE_CONTROL], "private, max-age=3300");
 
-        let renamed = json!({ "name": "renamed.txt" });
+        let renamed = json!({ "name": "renamed.txt", "community_ids": [community_id] });
         let (status, file) = send(&router, Method::PUT, &path, Some(renamed)).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(file["name"], json!("renamed.txt"));
-        let blank = json!({ "name": " " });
+        let blank = json!({ "name": " ", "community_ids": [community_id] });
         let (status, body) = send(&router, Method::PUT, &path, Some(blank)).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(body["errors"], json!({ "name": ["is blank"] }));

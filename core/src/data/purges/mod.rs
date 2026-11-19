@@ -23,6 +23,7 @@ macro_rules! query {
 pub(crate) enum Table {
     PostsCommunities,
     Posts,
+    FilesCommunities,
     Files,
     Memberships,
     Communities,
@@ -35,6 +36,7 @@ impl Table {
         match self {
             Self::PostsCommunities => crate::posts_communities::TABLE,
             Self::Posts => crate::posts::TABLE,
+            Self::FilesCommunities => crate::files_communities::TABLE,
             Self::Files => crate::files::TABLE,
             Self::Memberships => crate::memberships::TABLE,
             Self::Communities => crate::communities::TABLE,

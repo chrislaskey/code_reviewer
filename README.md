@@ -48,9 +48,9 @@ Inside the Tauri app each is a command of the same name
 | `membershipsJoin(communityId)` | `PUT /api/memberships/:community_id` |
 | `membershipsLeave(communityId)` | `DELETE /api/memberships/:community_id`, 204 |
 | `filesList()`, `filesGet(id)` | `GET /api/files`, `GET /api/files/:id`, each file with how it is shown and where it stands |
-| `filesCreate(file, name, onProgress?)` | `POST /api/files/upload` for where to PUT the bytes, the PUT to the bucket, then `POST /api/files`, 201; in the app one command, the bytes kept on the device and sent by the next sync |
-| `filesUpdate(id, name)` | `PUT /api/files/:id` with `{"name": "..."}` |
-| `filesDelete(id)` | `DELETE /api/files/:id`, 204 |
+| `filesCreate(file, name, communityIds, onProgress?)` | `POST /api/files/upload` for where to PUT the bytes, the PUT to the bucket, then `POST /api/files`, 201; in the app one command, the bytes kept on the device and sent by the next sync |
+| `filesUpdate(id, name, communityIds)` | `PUT /api/files/:id` with `{"name": "...", "community_ids": [...]}`, its communities among the user's |
+| `filesDelete(id)` | `DELETE /api/files/:id`, 204: out of the user's communities, deleted when those were its last |
 | `filesContentUrl(id)` | `/api/files/:id/content`, a redirect to the bytes for an `<img>`; in the app the `files` protocol, serving the device's copy |
 | `filesDownload(id)`, `filesDownloadSupported()` | the same URL with `?download=1`; in the desktop app a copy into Downloads |
 | `filesCopy(id)`, `filesCopySupported()` | the image onto the clipboard: on the web as a PNG, in the macOS and iOS apps with its own bytes too |
@@ -220,7 +220,10 @@ Garage, which `bin/dev` starts with the web server when it is installed
 ## Files added offline
 
 A file (`core/src/app/files.rs`) is the second upload pattern: a resource
-of its own whose row syncs like a post while its bytes travel apart. In
+of its own whose row syncs like a post while its bytes travel apart. A
+file belongs to its communities, not to its creator: a live member of
+one sees it, and it lives as long as it is in one
+(`core/src/app/files_communities.rs`, `docs/design/files-communities.md`). In
 the app a file picked on the New page is kept at once in the account's
 folder on the device, `accounts/<user id>/files/<file id>`, with a row
 whose create waits in the queue, so it is listed and shown with the

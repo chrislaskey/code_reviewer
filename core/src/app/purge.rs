@@ -44,6 +44,7 @@ pub const UNCONFIRMED_DAYS: i64 = 1;
 const TABLES: &[purges_records::Table] = &[
     purges_records::Table::PostsCommunities,
     purges_records::Table::Posts,
+    purges_records::Table::FilesCommunities,
     purges_records::Table::Files,
     purges_records::Table::Memberships,
     purges_records::Table::Communities,

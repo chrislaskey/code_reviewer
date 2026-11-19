@@ -126,7 +126,9 @@ The synced tables, parents first, which is the order a device writes
 them in: `app_users`, `app_communities`, `app_users_communities` (a
 membership), `app_posts`, `app_posts_communities` (a post in a
 community, under the owner's membership there), `app_files` (a file's
-row; its bytes travel apart, see `offline-files-decisions.md`). Their foreign keys are
+row; its bytes travel apart, see `offline-files-decisions.md`),
+`app_files_communities` (a file in a community, the community's, see
+`files-communities.md`). Their foreign keys are
 real on every deployment, with `on delete cascade`, which is what a
 device's prune leans on.
 
@@ -163,7 +165,8 @@ Any other field is refused as `not_editable: <field>`:
 | `app_users_communities` | `user_id`, `community_id`, `role` | `deleted_at` |
 | `app_posts_communities` | `post_id`, `community_id`, `users_communities_id` | `deleted_at` |
 | `app_users` | nothing, the server makes a user | `name`, by the user themselves; `avatar_url`, by the server only for now, see `uploads.md` |
-| `app_files` | `name`, `content_type`, `size`, once the bytes are in the bucket | `name`, `deleted_at` |
+| `app_files` | `name`, `content_type`, `size`, `communities`, once the bytes are in the bucket | `name`, by a member of one of its communities |
+| `app_files_communities` | `file_id`, `community_id`, by a member who sees the file | `deleted_at`, by a member of the community; the last one deleted deletes the file |
 
 Who made the event is not on the wire: the server records the user its
 token stood for, a device the user signed in, as `user_id` in

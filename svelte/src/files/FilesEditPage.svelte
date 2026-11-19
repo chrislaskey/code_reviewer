@@ -1,5 +1,5 @@
-<!-- Renaming a file, at /files/:id/edit, the one thing about a file
-     that changes; done, it shows the file -->
+<!-- Editing a file, at /files/:id/edit: its name, and its communities
+     among the person's; its bytes never change. Done, it shows the file -->
 <script>
   import FieldErrors from "../lib/FieldErrors.svelte";
   import { FormError, filesGet, filesUpdate } from "../lib/core/index.js";
@@ -7,10 +7,13 @@
   import { filesShowUrl } from "../lib/routes.js";
   import { Button, ErrorMessage, Heading, Input, Label, Link } from "../lib/components/index.js";
   import Page from "../lib/Page.svelte";
+  import FilesCommunitiesField from "./FilesCommunitiesField.svelte";
 
   const id = pathParams().id;
   let loaded = $state(false);
   let name = $state("");
+  /** @type {string[]} */
+  let communityIds = $state([]);
   /** @type {Record<string, string[]>} */
   let errors = $state({});
   let error = $state("");
@@ -18,7 +21,9 @@
 
   async function load() {
     try {
-      name = (await filesGet(id)).file.name;
+      const shown = await filesGet(id);
+      name = shown.file.name;
+      communityIds = shown.communities.map((community) => community.id);
       loaded = true;
     } catch (problem) {
       error = String(problem);
@@ -32,7 +37,7 @@
     errors = {};
     error = "";
     try {
-      await filesUpdate(id, name);
+      await filesUpdate(id, name, communityIds);
       await navigateToUrl(filesShowUrl(id));
     } catch (problem) {
       if (problem instanceof FormError) errors = problem.errors;
@@ -46,13 +51,14 @@
 </script>
 
 <Page>
-  <Heading level={1}>Rename file</Heading>
+  <Heading level={1}>Edit file</Heading>
   {#if loaded}
     <form onsubmit={save} class="flex flex-col gap-3">
       <Label text="Name">
         <Input bind:value={name} disabled={busy} />
         <FieldErrors {errors} fields={["name"]} />
       </Label>
+      <FilesCommunitiesField bind:communityIds {errors} disabled={busy} />
       {#if error && Object.keys(errors).length === 0}
         <ErrorMessage message={error} />
       {/if}

@@ -43,7 +43,12 @@ pub async fn reset(connection: &mut SqliteConnection, user_id: Uuid) -> Result<(
     for statement in [
         "DELETE FROM app_posts_communities WHERE id NOT IN
            (SELECT row_id FROM app_events WHERE status = 'pending' AND table_name = 'app_posts_communities')",
-        // A file the server refused is still the only copy of its bytes
+        // A file the server refused is still the only copy of its bytes,
+        // and its communities came with its create
+        "DELETE FROM app_files_communities WHERE id NOT IN
+           (SELECT row_id FROM app_events WHERE status = 'pending' AND table_name = 'app_files_communities')
+           AND file_id NOT IN (SELECT row_id FROM app_events WHERE table_name = 'app_files'
+            AND type = 'create' AND status IN ('pending', 'conflict'))",
         "DELETE FROM app_files WHERE id NOT IN
            (SELECT row_id FROM app_events WHERE table_name = 'app_files'
             AND (status = 'pending' OR (status = 'conflict' AND type = 'create')))",
