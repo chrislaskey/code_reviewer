@@ -3754,11 +3754,12 @@ pub(crate) mod tests {
             let report = run(&a, &server).await.expect("a sync");
             syncs += 1;
             eprintln!(
-                "sync {syncs}: {:?}, uploaded {}, pushed {}, left {}",
+                "sync {syncs}: {:?}, uploaded {}, pushed {}, left {}, pulled {}",
                 one.elapsed(),
                 report.uploaded,
                 report.pushed,
-                report.files_left
+                report.files_left,
+                report.pulled
             );
             if !report.more_files_to_send() {
                 assert_eq!(report.pending, 0, "{report:?}");

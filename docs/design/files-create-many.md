@@ -148,13 +148,26 @@ On a MacBook, in dev, against Garage, with small text files:
 | Creating, on the web, three at a time | 157 s |
 | Keeping them on a device, then its syncs (`sync_many_files_over_http`, a debug build) | 2.5 s, then 50 syncs in 82 s |
 
-A device's sync takes longer while many files wait, 0.9 s with 4,900
-waiting against 0.4 s with 900: it reads every pending event to choose
-what to hold back. A minute over 5,000 files; reading only the first
-`FILES_PER_SYNC` would remove it.
+A device's syncs grow slower as the files reach the server, 0.4 s for
+the first and 0.7 s for the tenth of 1,000: each pull starts
+`OVERLAP_SECONDS` (60) before its cursor, so a run of syncs a second
+apart pulls again every row the earlier ones brought, 200 more each
+time (a file and its row in a community). A minute over 5,000 files,
+bounded by the 60 seconds once a run lasts longer.
+Any run of syncs within a minute pulls again this way; only sending
+files makes runs this long. Left as it is, see "Left for later".
 
 ## Left for later
 
+- **No pull in a sync started only to send more files.** A sync that
+  `more_files_to_send` starts would ask, upload and push, and leave the
+  pull, backfill and prune to the last of the run or the next sync: the
+  push already writes the server's answers on the device, so nothing is
+  missed, and others' changes arrive at the end of the run instead of
+  during it. 50 pulls for 5,000 files become one. Raising
+  `FILES_PER_SYNC` instead would risk URLs expiring behind large files;
+  replacing the pull's time overlap with a sequence the server assigns
+  would fix every run of syncs, and changes `offline-sync.md`.
 - **A list that keeps going across pages**, a queue in `lib/` the pages
   read, and one that survives closing the tab, which needs resumable
   uploads.
