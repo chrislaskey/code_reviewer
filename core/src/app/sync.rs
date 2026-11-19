@@ -420,9 +420,9 @@ async fn page_of(
 /// user and community, a post after its owner, a post's community row
 /// after the post, the community and the membership it was added under,
 /// a file's live community row after the file and the community. A row
-/// taken out of a community brings no file along: the user may not see
-/// it any more, and a device without the file skips the row. A row
-/// brought along for another is sent once.
+/// taken out of a community brings no post or file along: the user may
+/// not see it, or never have, and a device without it skips the row. A
+/// row brought along for another is sent once.
 async fn with_parents(
     tx: &mut Transaction,
     rows: Vec<SyncedRow>,
@@ -453,7 +453,9 @@ async fn with_parents(
                 send_community(tx, &mut out, &mut sent, row.community_id).await?;
             }
             SyncedRow::PostCommunity(row) => {
-                if let Some(post) = posts::get_in(tx, row.post_id).await? {
+                if row.deleted_at.is_none()
+                    && let Some(post) = posts::get_in(tx, row.post_id).await?
+                {
                     send_user(tx, &mut out, &mut sent, post.user_id).await?;
                     send(
                         &mut out,
@@ -3543,6 +3545,51 @@ pub(crate) mod tests {
         accounts::sign_in_with_device_code_through(server, &device_code.code, &verifier)
             .await
             .expect("exchanged over HTTP")
+    }
+
+    #[tokio::test]
+    async fn sync_a_post_taken_out_before_a_device_joined_is_never_sent_to_it() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let (alice, _) = user_with_token(&server, "alice@example.com").await;
+            let (bob, bobs_token) = user_with_token(&server, "bob@example.com").await;
+            let gardening = communities::create(&server, &alice, "Gardening")
+                .await
+                .expect("a community");
+            let cooking = communities::create(&server, &alice, "Cooking")
+                .await
+                .expect("a community");
+            let post = posts::create(&server, &alice, "roses", &[gardening.id, cooking.id])
+                .await
+                .expect("a post");
+            posts_communities::remove(&server, &alice, post.id, gardening.id)
+                .await
+                .expect("taken out of gardening");
+            memberships::join(&server, &bob, gardening.id)
+                .await
+                .expect("joined after");
+
+            let page = pull(&server, &bob, PullRequest::default())
+                .await
+                .expect("a page");
+            assert!(
+                page.rows.iter().all(|row| row.table != posts::TABLE),
+                "the post is in cooking only, which bob is not in"
+            );
+            let device = device_of(&bob, &bobs_token).await;
+            run(&device, &InProcess { server: &server })
+                .await
+                .expect("a sync");
+            let mut tx = device.begin().await.expect("a transaction");
+            assert!(
+                posts::get_in(&mut tx, post.id)
+                    .await
+                    .expect("read")
+                    .is_none()
+            );
+            tx.commit().await.expect("committed");
+        })
+        .await;
     }
 
     /// A file added on one device reaches a running web server's bucket

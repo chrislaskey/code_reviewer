@@ -289,8 +289,10 @@ takes them away. So, as in Phoenix:
   it was added under, and their parents in turn, each sent once. So a
   device with foreign keys writes a page in order, and a post that
   became visible through a new community row, however old, arrives with
-  it. `Page.cursor` is the last row's place in the cursor order, not
-  counting what was brought along.
+  it. A row taken out of a community brings nothing along: its post may
+  be one the user never saw, from before they joined, and a device
+  without the post skips the row. `Page.cursor` is the last row's place
+  in the cursor order, not counting what was brought along.
 - **Joining is the device asking for everything in that community.** When
   a device applies a live membership of its own user that it did not
   have, or had left, it records the community in `app_sync_backfills` and,

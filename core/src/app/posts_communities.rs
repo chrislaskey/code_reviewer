@@ -305,13 +305,21 @@ pub(crate) async fn revive_with_membership(
 }
 
 /// Writes the server's row over the device's, unless an event of the
-/// device's for it is still pending; true when it was written.
+/// device's for it is still pending, or the device does not have its
+/// post: a row taken out of a community before this device saw the
+/// post; true when it was written.
 pub(crate) async fn apply_server_row(
     tx: &mut Transaction,
     row: &Value,
 ) -> Result<bool, PostCommunityError> {
     let row: PostCommunity = serde_json::from_value(row.clone())?;
     if events::has_pending(tx, TABLE, row.id).await? {
+        return Ok(false);
+    }
+    if crate::data::posts::replication::get(tx, row.post_id)
+        .await?
+        .is_none()
+    {
         return Ok(false);
     }
     posts_communities_records::replication::upsert(&mut *tx, AcceptedPostCommunity(&row)).await?;
