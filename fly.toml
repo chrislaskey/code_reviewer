@@ -1,0 +1,39 @@
+# The web server on Fly.io, built from the Dockerfile. One machine with
+# the SQLite database on a volume, `data`, mounted at /data: SQLite is one
+# file on one machine, so the app runs one machine only. Secrets, such as
+# STRIPE_SECRET_KEY or RESEND_API_KEY, are set with `fly secrets set`,
+# never here. See "Fly.io" in README.md.
+
+app = "starter-pack"
+primary_region = "ord"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  DATABASE_URL = "sqlite:/data/app.db"
+  SERVER_URL = "https://starter-pack.fly.dev"
+  TRUST_PROXY_HEADERS = "1"
+  TRIAL_USERS_MAX = "10"
+
+[[mounts]]
+  source = "data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

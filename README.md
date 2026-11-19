@@ -593,7 +593,8 @@ cargo run -p app_web                        # http://localhost:4000, serving sve
 (cd tauri && cargo tauri build)             # the app bundle, under target/release/bundle
 ```
 
-The web server reads `PORT`, `DATABASE_URL`, `SVELTE_DIST` (default
+The web server reads `HOST` (default `127.0.0.1`, `0.0.0.0` in a
+container), `PORT`, `DATABASE_URL`, `SVELTE_DIST` (default
 `svelte/dist`), `SVELTE_OPS_DIST` (default `svelte/dist-ops`, the ops app's
 build, for staff), `MAILER` with `RESEND_API_KEY` and `MAIL_FROM`,
 `STORAGE_BUCKET` (public, for pictures) and `STORAGE_PRIVATE_BUCKET`
@@ -636,6 +637,26 @@ to commit) and open the app in a simulator or emulator. The pages come
 from the Svelte dev server, which `TAURI_DEV_HOST` (set by the CLI) makes
 listen on this machine's network address so a phone reaches it, see
 `svelte/vite.config.js`.
+
+### Fly.io
+
+The web server deploys to Fly.io from the `Dockerfile` and `fly.toml` at
+the root. `fly launch` can't scan this repository (its root `Cargo.toml`
+is a workspace, with no package), so the app is created by hand, once,
+with its name and region in `fly.toml` (`app`, `primary_region`, and
+`SERVER_URL`):
+
+```sh
+fly apps create starter-pack
+fly volumes create data --size 1 --region ord --app starter-pack
+fly deploy
+```
+
+It runs one machine with the SQLite database on the `data` volume;
+`fly scale count 1` when a deploy made two. Emails go to the log,
+`fly logs`, until `MAILER` is set up with `fly secrets set`, as are the
+other secrets the server reads (above). `fly ssh console -C "app_web ops
+staff create <email>"` makes an account staff.
 
 ## Checks
 

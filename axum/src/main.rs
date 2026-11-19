@@ -2,7 +2,8 @@
 //! endpoints the apps converge with under `/api/sync`, the public website's
 //! pages, see `public`, and the Svelte pages (`../svelte/dist`) at every
 //! other path. Every request is from a
-//! user, see `current_user`. Listens on `PORT`, 4000 when unset, and
+//! user, see `current_user`. Listens on `HOST`, 127.0.0.1 when unset,
+//! and `PORT`, 4000 when unset, and
 //! opens the database `DATABASE_URL` names: a SQLite file, under `data/`
 //! beside this crate when unset, or a PostgreSQL database. The email it
 //! sends goes where `MAILER` says, see `mailer`, pictures go to the bucket
@@ -49,7 +50,7 @@ mod subscriptions;
 mod sync;
 
 use std::env;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -58,6 +59,7 @@ use app_core::deployment::FileStore;
 use crate::rate_limits::RateLimits;
 use crate::router::AppState;
 
+const DEFAULT_HOST: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 const DEFAULT_PORT: u16 = 4000;
 
 /// The built Svelte pages: `SVELTE_DIST`, else `../svelte/dist` beside this crate.
@@ -94,6 +96,17 @@ fn trial_users_max() -> Result<router::TrialUsersMax, String> {
             .map(router::TrialUsersMax)
             .map_err(|_| format!("TRIAL_USERS_MAX must be a number, not '{max}'")),
         Err(_) => Ok(router::TrialUsersMax(0)),
+    }
+}
+
+/// The address to listen on: `HOST`, `0.0.0.0` in a container so its
+/// proxy reaches the server, else only this machine.
+fn host() -> Result<IpAddr, String> {
+    match env::var("HOST") {
+        Ok(value) => value
+            .parse()
+            .map_err(|_| format!("HOST must be an IP address, got '{value}'")),
+        Err(_) => Ok(DEFAULT_HOST),
     }
 }
 
@@ -159,7 +172,7 @@ async fn main() -> Result<(), String> {
         server_url: checkouts::ServerUrl::open()?,
     };
 
-    let address = SocketAddr::from(([127, 0, 0, 1], port()?));
+    let address = SocketAddr::new(host()?, port()?);
     let listener = tokio::net::TcpListener::bind(address)
         .await
         .map_err(|error| format!("could not listen on {address}: {error}"))?;
