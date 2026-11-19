@@ -94,7 +94,7 @@
     display: none;
     gap: 6px;
     height: var(--bottom-bar-height);
-    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    padding: 6px 8px calc(6px + var(--bottom-bar-inset));
     background: var(--gutter-bg);
     box-shadow: 0 -1px 0 var(--gutter-ring);
   }
