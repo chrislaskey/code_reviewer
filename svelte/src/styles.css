@@ -77,11 +77,13 @@ body {
 }
 
 /* Small windows (below Tailwind's sm) have no gutter: the bottom bar
-   takes its place, and runs under a phone's home indicator. */
+   takes its place, and runs under a phone's home indicator, so its height
+   takes in the part of the inset the buttons must keep clear of. */
 @media (width < 40rem) {
   :root {
     --gutter-width: 0px;
-    --bottom-bar-height: calc(56px + env(safe-area-inset-bottom, 0px));
+    --bottom-bar-inset: max(0px, calc(env(safe-area-inset-bottom, 0px) - 16px));
+    --bottom-bar-height: calc(66px + var(--bottom-bar-inset));
   }
 }
 
@@ -282,7 +284,7 @@ body {
   display: none;
   gap: 6px;
   height: var(--bottom-bar-height);
-  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+  padding: 12px 8px calc(6px + var(--bottom-bar-inset));
   background: var(--gutter-bg);
   box-shadow: 0 -1px 0 var(--gutter-ring);
 }
@@ -301,12 +303,12 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 2px;
+  justify-content: flex-start;
+  gap: 4px;
   border-radius: 10px;
   color: var(--fg);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.01em;
   text-decoration: none;
   cursor: pointer;
@@ -332,8 +334,8 @@ body {
 }
 
 .bar-button .bar-icon {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
 }
 
 /* The page above the menu's sheet, dimmed; a tap on it closes the sheet. */
