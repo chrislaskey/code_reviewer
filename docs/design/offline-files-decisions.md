@@ -20,8 +20,11 @@ Built as written, in `core/src/app/files.rs`; what was left out is
   new file. So a copy on a device is never out of date.
 - **A file belongs to its communities.** A live member of one sees it,
   and it lives as long as it is in one, see `files-communities.md`.
-- **Any type, up to 25 MB**, one constant. The server checks the size
-  and nothing else; the content type is the device's word.
+- **Any type, up to 25 MB**, one constant. The bytes are checked by
+  their SHA-256, which the row holds: the bucket refuses other bytes,
+  and the server checks the size and the checksum the bucket holds,
+  see "Checksums" in `files-communities.md`. The content type is the
+  device's word.
 - **Private, in a bucket of their own**, `STORAGE_PRIVATE_BUCKET`, at
   `files/<creator id>/<file id>`, a key worked out from the row and
   never stored. Reading is through a download URL the server signs for a
@@ -83,7 +86,8 @@ keeps the database.
 **Adding a file.** The page's `<input type="file">`, the same on the
 web and in the app, where a command takes the bytes as its raw body:
 
-1. Rust checks the size and the name by the rules the server runs.
+1. Rust checks the size and the name by the rules the server runs, and
+   works out the bytes' SHA-256 in a blocking task.
 2. Rust writes the bytes into the account's folder under a new id.
 3. `files::create` writes the row and queues the create event, in one
    transaction.
@@ -95,8 +99,8 @@ which the cleanup removes, and never a row without a file.
 
 | Step | Who | What |
 | --- | --- | --- |
-| 1 | device, `files::ask_about_waiting` | for each pending create on `app_files`, asks `POST /api/files/upload` with `{id, content_type, size}` |
-| 2 | server | checks the size; looks at `files/<creator id>/<file id>`. There, of that size: `uploaded`. Otherwise a signed PUT URL, good for 10 minutes |
+| 1 | device, `files::ask_about_waiting` | for each pending create on `app_files`, asks `POST /api/files/upload` with `{id, content_type, size, sha256}` |
+| 2 | server | checks the size; looks at `files/<creator id>/<file id>`. There, of that size and with that checksum: `uploaded`. Otherwise a PUT URL signed for the content type and the checksum, good for 10 minutes |
 | 3 | device | pushes every pending event except those of a file not answered `uploaded`, `files::held_back`; a rename waits with its create |
 | 4 | device | pulls, backfills, prunes, as ever |
 | 5 | device, `files::upload_waiting` | sends each waiting file's bytes from disk to its URL, as a stream, with a longer timeout than the sync's requests |
@@ -113,7 +117,8 @@ which the cleanup removes, and never a row without a file.
   them. The sync lock is held while they go; an application with large
   files moves `files::upload_waiting` to a task of its own, which
   changes who calls it and no data.
-- One PUT per file, started over if cut off. No checksum.
+- One PUT per file, started over if cut off, carrying the checksum in
+  `x-amz-checksum-sha256`, which the bucket checks the bytes against.
 - The file has no row on the server when its upload is asked for, so
   the server holds the user to the key's prefix, their own: nobody else
   writes or claims a file before its row exists.
@@ -255,12 +260,12 @@ again before each delete.
 
 ## Left for later
 
-Communities for files; replacing content; multipart and resumable
+Replacing content; multipart and resumable
 uploads; uploads while the app is in the background; audio and video,
 which need the protocol to answer ranges; download on phones, through
 the share sheet; copying an image on the platforms other than macOS;
-thumbnails; checksums; a file
-attached to a post. See `docs/suggestions/files.md`.
+thumbnails; bytes stored once for many files; a file attached to a
+post. See `docs/suggestions/files.md`.
 
 ## Build order
 

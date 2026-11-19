@@ -8,9 +8,9 @@ private file is a file in the person's `Personal` community, where they
 are the only member.
 
 `offline-files-decisions.md` holds how a file's bytes are kept, sent and
-fetched; this holds who a file belongs to and who sees it. Phase 1 is
-built, in `core/src/app/files_communities.rs` and `core/src/app/files.rs`;
-phases 2 and 3 are to build, see "Build order".
+fetched; this holds who a file belongs to and who sees it. Phases 1 and 2
+are built, in `core/src/app/files_communities.rs` and
+`core/src/app/files.rs`; phase 3 is to build, see "Build order".
 
 ## Decisions
 
@@ -170,8 +170,13 @@ tell a file it already sees.
   `crypto.subtle.digest`, in `svelte/src/lib/core/`.
 - **The bucket checks it.** The server signs the checksum into the PUT
   URL, `x-amz-checksum-sha256`, so the bucket refuses other bytes, and
-  on create checks the checksum the bucket holds is the row's. The
-  server never reads the bytes.
+  on create checks the size and the checksum the bucket holds, by a
+  signed `HEAD` with `x-amz-checksum-mode: ENABLED`, against the row's.
+  The server never reads the bytes. Garage does both, checked by
+  `storage_s3_keeps_only_the_bytes_of_a_signed_checksum`, an ignored
+  test to run against any other store before using it.
+- **The web page needs a secure context** for `crypto.subtle`: HTTPS, or
+  `localhost` in dev.
 - **Duplicates are told only among files the user sees.** Picking a
   file whose checksum matches a file in the user's communities offers
   to put that file in the communities chosen instead. It is a check on
@@ -200,10 +205,10 @@ Three phases, each built and verified before the next.
    who left, get no file from the pull, the backfill, the community
    rows or the download URL, and cannot write to it.
 
-**Phase 2, the checksum:** the `sha256` column, computed by the app and
-the page, signed into the upload and checked on create. First confirm
-the dev bucket, Garage, refuses bytes that do not match a signed
-`x-amz-checksum-sha256` and answers the checksum it holds.
+**Phase 2, the checksum, built:** the `sha256` column, computed by the
+app and the page, signed into the upload and checked on create. Garage
+refuses bytes that do not match a signed `x-amz-checksum-sha256` and
+answers the checksum it holds.
 
 **Phase 3, duplicates:** picking a file the user already sees offers
 it, among all their communities and among those chosen.

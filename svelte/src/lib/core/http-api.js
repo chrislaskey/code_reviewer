@@ -393,22 +393,35 @@ export function filesGet(id) {
 
 /**
  * Creates the file the person picked: its bytes go straight to object
- * storage, then the server writes its row; answers the file.
+ * storage, checked against their SHA-256, then the server writes its
+ * row; answers the file.
  * @param {File} file
  * @param {string} name
  * @param {string[]} communityIds the communities the file is in, one at least
  * @param {(fraction: number) => void} [onProgress] from 0 to 1
  */
 export async function filesCreate(file, name, communityIds, onProgress) {
-  const upload = await send("POST", "/api/files/upload", { content_type: file.type, size: file.size });
+  const sha256 = await sha256Of(file);
+  const upload = await send("POST", "/api/files/upload", { content_type: file.type, size: file.size, sha256 });
   if (!upload.uploaded) await putFile(upload, file, onProgress);
   return send("POST", "/api/files", {
     id: upload.id,
     name,
     content_type: upload.content_type,
     size: file.size,
+    sha256,
     community_ids: communityIds,
   });
+}
+
+/**
+ * The file's SHA-256 as lowercase hex, which the bucket checks its bytes
+ * against.
+ * @param {File} file
+ */
+async function sha256Of(file) {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 /**

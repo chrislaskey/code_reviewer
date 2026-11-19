@@ -1012,7 +1012,8 @@ impl Transport for Http {
         self.post(token, "/api/files/upload", &request).await
     }
 
-    /// PUTs the file to the signed URL, streamed from the disk.
+    /// PUTs the file to the signed URL, streamed from the disk, with the
+    /// checksum the bucket checks the bytes against.
     async fn files_upload(
         &self,
         _token: Option<&str>,
@@ -1036,6 +1037,7 @@ impl Transport for Http {
             .put(url)
             .timeout(FILE_TRANSFER_TIMEOUT)
             .header(reqwest::header::CONTENT_TYPE, &upload.content_type)
+            .header("x-amz-checksum-sha256", &upload.checksum_sha256)
             .header(reqwest::header::CONTENT_LENGTH, size)
             .body(reqwest::Body::from(file))
             .send()
@@ -3585,7 +3587,12 @@ pub(crate) mod tests {
             .expect("signed in on b");
 
         let bytes: Vec<u8> = (0..300_000u32).map(|n| (n % 251) as u8).collect();
-        let file = files::tests::with_bytes(&a, &alice, "over http.bin", "", &bytes)
+        run(&a, &server).await.expect("a sync for her communities");
+        let personal = memberships::list_mine(&a, &alice)
+            .await
+            .expect("the memberships")[0]
+            .community_id;
+        let file = files::create_with_bytes(&a, &alice, "over http.bin", "", &[personal], &bytes)
             .await
             .expect("a file");
         let report = run(&a, &server).await.expect("a sync");

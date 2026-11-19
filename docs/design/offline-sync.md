@@ -165,7 +165,7 @@ Any other field is refused as `not_editable: <field>`:
 | `app_users_communities` | `user_id`, `community_id`, `role` | `deleted_at` |
 | `app_posts_communities` | `post_id`, `community_id`, `users_communities_id` | `deleted_at` |
 | `app_users` | nothing, the server makes a user | `name`, by the user themselves; `avatar_url`, by the server only for now, see `uploads.md` |
-| `app_files` | `name`, `content_type`, `size`, `communities`, once the bytes are in the bucket | `name`, by a member of one of its communities |
+| `app_files` | `name`, `content_type`, `size`, `sha256`, `communities`, once the bytes are in the bucket | `name`, by a member of one of its communities |
 | `app_files_communities` | `file_id`, `community_id`, by a member who sees the file | `deleted_at`, by a member of the community; the last one deleted deletes the file |
 
 Who made the event is not on the wire: the server records the user its

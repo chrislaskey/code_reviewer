@@ -4,7 +4,9 @@
 //! content type and the size; the bytes are in the server's bucket at
 //! `files/<creator id>/<file id>` and, on a device, in the account's
 //! folder under the file's id, see `deployment::FileStore`. The bytes
-//! never change: an update changes the name only. A file belongs to its
+//! never change: an update changes the name only, and the row holds
+//! their SHA-256, which the bucket checks on the upload and the server
+//! on the create. A file belongs to its
 //! communities, `files_communities`: a live member of one sees it, and
 //! it lives as long as it is in one.
 //!
@@ -33,6 +35,7 @@ use chrono::{DateTime, Utc};
 use garde::Validate;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -74,7 +77,7 @@ pub const BYTES_GONE: &str = "the file's bytes are no longer on this device";
 pub const FILE_NOT_UPLOADED: &str = "file_not_uploaded";
 /// The fields an event may set when it creates a file: `communities` is
 /// the rows of its first communities, written with it.
-const CREATE_FIELDS: &[&str] = &["name", "content_type", "size", "communities"];
+const CREATE_FIELDS: &[&str] = &["name", "content_type", "size", "sha256", "communities"];
 /// The fields an event may change on a file. A file is deleted by
 /// taking it out of its last community, see `files_communities`.
 const UPDATE_FIELDS: &[&str] = &["name"];
@@ -102,6 +105,8 @@ pub struct File {
     pub content_type: String,
     /// In bytes.
     pub size: u64,
+    /// The bytes' SHA-256, lowercase hex.
+    pub sha256: String,
     pub inserted_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     /// The server's version, 0 on a device's file not yet pushed.
@@ -190,6 +195,8 @@ pub struct FileNew {
     pub content_type: String,
     #[garde(custom(is_file_size))]
     pub size: u64,
+    #[garde(custom(is_sha256))]
+    pub sha256: String,
     /// One at least, checked with the user's memberships.
     #[garde(skip)]
     pub community_ids: Vec<Uuid>,
@@ -206,17 +213,21 @@ pub struct FileUploadNew {
     pub content_type: String,
     #[garde(custom(is_file_size))]
     pub size: u64,
+    #[garde(custom(is_sha256))]
+    pub sha256: String,
 }
 
 /// The server's answer to `FileUploadNew`: the bytes are already in the
-/// bucket, or where to PUT them, with the `Content-Type` header the URL
-/// was signed for.
+/// bucket, or where to PUT them, with the `Content-Type` and the
+/// `x-amz-checksum-sha256` headers the URL was signed for.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileUpload {
     pub id: Uuid,
     pub uploaded: bool,
     pub upload_url: Option<String>,
     pub content_type: String,
+    /// The bytes' SHA-256 in base64, as the header carries it.
+    pub checksum_sha256: String,
 }
 
 #[derive(Debug, Error)]
@@ -314,6 +325,7 @@ pub async fn create(
             "name": new.name,
             "content_type": new.content_type,
             "size": new.size,
+            "sha256": new.sha256,
             "communities": communities,
         })),
         now(),
@@ -337,11 +349,16 @@ pub async fn create_with_bytes(
     if deployment.role != Role::Device {
         return Err(FileError::DeviceOnly);
     }
+    let owned = bytes.to_vec();
+    let sha256 = tokio::task::spawn_blocking(move || sha256_hex(&owned))
+        .await
+        .map_err(|error| FileError::Malformed(error.to_string()))?;
     let new = FileNew {
         id: Uuid::now_v7(),
         name: name.to_string(),
         content_type: content_type.to_string(),
         size: bytes.len() as u64,
+        sha256,
         community_ids: community_ids.to_vec(),
     }
     .checked()?;
@@ -444,22 +461,30 @@ pub async fn create_upload(
     FieldErrors::check(&request).map_err(FileError::Invalid)?;
     let id = request.id.unwrap_or_else(Uuid::now_v7);
     let key = storage_key(user.id, id);
-    if storage.size(&key).await? == Some(request.size) {
+    let checksum_sha256 = base64_of_hex(&request.sha256)?;
+    if bucket_has(storage, &key, request.size, &checksum_sha256).await? {
         return Ok(FileUpload {
             id,
             uploaded: true,
             upload_url: None,
             content_type,
+            checksum_sha256,
         });
     }
     let upload_url = storage
-        .upload_url(&key, &content_type, UPLOAD_URL_LIFETIME)
+        .upload_url(
+            &key,
+            &content_type,
+            Some(&checksum_sha256),
+            UPLOAD_URL_LIFETIME,
+        )
         .await?;
     Ok(FileUpload {
         id,
         uploaded: false,
         upload_url: Some(upload_url),
         content_type,
+        checksum_sha256,
     })
 }
 
@@ -532,6 +557,10 @@ pub async fn ask_about_waiting<T: Transport>(
                 .unwrap_or_default()
                 .to_string(),
             size: event.changes["size"].as_u64().unwrap_or_default(),
+            sha256: event.changes["sha256"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string(),
         };
         if reachable {
             match transport.files_create_upload(token, request).await {
@@ -1114,7 +1143,7 @@ async fn apply(deployment: &Deployment, user: &User, event: &Event) -> Result<Ap
 }
 
 /// Whether the bucket holds the bytes of the file the event creates, at
-/// the size the event says.
+/// the size and with the checksum the event says.
 async fn is_uploaded(
     deployment: &Deployment,
     user: &User,
@@ -1123,19 +1152,77 @@ async fn is_uploaded(
     let Some(size) = event.changes.get("size").and_then(Value::as_u64) else {
         return Ok(false);
     };
+    let Some(sha256) = event.changes.get("sha256").and_then(Value::as_str) else {
+        return Ok(false);
+    };
     let key = storage_key(user.id, event.row_id);
-    Ok(bucket_size(deployment, &key).await? == Some(size))
+    bucket_has_bytes(deployment, &key, size, sha256).await
 }
 
 #[cfg(feature = "object-storage")]
-async fn bucket_size(deployment: &Deployment, key: &str) -> Result<Option<u64>, FileError> {
-    Ok(bucket(deployment)?.size(key).await?)
+async fn bucket_has_bytes(
+    deployment: &Deployment,
+    key: &str,
+    size: u64,
+    sha256: &str,
+) -> Result<bool, FileError> {
+    let Ok(checksum_sha256) = base64_of_hex(sha256) else {
+        return Ok(false);
+    };
+    bucket_has(bucket(deployment)?, key, size, &checksum_sha256).await
 }
 
 /// Without the bucket's code compiled in, as in the apps, there is none.
 #[cfg(not(feature = "object-storage"))]
-async fn bucket_size(_deployment: &Deployment, _key: &str) -> Result<Option<u64>, FileError> {
+async fn bucket_has_bytes(
+    _deployment: &Deployment,
+    _key: &str,
+    _size: u64,
+    _sha256: &str,
+) -> Result<bool, FileError> {
     Err(FileError::NoFileStore)
+}
+
+/// Whether the bucket holds bytes at the key of the size, whose checksum
+/// it checked is this base64 SHA-256.
+#[cfg(feature = "object-storage")]
+async fn bucket_has(
+    storage: &Storage,
+    key: &str,
+    size: u64,
+    checksum_sha256: &str,
+) -> Result<bool, FileError> {
+    if storage.size(key).await? != Some(size) {
+        return Ok(false);
+    }
+    Ok(storage.checksum_sha256(key).await?.as_deref() == Some(checksum_sha256))
+}
+
+/// The SHA-256 of the bytes, lowercase hex, as a file's row holds it.
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// The checksum as the bucket's header carries it, base64, from the
+/// row's hex.
+#[cfg(feature = "object-storage")]
+fn base64_of_hex(sha256: &str) -> Result<String, FileError> {
+    use base64::Engine;
+
+    let bytes = (0..sha256.len())
+        .step_by(2)
+        .map(|at| {
+            sha256
+                .get(at..at + 2)
+                .and_then(|pair| u8::from_str_radix(pair, 16).ok())
+        })
+        .collect::<Option<Vec<u8>>>()
+        .filter(|_| is_sha256(sha256, &()).is_ok())
+        .ok_or_else(|| FileError::Malformed(format!("{sha256} is not a SHA-256")))?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
 /// Applies the event in the transaction: checks the fields it changes
@@ -1189,6 +1276,7 @@ pub(crate) async fn apply_in(
                 name: String::new(),
                 content_type: String::new(),
                 size: 0,
+                sha256: String::new(),
                 inserted_at: event.row_inserted_at(now),
                 updated_at: now,
                 version,
@@ -1302,6 +1390,7 @@ impl File {
             name: file.name.clone(),
             content_type: file.content_type.clone(),
             size: file.size,
+            sha256: file.sha256.clone(),
             community_ids: Vec::new(),
         }
         .checked()?;
@@ -1322,6 +1411,7 @@ impl FileNew {
             name: self.name.trim().to_string(),
             content_type: content_type_or_unknown(&self.content_type),
             size: self.size,
+            sha256: self.sha256.clone(),
             community_ids: self.community_ids.clone(),
         };
         FieldErrors::check(&checked).map_err(FileError::Invalid)?;
@@ -1393,6 +1483,17 @@ fn is_content_type(value: &str, _context: &()) -> garde::Result {
     let printable = value.chars().all(|c| c.is_ascii_graphic() || c == ' ');
     if !well_formed || !printable || value.len() > MAX_NAME_LENGTH {
         return Err(garde::Error::new("is not a content type"));
+    }
+    Ok(())
+}
+
+/// A SHA-256 as lowercase hex.
+fn is_sha256(value: &str, _context: &()) -> garde::Result {
+    let hex = value
+        .chars()
+        .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c));
+    if value.len() != 64 || !hex {
+        return Err(garde::Error::new("is not a SHA-256"));
     }
     Ok(())
 }
@@ -1496,6 +1597,7 @@ pub(crate) mod tests {
             name: name.to_string(),
             content_type: "text/plain".to_string(),
             size: bytes.len() as u64,
+            sha256: sha256_hex(bytes),
             community_ids: vec![community_id],
         }
     }
@@ -2488,6 +2590,15 @@ pub(crate) mod tests {
             assert!(matches!(error, FileError::NotUploaded));
 
             storage
+                .put(&storage_key(alice.id, new.id), b"some other".to_vec())
+                .await
+                .expect("an upload of the size, other bytes");
+            let error = create(&deployment, &alice, &new)
+                .await
+                .expect_err("not the checksum it said");
+            assert!(matches!(error, FileError::NotUploaded));
+
+            storage
                 .put(&storage_key(alice.id, new.id), b"some notes".to_vec())
                 .await
                 .expect("the upload");
@@ -2523,6 +2634,7 @@ pub(crate) mod tests {
                 name: "  ".to_string(),
                 content_type: "not a type".to_string(),
                 size: MAX_BYTES + 1,
+                sha256: "not a checksum".to_string(),
                 community_ids: Vec::new(),
             };
             let error = create(&deployment, &alice, &wrong)
@@ -2534,6 +2646,7 @@ pub(crate) mod tests {
             assert_eq!(errors.0["name"], ["is blank"]);
             assert_eq!(errors.0["content_type"], ["is not a content type"]);
             assert_eq!(errors.0["size"], ["is larger than 25 MB"]);
+            assert_eq!(errors.0["sha256"], ["is not a SHA-256"]);
 
             let untyped = FileNew {
                 content_type: String::new(),
@@ -2685,6 +2798,7 @@ pub(crate) mod tests {
                 id: None,
                 content_type: "IMAGE/GIF".to_string(),
                 size: 3,
+                sha256: sha256_hex(b"GIF"),
             };
 
             let upload = create_upload(&deployment, &alice, &request)
@@ -2692,6 +2806,10 @@ pub(crate) mod tests {
                 .expect("where to upload");
             assert!(!upload.uploaded);
             assert_eq!(upload.content_type, "image/gif");
+            assert_eq!(
+                upload.checksum_sha256,
+                "dsZk7xUuBlki/tRycxXQZbj7Gu1hAVza73vP6jxY1as="
+            );
             let key = storage_key(alice.id, upload.id);
             assert_eq!(upload.upload_url, Some(format!("memory:///{key}")));
 

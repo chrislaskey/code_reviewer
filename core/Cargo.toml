@@ -15,7 +15,7 @@ sync-http = ["dep:reqwest"]
 # Sending email through Resend, for the server in production
 mail-resend = ["dep:reqwest", "dep:secrecy"]
 # Uploads straight to S3-style object storage, for the server; never in the Tauri app
-object-storage = ["dep:object_store", "dep:secrecy", "dep:futures-util"]
+object-storage = ["dep:object_store", "dep:secrecy", "dep:futures-util", "dep:reqwest", "dep:base64"]
 # Taking payments through Stripe, for the server; never in the Tauri app
 stripe = [
     "dep:async-stripe",
@@ -47,6 +47,7 @@ async-stripe-product = { version = "=1.0.0-rc.10", features = ["deserialize", "p
 async-stripe-shared = { version = "=1.0.0-rc.10", features = ["deserialize"], optional = true }
 async-stripe-types = { version = "=1.0.0-rc.10", optional = true }
 async-stripe-webhook = { version = "=1.0.0-rc.10", optional = true }
+base64 = { version = "0.22", optional = true }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
 futures-util = { version = "0.3", default-features = false, optional = true }
 garde = { version = "0.23", features = ["derive"] }

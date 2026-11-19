@@ -16,6 +16,7 @@ struct FileRow {
     name: String,
     content_type: String,
     size: i64,
+    sha256: String,
     inserted_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
     version: i64,
@@ -32,6 +33,7 @@ impl From<FileRow> for File {
             name: row.name,
             content_type: row.content_type,
             size: u64::try_from(row.size).unwrap_or_default(),
+            sha256: row.sha256,
             inserted_at: row.inserted_at,
             updated_at: row.updated_at,
             version: row.version,
@@ -45,7 +47,7 @@ impl From<FileRow> for File {
 macro_rules! select {
     ($($rest:expr),+ $(,)?) => {
         concat!(
-            "SELECT id, created_by_id, name, content_type, size, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id FROM app_files ",
+            "SELECT id, created_by_id, name, content_type, size, sha256, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id FROM app_files ",
             $($rest),+
         )
     };
@@ -156,14 +158,15 @@ pub async fn list_synced_after(
 
 pub async fn insert(connection: &mut PgConnection, file: &File) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_files (id, created_by_id, name, content_type, size, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+        "INSERT INTO app_files (id, created_by_id, name, content_type, size, sha256, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
     )
     .bind(file.id)
     .bind(file.created_by_id)
     .bind(&file.name)
     .bind(&file.content_type)
     .bind(size_of(file))
+    .bind(&file.sha256)
     .bind(file.inserted_at)
     .bind(file.updated_at)
     .bind(file.version)
@@ -196,11 +199,11 @@ pub async fn update(connection: &mut PgConnection, file: &File) -> Result<bool, 
 /// Writes the server's row over the device's, or inserts it.
 pub async fn upsert(connection: &mut PgConnection, file: &File) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_files (id, created_by_id, name, content_type, size, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        "INSERT INTO app_files (id, created_by_id, name, content_type, size, sha256, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          ON CONFLICT (id) DO UPDATE SET
            created_by_id = excluded.created_by_id, name = excluded.name, content_type = excluded.content_type,
-           size = excluded.size, inserted_at = excluded.inserted_at, updated_at = excluded.updated_at,
+           size = excluded.size, sha256 = excluded.sha256, inserted_at = excluded.inserted_at, updated_at = excluded.updated_at,
            version = excluded.version, last_synced_at = excluded.last_synced_at,
            deleted_at = excluded.deleted_at, deleted_by_id = excluded.deleted_by_id",
     )
@@ -209,6 +212,7 @@ pub async fn upsert(connection: &mut PgConnection, file: &File) -> Result<(), sq
     .bind(&file.name)
     .bind(&file.content_type)
     .bind(size_of(file))
+    .bind(&file.sha256)
     .bind(file.inserted_at)
     .bind(file.updated_at)
     .bind(file.version)

@@ -87,6 +87,7 @@ mod tests {
             name: name.to_string(),
             content_type: content_type.to_string(),
             size: 2048,
+            sha256: "0".repeat(64),
             inserted_at: updated_at,
             updated_at,
             version: 0,

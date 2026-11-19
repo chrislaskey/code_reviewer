@@ -163,7 +163,7 @@ pub async fn create_upload(
         image_type.extension
     );
     let upload_url = storage
-        .upload_url(&key, image_type.content_type, UPLOAD_URL_LIFETIME)
+        .upload_url(&key, image_type.content_type, None, UPLOAD_URL_LIFETIME)
         .await?;
     Ok(AvatarUpload {
         upload_url,

@@ -927,7 +927,7 @@ mod tests {
             Some(&cookie),
             Method::POST,
             "/api/files/upload",
-            Some(json!({ "content_type": "text/plain", "size": 5 })),
+            Some(json!({ "content_type": "text/plain", "size": 5, "sha256": "0".repeat(64) })),
         )
         .await;
         assert_eq!(
@@ -1741,7 +1741,8 @@ mod tests {
     async fn files_upload_create_show_rename_and_delete() {
         let (router, _) = test_router().await;
         let bytes = b"some notes".to_vec();
-        let picked = json!({ "content_type": "text/plain", "size": bytes.len() });
+        let sha256 = app_core::files::sha256_hex(&bytes);
+        let picked = json!({ "content_type": "text/plain", "size": bytes.len(), "sha256": sha256 });
         let (status, upload) = send(&router, Method::POST, "/api/files/upload", Some(picked)).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(upload["uploaded"], json!(false));
@@ -1753,6 +1754,7 @@ mod tests {
             "name": "notes.txt",
             "content_type": "text/plain",
             "size": bytes.len(),
+            "sha256": sha256,
             "community_ids": [community_id],
         });
 

@@ -336,6 +336,7 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
                 "name": file.name,
                 "content_type": file.content_type,
                 "size": file.size,
+                "sha256": file.sha256,
                 "communities": communities,
             }),
         );

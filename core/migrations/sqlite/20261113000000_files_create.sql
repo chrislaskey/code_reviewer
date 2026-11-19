@@ -2,14 +2,16 @@
 -- a file, whose bytes are in the server's bucket and in the account's
 -- folder on a device, and a row for each community it is in. A file
 -- belongs to its communities; `created_by_id` names who created it and
--- has no foreign key, so a file outlives its creator. Only the name
--- changes.
+-- has no foreign key, so a file outlives its creator. `sha256` is the
+-- bytes' checksum, lowercase hex, which the bucket checked. Only the
+-- name changes.
 CREATE TABLE app_files (
   id TEXT PRIMARY KEY NOT NULL,
   created_by_id TEXT NOT NULL,
   name TEXT NOT NULL,
   content_type TEXT NOT NULL,
   size INTEGER NOT NULL,
+  sha256 TEXT NOT NULL,
   inserted_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   version INTEGER NOT NULL DEFAULT 0,
