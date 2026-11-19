@@ -315,9 +315,14 @@ export function postsUpdate(id, body, communityIds) {
   return invoke("posts_update", { id, body, communityIds });
 }
 
-/** The files the user sees on this device, each `{file, creator, communities, shown_as, state, error}`. */
-export function filesList() {
-  return invoke("files_list");
+/**
+ * A page of the files the user sees on this device whose names contain
+ * `name` in any case, newest first: `{total, files}`, each file
+ * `{file, creator, communities, shown_as, state, error}`.
+ * @param {{name?: string, offset?: number, limit: number}} search at most 500 at once
+ */
+export function filesSearch(search) {
+  return invoke("files_search", { search });
 }
 
 /**

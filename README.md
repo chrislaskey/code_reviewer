@@ -47,7 +47,7 @@ Inside the Tauri app each is a command of the same name
 | `communitiesDelete(id)` | `DELETE /api/communities/:id`, 204; a member only, and every membership goes with it |
 | `membershipsJoin(communityId)` | `PUT /api/memberships/:community_id` |
 | `membershipsLeave(communityId)` | `DELETE /api/memberships/:community_id`, 204 |
-| `filesList()`, `filesGet(id)` | `GET /api/files`, `GET /api/files/:id`, each file with how it is shown and where it stands |
+| `filesSearch({name, offset, limit})`, `filesGet(id)` | `GET /api/files/search?name=...&offset=...&limit=...`, a page of the files whose names contain `name`, newest first, up to 500, with `total`, how many match; `GET /api/files/:id`. Each file with how it is shown and where it stands |
 | `filesSha256(file)`, `filesListDuplicates(sha256s)` | the picked file's SHA-256, worked out in the page; `POST /api/files/duplicates` with `{"sha256s": [...]}`, up to 500, the files the user sees with any of them |
 | `filesCreate(file, name, communityIds, onProgress?, sha256?)`, `filesCreateAtOnce` | `POST /api/files/upload` for where to PUT the bytes, the PUT to the bucket, then `POST /api/files`, 201; in the app one command, the bytes kept on the device and sent by the next sync. A page creates `filesCreateAtOnce` files at a time, 3 on the web and 1 in the app |
 | `filesUpdate(id, name, communityIds)` | `PUT /api/files/:id` with `{"name": "...", "community_ids": [...]}`, its communities among the user's |

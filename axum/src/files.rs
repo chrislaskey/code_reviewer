@@ -14,7 +14,9 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use app_core::deployment::Deployment;
-use app_core::files::{self, File, FileNew, FileUpload, FileUploadNew, FileWithState};
+use app_core::files::{
+    self, File, FileNew, FileSearch, FileSearchResults, FileUpload, FileUploadNew, FileWithState,
+};
 
 use crate::api_error::ApiError;
 use crate::current_user::CurrentUser;
@@ -41,12 +43,14 @@ pub struct ContentQuery {
     pub download: Option<String>,
 }
 
-/// The files the user sees.
-pub async fn list(
+/// A page of the files the user sees whose names contain `name`, and
+/// how many match in all.
+pub async fn search(
     State(deployment): State<Deployment>,
     CurrentUser(user): CurrentUser,
-) -> Result<Json<Vec<FileWithState>>, ApiError> {
-    Ok(Json(files::list(&deployment, &user).await?))
+    Query(search): Query<FileSearch>,
+) -> Result<Json<FileSearchResults>, ApiError> {
+    Ok(Json(files::search(&deployment, &user, &search).await?))
 }
 
 /// The files the user sees with any of these checksums, a POST since

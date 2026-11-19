@@ -382,9 +382,15 @@ export function postsDelete(id) {
 /** @param {string} id */
 const filePath = (id) => `/api/files/${encodeURIComponent(id)}`;
 
-/** The files the user sees, each `{file, creator, communities, shown_as, state, error}`. */
-export function filesList() {
-  return send("GET", "/api/files");
+/**
+ * A page of the files the user sees whose names contain `name` in any
+ * case, newest first: `{total, files}`, each file
+ * `{file, creator, communities, shown_as, state, error}`.
+ * @param {{name?: string, offset?: number, limit: number}} search at most 500 at once
+ */
+export function filesSearch({ name = "", offset = 0, limit }) {
+  const query = new URLSearchParams({ name, offset: String(offset), limit: String(limit) });
+  return send("GET", `/api/files/search?${query}`);
 }
 
 /**

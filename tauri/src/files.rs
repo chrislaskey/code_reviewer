@@ -16,7 +16,9 @@ use tauri::ipc::{InvokeBody, Request};
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 
-use app_core::files::{self, File, FileError, FileWithState, FilesCache};
+use app_core::files::{
+    self, File, FileError, FileSearch, FileSearchResults, FileWithState, FilesCache,
+};
 
 use crate::avatars::FormError;
 use crate::current_user::signed_in;
@@ -38,10 +40,15 @@ impl From<FileError> for FormError {
     }
 }
 
+/// A page of the files the user sees on this device whose names contain
+/// the name searched for, and how many match in all.
 #[tauri::command]
-pub async fn files_list(device: State<'_, DeviceAccounts>) -> Result<Vec<FileWithState>, String> {
+pub async fn files_search(
+    device: State<'_, DeviceAccounts>,
+    search: FileSearch,
+) -> Result<FileSearchResults, String> {
     let (deployment, user) = signed_in(&device).await?;
-    files::list(&deployment, &user)
+    files::search(&deployment, &user, &search)
         .await
         .map_err(|error| error.to_string())
 }

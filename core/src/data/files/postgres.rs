@@ -82,6 +82,40 @@ pub async fn list_visible(
     Ok(rows.into_iter().map(File::from).collect())
 }
 
+/// How many files the user sees whose names contain `$2` in any case,
+/// not deleted, and `limit` of them from `offset`, newest first.
+pub async fn search_visible(
+    connection: &mut PgConnection,
+    user_id: Uuid,
+    name: &str,
+    offset: i64,
+    limit: i64,
+) -> Result<(u64, Vec<File>), sqlx::Error> {
+    let (total,): (i64,) = sqlx::query_as(concat!(
+        "SELECT COUNT(*) FROM app_files WHERE deleted_at IS NULL AND strpos(lower(name), lower($2)) > 0 AND ",
+        visible_to!()
+    ))
+    .bind(user_id)
+    .bind(name)
+    .fetch_one(&mut *connection)
+    .await?;
+    let rows: Vec<FileRow> = sqlx::query_as(select!(
+        "WHERE deleted_at IS NULL AND strpos(lower(name), lower($2)) > 0 AND ",
+        visible_to!(),
+        " ORDER BY inserted_at DESC, id DESC LIMIT $3 OFFSET $4"
+    ))
+    .bind(user_id)
+    .bind(name)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(connection)
+    .await?;
+    Ok((
+        u64::try_from(total).unwrap_or_default(),
+        rows.into_iter().map(File::from).collect(),
+    ))
+}
+
 /// The files the user sees with any of these checksums, not deleted,
 /// newest first.
 pub async fn list_visible_with_sha256s(

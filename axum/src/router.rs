@@ -147,7 +147,8 @@ pub fn router(svelte_dist: &Path, ops_dist: &Path, state: AppState) -> Router {
             "/api/posts/{id}",
             get(posts::get).put(posts::update).delete(posts::delete),
         )
-        .route("/api/files", get(files::list).post(files::create))
+        .route("/api/files", post(files::create))
+        .route("/api/files/search", get(files::search))
         .route("/api/files/upload", post(files::create_upload))
         .route("/api/files/duplicates", post(files::list_duplicates))
         .route(
@@ -1770,11 +1771,16 @@ mod tests {
         assert_eq!(status, StatusCode::CREATED);
         assert_eq!(file["name"], json!("notes.txt"));
 
-        let (status, listed) = get(&router, "/api/files").await;
+        let (status, found) = get(&router, "/api/files/search?name=NOTES&limit=10").await;
         assert_eq!(status, StatusCode::OK);
-        assert_eq!(listed[0]["file"], file);
-        assert_eq!(listed[0]["state"], json!("synced"));
-        assert_eq!(listed[0]["communities"][0]["id"], community_id);
+        assert_eq!(found["total"], json!(1));
+        assert_eq!(found["files"][0]["file"], file);
+        assert_eq!(found["files"][0]["state"], json!("synced"));
+        assert_eq!(found["files"][0]["communities"][0]["id"], community_id);
+        let (_, found) = get(&router, "/api/files/search?name=other&limit=10").await;
+        assert_eq!(found["total"], json!(0));
+        let (status, _) = get(&router, "/api/files/search?limit=501").await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
         let other = app_core::files::sha256_hex(b"other");
         let checked = json!({ "sha256s": [other, sha256] });
         let (status, same) = send(

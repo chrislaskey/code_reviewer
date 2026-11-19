@@ -89,6 +89,8 @@ const KEY_PREFIX: &str = "files";
 pub const UNREFERENCED_DAYS: i64 = 1;
 /// The most checksums `list_duplicates` takes in one call.
 pub const MAX_DUPLICATES_CHECKED: usize = 500;
+/// The most files `search` answers in one call.
+pub const MAX_SEARCH_LIMIT: u32 = 500;
 /// The waiting files one sync asks about and sends, oldest first; the
 /// rest wait for the next, so a URL is used well within its lifetime
 /// and the sync lock is not held for thousands of files.
@@ -178,6 +180,26 @@ pub struct FileWithState {
     pub shown_as: ShownAs,
     pub state: FileState,
     pub error: Option<String>,
+}
+
+/// What a search of the user's files asks: the files whose names
+/// contain `name` in any case, every file for an empty one, `limit` of
+/// them from `offset`, newest first. See `docs/design/files-browsing.md`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FileSearch {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub offset: u32,
+    pub limit: u32,
+}
+
+/// What a search answers: how many files match in all, and the page of
+/// them asked for.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FileSearchResults {
+    pub total: u64,
+    pub files: Vec<FileWithState>,
 }
 
 /// The copies a device keeps of files the server holds too: how many,
@@ -321,6 +343,35 @@ pub async fn list_duplicates(
     let listed = with_states(&mut tx, deployment.role, user, files).await?;
     tx.commit().await?;
     Ok(listed)
+}
+
+/// The files the user sees whose names contain the name searched for,
+/// a page of them newest first, each with its state, creator and
+/// communities, and how many match in all. At most `MAX_SEARCH_LIMIT`
+/// files at once.
+pub async fn search(
+    deployment: &Deployment,
+    user: &User,
+    search: &FileSearch,
+) -> Result<FileSearchResults, FileError> {
+    if search.limit > MAX_SEARCH_LIMIT {
+        return Err(FileError::Invalid(FieldErrors::one(
+            "limit",
+            format!("at most {MAX_SEARCH_LIMIT} files at once"),
+        )));
+    }
+    let mut tx = deployment.begin().await?;
+    let (total, files) = files_records::search(
+        &mut tx,
+        user.id,
+        &search.name,
+        i64::from(search.offset),
+        i64::from(search.limit),
+    )
+    .await?;
+    let files = with_states(&mut tx, deployment.role, user, files).await?;
+    tx.commit().await?;
+    Ok(FileSearchResults { total, files })
 }
 
 /// One file the user sees, by its id, unless deleted, with its state,
@@ -2741,6 +2792,95 @@ pub(crate) mod tests {
                 .await
                 .expect("a file of no known type");
             assert_eq!(file.content_type, UNKNOWN_CONTENT_TYPE);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn files_search_finds_names_in_any_case_a_page_at_a_time() {
+        with_each_database(|database| async move {
+            let (deployment, storage) = server(database);
+            let alice = users::create(&deployment, "alice@example.com", "Alice")
+                .await
+                .expect("a user");
+            let bob = users::create(&deployment, "bob@example.com", "Bob")
+                .await
+                .expect("a user");
+            for (name, bytes) in [
+                ("Cat.gif", b"1"),
+                ("dog.gif", b"2"),
+                ("caterpillar.png", b"3"),
+                ("100%_done.txt", b"4"),
+            ] {
+                uploaded(&deployment, &storage, &alice, name, bytes).await;
+            }
+            let found = |name: &str, offset: u32, limit: u32| {
+                let deployment = deployment.clone();
+                let alice = alice.clone();
+                let asked = FileSearch {
+                    name: name.to_string(),
+                    offset,
+                    limit,
+                };
+                async move {
+                    let results = search(&deployment, &alice, &asked).await.expect("a search");
+                    let names: Vec<String> = results
+                        .files
+                        .into_iter()
+                        .map(|listed| listed.file.name)
+                        .collect();
+                    (results.total, names)
+                }
+            };
+
+            assert_eq!(
+                found("", 0, 10).await,
+                (
+                    4,
+                    vec![
+                        "100%_done.txt".to_string(),
+                        "caterpillar.png".to_string(),
+                        "dog.gif".to_string(),
+                        "Cat.gif".to_string(),
+                    ]
+                )
+            );
+            assert_eq!(
+                found("CAT", 0, 10).await,
+                (
+                    2,
+                    vec!["caterpillar.png".to_string(), "Cat.gif".to_string()]
+                )
+            );
+            assert_eq!(found("cat", 1, 1).await, (2, vec!["Cat.gif".to_string()]));
+            assert_eq!(found("cat", 2, 10).await, (2, Vec::new()));
+            assert_eq!(
+                found("%", 0, 10).await,
+                (1, vec!["100%_done.txt".to_string()])
+            );
+            assert_eq!(
+                found("_", 0, 10).await,
+                (1, vec!["100%_done.txt".to_string()])
+            );
+
+            let theirs = FileSearch {
+                limit: 10,
+                ..FileSearch::default()
+            };
+            let results = search(&deployment, &bob, &theirs).await.expect("a search");
+            assert_eq!((results.total, results.files.len()), (0, 0));
+
+            let too_many = FileSearch {
+                limit: MAX_SEARCH_LIMIT + 1,
+                ..FileSearch::default()
+            };
+            let error = search(&deployment, &alice, &too_many)
+                .await
+                .expect_err("over the limit");
+            let FileError::Invalid(errors) = error else {
+                panic!("field errors, got {error}");
+            };
+            assert_eq!(errors.0["limit"], ["at most 500 files at once"]);
         })
         .await;
     }

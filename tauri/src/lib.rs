@@ -93,7 +93,7 @@ pub fn run() {
             posts::posts_create,
             posts::posts_update,
             posts::posts_delete,
-            files::files_list,
+            files::files_search,
             files::files_list_duplicates,
             files::files_get,
             files::files_create,

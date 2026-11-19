@@ -24,6 +24,18 @@ pub(crate) async fn list(tx: &mut Transaction, user_id: Uuid) -> Result<Vec<File
     query!(tx, list_visible(user_id))
 }
 
+/// Counts the live files the user sees whose names contain `name` in
+/// any case, and lists `limit` of them from `offset`, newest first.
+pub(crate) async fn search(
+    tx: &mut Transaction,
+    user_id: Uuid,
+    name: &str,
+    offset: i64,
+    limit: i64,
+) -> Result<(u64, Vec<File>), sqlx::Error> {
+    query!(tx, search_visible(user_id, name, offset, limit))
+}
+
 /// Lists the live files the user sees with any of these checksums,
 /// newest first.
 pub(crate) async fn list_with_sha256s(
