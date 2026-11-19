@@ -188,7 +188,10 @@
 
 <main class="page with-waves">
   <Header>
-    {name ?? "No session"}
+    <a href={sessionsIndexUrl()} class="title-link">
+      <Icon name="hero-chevron-left" class="size-5" />
+      {name ?? "No session"}
+    </a>
     {#snippet subtitle()}
       The session's status and actions, and the agent's chat history. Refreshes every 5 seconds.
     {/snippet}
@@ -287,3 +290,14 @@
 
   <LogList />
 </main>
+
+<style>
+  /* The title, a link back to the sessions; it looks like the plain title. */
+  .title-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: inherit;
+    text-decoration: none;
+  }
+</style>

@@ -1,4 +1,5 @@
-<!-- The Starter Pack's page header: a title, an optional subtitle and actions. -->
+<!-- The Starter Pack's page header: a title on its own line, then an
+     optional subtitle with the optional actions on its right, top aligned. -->
 <script>
   /**
    * @typedef {Object} Props
@@ -11,14 +12,16 @@
   let { actions, children, subtitle } = $props();
 </script>
 
-<header class={[actions != null && "flex items-center justify-between gap-6", "pb-6"]}>
-  <div>
-    <h1 class="text-2xl font-semibold leading-9">
-      {@render children?.()}
-    </h1>
-    {#if subtitle != null}<p class="mt-1 text-base-content/70">
-      {@render subtitle?.()}
-    </p>{/if}
-  </div>
-  <div class="flex-none">{@render actions?.()}</div>
+<header class="pb-6">
+  <h1 class="text-2xl font-semibold leading-9">
+    {@render children?.()}
+  </h1>
+  {#if subtitle != null || actions != null}
+    <div class="mt-1 flex items-start justify-between gap-6">
+      {#if subtitle != null}<p class="text-base-content/70">
+        {@render subtitle?.()}
+      </p>{/if}
+      {#if actions != null}<div class="flex-none">{@render actions?.()}</div>{/if}
+    </div>
+  {/if}
 </header>

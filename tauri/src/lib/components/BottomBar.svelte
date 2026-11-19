@@ -94,7 +94,7 @@
     display: none;
     gap: 6px;
     height: var(--bottom-bar-height);
-    padding: 6px 8px calc(6px + var(--bottom-bar-inset));
+    padding: 12px 8px calc(6px + var(--bottom-bar-inset));
     background: var(--gutter-bg);
     box-shadow: 0 -1px 0 var(--gutter-ring);
   }
@@ -113,13 +113,13 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 2px;
+    justify-content: flex-start;
+    gap: 4px;
     border-radius: 10px;
     background: transparent;
     color: var(--fg);
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 500;
     letter-spacing: 0.01em;
     text-decoration: none;
     cursor: pointer;
@@ -145,8 +145,8 @@
   }
 
   .bar-button :global(.bar-icon) {
-    width: 20px;
-    height: 20px;
+    width: 26px;
+    height: 26px;
   }
 
   /* The page above the sheet, dimmed; a tap on it closes the sheet. */

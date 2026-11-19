@@ -160,8 +160,8 @@ body {
   :root {
     --gutter-width: 0px;
     --bottom-bar-inset: max(0px, calc(env(safe-area-inset-bottom, 0px) - 16px));
-    --bottom-bar-height: calc(56px + var(--bottom-bar-inset));
-    --page-top: calc(env(safe-area-inset-top, 0px) + 1rem);
+    --bottom-bar-height: calc(66px + var(--bottom-bar-inset));
+    --page-top: max(1rem, calc(env(safe-area-inset-top, 0px) - 0.25rem));
   }
 
   .app-gutter {
