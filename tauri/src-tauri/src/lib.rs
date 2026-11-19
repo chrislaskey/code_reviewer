@@ -22,6 +22,8 @@
 #[cfg(target_os = "ios")]
 mod apple_push_registration;
 mod connection;
+#[cfg(target_os = "ios")]
+mod keyboard_accessory_bar;
 #[cfg(desktop)]
 mod notifications;
 mod remote_access;
@@ -50,6 +52,8 @@ pub fn run() {
         .setup(|app| {
             let connection = connect_to_backend(app)?;
             app.manage(connection);
+            #[cfg(target_os = "ios")]
+            keyboard_accessory_bar::hide_keyboard_accessory_bar();
             #[cfg(target_os = "ios")]
             tauri::async_runtime::spawn(apple_push_registration::send_apple_push_token_if_allowed(
                 app.handle().clone(),

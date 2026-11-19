@@ -647,6 +647,7 @@ dependencies = [
  "code_reviewer_server",
  "env_logger",
  "log",
+ "objc2",
  "secrecy",
  "serde",
  "tauri",

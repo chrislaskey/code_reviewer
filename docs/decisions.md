@@ -1097,3 +1097,16 @@ pass through Apple.
   `set_apple_push_token`. At launch and after pairing it's sent again
   without asking, if notifications are allowed, since it changes when the
   app is reinstalled.
+
+## 31. Phones: no bar above the keyboard
+
+On iOS a web view shows a bar above the keyboard with previous, next and
+done buttons for moving between form fields. The app's forms are mostly a
+single text box, so the bar only takes up screen. **Decision:** at launch
+the iOS app replaces `inputAccessoryView` on WebKit's content view
+(`WKContentView`) with one that returns none (`keyboard_accessory_bar.rs`,
+with the `objc2` crate). WebKit has no public setting for the bar, so this
+relies on a private class name, as Capacitor's `hideFormAccessoryBar` does.
+If a later iOS renames the class, a warning is logged and the bar is back;
+nothing breaks. Without the done button, the keyboard closes by tapping
+outside the text box.
