@@ -46,6 +46,18 @@ pub async fn files_list(device: State<'_, DeviceAccounts>) -> Result<Vec<FileWit
         .map_err(|error| error.to_string())
 }
 
+/// The files the user sees on this device with these bytes.
+#[tauri::command]
+pub async fn files_list_with_sha256(
+    device: State<'_, DeviceAccounts>,
+    sha256: String,
+) -> Result<Vec<FileWithState>, String> {
+    let (deployment, user) = signed_in(&device).await?;
+    files::list_with_sha256(&deployment, &user, &sha256)
+        .await
+        .map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 pub async fn files_get(
     device: State<'_, DeviceAccounts>,

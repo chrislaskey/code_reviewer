@@ -1774,6 +1774,14 @@ mod tests {
         assert_eq!(listed[0]["file"], file);
         assert_eq!(listed[0]["state"], json!("synced"));
         assert_eq!(listed[0]["communities"][0]["id"], community_id);
+        let (status, same) = get(&router, &format!("/api/files?sha256={sha256}")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(same[0]["file"], file);
+        let other = app_core::files::sha256_hex(b"other");
+        let (_, none) = get(&router, &format!("/api/files?sha256={other}")).await;
+        assert_eq!(none, json!([]));
+        let (status, _) = get(&router, "/api/files?sha256=nope").await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 
         let path = format!("/api/files/{id}");
         let (status, headers, _) = send_with(

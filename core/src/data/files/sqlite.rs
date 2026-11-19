@@ -83,6 +83,24 @@ pub async fn list_visible(
     Ok(rows.into_iter().map(File::from).collect())
 }
 
+/// The files the user sees with these bytes, not deleted, newest first.
+pub async fn list_visible_with_sha256(
+    connection: &mut SqliteConnection,
+    user_id: Uuid,
+    sha256: &str,
+) -> Result<Vec<File>, sqlx::Error> {
+    let rows: Vec<FileRow> = sqlx::query_as(select!(
+        "WHERE deleted_at IS NULL AND sha256 = $2 AND ",
+        visible_to!(),
+        " ORDER BY inserted_at DESC, id DESC"
+    ))
+    .bind(user_id.hyphenated())
+    .bind(sha256)
+    .fetch_all(connection)
+    .await?;
+    Ok(rows.into_iter().map(File::from).collect())
+}
+
 /// The file by its id if the user sees it, not deleted.
 pub async fn get_visible(
     connection: &mut SqliteConnection,

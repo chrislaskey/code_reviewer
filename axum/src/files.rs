@@ -30,16 +30,27 @@ pub struct FileFields {
 }
 
 #[derive(Deserialize)]
+pub struct ListQuery {
+    /// Present to list only the files with these bytes.
+    pub sha256: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub struct ContentQuery {
     /// Present to save the file under its name instead of showing it.
     pub download: Option<String>,
 }
 
+/// The files the user sees, or with `?sha256=`, those with these bytes.
 pub async fn list(
     State(deployment): State<Deployment>,
     CurrentUser(user): CurrentUser,
+    Query(query): Query<ListQuery>,
 ) -> Result<Json<Vec<FileWithState>>, ApiError> {
-    Ok(Json(files::list(&deployment, &user).await?))
+    Ok(Json(match query.sha256 {
+        Some(sha256) => files::list_with_sha256(&deployment, &user, &sha256).await?,
+        None => files::list(&deployment, &user).await?,
+    }))
 }
 
 pub async fn get(

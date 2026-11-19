@@ -21,6 +21,7 @@ CREATE TABLE app_files (
 );
 
 CREATE INDEX app_files_last_synced_at ON app_files (last_synced_at, id);
+CREATE INDEX app_files_sha256 ON app_files (sha256);
 
 -- Taking a file out soft-deletes its row; putting it back revives the
 -- same row, so the unique index is plain.

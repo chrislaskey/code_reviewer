@@ -8,9 +8,9 @@ private file is a file in the person's `Personal` community, where they
 are the only member.
 
 `offline-files-decisions.md` holds how a file's bytes are kept, sent and
-fetched; this holds who a file belongs to and who sees it. Phases 1 and 2
-are built, in `core/src/app/files_communities.rs` and
-`core/src/app/files.rs`; phase 3 is to build, see "Build order".
+fetched; this holds who a file belongs to and who sees it. All three
+phases are built, in `core/src/app/files_communities.rs` and
+`core/src/app/files.rs`, see "Build order".
 
 ## Decisions
 
@@ -177,11 +177,16 @@ tell a file it already sees.
   test to run against any other store before using it.
 - **The web page needs a secure context** for `crypto.subtle`: HTTPS, or
   `localhost` in dev.
-- **Duplicates are told only among files the user sees.** Picking a
-  file whose checksum matches a file in the user's communities offers
-  to put that file in the communities chosen instead. It is a check on
-  the device's own rows, offline as well; the server never answers
-  whether a checksum exists anywhere.
+- **Duplicates are told only among files the user sees.** Once a file
+  is picked, the New page asks `filesListWithSameBytes(file)`, which
+  works out the checksum in the page and lists the files the user sees
+  with it, `files::list_with_sha256`, by the same predicate as every
+  read: `GET /api/files?sha256=` on the web, the device's own rows in
+  the app, offline as well. The server never answers whether a
+  checksum exists anywhere else. The page shows the newest: when it is
+  already in a community chosen, it says so; otherwise it offers to
+  put that file in the communities chosen instead, and Create makes a
+  copy all the same.
 
 Bytes stored once for many files is not built; how to build it safely
 is in `docs/suggestions/files.md`.
@@ -210,5 +215,5 @@ app and the page, signed into the upload and checked on create. Garage
 refuses bytes that do not match a signed `x-amz-checksum-sha256` and
 answers the checksum it holds.
 
-**Phase 3, duplicates:** picking a file the user already sees offers
-it, among all their communities and among those chosen.
+**Phase 3, duplicates, built:** picking a file the user already sees
+offers it, among all their communities and among those chosen.

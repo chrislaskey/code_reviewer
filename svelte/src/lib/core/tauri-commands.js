@@ -1,6 +1,7 @@
 // app_core over the Tauri app's commands (../../../../tauri/src/).
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { sha256Of } from "./checksums.js";
 import { FormError } from "./form_error.js";
 
 /** The user signed in on this device; null when nobody is. */
@@ -318,6 +319,15 @@ export function postsUpdate(id, body, communityIds) {
 /** The files the user sees on this device, each `{file, creator, communities, shown_as, state, error}`. */
 export function filesList() {
   return invoke("files_list");
+}
+
+/**
+ * The files the user sees on this device with the same bytes as the one
+ * picked.
+ * @param {File} file
+ */
+export async function filesListWithSameBytes(file) {
+  return invoke("files_list_with_sha256", { sha256: await sha256Of(file) });
 }
 
 /** @param {string} id */

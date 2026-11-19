@@ -65,6 +65,7 @@ export const postsCreate = core.postsCreate;
 export const postsUpdate = core.postsUpdate;
 export const postsDelete = core.postsDelete;
 export const filesList = core.filesList;
+export const filesListWithSameBytes = core.filesListWithSameBytes;
 export const filesGet = core.filesGet;
 export const filesCreate = core.filesCreate;
 export const filesUpdate = core.filesUpdate;

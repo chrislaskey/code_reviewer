@@ -48,6 +48,7 @@ Inside the Tauri app each is a command of the same name
 | `membershipsJoin(communityId)` | `PUT /api/memberships/:community_id` |
 | `membershipsLeave(communityId)` | `DELETE /api/memberships/:community_id`, 204 |
 | `filesList()`, `filesGet(id)` | `GET /api/files`, `GET /api/files/:id`, each file with how it is shown and where it stands |
+| `filesListWithSameBytes(file)` | `GET /api/files?sha256=...`, the files the user sees with the picked file's bytes, by its SHA-256 worked out in the page |
 | `filesCreate(file, name, communityIds, onProgress?)` | `POST /api/files/upload` for where to PUT the bytes, the PUT to the bucket, then `POST /api/files`, 201; in the app one command, the bytes kept on the device and sent by the next sync |
 | `filesUpdate(id, name, communityIds)` | `PUT /api/files/:id` with `{"name": "...", "community_ids": [...]}`, its communities among the user's |
 | `filesDelete(id)` | `DELETE /api/files/:id`, 204: out of the user's communities, deleted when those were its last |

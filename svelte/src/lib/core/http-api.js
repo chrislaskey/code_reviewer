@@ -4,6 +4,7 @@
 // `"errors"`. An answer that is not JSON is thrown too, naming the
 // request, so a server without the route never passes for one with it.
 import { FormError } from "./form_error.js";
+import { sha256Of } from "./checksums.js";
 import { putFile } from "./uploads.js";
 
 /**
@@ -386,6 +387,14 @@ export function filesList() {
   return send("GET", "/api/files");
 }
 
+/**
+ * The files the user sees with the same bytes as the one picked.
+ * @param {File} file
+ */
+export async function filesListWithSameBytes(file) {
+  return send("GET", `/api/files?sha256=${await sha256Of(file)}`);
+}
+
 /** @param {string} id */
 export function filesGet(id) {
   return send("GET", filePath(id));
@@ -414,15 +423,6 @@ export async function filesCreate(file, name, communityIds, onProgress) {
   });
 }
 
-/**
- * The file's SHA-256 as lowercase hex, which the bucket checks its bytes
- * against.
- * @param {File} file
- */
-async function sha256Of(file) {
-  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
 
 /**
  * @param {string} id

@@ -285,6 +285,26 @@ pub async fn list(deployment: &Deployment, user: &User) -> Result<Vec<FileWithSt
     Ok(listed)
 }
 
+/// The files the user sees whose bytes have this SHA-256, newest first,
+/// each with its state, creator and communities: what a page offers in
+/// place of creating the same file again. Only rows the user already
+/// sees are compared, on the server and on a device, offline as well,
+/// so it tells nothing of files elsewhere.
+pub async fn list_with_sha256(
+    deployment: &Deployment,
+    user: &User,
+    sha256: &str,
+) -> Result<Vec<FileWithState>, FileError> {
+    is_sha256(sha256, &()).map_err(|error| {
+        FileError::Invalid(FieldErrors::one("sha256", error.message().to_string()))
+    })?;
+    let mut tx = deployment.begin().await?;
+    let files = files_records::list_with_sha256(&mut tx, user.id, sha256).await?;
+    let listed = with_states(&mut tx, deployment.role, user, files).await?;
+    tx.commit().await?;
+    Ok(listed)
+}
+
 /// One file the user sees, by its id, unless deleted, with its state,
 /// creator and communities.
 pub async fn get(

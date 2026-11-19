@@ -1133,4 +1133,37 @@ mod tests {
         })
         .await;
     }
+
+    #[tokio::test]
+    async fn files_list_with_sha256_finds_the_same_bytes_among_the_files_a_user_sees_only() {
+        with_each_database(|database| async move {
+            let (server, storage) = server(database);
+            let alice = user(&server, "Alice").await;
+            let bob = user(&server, "Bob").await;
+            let garden = community(&server, &alice, "Garden").await;
+            let woodwork = community(&server, &bob, "Woodwork").await;
+            let alices = file_in(&server, &storage, &alice, "roses.jpg", &[garden]).await;
+            let bobs = file_in(&server, &storage, &bob, "the same.jpg", &[woodwork]).await;
+            assert_eq!(alices.sha256, bobs.sha256, "the same bytes");
+
+            let found = files::list_with_sha256(&server, &alice, &alices.sha256)
+                .await
+                .expect("found");
+            let names: Vec<&str> = found.iter().map(|shown| shown.file.name.as_str()).collect();
+            assert_eq!(names, ["roses.jpg"], "nothing of bob's is told");
+            assert_eq!(found[0].communities[0].id, garden);
+            let other = files::sha256_hex(b"other bytes");
+            assert!(
+                files::list_with_sha256(&server, &alice, &other)
+                    .await
+                    .expect("looked")
+                    .is_empty()
+            );
+            let error = files::list_with_sha256(&server, &alice, "not a checksum")
+                .await
+                .expect_err("not a SHA-256");
+            assert!(matches!(error, FileError::Invalid(_)));
+        })
+        .await;
+    }
 }
