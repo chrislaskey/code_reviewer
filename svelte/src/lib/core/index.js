@@ -69,6 +69,7 @@ export const filesList = core.filesList;
 export const filesListDuplicates = core.filesListDuplicates;
 export const filesGet = core.filesGet;
 export const filesCreate = core.filesCreate;
+export const filesCreateAtOnce = core.filesCreateAtOnce;
 export const filesUpdate = core.filesUpdate;
 export const filesDelete = core.filesDelete;
 export const filesContentUrl = core.filesContentUrl;

@@ -6,7 +6,9 @@ with each duplicate, and watch each file go. Built on the single-file
 create of `files-communities.md` and `offline-files-decisions.md`,
 which stays as it is: many files are many creates.
 
-Not built yet. Meant for a library at once, thousands of small images
+Built in `svelte/src/files/FilesNewPage.svelte` and `FilesNewRow.svelte`,
+on `files::list_duplicates` and the sync's `files::FILES_PER_SYNC`.
+Meant for a library at once, thousands of small images
 say: up to 5,000 files in a list, each up to the 25 MB of one file. A
 list of large files takes as long as it takes; splitting it is the
 person's choice.
@@ -109,8 +111,8 @@ the files index shows each one waiting until then, as for one file.
   within them, rather than expiring behind thousands of others and
   counting a try against its file; and posts and pulls wait for 100
   files, not 5,000.
-- **To measure**: a push of 500 file creates, each checked in the
-  bucket by the server before it is written, within the push's time.
+- **A push carries 100 file creates at most**, so the server checks at
+  most 100 files in the bucket within one push request.
 
 ## Staying on the page
 
@@ -118,6 +120,38 @@ While files are going, closing or reloading the tab asks first
 (`beforeunload`). A link to another page inside the app is not stopped:
 the requests already started finish, and their results are not shown.
 Keeping a list going across pages is left for later.
+
+## Thousands of rows on one page
+
+- **The checksums are written to the rows at once**, after the last is
+  worked out and the duplicates asked for; written one by one, every
+  row redrew the whole list each time, minutes for 5,000.
+- **The order shown is arranged at moments**: when files are added,
+  checked, removed, and when a Create ends, not as each row changes.
+- **While files go, nothing counts the whole list**: the page shows the
+  count of the run, and the totals once it ends.
+- **A file dropped on the app's window reaches the page**: the main
+  window's `dragDropEnabled` is off, so the webview has the drop, as a
+  browser does, and Tauri does not take it.
+- **On SQLite a transaction takes the write lock as it begins**,
+  `BEGIN IMMEDIATE`, so three creates at once wait their turn instead
+  of failing with "database is locked", see `Database::begin`.
+
+## Measured
+
+On a MacBook, in dev, against Garage, with small text files:
+
+| What | 5,000 files |
+| --- | --- |
+| Picking and checking for duplicates, on the web | 4 s |
+| A choice, and the same for the rest | under 0.2 s |
+| Creating, on the web, three at a time | 157 s |
+| Keeping them on a device, then its syncs (`sync_many_files_over_http`, a debug build) | 2.5 s, then 50 syncs in 82 s |
+
+A device's sync takes longer while many files wait, 0.9 s with 4,900
+waiting against 0.4 s with 900: it reads every pending event to choose
+what to hold back. A minute over 5,000 files; reading only the first
+`FILES_PER_SYNC` would remove it.
 
 ## Left for later
 

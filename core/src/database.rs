@@ -49,9 +49,15 @@ pub enum DatabaseError {
 }
 
 impl Database {
+    /// On SQLite the transaction takes the write lock as it begins, so
+    /// two that read then write wait their turn by the busy timeout;
+    /// begun as readers, the second to write would fail at once with
+    /// "database is locked".
     pub async fn begin(&self) -> Result<Transaction, sqlx::Error> {
         Ok(match self {
-            Database::Sqlite(pool) => Transaction::Sqlite(pool.begin().await?),
+            Database::Sqlite(pool) => {
+                Transaction::Sqlite(pool.begin_with("BEGIN IMMEDIATE").await?)
+            }
             #[cfg(feature = "postgres")]
             Database::Postgres(pool) => Transaction::Postgres(pool.begin().await?),
         })
@@ -192,5 +198,40 @@ pub(crate) mod tests {
                 .expect("the server's PostgreSQL database");
         }
         panic!("{variable} must be sqlite:<path> or, with the postgres feature, postgres://...");
+    }
+
+    #[tokio::test]
+    // Without the postgres feature, SQLite is the only variant
+    #[allow(irrefutable_let_patterns)]
+    async fn database_transactions_that_read_then_write_at_once_wait_their_turn() {
+        let folder = tempfile::tempdir().expect("a folder");
+        let database = Database::open_sqlite_file(&folder.path().join("app.db"))
+            .await
+            .expect("a SQLite file");
+        let Database::Sqlite(pool) = &database else {
+            panic!("a SQLite database");
+        };
+        sqlx::query("CREATE TABLE counts (n INTEGER)")
+            .execute(pool)
+            .await
+            .expect("a table");
+
+        let write = |database: Database| async move {
+            let mut tx = database.begin().await?;
+            let Transaction::Sqlite(sqlite) = &mut tx else {
+                panic!("a SQLite transaction");
+            };
+            sqlx::query("SELECT count(*) FROM counts")
+                .execute(&mut **sqlite)
+                .await?;
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            sqlx::query("INSERT INTO counts (n) VALUES (1)")
+                .execute(&mut **sqlite)
+                .await?;
+            tx.commit().await
+        };
+        let (first, second) = tokio::join!(write(database.clone()), write(database.clone()));
+        first.expect("the first write");
+        second.expect("the second write, after the first");
     }
 }

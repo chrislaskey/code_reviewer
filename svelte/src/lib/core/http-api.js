@@ -400,6 +400,9 @@ export function filesGet(id) {
   return send("GET", filePath(id));
 }
 
+/** How many files a page creates at once: each waits on its upload. */
+export const filesCreateAtOnce = 3;
+
 /**
  * Creates the file the person picked: its bytes go straight to object
  * storage, checked against their SHA-256, then the server writes its
@@ -408,9 +411,10 @@ export function filesGet(id) {
  * @param {string} name
  * @param {string[]} communityIds the communities the file is in, one at least
  * @param {(fraction: number) => void} [onProgress] from 0 to 1
+ * @param {string} [sha256] the file's, when the page already has it
  */
-export async function filesCreate(file, name, communityIds, onProgress) {
-  const sha256 = await sha256Of(file);
+export async function filesCreate(file, name, communityIds, onProgress, sha256) {
+  sha256 ??= await sha256Of(file);
   const upload = await send("POST", "/api/files/upload", { content_type: file.type, size: file.size, sha256 });
   if (!upload.uploaded) await putFile(upload, file, onProgress);
   return send("POST", "/api/files", {

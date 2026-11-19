@@ -43,7 +43,7 @@
 <Page>
   <div class="flex items-center justify-between gap-4">
     <Heading level={1}>Files</Heading>
-    <Button variant="primary" size="sm" href={filesNewUrl()}>New file</Button>
+    <Button variant="primary" size="sm" href={filesNewUrl()}>New files</Button>
   </div>
 
   <ErrorMessage message={error} />

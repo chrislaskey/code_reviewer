@@ -3683,6 +3683,101 @@ pub(crate) mod tests {
             .expect("signed out on a");
     }
 
+    /// Many files added on a device, `FILES` of them, 1,000 unless set,
+    /// reach a running web server's bucket a sync of
+    /// `files::FILES_PER_SYNC` at a time, each sync starting the next as
+    /// the app does; prints how long each took. Run as
+    /// `sync_a_file_over_http` is:
+    ///
+    /// ```sh
+    /// SYNC_SERVER_URL=http://localhost:4010 TEST_SERVER_DATABASE_URL=sqlite:../axum/data/app.db \
+    ///   cargo test -p app_core --features sync-http many_files_over_http -- --ignored --nocapture
+    /// ```
+    #[cfg(feature = "sync-http")]
+    #[tokio::test]
+    #[ignore]
+    async fn sync_many_files_over_http() {
+        use crate::deployment::FileStore;
+        use crate::files::FileState;
+
+        let url = std::env::var("SYNC_SERVER_URL").expect("SYNC_SERVER_URL");
+        let count: usize = std::env::var("FILES")
+            .ok()
+            .and_then(|count| count.parse().ok())
+            .unwrap_or(1000);
+        let server = Http::new(&url).expect("a transport");
+        let servers_database =
+            crate::database::tests::open_from_env("TEST_SERVER_DATABASE_URL").await;
+        let servers_database = Deployment::new(servers_database, Role::Server);
+        let email = format!("{}@example.com", Uuid::now_v7().simple());
+        let folder = tempfile::tempdir().expect("a folder");
+        let a = users::tests::device()
+            .await
+            .with_file_store(FileStore::Folder(folder.path().to_path_buf()));
+        let alice = {
+            let session = device_session_over(&server, &servers_database, &email).await;
+            accounts::keep_signed_in(&a, session)
+                .await
+                .expect("signed in on a")
+        };
+        run(&a, &server).await.expect("a sync for her communities");
+        let personal = memberships::list_mine(&a, &alice)
+            .await
+            .expect("the memberships")[0]
+            .community_id;
+
+        let started = std::time::Instant::now();
+        let mut ids = Vec::with_capacity(count);
+        for number in 0..count {
+            let bytes = format!("emoji number {number}");
+            let file = files::create_with_bytes(
+                &a,
+                &alice,
+                &format!("{number}.txt"),
+                "text/plain",
+                &[personal],
+                bytes.as_bytes(),
+            )
+            .await
+            .expect("a file");
+            ids.push(file.id);
+        }
+        eprintln!(
+            "{count} files kept on the device in {:?}",
+            started.elapsed()
+        );
+
+        let started = std::time::Instant::now();
+        let mut syncs = 0;
+        loop {
+            let one = std::time::Instant::now();
+            let report = run(&a, &server).await.expect("a sync");
+            syncs += 1;
+            eprintln!(
+                "sync {syncs}: {:?}, uploaded {}, pushed {}, left {}",
+                one.elapsed(),
+                report.uploaded,
+                report.pushed,
+                report.files_left
+            );
+            if !report.more_files_to_send() {
+                assert_eq!(report.pending, 0, "{report:?}");
+                break;
+            }
+        }
+        eprintln!(
+            "{count} files sent in {syncs} syncs, {:?}",
+            started.elapsed()
+        );
+        for id in ids {
+            let shown = files::get(&a, &alice, id).await.expect("on a");
+            assert_eq!(shown.state, FileState::Synced);
+        }
+        accounts::sign_out_on_device(&a, &server)
+            .await
+            .expect("signed out on a");
+    }
+
     /// Two devices against a running web server, `SYNC_SERVER_URL`,
     /// whose database, `TEST_SERVER_DATABASE_URL`, the test opens itself
     /// to sign a user up and read nothing from the server's log, then

@@ -348,6 +348,9 @@ export function filesDelete(id) {
   return invoke("files_delete", { id });
 }
 
+/** How many files a page creates at once: one, each a local write. */
+export const filesCreateAtOnce = 1;
+
 /**
  * Creates the file the person picked: kept on this device at once, and
  * sent to the server by the next sync; answers the file. The bytes are
@@ -356,8 +359,9 @@ export function filesDelete(id) {
  * @param {string} name
  * @param {string[]} communityIds the communities the file is in, one at least
  * @param {(fraction: number) => void} [_onProgress] nothing to wait for here
+ * @param {string} [_sha256] worked out again in Rust, from the bytes it keeps
  */
-export async function filesCreate(file, name, communityIds, _onProgress) {
+export async function filesCreate(file, name, communityIds, _onProgress, _sha256) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const headers = {
     "x-file-name": encodeURIComponent(name),

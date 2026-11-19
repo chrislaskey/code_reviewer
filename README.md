@@ -49,7 +49,7 @@ Inside the Tauri app each is a command of the same name
 | `membershipsLeave(communityId)` | `DELETE /api/memberships/:community_id`, 204 |
 | `filesList()`, `filesGet(id)` | `GET /api/files`, `GET /api/files/:id`, each file with how it is shown and where it stands |
 | `filesSha256(file)`, `filesListDuplicates(sha256s)` | the picked file's SHA-256, worked out in the page; `POST /api/files/duplicates` with `{"sha256s": [...]}`, up to 500, the files the user sees with any of them |
-| `filesCreate(file, name, communityIds, onProgress?)` | `POST /api/files/upload` for where to PUT the bytes, the PUT to the bucket, then `POST /api/files`, 201; in the app one command, the bytes kept on the device and sent by the next sync |
+| `filesCreate(file, name, communityIds, onProgress?, sha256?)`, `filesCreateAtOnce` | `POST /api/files/upload` for where to PUT the bytes, the PUT to the bucket, then `POST /api/files`, 201; in the app one command, the bytes kept on the device and sent by the next sync. A page creates `filesCreateAtOnce` files at a time, 3 on the web and 1 in the app |
 | `filesUpdate(id, name, communityIds)` | `PUT /api/files/:id` with `{"name": "...", "community_ids": [...]}`, its communities among the user's |
 | `filesDelete(id)` | `DELETE /api/files/:id`, 204: out of the user's communities, deleted when those were its last |
 | `filesContentUrl(id)` | `/api/files/:id/content`, a redirect to the bytes for an `<img>`; in the app the `files` protocol, serving the device's copy |
@@ -428,7 +428,7 @@ shows the page at the path, swapped in place:
 | `/posts/:id` | `posts/PostsShowPage.svelte`, with Edit and Delete |
 | `/posts/:id/edit` | `posts/PostsEditPage.svelte` |
 | `/files` | `files/FilesIndexPage.svelte`, each with its state when it is not on the server yet |
-| `/files/new` | `files/FilesNewPage.svelte`, a file picked and named |
+| `/files/new` | `files/FilesNewPage.svelte`, one file or up to 5,000 picked or dropped, each named, duplicates decided, created together |
 | `/files/:id` | `files/FilesShowPage.svelte`, the file shown in place when it is an image, plain text or a PDF, with Download, Rename and Delete |
 | `/files/:id/edit` | `files/FilesEditPage.svelte`, renaming |
 | `/communities` | `communities/CommunitiesIndexPage.svelte`, to create, join and leave |
