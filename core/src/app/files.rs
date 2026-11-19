@@ -87,6 +87,12 @@ const KEY_PREFIX: &str = "files";
 /// in the bucket and on a device: an upload whose row never came, bytes
 /// written a moment before their row.
 pub const UNREFERENCED_DAYS: i64 = 1;
+/// The most checksums `list_duplicates` takes in one call.
+pub const MAX_DUPLICATES_CHECKED: usize = 500;
+/// The waiting files one sync asks about and sends, oldest first; the
+/// rest wait for the next, so a URL is used well within its lifetime
+/// and the sync lock is not held for thousands of files.
+pub const FILES_PER_SYNC: usize = 100;
 /// How long a signed upload URL works.
 #[cfg(feature = "object-storage")]
 const UPLOAD_URL_LIFETIME: std::time::Duration = std::time::Duration::from_secs(10 * 60);
@@ -285,21 +291,33 @@ pub async fn list(deployment: &Deployment, user: &User) -> Result<Vec<FileWithSt
     Ok(listed)
 }
 
-/// The files the user sees whose bytes have this SHA-256, newest first,
-/// each with its state, creator and communities: what a page offers in
-/// place of creating the same file again. Only rows the user already
-/// sees are compared, on the server and on a device, offline as well,
-/// so it tells nothing of files elsewhere.
-pub async fn list_with_sha256(
+/// The files the user sees whose bytes have any of these SHA-256s,
+/// newest first, each with its state, creator and communities: what a
+/// page offers in place of creating the same files again. Only rows the
+/// user already sees are compared, on the server and on a device,
+/// offline as well, so it tells nothing of files elsewhere. At most
+/// `MAX_DUPLICATES_CHECKED` checksums at once.
+pub async fn list_duplicates(
     deployment: &Deployment,
     user: &User,
-    sha256: &str,
+    sha256s: &[String],
 ) -> Result<Vec<FileWithState>, FileError> {
-    is_sha256(sha256, &()).map_err(|error| {
-        FileError::Invalid(FieldErrors::one("sha256", error.message().to_string()))
-    })?;
+    if sha256s.len() > MAX_DUPLICATES_CHECKED {
+        return Err(FileError::Invalid(FieldErrors::one(
+            "sha256s",
+            format!("at most {MAX_DUPLICATES_CHECKED} checksums at once"),
+        )));
+    }
+    for sha256 in sha256s {
+        is_sha256(sha256, &()).map_err(|error| {
+            FileError::Invalid(FieldErrors::one("sha256s", error.message().to_string()))
+        })?;
+    }
+    if sha256s.is_empty() {
+        return Ok(Vec::new());
+    }
     let mut tx = deployment.begin().await?;
-    let files = files_records::list_with_sha256(&mut tx, user.id, sha256).await?;
+    let files = files_records::list_with_sha256s(&mut tx, user.id, sha256s).await?;
     let listed = with_states(&mut tx, deployment.role, user, files).await?;
     tx.commit().await?;
     Ok(listed)
@@ -544,9 +562,10 @@ pub struct WaitingFile {
 }
 
 /// The first step of a sync on a device: asks the server about the
-/// bytes of every file whose create is pending. What the device knows
-/// of an upload is only this answer, asked again by every sync and
-/// kept nowhere. Once the server cannot be reached the rest are not
+/// bytes of the first `FILES_PER_SYNC` files whose create is pending,
+/// and answers every one, those not asked with nothing. What the device
+/// knows of an upload is only this answer, asked again by every sync
+/// and kept nowhere. Once the server cannot be reached the rest are not
 /// asked, so a device offline waits for one request, not one per file.
 pub async fn ask_about_waiting<T: Transport>(
     deployment: &Deployment,
@@ -563,7 +582,7 @@ pub async fn ask_about_waiting<T: Transport>(
 
     let mut waiting = Vec::with_capacity(creates.len());
     let mut reachable = true;
-    for stored in creates {
+    for (index, stored) in creates.into_iter().enumerate() {
         let event = &stored.event;
         let mut file = WaitingFile {
             id: event.row_id,
@@ -582,7 +601,7 @@ pub async fn ask_about_waiting<T: Transport>(
                 .unwrap_or_default()
                 .to_string(),
         };
-        if reachable {
+        if reachable && index < FILES_PER_SYNC {
             match transport.files_create_upload(token, request).await {
                 Ok(upload) => file.upload = Some(upload),
                 // The server will not take this file, whatever is sent
@@ -2151,6 +2170,48 @@ pub(crate) mod tests {
                 get(&a, &alice, lost.id).await.expect("kept").file.name,
                 "renamed.txt"
             );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn files_a_sync_sends_files_per_sync_and_leaves_the_rest_for_the_next() {
+        with_each_database(|database| async move {
+            let (server, storage) = server(database);
+            let (alice, token) = user_with_token(&server, "alice@example.com").await;
+            let (a, _folder) = device_with_folder(&alice, &token).await;
+            let mut created = Vec::new();
+            for number in 0..=FILES_PER_SYNC {
+                let name = format!("{number}.txt");
+                let file = with_bytes(&a, &alice, &name, "text/plain", name.as_bytes())
+                    .await
+                    .expect("a file");
+                created.push(file);
+            }
+            let last = created.last().expect("the last file");
+
+            let report = sync::run(&a, &InProcess { server: &server })
+                .await
+                .expect("a sync");
+            assert_eq!(report.uploaded, FILES_PER_SYNC);
+            assert_eq!(report.files_left, 1);
+            assert!(report.more_files_to_send());
+            assert_eq!(report.pending, 1);
+            assert_eq!(in_bucket(&storage, &alice, last.id).await, None);
+            assert_eq!(
+                state_of(&a, &alice, last.id).await,
+                (FileState::Waiting, None),
+                "held back, not pushed without its bytes"
+            );
+
+            let report = sync::run(&a, &InProcess { server: &server })
+                .await
+                .expect("a sync");
+            assert_eq!(report.uploaded, 1);
+            assert_eq!(report.files_left, 0);
+            assert!(!report.more_files_to_send());
+            assert_eq!(report.pending, 0);
+            assert_eq!(state_of(&a, &alice, last.id).await.0, FileState::Synced);
         })
         .await;
     }

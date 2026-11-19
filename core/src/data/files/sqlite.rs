@@ -3,6 +3,7 @@
 //! A user sees a file in a community they are a live member of.
 
 use chrono::{DateTime, Utc};
+use sqlx::types::Json;
 use sqlx::{FromRow, SqliteConnection};
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
@@ -83,19 +84,20 @@ pub async fn list_visible(
     Ok(rows.into_iter().map(File::from).collect())
 }
 
-/// The files the user sees with these bytes, not deleted, newest first.
-pub async fn list_visible_with_sha256(
+/// The files the user sees with any of these checksums, not deleted,
+/// newest first.
+pub async fn list_visible_with_sha256s(
     connection: &mut SqliteConnection,
     user_id: Uuid,
-    sha256: &str,
+    sha256s: &[String],
 ) -> Result<Vec<File>, sqlx::Error> {
     let rows: Vec<FileRow> = sqlx::query_as(select!(
-        "WHERE deleted_at IS NULL AND sha256 = $2 AND ",
+        "WHERE deleted_at IS NULL AND sha256 IN (SELECT value FROM json_each($2)) AND ",
         visible_to!(),
         " ORDER BY inserted_at DESC, id DESC"
     ))
     .bind(user_id.hyphenated())
-    .bind(sha256)
+    .bind(Json(sha256s))
     .fetch_all(connection)
     .await?;
     Ok(rows.into_iter().map(File::from).collect())

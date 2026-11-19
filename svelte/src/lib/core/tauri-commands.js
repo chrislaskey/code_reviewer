@@ -1,7 +1,6 @@
 // app_core over the Tauri app's commands (../../../../tauri/src/).
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { sha256Of } from "./checksums.js";
 import { FormError } from "./form_error.js";
 
 /** The user signed in on this device; null when nobody is. */
@@ -322,12 +321,12 @@ export function filesList() {
 }
 
 /**
- * The files the user sees on this device with the same bytes as the one
- * picked.
- * @param {File} file
+ * The files the user sees on this device with any of these checksums,
+ * up to 500 at once.
+ * @param {string[]} sha256s
  */
-export async function filesListWithSameBytes(file) {
-  return invoke("files_list_with_sha256", { sha256: await sha256Of(file) });
+export function filesListDuplicates(sha256s) {
+  return invoke("files_list_duplicates", { sha256s });
 }
 
 /** @param {string} id */

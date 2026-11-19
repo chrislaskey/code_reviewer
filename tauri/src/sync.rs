@@ -16,7 +16,11 @@
 //! with its file, and the pages are told, `account_deleted`.
 //! A sync is a spawned task, not a queued job, and the only queue is the
 //! pending events: see "How a sync is started and run" in the design.
+//! One spawned sync waits at most: a write while one waits starts none,
+//! since the waiting one sees it. A sync that left files for the next
+//! starts the next.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex as SyncMutex, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -36,11 +40,12 @@ const INTERVAL: Duration = Duration::from_secs(30);
 /// window is not news.
 const FOREGROUND_GAP: Duration = Duration::from_secs(5);
 
-/// The server, the lock one sync at a time holds, and when the last
-/// sync started.
+/// The server, the lock one sync at a time holds, whether a spawned
+/// sync is waiting for it, and when the last sync started.
 pub struct SyncServer {
     transport: Http,
     one_at_a_time: Mutex<()>,
+    one_waiting: AtomicBool,
     last_started: SyncMutex<Option<Instant>>,
 }
 
@@ -64,6 +69,7 @@ pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     app.manage(SyncServer {
         transport: Http::new(&url)?,
         one_at_a_time: Mutex::new(()),
+        one_waiting: AtomicBool::new(false),
         last_started: SyncMutex::new(None),
     });
     spawn(app.handle().clone());
@@ -90,10 +96,18 @@ pub fn online_error(app: &AppHandle, error: online::OnlineError) -> String {
     error.to_string()
 }
 
-/// Starts a sync in the background.
+/// Starts a sync in the background, unless one started so is still
+/// waiting to run.
 pub fn spawn(app: AppHandle) {
+    if app
+        .state::<SyncServer>()
+        .one_waiting
+        .swap(true, Ordering::SeqCst)
+    {
+        return;
+    }
     tauri::async_runtime::spawn(async move {
-        let _ = run(&app).await;
+        let _ = run_after_waiting(&app, true).await;
     });
 }
 
@@ -115,9 +129,18 @@ pub fn spawn_on_foreground(app: &AppHandle) {
 /// One sync of the active account, reported to the pages as a `synced`
 /// event; with nobody active, a report saying so.
 pub async fn run(app: &AppHandle) -> Result<Report, String> {
+    run_after_waiting(app, false).await
+}
+
+/// `run`, by a sync `spawn` started when `spawned`, which is no longer
+/// waiting once it holds the lock.
+async fn run_after_waiting(app: &AppHandle, spawned: bool) -> Result<Report, String> {
     let server = app.state::<SyncServer>();
     let device = app.state::<DeviceAccounts>();
     let _one_at_a_time = server.one_at_a_time.lock().await;
+    if spawned {
+        server.one_waiting.store(false, Ordering::SeqCst);
+    }
     *server
         .last_started
         .lock()
@@ -149,6 +172,9 @@ pub async fn run(app: &AppHandle) -> Result<Report, String> {
         && online::plan_is_stale(&deployment).await.unwrap_or(true)
     {
         crate::purchasing::plan_refresh(&deployment, &server.transport).await;
+    }
+    if result.as_ref().is_ok_and(Report::more_files_to_send) {
+        spawn(app.clone());
     }
     let result = result.map_err(|error| error.to_string());
     match &result {

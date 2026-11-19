@@ -30,9 +30,9 @@ pub struct FileFields {
 }
 
 #[derive(Deserialize)]
-pub struct ListQuery {
-    /// Present to list only the files with these bytes.
-    pub sha256: Option<String>,
+pub struct DuplicatesQuery {
+    /// The checksums of the files a person picked.
+    pub sha256s: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -41,16 +41,24 @@ pub struct ContentQuery {
     pub download: Option<String>,
 }
 
-/// The files the user sees, or with `?sha256=`, those with these bytes.
+/// The files the user sees.
 pub async fn list(
     State(deployment): State<Deployment>,
     CurrentUser(user): CurrentUser,
-    Query(query): Query<ListQuery>,
 ) -> Result<Json<Vec<FileWithState>>, ApiError> {
-    Ok(Json(match query.sha256 {
-        Some(sha256) => files::list_with_sha256(&deployment, &user, &sha256).await?,
-        None => files::list(&deployment, &user).await?,
-    }))
+    Ok(Json(files::list(&deployment, &user).await?))
+}
+
+/// The files the user sees with any of these checksums, a POST since
+/// hundreds of them do not fit a URL.
+pub async fn list_duplicates(
+    State(deployment): State<Deployment>,
+    CurrentUser(user): CurrentUser,
+    Json(query): Json<DuplicatesQuery>,
+) -> Result<Json<Vec<FileWithState>>, ApiError> {
+    Ok(Json(
+        files::list_duplicates(&deployment, &user, &query.sha256s).await?,
+    ))
 }
 
 pub async fn get(

@@ -9,6 +9,7 @@ import * as tauriCommands from "./tauri-commands.js";
 import { putFile } from "./uploads.js";
 
 export { FormError } from "./form_error.js";
+export { sha256Of as filesSha256 } from "./checksums.js";
 
 const core = isTauri() ? tauriCommands : httpApi;
 
@@ -65,7 +66,7 @@ export const postsCreate = core.postsCreate;
 export const postsUpdate = core.postsUpdate;
 export const postsDelete = core.postsDelete;
 export const filesList = core.filesList;
-export const filesListWithSameBytes = core.filesListWithSameBytes;
+export const filesListDuplicates = core.filesListDuplicates;
 export const filesGet = core.filesGet;
 export const filesCreate = core.filesCreate;
 export const filesUpdate = core.filesUpdate;

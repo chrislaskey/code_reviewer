@@ -24,13 +24,14 @@ pub(crate) async fn list(tx: &mut Transaction, user_id: Uuid) -> Result<Vec<File
     query!(tx, list_visible(user_id))
 }
 
-/// Lists the live files the user sees with these bytes, newest first.
-pub(crate) async fn list_with_sha256(
+/// Lists the live files the user sees with any of these checksums,
+/// newest first.
+pub(crate) async fn list_with_sha256s(
     tx: &mut Transaction,
     user_id: Uuid,
-    sha256: &str,
+    sha256s: &[String],
 ) -> Result<Vec<File>, sqlx::Error> {
-    query!(tx, list_visible_with_sha256(user_id, sha256))
+    query!(tx, list_visible_with_sha256s(user_id, sha256s))
 }
 
 /// Gets a live file the user sees.

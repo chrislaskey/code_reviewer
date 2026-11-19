@@ -99,7 +99,7 @@ which the cleanup removes, and never a row without a file.
 
 | Step | Who | What |
 | --- | --- | --- |
-| 1 | device, `files::ask_about_waiting` | for each pending create on `app_files`, asks `POST /api/files/upload` with `{id, content_type, size, sha256}` |
+| 1 | device, `files::ask_about_waiting` | for each pending create on `app_files`, the oldest `files::FILES_PER_SYNC` (100), asks `POST /api/files/upload` with `{id, content_type, size, sha256}` |
 | 2 | server | checks the size; looks at `files/<creator id>/<file id>`. There, of that size and with that checksum: `uploaded`. Otherwise a PUT URL signed for the content type and the checksum, good for 10 minutes |
 | 3 | device | pushes every pending event except those of a file not answered `uploaded`, `files::held_back`; a rename waits with its create |
 | 4 | device | pulls, backfills, prunes, as ever |
@@ -110,6 +110,10 @@ which the cleanup removes, and never a row without a file.
 - What to hold back is worked out in each sync and kept nowhere. Once
   the server cannot be reached the rest of the files are not asked
   about, so a device offline waits on one request, not one per file.
+- A sync takes 100 files at most, and holds the rest back unasked, so
+  every URL is used within its 10 minutes and the lock is not held for
+  thousands of files. One that sent or pushed something and left files
+  starts the next sync at once.
 - Every step can run again: a sync cut off after step 5 hears
   `uploaded` next time and pushes.
 - A file that fails holds back only its own events.

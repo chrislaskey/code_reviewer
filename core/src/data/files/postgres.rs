@@ -82,19 +82,20 @@ pub async fn list_visible(
     Ok(rows.into_iter().map(File::from).collect())
 }
 
-/// The files the user sees with these bytes, not deleted, newest first.
-pub async fn list_visible_with_sha256(
+/// The files the user sees with any of these checksums, not deleted,
+/// newest first.
+pub async fn list_visible_with_sha256s(
     connection: &mut PgConnection,
     user_id: Uuid,
-    sha256: &str,
+    sha256s: &[String],
 ) -> Result<Vec<File>, sqlx::Error> {
     let rows: Vec<FileRow> = sqlx::query_as(select!(
-        "WHERE deleted_at IS NULL AND sha256 = $2 AND ",
+        "WHERE deleted_at IS NULL AND sha256 = ANY($2) AND ",
         visible_to!(),
         " ORDER BY inserted_at DESC, id DESC"
     ))
     .bind(user_id)
-    .bind(sha256)
+    .bind(sha256s)
     .fetch_all(connection)
     .await?;
     Ok(rows.into_iter().map(File::from).collect())

@@ -94,7 +94,7 @@ pub fn run() {
             posts::posts_update,
             posts::posts_delete,
             files::files_list,
-            files::files_list_with_sha256,
+            files::files_list_duplicates,
             files::files_get,
             files::files_create,
             files::files_update,

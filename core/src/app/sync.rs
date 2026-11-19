@@ -1158,6 +1158,10 @@ pub struct Report {
     pub rejected: usize,
     /// Files whose bytes this sync sent to the server's bucket.
     pub uploaded: usize,
+    /// Files waiting past the `files::FILES_PER_SYNC` this sync asked
+    /// about, left for the next.
+    #[serde(default)]
+    pub files_left: usize,
     /// Files' bytes removed from the device: of files deleted or no
     /// longer seen, and leftovers no file points at.
     pub cleaned: usize,
@@ -1175,6 +1179,15 @@ pub struct Report {
     pub pending: i64,
     /// Why the push failed as a whole, when it did; the pull still ran.
     pub push_error: Option<String>,
+}
+
+impl Report {
+    /// Whether another sync should start at once: files were left for
+    /// it, and this one got somewhere, so a file failing every time
+    /// waits for the next sync on its own schedule instead.
+    pub fn more_files_to_send(&self) -> bool {
+        self.files_left > 0 && (self.uploaded > 0 || self.pushed > 0)
+    }
 }
 
 /// Where a device stands: whether it works offline, what waits, what
@@ -1234,6 +1247,7 @@ pub async fn run<T: Transport>(
     let (user, token) = users::signed_in_with_token(deployment).await?;
     let token = Some(token.as_str());
     let mut waiting = files::ask_about_waiting(deployment, transport, token).await?;
+    report.files_left = waiting.len().saturating_sub(files::FILES_PER_SYNC);
     let held_back = files::held_back(deployment, &waiting).await?;
     if let Err(error) =
         push_pending(deployment, transport, token, &user, &held_back, &mut report).await

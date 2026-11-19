@@ -1135,7 +1135,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn files_list_with_sha256_finds_the_same_bytes_among_the_files_a_user_sees_only() {
+    async fn files_list_duplicates_finds_the_same_bytes_among_the_files_a_user_sees_only() {
         with_each_database(|database| async move {
             let (server, storage) = server(database);
             let alice = user(&server, "Alice").await;
@@ -1145,23 +1145,34 @@ mod tests {
             let alices = file_in(&server, &storage, &alice, "roses.jpg", &[garden]).await;
             let bobs = file_in(&server, &storage, &bob, "the same.jpg", &[woodwork]).await;
             assert_eq!(alices.sha256, bobs.sha256, "the same bytes");
+            let other = files::sha256_hex(b"other bytes");
 
-            let found = files::list_with_sha256(&server, &alice, &alices.sha256)
+            let found = files::list_duplicates(&server, &alice, &[other.clone(), alices.sha256])
                 .await
                 .expect("found");
             let names: Vec<&str> = found.iter().map(|shown| shown.file.name.as_str()).collect();
             assert_eq!(names, ["roses.jpg"], "nothing of bob's is told");
             assert_eq!(found[0].communities[0].id, garden);
-            let other = files::sha256_hex(b"other bytes");
             assert!(
-                files::list_with_sha256(&server, &alice, &other)
+                files::list_duplicates(&server, &alice, std::slice::from_ref(&other))
                     .await
                     .expect("looked")
                     .is_empty()
             );
-            let error = files::list_with_sha256(&server, &alice, "not a checksum")
+            assert!(
+                files::list_duplicates(&server, &alice, &[])
+                    .await
+                    .expect("looked")
+                    .is_empty()
+            );
+            let error = files::list_duplicates(&server, &alice, &["not a checksum".to_string()])
                 .await
                 .expect_err("not a SHA-256");
+            assert!(matches!(error, FileError::Invalid(_)));
+            let too_many = vec![other; files::MAX_DUPLICATES_CHECKED + 1];
+            let error = files::list_duplicates(&server, &alice, &too_many)
+                .await
+                .expect_err("too many");
             assert!(matches!(error, FileError::Invalid(_)));
         })
         .await;

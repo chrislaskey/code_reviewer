@@ -406,12 +406,14 @@ and no websocket, and another device sees a change on its own next pull.
 
 **Two syncs never overlap.** The task takes a Tokio mutex before running.
 A second task that arrives while one is running waits on the lock, then
-runs a full sync of its own. Nothing is coalesced or cancelled, and
-nothing is lost by that: the only queue is the data, the pending events
-in `app_events` and the communities in `app_sync_backfills`, which a sync
-reads when it runs. Three writes in a row spawn three syncs; the first
-pushes all three events and the next two find nothing to push and only
-pull.
+runs a full sync of its own. At most one spawned task waits: a trigger
+that finds one already waiting spawns none, since the waiting one reads
+the data when it runs. Nothing is lost by that: the only queue is the
+data, the pending events in `app_events` and the communities in
+`app_sync_backfills`. Three writes in a row during a sync spawn one more;
+5,000 files created in a row spawn a few, not 5,000. The Sync now button
+and the timer run their own sync either way. A sync that left files for
+the next, `Report::more_files_to_send`, spawns the next as it ends.
 
 **The steps follow each other in the same task.** `sync::run` is one
 async function: it pushes the pending events, keeps a push failure in

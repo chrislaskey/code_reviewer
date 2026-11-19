@@ -149,6 +149,7 @@ pub fn router(svelte_dist: &Path, ops_dist: &Path, state: AppState) -> Router {
         )
         .route("/api/files", get(files::list).post(files::create))
         .route("/api/files/upload", post(files::create_upload))
+        .route("/api/files/duplicates", post(files::list_duplicates))
         .route(
             "/api/files/{id}",
             get(files::get).put(files::update).delete(files::delete),
@@ -1774,13 +1775,26 @@ mod tests {
         assert_eq!(listed[0]["file"], file);
         assert_eq!(listed[0]["state"], json!("synced"));
         assert_eq!(listed[0]["communities"][0]["id"], community_id);
-        let (status, same) = get(&router, &format!("/api/files?sha256={sha256}")).await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(same[0]["file"], file);
         let other = app_core::files::sha256_hex(b"other");
-        let (_, none) = get(&router, &format!("/api/files?sha256={other}")).await;
-        assert_eq!(none, json!([]));
-        let (status, _) = get(&router, "/api/files?sha256=nope").await;
+        let checked = json!({ "sha256s": [other, sha256] });
+        let (status, same) = send(
+            &router,
+            Method::POST,
+            "/api/files/duplicates",
+            Some(checked),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(same.as_array().expect("a list").len(), 1);
+        assert_eq!(same[0]["file"], file);
+        let checked = json!({ "sha256s": ["nope"] });
+        let (status, _) = send(
+            &router,
+            Method::POST,
+            "/api/files/duplicates",
+            Some(checked),
+        )
+        .await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 
         let path = format!("/api/files/{id}");

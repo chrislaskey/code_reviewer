@@ -7,7 +7,7 @@
      device and sent when it next syncs, see filesCreate in lib/core/. -->
 <script>
   import FieldErrors from "../lib/FieldErrors.svelte";
-  import { FormError, filesCreate, filesListWithSameBytes, filesUpdate } from "../lib/core/index.js";
+  import { FormError, filesCreate, filesListDuplicates, filesSha256, filesUpdate } from "../lib/core/index.js";
   import { currentCommunityLoad } from "../lib/current_community.js";
   import { navigateToUrl } from "../lib/router.js";
   import { filesIndexUrl, filesShowUrl } from "../lib/routes.js";
@@ -40,7 +40,7 @@
     const picked = file;
     if (!picked) return;
     try {
-      const found = await filesListWithSameBytes(picked);
+      const found = await filesListDuplicates([await filesSha256(picked)]);
       if (file === picked) same = found[0] ?? null;
     } catch {
       // Creating a copy is still fine

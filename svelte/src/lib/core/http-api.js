@@ -388,11 +388,11 @@ export function filesList() {
 }
 
 /**
- * The files the user sees with the same bytes as the one picked.
- * @param {File} file
+ * The files the user sees with any of these checksums, up to 500 at once.
+ * @param {string[]} sha256s
  */
-export async function filesListWithSameBytes(file) {
-  return send("GET", `/api/files?sha256=${await sha256Of(file)}`);
+export function filesListDuplicates(sha256s) {
+  return send("POST", "/api/files/duplicates", { sha256s });
 }
 
 /** @param {string} id */

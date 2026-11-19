@@ -46,14 +46,14 @@ pub async fn files_list(device: State<'_, DeviceAccounts>) -> Result<Vec<FileWit
         .map_err(|error| error.to_string())
 }
 
-/// The files the user sees on this device with these bytes.
+/// The files the user sees on this device with any of these checksums.
 #[tauri::command]
-pub async fn files_list_with_sha256(
+pub async fn files_list_duplicates(
     device: State<'_, DeviceAccounts>,
-    sha256: String,
+    sha256s: Vec<String>,
 ) -> Result<Vec<FileWithState>, String> {
     let (deployment, user) = signed_in(&device).await?;
-    files::list_with_sha256(&deployment, &user, &sha256)
+    files::list_duplicates(&deployment, &user, &sha256s)
         .await
         .map_err(|error| error.to_string())
 }

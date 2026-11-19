@@ -178,11 +178,12 @@ tell a file it already sees.
 - **The web page needs a secure context** for `crypto.subtle`: HTTPS, or
   `localhost` in dev.
 - **Duplicates are told only among files the user sees.** Once a file
-  is picked, the New page asks `filesListWithSameBytes(file)`, which
-  works out the checksum in the page and lists the files the user sees
-  with it, `files::list_with_sha256`, by the same predicate as every
-  read: `GET /api/files?sha256=` on the web, the device's own rows in
-  the app, offline as well. The server never answers whether a
+  is picked, the New page works out its checksum, `filesSha256(file)`,
+  and asks `filesListDuplicates(sha256s)` for the files the user sees
+  with any of the checksums, up to 500 at once,
+  `files::list_duplicates`, by the same predicate as every read:
+  `POST /api/files/duplicates` on the web, the device's own rows in the
+  app, offline as well. The server never answers whether a
   checksum exists anywhere else. The page shows the newest: when it is
   already in a community chosen, it says so; otherwise it offers to
   put that file in the communities chosen instead, and Create makes a
