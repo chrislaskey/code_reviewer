@@ -30,7 +30,8 @@ this one:
 - **Magic links.** Phoenix logs a user in by a link sent to the email;
   here the email carries a code. A link is the same pending sign-in
   with the pending token and the code in the URL, and on a phone it
-  can open the app directly once the universal links exist.
+  can open the app directly through universal links, which a tap in
+  Mail opens; `starter-pack.fly.dev` can serve their file.
 - **A way back for an app that locks out.** A forgotten password is
   reset after the emailed code by default, which leaves it guarding
   nothing the inbox does not already open. With
@@ -69,9 +70,10 @@ this one:
 - **Remembering a browser** for thirty days, so the code is not asked
   on every new browser session: Phoenix's remember-me, a longer cookie
   on the `session` token.
-- **The automatic returns to the app** after a browser sign-in, in place
-  of pasting the code: a loopback redirect on desktop, and universal
-  links on iOS and Android, see "To decide" 6 in the design.
+- **The automatic return on Android**, in place of pasting the code:
+  a Custom Tab, Android's sign-in sheet, as the iPhone's
+  `ASWebAuthenticationSession`. The desktop's loopback and the iPhone's
+  sheet are built, see "Since 2026-11-20" in the design.
 - **A dev mailbox page** showing the emails the `Memory` mailer holds,
   as Phoenix's `/dev/mailbox` does, instead of reading the log.
 - **HTML emails and a sender name**; the emails are text only.
