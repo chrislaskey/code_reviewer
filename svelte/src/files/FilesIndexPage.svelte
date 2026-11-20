@@ -12,7 +12,7 @@
   import AnimationsToggle from "../lib/AnimationsToggle.svelte";
   import FileImage from "../lib/FileImage.svelte";
   import FilesGrid from "./FilesGrid.svelte";
-  import { filesCacheDelete, filesCacheGet, filesContentUrl, filesSearch, onSynced } from "../lib/core/index.js";
+  import { filesCacheDelete, filesCacheGet, filesContentUrl, filesSearch, filesSearchWaitMs, onSynced } from "../lib/core/index.js";
   import { filesNewUrl, filesShowUrl } from "../lib/routes.js";
   import { fileSize } from "./file_size.js";
   import { filesView, setFilesView } from "./files_view.js";
@@ -20,7 +20,6 @@
   import Page from "../lib/Page.svelte";
 
   const PAGE_SIZE = 200;
-  const SEARCH_WAIT_MS = 200;
 
   /** @type {{ view: import("./files_view.js").FilesView, label: string, icon: string }[]} */
   const VIEW_CHOICES = [
@@ -139,7 +138,7 @@
     searchTimer = setTimeout(() => {
       shown = { start: 0, end: PAGE_SIZE };
       startOver();
-    }, SEARCH_WAIT_MS);
+    }, filesSearchWaitMs);
   }
 
   /** @param {import("./files_view.js").FilesView} chosen */

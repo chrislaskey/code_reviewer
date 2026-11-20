@@ -62,8 +62,10 @@ command, `filesSearch` in `svelte/src/lib/core/`, and
   square.
 - **The list shows the first page and loads more** with a button, a
   page at a time.
-- **A search waits for a pause in typing**, 200 ms, then starts over
-  from the top. An answer to an older search or an older sync is
+- **A search waits for a pause in typing**, then starts over from the
+  top: 50 ms in the app, where it reads the device's SQLite, and 200 ms
+  on the web, where each asks the server (`filesSearchWaitMs` in
+  `svelte/src/lib/core/`). An answer to an older search or an older sync is
   dropped.
 - **A sync starts the pages over**: rows come and go with it, and
   every position after them moves.

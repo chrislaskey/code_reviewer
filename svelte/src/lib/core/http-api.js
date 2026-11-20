@@ -393,6 +393,9 @@ export function filesSearch({ name = "", offset = 0, limit }) {
   return send("GET", `/api/files/search?${query}`);
 }
 
+/** How long a search waits for a pause in typing: each asks the server. */
+export const filesSearchWaitMs = 200;
+
 /**
  * The files the user sees with any of these checksums, up to 500 at once.
  * @param {string[]} sha256s

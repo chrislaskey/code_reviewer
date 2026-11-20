@@ -66,6 +66,7 @@ export const postsCreate = core.postsCreate;
 export const postsUpdate = core.postsUpdate;
 export const postsDelete = core.postsDelete;
 export const filesSearch = core.filesSearch;
+export const filesSearchWaitMs = core.filesSearchWaitMs;
 export const filesListDuplicates = core.filesListDuplicates;
 export const filesGet = core.filesGet;
 export const filesCreate = core.filesCreate;

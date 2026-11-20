@@ -325,6 +325,9 @@ export function filesSearch(search) {
   return invoke("files_search", { search });
 }
 
+/** How long a search waits for a pause in typing: each a local read. */
+export const filesSearchWaitMs = 50;
+
 /**
  * The files the user sees on this device with any of these checksums,
  * up to 500 at once.
