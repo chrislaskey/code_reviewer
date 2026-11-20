@@ -121,7 +121,7 @@ pub fn run() {
             local_users::local_users_create,
             local_users::local_users_move,
             local_users::local_users_keep_separate,
-            quick_picker::quick_picker_list,
+            quick_picker::quick_picker_files_search,
             quick_picker::quick_picker_paste,
             quick_picker::quick_picker_close,
             quick_picker::quick_picker_open_app,

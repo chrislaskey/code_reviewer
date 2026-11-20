@@ -183,12 +183,16 @@ pub struct FileWithState {
 }
 
 /// What a search of the user's files asks: the files whose names
-/// contain `name` in any case, every file for an empty one, `limit` of
-/// them from `offset`, newest first. See `docs/design/files-browsing.md`.
+/// contain `name` in any case, every file for an empty one, of one of
+/// `content_types`, any for none, `limit` of them from `offset`, newest
+/// first. See `docs/design/files-browsing.md`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileSearch {
     #[serde(default)]
     pub name: String,
+    /// Content types without parameters, as `image/png`.
+    #[serde(default)]
+    pub content_types: Vec<String>,
     #[serde(default)]
     pub offset: u32,
     pub limit: u32,
@@ -346,7 +350,7 @@ pub async fn list_duplicates(
 }
 
 /// The files the user sees whose names contain the name searched for,
-/// a page of them newest first, each with its state, creator and
+/// of the content types searched for, a page of them newest first, each with its state, creator and
 /// communities, and how many match in all. At most `MAX_SEARCH_LIMIT`
 /// files at once.
 pub async fn search(
@@ -365,6 +369,7 @@ pub async fn search(
         &mut tx,
         user.id,
         &search.name,
+        &search.content_types,
         i64::from(search.offset),
         i64::from(search.limit),
     )
@@ -2821,6 +2826,7 @@ pub(crate) mod tests {
                     name: name.to_string(),
                     offset,
                     limit,
+                    ..FileSearch::default()
                 };
                 async move {
                     let results = search(&deployment, &alice, &asked).await.expect("a search");
@@ -2881,6 +2887,60 @@ pub(crate) mod tests {
                 panic!("field errors, got {error}");
             };
             assert_eq!(errors.0["limit"], ["at most 500 files at once"]);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn files_search_keeps_to_the_content_types_asked_for() {
+        with_each_database(|database| async move {
+            let (deployment, storage) = server(database);
+            let alice = users::create(&deployment, "alice@example.com", "Alice")
+                .await
+                .expect("a user");
+            let community_id = personal(&deployment, &alice).await;
+            for (name, content_type, bytes) in [
+                ("cat.gif", "image/gif", b"1"),
+                ("cat.png", "image/png; charset=binary", b"2"),
+                ("cat.svg", "image/svg+xml", b"3"),
+                ("cat.txt", "text/plain", b"4"),
+            ] {
+                let new = FileNew {
+                    content_type: content_type.to_string(),
+                    ..new_file(name, bytes, community_id)
+                };
+                storage
+                    .put(&storage_key(alice.id, new.id), bytes.to_vec())
+                    .await
+                    .expect("the upload");
+                create(&deployment, &alice, &new).await.expect("a file");
+            }
+            let found = |content_types: &[&str]| {
+                let deployment = deployment.clone();
+                let alice = alice.clone();
+                let asked = FileSearch {
+                    name: "CAT".to_string(),
+                    content_types: content_types.iter().map(ToString::to_string).collect(),
+                    offset: 0,
+                    limit: 10,
+                };
+                async move {
+                    let results = search(&deployment, &alice, &asked).await.expect("a search");
+                    let names: Vec<String> = results
+                        .files
+                        .into_iter()
+                        .map(|listed| listed.file.name)
+                        .collect();
+                    (results.total, names)
+                }
+            };
+
+            assert_eq!(
+                found(&["image/gif", "image/png"]).await,
+                (2, vec!["cat.png".to_string(), "cat.gif".to_string()])
+            );
+            assert_eq!(found(&[]).await.0, 4);
+            assert_eq!(found(&["image/jpeg"]).await, (0, Vec::new()));
         })
         .await;
     }

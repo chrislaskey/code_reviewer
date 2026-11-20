@@ -18,8 +18,7 @@
   import { filesView, setFilesView } from "./files_view.js";
   import { Badge, Button, ErrorMessage, Heading, Icon, Input, Link, Panel, Text } from "../lib/components/index.js";
   import Page from "../lib/Page.svelte";
-
-  const PAGE_SIZE = 200;
+  import { PAGE_SIZE, PagedSearch } from "../lib/paged_search.svelte.js";
 
   /** @type {{ view: import("./files_view.js").FilesView, label: string, icon: string }[]} */
   const VIEW_CHOICES = [
@@ -28,25 +27,18 @@
   ];
 
   let name = $state("");
-  /** @type {number | null} how many files match, null until the first answer */
-  let total = $state(null);
-  /** @type {any[]} the files by position, a hole where one has not come yet */
-  let rows = $state.raw([]);
-  let error = $state("");
   /** @type {{count: number, bytes: number} | null} */
   let cache = $state(null);
+  let cacheError = $state("");
   let view = $state(filesView());
 
-  /** The pages asked for since the search started over. */
-  let pagesAsked = new Set();
-  /** Counts the times the search started over, so an older answer is dropped. */
-  let generation = 0;
-  /** The positions on screen, which a sync fetches again. */
-  let shown = { start: 0, end: PAGE_SIZE };
+  const search = new PagedSearch((offset, limit) => filesSearch({ name, offset, limit }));
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let searchTimer;
 
-  let listed = $derived(firstHole(rows));
+  let total = $derived(search.total);
+  let listed = $derived(firstHole(search.rows));
+  let error = $derived(search.error || cacheError);
 
   /** @param {any[]} files */
   function firstHole(files) {
@@ -55,104 +47,28 @@
     return files.slice(0, count);
   }
 
-  /**
-   * @param {any[]} files the files by position, changed in place
-   * @param {number} page
-   * @param {any[]} found
-   */
-  function place(files, page, found) {
-    found.forEach((file, index) => (files[page * PAGE_SIZE + index] = file));
-  }
-
-  /** @param {number} page */
-  function searchPage(page) {
-    return filesSearch({ name, offset: page * PAGE_SIZE, limit: PAGE_SIZE });
-  }
-
-  /**
-   * @param {number} start
-   * @param {number} end
-   */
-  function pagesOf(start, end) {
-    const pages = [];
-    for (let page = Math.floor(start / PAGE_SIZE); page * PAGE_SIZE < Math.max(end, 1); page += 1) pages.push(page);
-    return pages;
-  }
-
-  /**
-   * Asks again for every page on screen, and shows the answers together,
-   * so the files shown are replaced at once rather than emptied first.
-   */
-  async function startOver() {
-    generation += 1;
-    const asked = generation;
-    const pages = pagesOf(shown.start, shown.end);
-    pagesAsked = new Set(pages);
-    try {
-      const answers = await Promise.all(pages.map(searchPage));
-      if (asked !== generation) return;
-      const next = [];
-      answers.forEach(({ files }, index) => place(next, pages[index], files));
-      total = answers[answers.length - 1].total;
-      rows = next;
-      error = "";
-    } catch (problem) {
-      if (asked === generation) error = String(problem);
-    }
-  }
-
-  /** @param {number} page */
-  async function loadPage(page) {
-    if (pagesAsked.has(page)) return;
-    pagesAsked.add(page);
-    const asked = generation;
-    try {
-      const { total: matching, files } = await searchPage(page);
-      if (asked !== generation) return;
-      const next = rows.slice();
-      place(next, page, files);
-      total = matching;
-      rows = next;
-    } catch (problem) {
-      if (asked !== generation) return;
-      pagesAsked.delete(page);
-      error = String(problem);
-    }
-  }
-
-  /**
-   * @param {number} start
-   * @param {number} end
-   */
-  function showPositions(start, end) {
-    shown = { start, end };
-    for (const page of pagesOf(start, end)) loadPage(page);
-  }
-
   function loadMore() {
-    showPositions(0, listed.length + PAGE_SIZE);
+    search.showPositions(0, listed.length + PAGE_SIZE);
   }
 
   function searchAfterPause() {
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => {
-      shown = { start: 0, end: PAGE_SIZE };
-      startOver();
-    }, filesSearchWaitMs);
+    searchTimer = setTimeout(() => search.startOverFromTop(), filesSearchWaitMs);
   }
 
   /** @param {import("./files_view.js").FilesView} chosen */
   function showAs(chosen) {
     view = chosen;
     setFilesView(chosen);
-    if (chosen === "list") shown = { start: 0, end: Math.max(listed.length, PAGE_SIZE) };
+    if (chosen === "list") search.showPositions(0, Math.max(listed.length, PAGE_SIZE));
   }
 
   async function loadCache() {
     try {
       cache = await filesCacheGet();
+      cacheError = "";
     } catch (problem) {
-      error = String(problem);
+      cacheError = String(problem);
     }
   }
 
@@ -160,19 +76,20 @@
     try {
       await filesCacheDelete();
       cache = await filesCacheGet();
+      cacheError = "";
     } catch (problem) {
-      error = String(problem);
+      cacheError = String(problem);
     }
   }
 
   $effect(() =>
     onSynced(() => {
-      startOver();
+      search.startOver();
       loadCache();
     }),
   );
   $effect(() => () => clearTimeout(searchTimer));
-  startOver();
+  search.startOver();
   loadCache();
 </script>
 
@@ -211,7 +128,7 @@
   {/if}
 
   {#if total && view === "grid"}
-    <FilesGrid {total} {rows} onshow={showPositions} />
+    <FilesGrid {total} rows={search.rows} onshow={(start, end) => search.showPositions(start, end)} />
   {:else if total}
     <ul class="flex flex-col gap-3">
       {#each listed as { file, communities, shown_as, state, error: problem } (file.id)}

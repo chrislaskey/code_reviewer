@@ -511,7 +511,7 @@ nav) dispatches, keeping the choice in `localStorage` under `app:theme`;
 ### Quick picker
 
 On macOS ⌃⌘T in any app opens a second window, a small panel under the
-text caret, listing the signed-in person's posts and images
+text caret, a grid of the signed-in person's images
 (`svelte/src/quick-picker.html`, `tauri/src/quick_picker/`). Choosing
 one copies it and pastes it where the person was typing; with nobody
 signed in it sends them to the app to sign in. The design, its limits

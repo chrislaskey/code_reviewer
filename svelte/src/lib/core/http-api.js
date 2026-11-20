@@ -610,12 +610,13 @@ export function conflictsLetGo(_id) {
 
 // The quick picker is the desktop app's: a browser has none.
 
-export function quickPickerList() {
+/** @param {{name?: string, offset?: number, limit: number}} _search */
+export function quickPickerFilesSearch(_search) {
   return Promise.reject(new Error("the quick picker is the desktop app's"));
 }
 
-/** @param {string} _kind @param {string} _id */
-export function quickPickerPaste(_kind, _id) {
+/** @param {string} _id */
+export function quickPickerPaste(_id) {
   return Promise.reject(new Error("the quick picker is the desktop app's"));
 }
 

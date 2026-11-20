@@ -9,7 +9,10 @@ served by the same design, a little slower, not by another one.
 
 Built in `files::search`, `GET /api/files/search`, the `files_search`
 command, `filesSearch` in `svelte/src/lib/core/`, and
-`svelte/src/files/FilesIndexPage.svelte` with `FilesGrid.svelte`.
+`svelte/src/files/FilesIndexPage.svelte` with `FilesGrid.svelte`. The
+grid is `svelte/src/lib/TileGrid.svelte` and the pages it asks for
+`lib/paged_search.svelte.js`, which the desktop quick picker shares
+(`quick-picker.md`).
 
 ## Decisions
 
@@ -20,7 +23,8 @@ command, `filesSearch` in `svelte/src/lib/core/`, and
   the query and a condition in its SQL, in one place, under the same
   visibility as every read.
 - **A search answers the total and one page.** `FileSearch` is the
-  name searched for, an offset and a limit; `FileSearchResults` is how
+  name searched for, the content types (any when none), an offset and a
+  limit; `FileSearchResults` is how
   many files match and the files at that offset, each with its state,
   creator and communities as the list had them. Only that page's
   states and communities are worked out. A limit is at most
@@ -52,7 +56,8 @@ command, `filesSearch` in `svelte/src/lib/core/`, and
   many to a screen.
 - **The grid draws only what is on screen.** Every tile is the same
   size, so which tiles are on screen is arithmetic on the scroll
-  position, the grid's width and the total; the grid is as tall as all
+  position (the page's, or the quick picker's box), the grid's width
+  and the total; the grid is as tall as all
   of them and draws those on screen and a screen above and below. A
   tile scrolled away is gone, image and all, so a few hundred images at
   most are alive at once, an animated GIF plays only while seen, and
@@ -73,7 +78,8 @@ command, `filesSearch` in `svelte/src/lib/core/`, and
 ## Left for later
 
 - **Filters beside the name**: a file's community, and tags once files
-  have them, each a field of `FileSearch` and a menu on the page.
+  have them, each a field of `FileSearch` as `content_types` is, and a
+  menu on the page.
 - **Other orders** than newest first.
 - **A cap on the count**: past some number, "10,000+", if counting a
   collector's matches proves slow.

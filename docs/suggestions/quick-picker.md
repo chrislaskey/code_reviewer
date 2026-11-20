@@ -4,9 +4,9 @@ Built from `docs/design/quick-picker.md`. Left for later, on purpose:
 
 - **A shortcut the person chooses.** `unregister` and `register` on the
   global shortcut plugin, the choice kept in `device_settings`.
-- **What is listed.** Posts and images today; snippets of their own, or
-  files that are not images (copied as the file), would be a resource
-  and a kind each.
+- **What is listed.** Images only; posts (pasted as their body),
+  snippets of their own, or files that are not images (copied as the
+  file) would each be a search of their own beside the files'.
 - **Small thumbnails**, made once and kept, instead of the whole image.
 - **The theme, live.** The page would listen for the theme's change
   (a `storage` event) as the main window makes it.

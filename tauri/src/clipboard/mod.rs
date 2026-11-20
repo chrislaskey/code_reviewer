@@ -1,8 +1,7 @@
 //! Copying an image to the system clipboard on Apple's platforms, where
 //! Tauri has nothing that keeps an animated GIF: each app pastes the form
 //! it understands, the GIF's own bytes where GIFs are taken and a PNG
-//! elsewhere. AppKit on macOS (`macos`), UIKit on iOS (`ios`). Text too
-//! on macOS, for the quick picker.
+//! elsewhere. AppKit on macOS (`macos`), UIKit on iOS (`ios`).
 
 #[cfg(target_os = "ios")]
 mod ios;
@@ -25,19 +24,35 @@ pub struct ClipboardImage<'a> {
     pub file: &'a Path,
 }
 
+/// The image content types the clipboard takes, each with the uniform
+/// type identifier Apple's platforms know it by.
+const IMAGE_TYPES: &[(&str, &str)] = &[
+    ("image/png", PNG_TYPE),
+    ("image/jpeg", "public.jpeg"),
+    ("image/gif", "com.compuserve.gif"),
+    ("image/webp", "org.webmproject.webp"),
+    ("image/tiff", "public.tiff"),
+    ("image/bmp", "com.microsoft.bmp"),
+    ("image/heic", "public.heic"),
+];
+
 /// The uniform type identifier Apple's platforms know an image content
 /// type by, for those the clipboard takes.
 pub fn uniform_type_of(content_type: &str) -> Option<&'static str> {
-    match content_type.split(';').next().unwrap_or_default().trim() {
-        "image/png" => Some(PNG_TYPE),
-        "image/jpeg" => Some("public.jpeg"),
-        "image/gif" => Some("com.compuserve.gif"),
-        "image/webp" => Some("org.webmproject.webp"),
-        "image/tiff" => Some("public.tiff"),
-        "image/bmp" => Some("com.microsoft.bmp"),
-        "image/heic" => Some("public.heic"),
-        _ => None,
-    }
+    let essence = content_type.split(';').next().unwrap_or_default().trim();
+    IMAGE_TYPES
+        .iter()
+        .find(|(image_type, _uniform_type)| *image_type == essence)
+        .map(|(_image_type, uniform_type)| *uniform_type)
+}
+
+/// The image content types the clipboard takes, as a search asks for them.
+#[cfg(target_os = "macos")]
+pub fn image_content_types() -> Vec<String> {
+    IMAGE_TYPES
+        .iter()
+        .map(|(image_type, _uniform_type)| image_type.to_string())
+        .collect()
 }
 
 /// Copies the image to the clipboard; call on the main thread, where
@@ -47,12 +62,6 @@ pub fn copy_image(image: ClipboardImage<'_>) -> Result<Vec<String>, String> {
     return macos::copy_image(image);
     #[cfg(target_os = "ios")]
     return ios::copy_image(image);
-}
-
-/// Copies the text to the clipboard; call on the main thread.
-#[cfg(target_os = "macos")]
-pub fn copy_text(text: &str) -> Result<(), String> {
-    macos::copy_text(text)
 }
 
 #[cfg(test)]

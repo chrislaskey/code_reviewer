@@ -11,7 +11,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use uuid::Uuid;
 
-use app_core::posts;
+use app_core::files::{self as core_files, FileSearch, FileSearchResults};
 
 use crate::MAIN_WINDOW;
 use crate::clipboard;
@@ -22,8 +22,8 @@ use crate::macos::ScreenRect;
 use crate::macos::running_app::{self, RunningApp};
 use crate::macos::{accessibility, keyboard};
 
+use super::panel;
 use super::placement::{self, Placement, TextPlacement};
-use super::{Item, ItemKind, items, panel};
 
 const SHORTCUT_LABEL: &str = "⌃⌘T";
 const OPENED_EVENT: &str = "quick-picker-opened";
@@ -82,10 +82,19 @@ pub fn register(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub async fn list(app: &AppHandle) -> Result<Vec<Item>, String> {
+pub async fn files_search(
+    app: &AppHandle,
+    search: FileSearch,
+) -> Result<FileSearchResults, String> {
     let device = app.state::<DeviceAccounts>();
     let (deployment, user) = signed_in(&device).await?;
-    items::list(&deployment, &user).await
+    let images = FileSearch {
+        content_types: clipboard::image_content_types(),
+        ..search
+    };
+    core_files::search(&deployment, &user, &images)
+        .await
+        .map_err(|error| error.to_string())
 }
 
 /// Opens the picker, or closes it when it's open. Main thread only.
@@ -163,11 +172,11 @@ pub fn accessibility_request() -> bool {
     accessibility::is_trusted(true)
 }
 
-/// Copies the item to the clipboard, closes the picker and presses ⌘V
+/// Copies the image to the clipboard, closes the picker and presses ⌘V
 /// in the app the picker opened over. Without Accessibility access, or
-/// when that app cannot be brought back, the item is copied only.
-pub async fn paste(app: &AppHandle, kind: ItemKind, id: Uuid) -> Result<(), String> {
-    copy(app, kind, id).await?;
+/// when that app cannot be brought back, the image is copied only.
+pub async fn paste(app: &AppHandle, id: Uuid) -> Result<(), String> {
+    files::copy_to_clipboard(app, id).await?;
     let previous_app = state(app).previous_app.clone();
 
     let to_close = app.clone();
@@ -184,20 +193,6 @@ pub async fn paste(app: &AppHandle, kind: ItemKind, id: Uuid) -> Result<(), Stri
     }
     tokio::time::sleep(PASTE_DELAY).await;
     keyboard::press_paste_shortcut()
-}
-
-async fn copy(app: &AppHandle, kind: ItemKind, id: Uuid) -> Result<(), String> {
-    match kind {
-        ItemKind::Image => files::copy_to_clipboard(app, id).await,
-        ItemKind::Text => {
-            let device = app.state::<DeviceAccounts>();
-            let (deployment, user) = signed_in(&device).await?;
-            let shown = posts::get(&deployment, &user, id)
-                .await
-                .map_err(|error| error.to_string())?;
-            run_on_main_thread(app, move || clipboard::copy_text(&shown.post.body)).await
-        }
-    }
 }
 
 /// The non-activating panel normally leaves the previous app in front.

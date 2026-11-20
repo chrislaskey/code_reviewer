@@ -5,7 +5,7 @@ use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
 use objc2_app_kit::{
     NSBitmapImageFileType, NSBitmapImageRep, NSPasteboard, NSPasteboardItem,
-    NSPasteboardTypeFileURL, NSPasteboardTypePNG, NSPasteboardTypeString, NSPasteboardTypeTIFF,
+    NSPasteboardTypeFileURL, NSPasteboardTypePNG, NSPasteboardTypeTIFF,
 };
 use objc2_foundation::{NSArray, NSData, NSDictionary, NSString, NSURL};
 
@@ -22,21 +22,6 @@ const TIFF_RENDERING: bool = false;
 /// TIFF rendering when `TIFF_RENDERING`. Returns the types written.
 pub(super) fn copy_image(image: ClipboardImage<'_>) -> Result<Vec<String>, String> {
     write_image(image, &NSPasteboard::generalPasteboard(), TIFF_RENDERING)
-}
-
-pub(super) fn copy_text(text: &str) -> Result<(), String> {
-    write_text(text, &NSPasteboard::generalPasteboard())
-}
-
-fn write_text(text: &str, pasteboard: &NSPasteboard) -> Result<(), String> {
-    pasteboard.clearContents();
-    // SAFETY: the pasteboard type constant is a framework static.
-    let written =
-        unsafe { pasteboard.setString_forType(&NSString::from_str(text), NSPasteboardTypeString) };
-    if !written {
-        return Err("the clipboard refused the text".into());
-    }
-    Ok(())
 }
 
 fn write_image(
@@ -131,15 +116,6 @@ mod tests {
             .expect("the GIF")
             .to_vec();
         assert_eq!(gif, GIF, "the animation is kept");
-    }
-
-    #[test]
-    fn clipboard_macos_copy_text_writes_the_text() {
-        let pasteboard = NSPasteboard::pasteboardWithUniqueName();
-        write_text(r"¯\_(ツ)_/¯", &pasteboard).expect("copied");
-        // SAFETY: a framework static.
-        let text = unsafe { pasteboard.stringForType(NSPasteboardTypeString) }.expect("the text");
-        assert_eq!(text.to_string(), r"¯\_(ツ)_/¯");
     }
 
     #[test]

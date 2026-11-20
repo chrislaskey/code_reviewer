@@ -1,13 +1,11 @@
 //! The quick picker: ⌃⌘T anywhere on the Mac opens a small window under
-//! the text caret, listing the signed-in user's posts and images under
-//! a filter box. Choosing one copies it to the clipboard, closes the
+//! the text caret, a grid of the signed-in user's images under a search
+//! box. Choosing one copies it to the clipboard, closes the
 //! window and pastes it where the person was typing. With nobody signed
 //! in the window says so and opens the app. macOS only, see `popup`;
 //! elsewhere the commands answer that it is not available. See
 //! `docs/design/quick-picker.md`.
 
-#[cfg(target_os = "macos")]
-mod items;
 #[cfg(target_os = "macos")]
 mod panel;
 #[cfg(target_os = "macos")]
@@ -18,45 +16,28 @@ mod popup;
 #[path = "unavailable.rs"]
 mod popup;
 
-use serde::{Deserialize, Serialize};
+use app_core::files::{FileSearch, FileSearchResults};
 use tauri::AppHandle;
 use uuid::Uuid;
 
 pub use popup::register;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ItemKind {
-    /// A post, pasted as its body.
-    Text,
-    /// A file that is an image the clipboard takes.
-    Image,
-}
-
-/// A post or an image as the picker lists it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-pub struct Item {
-    pub kind: ItemKind,
-    /// The post's or the file's.
-    pub id: Uuid,
-    /// The post's body, or the file's name.
-    pub label: String,
-    /// The image's size in bytes.
-    pub size: Option<u64>,
-}
-
-/// The signed-in user's posts and images, newest first; an error when
-/// nobody is signed in.
+/// A page of the user's images the clipboard takes whose names contain
+/// the name searched for, newest first, and how many match in all; an
+/// error when nobody is signed in.
 #[tauri::command]
-pub async fn quick_picker_list(app: AppHandle) -> Result<Vec<Item>, String> {
-    popup::list(&app).await
+pub async fn quick_picker_files_search(
+    app: AppHandle,
+    search: FileSearch,
+) -> Result<FileSearchResults, String> {
+    popup::files_search(&app, search).await
 }
 
-/// Copies the item, closes the picker and pastes into the app it opened
-/// over.
+/// Copies the file's image, closes the picker and pastes into the app it
+/// opened over.
 #[tauri::command]
-pub async fn quick_picker_paste(app: AppHandle, kind: ItemKind, id: Uuid) -> Result<(), String> {
-    popup::paste(&app, kind, id).await
+pub async fn quick_picker_paste(app: AppHandle, id: Uuid) -> Result<(), String> {
+    popup::paste(&app, id).await
 }
 
 /// Closes the picker without pasting.

@@ -1,10 +1,12 @@
 # Quick picker
 
 ⌃⌘T in any app on the Mac opens a small window under the text caret. It
-lists the signed-in person's posts, as text, and their image files under
-a filter box. ↑/↓ move the selection; Enter takes the selected item, a
-click takes the one clicked: it is copied to the clipboard, the window
-closes, and it is pasted where the person was typing. Escape or a click
+shows the signed-in person's images, those the clipboard takes, as a
+grid under a search box: the files index's grid, searched and fetched
+the same way (`files-browsing.md`). The arrows move the selection, ↑/↓
+a row and ←/→ a tile; Enter takes the selected image, a click takes the
+one clicked: it is copied to the clipboard, the window closes, and it is
+pasted where the person was typing. Escape or a click
 elsewhere closes the window. With nobody signed in, the window says so
 and its button brings the app's window to the front on the accounts
 page, where a sign-in starts.
@@ -19,10 +21,10 @@ rest is AppKit, Accessibility and Core Graphics calls made from Rust.
 
 ```
 svelte/src/quick-picker.html, quick-picker/   the window's page, an HTML entry of its own
-svelte/src/lib/core/                          quickPickerList, quickPickerPaste, ... as every page's calls
+svelte/src/lib/core/                          quickPickerFilesSearch, quickPickerPaste, ... as every page's calls
+svelte/src/lib/TileGrid.svelte, paged_search.svelte.js   the grid and its pages, shared with the files index
 tauri/src/quick_picker/
-  mod.rs          the commands, and `Item`
-  items.rs        posts and image files as items, the last changed first
+  mod.rs          the commands
   popup.rs        the shortcut, open and close, copy and paste
   placement.rs    where the window opens: caret, text field or screen
   panel.rs        the non-activating NSPanel
@@ -31,18 +33,22 @@ tauri/src/macos/
   accessibility.rs  Accessibility access, the caret of the app in front
   running_app.rs    the app in front, activating an app
   keyboard.rs       pressing ⌘V
-tauri/src/clipboard/                          the image copy the files page uses, and text
+tauri/src/clipboard/                          the image copy the files page uses, and the image types it takes
 tauri/capabilities/quick-picker.json          lets the window listen for its opening
 ```
 
-The Rust side lists the items, decides where the window opens, copies
-and pastes. The page asks for the list each time the window opens,
-filters it as the person types, moves the selection and sends the pick.
+The Rust side searches the images, decides where the window opens,
+copies and pastes. The search is `files::search` on the device's SQLite
+with the clipboard's image types as its `content_types`, so the window
+holds only the pages it shows, 200 images a page, and draws only the
+tiles on screen. Each opening starts over with an empty search; a
+search waits 50 ms for a pause in typing. The page moves the selection
+and sends the pick.
 
 | Command | Does |
 | --- | --- |
-| `quick_picker_list` | the posts the user sees and their images the clipboard takes; an error when nobody is signed in |
-| `quick_picker_paste` | copies the item (`kind`, `id`), closes the window, presses ⌘V |
+| `quick_picker_files_search` | a page of the images the user sees that the clipboard takes, named with the name searched for, newest first, and how many match; an error when nobody is signed in |
+| `quick_picker_paste` | copies the file's image (`id`), closes the window, presses ⌘V |
 | `quick_picker_close` | Escape |
 | `quick_picker_open_app` | closes the window, shows the app's window on `/accounts` |
 | `quick_picker_accessibility_request` | opens the system's Accessibility dialog |
@@ -82,14 +88,13 @@ understands and an animated GIF stays animated where GIFs are taken.
 The URL is of a copy under the file's own name, in the cache's
 `clipboard` folder, which holds only the last one: the account's folder
 keeps a file under its id with no extension, and an app that takes the
-file would not know it for an image. A post's body is written as a
-string.
+file would not know it for an image.
 
 **Pasting.** The window closes, then ⌘V is posted with Core Graphics
 after 200 ms, so the previous app has the keyboard back and Enter is
 released. When this app is in front (⌃⌘T pressed in its own window),
 the previous app is activated first; macOS may refuse, and then the
-item is copied only. Apps with Secure Keyboard Entry drop the ⌘V.
+image is copied only. Apps with Secure Keyboard Entry drop the ⌘V.
 
 **Accessibility access** is needed for the caret and the paste. Without
 it the window opens at the screen position and copies only; its footer
@@ -107,24 +112,26 @@ says so and asks for access.
 - **The theme** is read when the page loads, at startup; a theme chosen
   later reaches the picker at the next launch.
 - **Thumbnails** are the images themselves, through the `files`
-  protocol, so an image not on this device is fetched to be listed.
+  protocol, so an image not on this device is fetched once its tile is
+  near the screen.
 - **`tauri-nspanel`** is a community plugin that relies on class
   swizzling.
 
 ## Testing
 
-`cargo test` covers the items' order and which files are listed, the placement
-decisions and position math, the lookup's short-circuits, and the text
-written to a pasteboard of the test's own. By hand:
+`cargo test` covers the search's content types (in `app_core`), the placement
+decisions and position math, and the lookup's short-circuits. By hand:
 
 1. `cargo tauri dev`, signed out. ⌃⌘T in another app: the window says
    to sign in; Enter or the button brings the app to the accounts page.
-2. Sign in, add a post and a few images (a GIF among them). ⌃⌘T in
-   TextEdit: the window opens under the caret, the filter box focused,
-   TextEdit still in front. Type to filter; Enter pastes the first
-   match; a click pastes the one clicked; Escape closes.
+2. Sign in, add a few images (a GIF among them) and a text file. ⌃⌘T
+   in TextEdit: the window opens under the caret, the search box
+   focused, TextEdit still in front, the text file not shown. Type to
+   search; the arrows move the selection, the grid scrolling to keep it
+   shown; Enter pastes the selected image; a click pastes the one
+   clicked; Escape closes.
 3. Without Accessibility access the footer offers to allow it, and an
-   item is copied only: ⌘V pastes it.
+   image is copied only: ⌘V pastes it.
 4. An animated GIF into Slack or Discord animates; into Notes or
    TextEdit it is a still picture.
 5. Sign out, ⌃⌘T: the sign-in message again.

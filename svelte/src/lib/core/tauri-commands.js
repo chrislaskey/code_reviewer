@@ -534,20 +534,21 @@ export function conflictsLetGo(id) {
 // The quick picker, the desktop app's second window (../../quick-picker/).
 
 /**
- * The signed-in person's posts and images, newest first, each
- * `{kind, id, label, size}`.
+ * A page of the signed-in person's images the clipboard takes whose
+ * names contain `name` in any case, newest first: `{total, files}`, as
+ * `filesSearch` answers.
+ * @param {{name?: string, offset?: number, limit: number}} search at most 500 at once
  */
-export function quickPickerList() {
-  return invoke("quick_picker_list");
+export function quickPickerFilesSearch(search) {
+  return invoke("quick_picker_files_search", { search });
 }
 
 /**
- * Copies the item, closes the picker and pastes where the person was typing.
- * @param {string} kind "text" or "image"
+ * Copies the file's image, closes the picker and pastes where the person was typing.
  * @param {string} id
  */
-export function quickPickerPaste(kind, id) {
-  return invoke("quick_picker_paste", { kind, id });
+export function quickPickerPaste(id) {
+  return invoke("quick_picker_paste", { id });
 }
 
 export function quickPickerClose() {

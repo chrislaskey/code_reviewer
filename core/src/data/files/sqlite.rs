@@ -64,6 +64,14 @@ macro_rules! visible_to {
     };
 }
 
+/// A search's files: live, named with `$2` in any case, and of one of
+/// the content types `$3`, a JSON array, by the type before any `;`.
+macro_rules! searched {
+    () => {
+        "deleted_at IS NULL AND instr(lower(name), lower($2)) > 0 AND (json_array_length($3) = 0 OR trim(substr(content_type, 1, instr(content_type || ';', ';') - 1)) IN (SELECT value FROM json_each($3))) AND "
+    };
+}
+
 fn size_of(file: &File) -> i64 {
     i64::try_from(file.size).unwrap_or(i64::MAX)
 }
@@ -85,29 +93,35 @@ pub async fn list_visible(
 }
 
 /// How many files the user sees whose names contain `$2` in any case,
-/// not deleted, and `limit` of them from `offset`, newest first.
+/// of one of the content types `$3` (any for none), not deleted, and
+/// `limit` of them from `offset`, newest first.
 pub async fn search_visible(
     connection: &mut SqliteConnection,
     user_id: Uuid,
     name: &str,
+    content_types: &[String],
     offset: i64,
     limit: i64,
 ) -> Result<(u64, Vec<File>), sqlx::Error> {
     let (total,): (i64,) = sqlx::query_as(concat!(
-        "SELECT COUNT(*) FROM app_files WHERE deleted_at IS NULL AND instr(lower(name), lower($2)) > 0 AND ",
+        "SELECT COUNT(*) FROM app_files WHERE ",
+        searched!(),
         visible_to!()
     ))
     .bind(user_id.hyphenated())
     .bind(name)
+    .bind(Json(content_types))
     .fetch_one(&mut *connection)
     .await?;
     let rows: Vec<FileRow> = sqlx::query_as(select!(
-        "WHERE deleted_at IS NULL AND instr(lower(name), lower($2)) > 0 AND ",
+        "WHERE ",
+        searched!(),
         visible_to!(),
-        " ORDER BY inserted_at DESC, id DESC LIMIT $3 OFFSET $4"
+        " ORDER BY inserted_at DESC, id DESC LIMIT $4 OFFSET $5"
     ))
     .bind(user_id.hyphenated())
     .bind(name)
+    .bind(Json(content_types))
     .bind(limit)
     .bind(offset)
     .fetch_all(connection)
