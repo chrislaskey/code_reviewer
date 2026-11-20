@@ -18,12 +18,13 @@
    * @property {string} email where the code went
    * @property {string} pending the pending sign-in the email step answered
    * @property {string} [challenge] the device's, when it opened the page
+   * @property {string} [appPort] the desktop app's, to return the device code to
    * @property {boolean} [keepSignedIn] whether the browser stays signed in after it closes
    * @property {() => void} onstartover back to the email
    */
 
   /** @type {Props} */
-  let { email, pending, challenge = "", keepSignedIn = false, onstartover } = $props();
+  let { email, pending, challenge = "", appPort = "", keepSignedIn = false, onstartover } = $props();
 
   /** The step after the code, once the code answered one. */
   let next = $state(/** @type {"password" | "new_password" | null} */ (null));
@@ -102,7 +103,7 @@
 </script>
 
 {#if deviceCode}
-  <AccountsDeviceCode code={deviceCode} />
+  <AccountsDeviceCode code={deviceCode} {appPort} />
 {:else if next}
   <AccountsPasswordForm
     isNew={next === "new_password"}

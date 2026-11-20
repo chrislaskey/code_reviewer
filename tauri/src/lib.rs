@@ -10,6 +10,8 @@
 //! window, see `quick_picker`.
 
 mod accounts;
+#[cfg(desktop)]
+mod accounts_loopback;
 mod avatars;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 mod clipboard;
@@ -54,6 +56,8 @@ pub fn run() {
         })
         .setup(|app| {
             device_accounts::open_and_manage(app)?;
+            #[cfg(desktop)]
+            app.manage(accounts_loopback::AccountsLoopback::default());
             sync::setup(app)?;
             store_transactions::spawn_send_unfinished(app.handle().clone());
             quick_picker::register(app.handle())?;

@@ -32,6 +32,11 @@ uuid = { version = "1", features = ["serde"] }
 [target.'cfg(not(target_os = "ios"))'.dependencies]
 whoami = "2"
 
+# The localhost listener the browser returns a sign-in's code to, on
+# desktops only, see src/accounts_loopback.rs
+[target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
+tauri-plugin-oauth = "2"
+
 # The clipboard's image types, see src/clipboard/, and the quick picker,
 # see src/quick_picker/ and src/macos/
 [target.'cfg(target_os = "macos")'.dependencies]

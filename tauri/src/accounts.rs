@@ -4,7 +4,8 @@
 //! the verifier, keeps it in `device.db`, and opens the browser at the
 //! sign-in page `server_urls` names with the verifier's challenge; the
 //! page, done,
-//! shows a code the person pastes into the app, and
+//! shows a code the person pastes into the app, or on a desktop returns
+//! it to `accounts_loopback`, and
 //! `accounts_sign_in_finish` exchanges it with the verifier for the
 //! session, which goes into the account's own file, see
 //! `device_accounts`, which becomes the active one and syncs. The app
@@ -14,7 +15,7 @@
 //! waiting reaches the server, then closes the account, whose data stays
 //! for the next sign-in.
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::device_accounts::{DeviceAccounts, PendingSignIn, SignInFinished};
@@ -23,7 +24,8 @@ use crate::sync::{self, SyncServer};
 use app_core::accounts::{self, PasswordUpdate, SecondFactor};
 
 /// Keeps a verifier and opens the browser on the sign-in page, with the
-/// email filled in for an account signed out on this device.
+/// email filled in for an account signed out on this device. On a
+/// desktop the page returns the code to the app, see `accounts_loopback`.
 #[tauri::command]
 pub async fn accounts_sign_in_start(
     app: AppHandle,
@@ -39,11 +41,26 @@ pub async fn accounts_sign_in_start(
         &server_urls::browser_sign_in_url(&app),
         &challenge,
         email.as_deref(),
+        app_port(&app),
     );
     log::info!("opening the browser to sign in at {url}");
     app.opener()
         .open_url(url, None::<&str>)
         .map_err(|error| format!("could not open the browser: {error}"))
+}
+
+/// The port the page returns the code to; none on a phone, or when the
+/// listener could not start, where the person pastes it.
+#[cfg(desktop)]
+fn app_port(app: &AppHandle) -> Option<u16> {
+    crate::accounts_loopback::start(app)
+        .inspect_err(|error| log::warn!("{error}; the code is pasted instead"))
+        .ok()
+}
+
+#[cfg(mobile)]
+fn app_port(_app: &AppHandle) -> Option<u16> {
+    None
 }
 
 /// The sign-in waiting on the browser, for the accounts page to show
@@ -65,19 +82,24 @@ pub async fn accounts_sign_in_pending(
 #[tauri::command]
 pub async fn accounts_sign_in_finish(
     app: AppHandle,
-    device: State<'_, DeviceAccounts>,
-    server: State<'_, SyncServer>,
     code: String,
 ) -> Result<SignInFinished, String> {
+    sign_in_finish(&app, code.trim()).await
+}
+
+/// The finish of a sign-in, with a pasted code or one the browser
+/// returned to `accounts_loopback`.
+pub async fn sign_in_finish(app: &AppHandle, code: &str) -> Result<SignInFinished, String> {
+    let device = app.state::<DeviceAccounts>();
+    let server = app.state::<SyncServer>();
     let verifier = device
         .sign_in_verifier()
         .await
         .map_err(|error| error.to_string())?
         .ok_or("No sign-in is waiting; start again")?;
-    let session =
-        accounts::sign_in_with_device_code_through(server.transport(), code.trim(), &verifier)
-            .await
-            .map_err(|error| error.to_string())?;
+    let session = accounts::sign_in_with_device_code_through(server.transport(), code, &verifier)
+        .await
+        .map_err(|error| error.to_string())?;
     let finished = {
         let _no_sync_meanwhile = server.hold().await;
         device
@@ -89,18 +111,28 @@ pub async fn accounts_sign_in_finish(
         .sign_in_clear()
         .await
         .map_err(|error| error.to_string())?;
+    stop_loopback(app);
     crate::store_transactions::spawn_send_unfinished(app.clone());
-    sync::spawn(app);
+    sync::spawn(app.clone());
     Ok(finished)
 }
 
 #[tauri::command]
-pub async fn accounts_sign_in_cancel(device: State<'_, DeviceAccounts>) -> Result<(), String> {
+pub async fn accounts_sign_in_cancel(
+    app: AppHandle,
+    device: State<'_, DeviceAccounts>,
+) -> Result<(), String> {
+    stop_loopback(&app);
     device.move_offered_forget().await;
     device
         .sign_in_clear()
         .await
         .map_err(|error| error.to_string())
+}
+
+fn stop_loopback(_app: &AppHandle) {
+    #[cfg(desktop)]
+    crate::accounts_loopback::stop(_app);
 }
 
 #[tauri::command]
@@ -148,11 +180,20 @@ pub async fn accounts_password_update(
         .map_err(|error| error.to_string())
 }
 
-/// The sign-in page with the challenge and the email in its query.
-fn sign_in_page_with(page: &str, challenge: &str, email: Option<&str>) -> String {
+/// The sign-in page with the challenge, the email and the app's port in
+/// its query.
+fn sign_in_page_with(
+    page: &str,
+    challenge: &str,
+    email: Option<&str>,
+    app_port: Option<u16>,
+) -> String {
     let mut url = format!("{page}?challenge={}", encode(challenge));
     if let Some(email) = email.filter(|email| !email.is_empty()) {
         url.push_str(&format!("&email={}", encode(email)));
+    }
+    if let Some(port) = app_port {
+        url.push_str(&format!("&app_port={port}"));
     }
     url
 }
@@ -179,15 +220,15 @@ mod tests {
     #[test]
     fn accounts_sign_in_page_with_carries_the_challenge_and_the_email_encoded() {
         let page = "http://localhost:5002/accounts/sign-in";
-        let url = sign_in_page_with(page, "abc123", Some("alice+1@example.com"));
+        let url = sign_in_page_with(page, "abc123", Some("alice+1@example.com"), None);
         assert_eq!(
             url,
             "http://localhost:5002/accounts/sign-in?challenge=abc123&email=alice%2B1%40example.com"
         );
-        let url = sign_in_page_with(page, "abc123", Some(""));
+        let url = sign_in_page_with(page, "abc123", Some(""), Some(53122));
         assert_eq!(
             url,
-            "http://localhost:5002/accounts/sign-in?challenge=abc123"
+            "http://localhost:5002/accounts/sign-in?challenge=abc123&app_port=53122"
         );
     }
 }

@@ -15,6 +15,7 @@
 
   const query = new URLSearchParams(window.location.search);
   const challenge = query.get("challenge") ?? "";
+  const appPort = query.get("app_port") ?? "";
 
   let email = $state(query.get("email") ?? "");
   let name = $state("");
@@ -45,7 +46,7 @@
     <Text tone="muted">Signing up for the app on your device.</Text>
   {/if}
   {#if pending}
-    <AccountsSignInSteps {email} {pending} {challenge} {keepSignedIn} onstartover={() => (pending = "")} />
+    <AccountsSignInSteps {email} {pending} {challenge} {appPort} {keepSignedIn} onstartover={() => (pending = "")} />
   {:else}
     <AccountsForm bind:email bind:name withName bind:keepSignedIn withKeepSignedIn={!challenge} submitText="Sign up" {error} {busy} onsubmit={signUp} />
     <Text tone="muted">By signing up you accept the <PublicPagesLinks />.</Text>

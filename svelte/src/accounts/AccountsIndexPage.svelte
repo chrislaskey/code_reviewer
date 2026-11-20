@@ -2,7 +2,8 @@
      one, the others to switch to or sign in to, each to remove from the
      device, and Add account. The device section of the app: no account
      is open while the person adds one, which happens in the browser,
-     with the dialog waiting for its code. On a device with no account,
+     with the dialog waiting for its code, pasted or, on a desktop,
+     returned by the browser. On a device with no account,
      Skip makes a local user, on this device only; when they later sign
      up or in, they are asked whether what they made moves into the
      account, see docs/design/accounts-local-and-trial-users.md. -->
@@ -20,6 +21,7 @@
     localUsersCreate,
     localUsersKeepSeparate,
     localUsersMove,
+    onAccountsSignInFinished,
   } from "../lib/core/index.js";
   import { currentUserForget } from "../lib/current_user.js";
   import { navigateToUrl } from "../lib/router.js";
@@ -109,16 +111,33 @@
         signInError = String(problem);
         return;
       }
-      signingIn = null;
-      if (finished.outcome === "move_offered") {
-        moveError = "";
-        moveOffered = { email: finished.email, items: finished.items };
-        return;
-      }
-      currentUserForget();
-      await navigateToUrl(postsIndexUrl());
+      await signedIn(finished);
     });
   }
+
+  /** @param {{outcome: "signed_in"} | {outcome: "move_offered", email: string, items: number}} finished */
+  async function signedIn(finished) {
+    signingIn = null;
+    if (finished.outcome === "move_offered") {
+      moveError = "";
+      moveOffered = { email: finished.email, items: finished.items };
+      return;
+    }
+    currentUserForget();
+    await navigateToUrl(postsIndexUrl());
+  }
+
+  $effect(() =>
+    onAccountsSignInFinished((returned) =>
+      doThen(async () => {
+        if (returned.result === "failed") {
+          signInError = returned.error;
+          return;
+        }
+        await signedIn(returned.finished);
+      }),
+    ),
+  );
 
   /** Skip: a local user, made and opened with no request. */
   function skip() {

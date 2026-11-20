@@ -1,10 +1,17 @@
-<!-- The end of a sign-in a device started in this browser: the code the
-     person pastes into the app, see docs/design/accounts-sign-in.md. -->
+<!-- The end of a sign-in a device started in this browser: on a desktop,
+     the code returned to the app at once, else the code the person
+     pastes into the app, see docs/design/accounts-sign-in.md. -->
 <script>
   import { Button, Text } from "../lib/components/index.js";
-  /** @type {{code: string}} */
-  let { code } = $props();
+  import { accountsAppReturnUrl } from "../lib/routes.js";
+  /** @type {{code: string, appPort?: string}} */
+  let { code, appPort = "" } = $props();
   let copied = $state(false);
+  const returnUrl = $derived(accountsAppReturnUrl(appPort, code));
+
+  $effect(() => {
+    if (returnUrl) window.location.assign(returnUrl);
+  });
 
   async function copy() {
     try {
@@ -17,7 +24,12 @@
 </script>
 
 <div class="flex flex-col gap-3">
-  <Text>You are signed in. Paste this code into the app to finish there, then you can close this tab.</Text>
+  {#if returnUrl}
+    <Text>You are signed in. Returning you to the app…</Text>
+    <Text tone="muted" size="sm">If the app does not open, paste this code into it.</Text>
+  {:else}
+    <Text>You are signed in. Paste this code into the app to finish there, then you can close this tab.</Text>
+  {/if}
   <div class="flex flex-wrap items-center gap-3">
     <code class="rounded bg-base-200 px-3 py-2 text-lg break-all select-all" data-device-code>{code}</code>
     <Button size="sm" onclick={copy}>{copied ? "Copied" : "Copy"}</Button>

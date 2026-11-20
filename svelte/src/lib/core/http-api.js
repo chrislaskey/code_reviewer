@@ -217,6 +217,14 @@ export function accountsSignInCancel() {
   return Promise.resolve(null);
 }
 
+/**
+ * @param {(returned: unknown) => void} _callback
+ * @returns {() => void} stops listening
+ */
+export function onAccountsSignInFinished(_callback) {
+  return () => {};
+}
+
 export function accountsSignOut() {
   return send("DELETE", "/api/accounts/sign-out");
 }

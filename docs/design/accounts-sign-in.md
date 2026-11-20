@@ -87,6 +87,41 @@ code, or made at sign-up (items 4, 5 and 22), read it as moved here.
   The code's answer carries `can_reset_password`, so the page shows the
   link only when it would work.
 
+## Since 2026-11-20: the desktop returns the code itself
+
+On a desktop the person no longer pastes the code.
+`accounts_sign_in_start` starts a listener on `127.0.0.1`, on a port
+the system picks, through `tauri-plugin-oauth`, and adds
+`app_port=<port>` to the sign-in page's query; the sign-in and sign-up
+links keep it, as they keep the challenge. When the page has the
+device code it navigates to `http://127.0.0.1:<port>/?code=…`, built by
+`accountsAppReturnUrl`, which takes only a port, so the page can send
+a code nowhere but this computer. The listener answers its first
+request with a redirect to `/accounts/back-to-app` on the web and
+hands the URL to `tauri/src/accounts_loopback.rs`, which finishes the
+sign-in as a pasted code does, brings the window to the front, and
+emits `accounts-sign-in-finished` for the accounts page, `{result:
+"finished", finished}` or `{result: "failed", error}`. The page still
+shows the code under "Returning you to the app…", and the dialog keeps
+its field, so pasting stays the fallback: on a phone, when the
+listener cannot start, or when the app was quit while the browser was
+open. A new start, a cancel or a pasted finish stops the listener; a
+stray request to the port ends it with a code that is useless without
+the verifier.
+
+**On iOS, `ASWebAuthenticationSession` instead of universal links**,
+agreed 2026-11-20, the next step. iOS does not open the app from a
+universal link on the domain the person is already browsing, nor from a
+redirect they did not tap, and the end of a sign-in on the server's own
+pages is both. The system sheet opens the sign-in page inside the app,
+shares Safari's cookies, and hands the callback URL, a custom scheme,
+back to the session that opened it alone, so another app claiming the
+scheme gets nothing, and PKCE still guards the code. The `https`
+callback through associated domains, on newer systems, is the same
+`apple-app-site-association` file, which works on
+`starter-pack.fly.dev`. Universal links stay for links in emails,
+later.
+
 ## Before that
 
 A sign-up or a sign-in was one request with an email and a
@@ -427,9 +462,9 @@ the code, and Cancel. The browser runs the web sign-in or sign-up above
 with one difference: the code request carries the challenge, so the
 server answers a device code and sets no cookie: a `device_code` row
 with `hash(code + challenge)`, five minutes. The page shows the code
-with Copy and says to paste it into the app; later, on a desktop it
-redirects to the app's loopback address with the code, and on a phone
-it opens the universal link. The person
+with Copy and says to paste it into the app; on a desktop it
+redirects to the app's loopback address with the code, see "Since
+2026-11-20". The person
 pastes it; the app posts the code and the verifier; the server finds
 the row by `hash(code + sha256(verifier))`, deletes it, makes an `api`
 token and answers the session; the app hands the session to
@@ -659,5 +694,5 @@ only, with the association files served by the web server.
 5. Rate limits: `governor` in the state, the per-address and
    per-resend keys, `tower_governor` on the accounts routes.
 6. Resend behind the feature, with `MAILER=resend`.
-7. Later, each its own step: the desktop loopback; universal links on
-   mobile; the suggestions list.
+7. Later, each its own step: the desktop loopback, built 2026-11-20;
+   `ASWebAuthenticationSession` on iOS; the suggestions list.

@@ -73,8 +73,8 @@ export function accountsIndexUrl({ accountDeleted = false } = {}) {
 
 // The account pages carry two things in their query, which every link
 // between them keeps unless the caller says otherwise: a device's
-// challenge, when it opened the page in the browser to sign in, and the
-// email to fill in. So the nav's Sign in and Sign up, and the pages'
+// challenge, when it opened the page in the browser to sign in, the
+// desktop app's port to return the code to, and the email to fill in. So the nav's Sign in and Sign up, and the pages'
 // own links, all stay a device's sign-in.
 
 /**
@@ -82,7 +82,7 @@ export function accountsIndexUrl({ accountDeleted = false } = {}) {
  * @param {string} [challenge] a device's, else the current address's
  */
 export function accountsSignUpUrl(email = currentQuery("email"), challenge = currentQuery("challenge")) {
-  return withQuery(ACCOUNTS_SIGN_UP_PATH, { email, challenge });
+  return withQuery(ACCOUNTS_SIGN_UP_PATH, { email, challenge, app_port: currentQuery("app_port") });
 }
 
 /**
@@ -90,7 +90,20 @@ export function accountsSignUpUrl(email = currentQuery("email"), challenge = cur
  * @param {string} [challenge] a device's, else the current address's
  */
 export function accountsSignInUrl(email = currentQuery("email"), challenge = currentQuery("challenge")) {
-  return withQuery(ACCOUNTS_SIGN_IN_PATH, { email, challenge });
+  return withQuery(ACCOUNTS_SIGN_IN_PATH, { email, challenge, app_port: currentQuery("app_port") });
+}
+
+/**
+ * Where the browser returns a device code to the desktop app that
+ * started the sign-in: its listener on this computer, only ever a
+ * loopback address. "" when the port is not one.
+ * @param {string} appPort
+ * @param {string} code
+ */
+export function accountsAppReturnUrl(appPort, code) {
+  const port = Number(appPort);
+  if (!/^\d+$/.test(appPort) || port < 1 || port > 65535) return "";
+  return `http://127.0.0.1:${port}/?code=${encodeURIComponent(code)}`;
 }
 
 /**
