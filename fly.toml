@@ -15,6 +15,13 @@ primary_region = "ord"
   SERVER_URL = "https://starter-pack.fly.dev"
   TRUST_PROXY_HEADERS = "1"
   TRIAL_USERS_MAX = "10"
+  MAILER = "resend"
+  MAIL_FROM = "Starter Pack <onboarding@resend.dev>"
+  STORAGE_ENDPOINT = "https://t3.storage.dev"
+  STORAGE_REGION = "auto"
+  STORAGE_BUCKET = "starter-pack-public"
+  STORAGE_PUBLIC_URL = "https://starter-pack-public.t3.tigrisfiles.io"
+  STORAGE_PRIVATE_BUCKET = "starter-pack-files"
 
 [[mounts]]
   source = "data"

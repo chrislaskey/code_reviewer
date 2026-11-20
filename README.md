@@ -649,14 +649,65 @@ with its name and region in `fly.toml` (`app`, `primary_region`, and
 ```sh
 fly apps create starter-pack
 fly volumes create data --size 1 --region ord --app starter-pack
-fly deploy
+fly deploy --ha=false
 ```
 
 It runs one machine with the SQLite database on the `data` volume;
-`fly scale count 1` when a deploy made two. Emails go to the log,
-`fly logs`, until `MAILER` is set up with `fly secrets set`, as are the
-other secrets the server reads (above). `fly ssh console -C "app_web ops
-staff create <email>"` makes an account staff.
+`--ha=false` keeps it at one. `fly ssh console -C "app_web ops staff
+create <email>"` makes an account staff. Settings that aren't secret are
+in `fly.toml`'s `[env]`; secrets are set with `fly secrets set --stage`,
+which waits for the next deploy. A secret goes in before the setting that
+needs it, since the server won't start with one and not the other.
+
+#### Email, Resend
+
+Until `MAILER` is set, emails go to the log, `fly logs`. For Resend, an
+API key with sending access, then:
+
+```sh
+fly secrets set --stage RESEND_API_KEY=re_... --app starter-pack
+```
+
+and in `fly.toml`, `MAILER = "resend"` and `MAIL_FROM`, then a deploy.
+Resend sends only from a domain verified with it, which `fly.dev` can't
+be: until there is one, `MAIL_FROM` is `onboarding@resend.dev`, which
+Resend delivers only to the Resend account's own email. A refused email
+is logged as `email not sent:` with Resend's reason.
+
+#### Storage, Tigris
+
+Two buckets: `STORAGE_BUCKET`, public, for pictures, and
+`STORAGE_PRIVATE_BUCKET` for files. `fly storage create` attaches one
+bucket to an app, setting `BUCKET_NAME` and `AWS_*` secrets, which the
+server doesn't read, so the second is made outside the app (from a folder
+with no `fly.toml`) or in the Tigris console, `fly storage dashboard`:
+
+```sh
+fly storage create --public -n starter-pack-public -o personal
+fly storage create -n starter-pack-files -o personal
+```
+
+The Tigris dashboard opens with `fly storage dashboard -o personal`, or
+on one bucket with `fly storage dashboard starter-pack-public`. There,
+under Access keys, a key with ReadWrite on just the two buckets, and
+revoke the keys `fly storage create` printed. Then the key, and unset
+whatever `fly storage create` set on the app:
+
+```sh
+fly secrets set --stage STORAGE_ACCESS_KEY_ID=tid_... STORAGE_SECRET_ACCESS_KEY=tsec_... --app starter-pack
+fly secrets unset --stage AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_ENDPOINT_URL_S3 AWS_REGION BUCKET_NAME --app starter-pack
+```
+
+The pages PUT to the buckets straight from the browser, so each bucket
+needs a CORS rule, in its Bucket settings, CORS configuration, from
+`fly storage dashboard <bucket>`: the origin `https://starter-pack.fly.dev`,
+the methods `*`, and the allowed headers `*`. Left empty, the headers
+the PUT sends (`Content-Type`, and `x-amz-checksum-sha256` for a file)
+are refused, and every upload fails as if the bucket were unreachable.
+
+`fly.toml` names the buckets, `STORAGE_ENDPOINT` (`https://t3.storage.dev`),
+`STORAGE_REGION` (`auto`) and `STORAGE_PUBLIC_URL`
+(`https://starter-pack-public.t3.tigrisfiles.io`); then a deploy.
 
 ## Checks
 

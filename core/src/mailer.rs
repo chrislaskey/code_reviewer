@@ -72,7 +72,10 @@ impl Mailer {
                 Ok(())
             }
             #[cfg(feature = "mail-resend")]
-            Mailer::Resend(resend) => resend.send(mail).await,
+            Mailer::Resend(resend) => resend
+                .send(mail)
+                .await
+                .inspect_err(|error| tracing::error!("email not sent: {error}")),
         }
     }
 
