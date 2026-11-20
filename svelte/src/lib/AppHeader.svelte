@@ -25,6 +25,7 @@
 </script>
 
 <header class="app-header" data-tauri-drag-region>
+  <div class="page-corner" aria-hidden="true"></div>
   <div class="app-header-history">
     <Button
       variant="ghost"
