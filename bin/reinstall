@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+#
+# Builds the iOS app for a phone, then installs and launches it on a
+# connected iPhone, syncing with the web server on Fly.io.
+#
+# Run `bin/reinstall --help` for the details.
+
+set -eo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+BUNDLE_IDENTIFIER="com.starterpack.app"
+APP_NAME="Starter Pack"
+IPA="$ROOT/tauri/gen/apple/build/arm64/$APP_NAME.ipa"
+XCODE_PROJECT="$ROOT/tauri/gen/apple/app_tauri.xcodeproj/project.pbxproj"
+DEFAULT_SYNC_SERVER_URL="https://starter-pack.fly.dev"
+
+help() {
+  cat <<USAGE
+Builds the iOS app for a phone, then installs and launches it on a
+connected iPhone, over the copy already there, keeping its data.
+
+Usage: $0 [DEVICE]
+
+DEVICE is a name or identifier from \`xcrun devicectl list devices\`. When
+left out, the first iPhone connected or paired over the network.
+
+The app syncs with SYNC_SERVER_URL, from the environment or else from
+.env, $DEFAULT_SYNC_SERVER_URL when unset: a phone reaches no
+localhost, and gets no environment, so the URL is compiled in with
+\`--config\` (tauri/src/server_urls.rs). It signs in on that server's
+sign-in page.
+
+Why not \`cargo tauri ios run\`: with tauri-cli 2.12.4 it builds and signs
+the app, then fails exporting it ("Couldn't load -exportOptionsPlist").
+\`cargo tauri ios build --debug\` exports without that error, so this runs
+it, takes the app out of the .ipa it writes, and installs that with
+\`devicectl\`.
+
+The signing team is APPLE_DEVELOPMENT_TEAM, from the environment or else
+from .env (copy .env.example), so it stays out of the repository. The
+Tauri CLI writes it into the Xcode project while building; this removes it
+again afterwards. Also needs the phone registered in that team's developer
+account, and Developer Mode on the phone.
+USAGE
+}
+
+fail() {
+  echo "$0: $*" >&2
+  exit 1
+}
+
+# A variable from the environment, else its last line in .env.
+read_setting() {
+  local name="$1"
+  if [ -n "${!name:-}" ]; then
+    echo "${!name}"
+  elif [ -f "$ROOT/.env" ]; then
+    sed -n "s/^$name=//p" "$ROOT/.env" | tail -n 1
+  fi
+}
+
+case "${1:-}" in
+  help|-h|--help) help; exit 0 ;;
+  -*) fail "unknown option '$1'; run \`$0 --help\`" ;;
+esac
+
+APPLE_DEVELOPMENT_TEAM="$(read_setting APPLE_DEVELOPMENT_TEAM)"
+[ -n "$APPLE_DEVELOPMENT_TEAM" ] || fail "set APPLE_DEVELOPMENT_TEAM in .env (copy .env.example) or the environment"
+export APPLE_DEVELOPMENT_TEAM
+
+sync_server_url="$(read_setting SYNC_SERVER_URL)"
+sync_server_url="${sync_server_url:-$DEFAULT_SYNC_SERVER_URL}"
+
+device="${1:-}"
+if [ -z "$device" ]; then
+  device="$(xcrun devicectl list devices 2>/dev/null \
+    | awk '/iPhone/ && (/connected/ || /available/)' \
+    | grep -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}' \
+    | head -n 1 || true)"
+  [ -n "$device" ] || fail "no connected iPhone; plug one in and unlock it, or name one (\`xcrun devicectl list devices\`)"
+fi
+
+unpacked="$(mktemp -d)"
+remove_team_from_xcode_project() {
+  sed -i '' "/DEVELOPMENT_TEAM = \"$APPLE_DEVELOPMENT_TEAM\";/d" "$XCODE_PROJECT"
+  rm -rf "$unpacked"
+}
+trap remove_team_from_xcode_project EXIT
+
+tauri_config="{\"plugins\":{\"starter-pack\":{\"syncServerUrl\":\"$sync_server_url\",\"browserSignInUrl\":\"\"}}}"
+
+echo "=== Installing the node packages ==="
+(cd "$ROOT/svelte" && pnpm install --frozen-lockfile)
+
+echo "=== Building the iOS app, syncing with $sync_server_url ==="
+(cd "$ROOT/tauri" && cargo tauri ios build --debug --config "$tauri_config")
+
+echo "=== Installing on $device ==="
+unzip -q "$IPA" -d "$unpacked"
+xcrun devicectl device install app --device "$device" "$unpacked/Payload/$APP_NAME.app"
+
+echo "=== Launching ==="
+xcrun devicectl device process launch --device "$device" "$BUNDLE_IDENTIFIER"

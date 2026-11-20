@@ -26,7 +26,10 @@ sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio",
 thiserror = { workspace = true }
 tokio = { version = "1", features = ["sync", "time", "fs", "rt"] }
 uuid = { version = "1", features = ["serde"] }
-# The device's name, for the community a local user starts with
+
+# The device's name, for the community a local user starts with; not on
+# iOS, where it links a macOS-only call, see src/local_users.rs
+[target.'cfg(not(target_os = "ios"))'.dependencies]
 whoami = "2"
 
 # The clipboard's image types, see src/clipboard/, and the quick picker,

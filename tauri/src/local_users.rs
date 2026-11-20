@@ -74,6 +74,14 @@ pub async fn local_users_keep_separate(
 
 /// What the system calls this device, "Alice's MacBook Pro", or nothing
 /// when it will not say; a phone answers little more than its model.
+#[cfg(not(target_os = "ios"))]
 fn device_name() -> String {
     whoami::devicename().unwrap_or_default()
+}
+
+/// Nothing on iOS: `whoami` asks SystemConfiguration there, which has the
+/// call only on macOS, so the app would not link.
+#[cfg(target_os = "ios")]
+fn device_name() -> String {
+    String::new()
 }

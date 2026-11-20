@@ -7,5 +7,8 @@
 
 .DS_Store
 
+# Local settings, such as the signing team for bin/reinstall (.env.example)
+/.env
+
 # The web server's SQLite file in dev
 /axum/data/
