@@ -73,7 +73,8 @@ this one:
 - **The automatic return on Android**, in place of pasting the code:
   a Custom Tab, Android's sign-in sheet, as the iPhone's
   `ASWebAuthenticationSession`. The desktop's loopback and the iPhone's
-  sheet are built, see "Since 2026-11-20" in the design.
+  sheet are built, see "Since 2026-11-20" in the design. The next steps
+  for signing in, in order, are in `sign-in.md`.
 - **A dev mailbox page** showing the emails the `Memory` mailer holds,
   as Phoenix's `/dev/mailbox` does, instead of reading the log.
 - **HTML emails and a sender name**; the emails are text only.
