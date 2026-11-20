@@ -17,7 +17,7 @@ import {
   TRACE_SHOW_PATH,
 } from "./routes.js";
 
-const { navigate } = createRouter({
+const { navigate, route } = createRouter({
   layout: RemountPageOnNavigation,
   [HOME_PATH]: () => import("../HomePage.svelte"),
   [SESSIONS_INDEX_PATH]: () => import("../sessions/SessionsIndexPage.svelte"),
@@ -29,6 +29,9 @@ const { navigate } = createRouter({
   [TRACE_SHOW_PATH]: () => import("../traces/TraceShowPage.svelte"),
   [REMOTE_ACCESS_PATH]: () => import("../remote_access/RemoteAccessPage.svelte"),
 });
+
+/** The current path and query, which the layout keys each page on. */
+export { route };
 
 // The router types its paths; ours come from routes.js, so any path goes.
 const navigateToPath = /** @type {(pathname: string, options: { search: string }) => Promise<unknown>} */ (
