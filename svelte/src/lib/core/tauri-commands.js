@@ -160,14 +160,15 @@ export function accountsSignInCancel() {
 }
 
 /**
- * Calls back when the browser returned the code to the desktop app and
- * the sign-in finished there: `{result: "finished", finished}`, with what
+ * Calls back when the code came back to the app by itself, from the
+ * desktop's browser or the iPhone's sign-in sheet, and the sign-in
+ * finished: `{result: "finished", finished}`, with what
  * accountsSignInFinish answers, or `{result: "failed", error}`.
  * @param {(returned: {result: "finished", finished: any} | {result: "failed", error: string}) => void} callback
  * @returns {() => void} stops listening
  */
-export function onAccountsSignInFinished(callback) {
-  const stopping = listen("accounts-sign-in-finished", (event) => callback(/** @type {any} */ (event.payload)));
+export function onAccountsSignInReturned(callback) {
+  const stopping = listen("accounts-sign-in-returned", (event) => callback(/** @type {any} */ (event.payload)));
   return () => {
     stopping.then((stop) => stop());
   };

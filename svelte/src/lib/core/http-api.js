@@ -221,7 +221,7 @@ export function accountsSignInCancel() {
  * @param {(returned: unknown) => void} _callback
  * @returns {() => void} stops listening
  */
-export function onAccountsSignInFinished(_callback) {
+export function onAccountsSignInReturned(_callback) {
   return () => {};
 }
 

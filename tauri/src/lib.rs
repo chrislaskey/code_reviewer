@@ -12,6 +12,8 @@
 mod accounts;
 #[cfg(desktop)]
 mod accounts_loopback;
+#[cfg(target_os = "ios")]
+mod accounts_sheet;
 mod avatars;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 mod clipboard;
@@ -45,7 +47,9 @@ pub(crate) const MAIN_WINDOW: &str = "main";
 pub fn run() {
     let builder = tauri::Builder::default();
     #[cfg(target_os = "ios")]
-    let builder = builder.plugin(tauri_plugin_storekit::init());
+    let builder = builder
+        .plugin(tauri_plugin_storekit::init())
+        .plugin(tauri_plugin_web_auth_session::init());
     builder
         .plugin(tauri_plugin_opener::init())
         .register_asynchronous_uri_scheme_protocol("files", |context, request, responder| {

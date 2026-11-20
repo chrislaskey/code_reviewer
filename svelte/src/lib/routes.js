@@ -73,8 +73,9 @@ export function accountsIndexUrl({ accountDeleted = false } = {}) {
 
 // The account pages carry two things in their query, which every link
 // between them keeps unless the caller says otherwise: a device's
-// challenge, when it opened the page in the browser to sign in, the
-// desktop app's port to return the code to, and the email to fill in. So the nav's Sign in and Sign up, and the pages'
+// challenge, when it opened the page in the browser to sign in, where
+// to return the code to, the desktop app's port or the iPhone app's
+// scheme, and the email to fill in. So the nav's Sign in and Sign up, and the pages'
 // own links, all stay a device's sign-in.
 
 /**
@@ -82,7 +83,7 @@ export function accountsIndexUrl({ accountDeleted = false } = {}) {
  * @param {string} [challenge] a device's, else the current address's
  */
 export function accountsSignUpUrl(email = currentQuery("email"), challenge = currentQuery("challenge")) {
-  return withQuery(ACCOUNTS_SIGN_UP_PATH, { email, challenge, app_port: currentQuery("app_port") });
+  return withQuery(ACCOUNTS_SIGN_UP_PATH, { email, challenge, ...appReturnQuery() });
 }
 
 /**
@@ -90,20 +91,31 @@ export function accountsSignUpUrl(email = currentQuery("email"), challenge = cur
  * @param {string} [challenge] a device's, else the current address's
  */
 export function accountsSignInUrl(email = currentQuery("email"), challenge = currentQuery("challenge")) {
-  return withQuery(ACCOUNTS_SIGN_IN_PATH, { email, challenge, app_port: currentQuery("app_port") });
+  return withQuery(ACCOUNTS_SIGN_IN_PATH, { email, challenge, ...appReturnQuery() });
 }
 
+/** The iPhone app's scheme, its bundle identifier in tauri.conf.json. */
+const APP_URL_SCHEME = "com.starterpack.app";
+
 /**
- * Where the browser returns a device code to the desktop app that
- * started the sign-in: its listener on this computer, only ever a
- * loopback address. "" when the port is not one.
- * @param {string} appPort
+ * Where the browser returns a device code to the app that started the
+ * sign-in: the desktop app's listener on this computer, only ever a
+ * loopback address, or the iPhone app's own scheme, which closes its
+ * sign-in sheet. "" when neither is asked for, and the code is pasted.
+ * @param {{appPort?: string, appScheme?: string}} appReturn from the page's query
  * @param {string} code
  */
-export function accountsAppReturnUrl(appPort, code) {
+export function accountsAppReturnUrl({ appPort = "", appScheme = "" }, code) {
+  const query = `?code=${encodeURIComponent(code)}`;
+  if (appScheme === APP_URL_SCHEME) return `${APP_URL_SCHEME}://accounts/sign-in${query}`;
   const port = Number(appPort);
   if (!/^\d+$/.test(appPort) || port < 1 || port > 65535) return "";
-  return `http://127.0.0.1:${port}/?code=${encodeURIComponent(code)}`;
+  return `http://127.0.0.1:${port}/${query}`;
+}
+
+/** The current address's way back to the app, for the links between the pages. */
+function appReturnQuery() {
+  return { app_port: currentQuery("app_port"), app_scheme: currentQuery("app_scheme") };
 }
 
 /**

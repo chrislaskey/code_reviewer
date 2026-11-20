@@ -2,8 +2,8 @@
      one, the others to switch to or sign in to, each to remove from the
      device, and Add account. The device section of the app: no account
      is open while the person adds one, which happens in the browser,
-     with the dialog waiting for its code, pasted or, on a desktop,
-     returned by the browser. On a device with no account,
+     with the dialog waiting for its code, pasted or returned by itself,
+     on a desktop by the browser, on an iPhone by the sign-in sheet. On a device with no account,
      Skip makes a local user, on this device only; when they later sign
      up or in, they are asked whether what they made moves into the
      account, see docs/design/accounts-local-and-trial-users.md. -->
@@ -21,7 +21,7 @@
     localUsersCreate,
     localUsersKeepSeparate,
     localUsersMove,
-    onAccountsSignInFinished,
+    onAccountsSignInReturned,
   } from "../lib/core/index.js";
   import { currentUserForget } from "../lib/current_user.js";
   import { navigateToUrl } from "../lib/router.js";
@@ -128,7 +128,7 @@
   }
 
   $effect(() =>
-    onAccountsSignInFinished((returned) =>
+    onAccountsSignInReturned((returned) =>
       doThen(async () => {
         if (returned.result === "failed") {
           signInError = returned.error;

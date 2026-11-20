@@ -4,8 +4,9 @@
 //! the verifier, keeps it in `device.db`, and opens the browser at the
 //! sign-in page `server_urls` names with the verifier's challenge; the
 //! page, done,
-//! shows a code the person pastes into the app, or on a desktop returns
-//! it to `accounts_loopback`, and
+//! shows a code the person pastes into the app, or returns it by
+//! itself: on a desktop to `accounts_loopback`, on an iPhone through the
+//! sign-in sheet of `accounts_sheet`; and
 //! `accounts_sign_in_finish` exchanges it with the verifier for the
 //! session, which goes into the account's own file, see
 //! `device_accounts`, which becomes the active one and syncs. The app
@@ -15,7 +16,8 @@
 //! waiting reaches the server, then closes the account, whose data stays
 //! for the next sign-in.
 
-use tauri::{AppHandle, Manager, State};
+use serde::Serialize;
+use tauri::{AppHandle, Emitter, Manager, State, Url};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::device_accounts::{DeviceAccounts, PendingSignIn, SignInFinished};
@@ -23,9 +25,29 @@ use crate::server_urls;
 use crate::sync::{self, SyncServer};
 use app_core::accounts::{self, PasswordUpdate, SecondFactor};
 
-/// Keeps a verifier and opens the browser on the sign-in page, with the
-/// email filled in for an account signed out on this device. On a
-/// desktop the page returns the code to the app, see `accounts_loopback`.
+const SIGN_IN_RETURNED_EVENT: &str = "accounts-sign-in-returned";
+
+/// How the page hands the code back to the app by itself.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum AppReturn {
+    /// To `accounts_loopback`'s listener on this computer.
+    Port(u16),
+    /// To the app's scheme, which closes the iPhone's sign-in sheet.
+    #[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+    Scheme(String),
+}
+
+/// What the accounts page is told when the code came back by itself.
+#[derive(Clone, Debug, Serialize)]
+#[serde(tag = "result", rename_all = "snake_case")]
+pub enum SignInReturned {
+    Finished { finished: SignInFinished },
+    Failed { error: String },
+}
+
+/// Keeps a verifier and opens the sign-in page, with the email filled
+/// in for an account signed out on this device: in the browser, or on
+/// an iPhone in the sign-in sheet over the app.
 #[tauri::command]
 pub async fn accounts_sign_in_start(
     app: AppHandle,
@@ -41,26 +63,44 @@ pub async fn accounts_sign_in_start(
         &server_urls::browser_sign_in_url(&app),
         &challenge,
         email.as_deref(),
-        app_port(&app),
+        app_return(&app),
     );
+    sign_in_page_open(&app, url)
+}
+
+/// Where the page returns the code to; none on Android, or when the
+/// listener could not start, where the person pastes it.
+#[cfg(desktop)]
+fn app_return(app: &AppHandle) -> Option<AppReturn> {
+    crate::accounts_loopback::start(app)
+        .inspect_err(|error| log::warn!("{error}; the code is pasted instead"))
+        .ok()
+        .map(AppReturn::Port)
+}
+
+#[cfg(target_os = "ios")]
+fn app_return(app: &AppHandle) -> Option<AppReturn> {
+    Some(AppReturn::Scheme(app.config().identifier.clone()))
+}
+
+#[cfg(target_os = "android")]
+fn app_return(_app: &AppHandle) -> Option<AppReturn> {
+    None
+}
+
+#[cfg(target_os = "ios")]
+fn sign_in_page_open(app: &AppHandle, url: String) -> Result<(), String> {
+    log::info!("opening the sign-in sheet at {url}");
+    crate::accounts_sheet::open(app, url);
+    Ok(())
+}
+
+#[cfg(not(target_os = "ios"))]
+fn sign_in_page_open(app: &AppHandle, url: String) -> Result<(), String> {
     log::info!("opening the browser to sign in at {url}");
     app.opener()
         .open_url(url, None::<&str>)
         .map_err(|error| format!("could not open the browser: {error}"))
-}
-
-/// The port the page returns the code to; none on a phone, or when the
-/// listener could not start, where the person pastes it.
-#[cfg(desktop)]
-fn app_port(app: &AppHandle) -> Option<u16> {
-    crate::accounts_loopback::start(app)
-        .inspect_err(|error| log::warn!("{error}; the code is pasted instead"))
-        .ok()
-}
-
-#[cfg(mobile)]
-fn app_port(_app: &AppHandle) -> Option<u16> {
-    None
 }
 
 /// The sign-in waiting on the browser, for the accounts page to show
@@ -87,8 +127,8 @@ pub async fn accounts_sign_in_finish(
     sign_in_finish(&app, code.trim()).await
 }
 
-/// The finish of a sign-in, with a pasted code or one the browser
-/// returned to `accounts_loopback`.
+/// The finish of a sign-in, with a pasted code or one that came back
+/// by itself, see `sign_in_finish_returned`.
 pub async fn sign_in_finish(app: &AppHandle, code: &str) -> Result<SignInFinished, String> {
     let device = app.state::<DeviceAccounts>();
     let server = app.state::<SyncServer>();
@@ -128,6 +168,36 @@ pub async fn accounts_sign_in_cancel(
         .sign_in_clear()
         .await
         .map_err(|error| error.to_string())
+}
+
+/// The finish of a sign-in with the URL the page handed back, which
+/// carries the code.
+pub async fn sign_in_finish_returned(app: &AppHandle, url: &str) -> SignInReturned {
+    let Some(code) = device_code_in(url) else {
+        return SignInReturned::Failed {
+            error: "The sign-in page sent back no code; paste it instead".to_string(),
+        };
+    };
+    match sign_in_finish(app, &code).await {
+        Ok(finished) => SignInReturned::Finished { finished },
+        Err(error) => SignInReturned::Failed { error },
+    }
+}
+
+/// Tells the accounts page, with `accounts-sign-in-returned`.
+pub fn sign_in_returned_tell(app: &AppHandle, returned: SignInReturned) {
+    if let Err(error) = app.emit(SIGN_IN_RETURNED_EVENT, returned) {
+        log::error!("could not tell the page how the sign-in ended: {error}");
+    }
+}
+
+/// The `code` in a URL's query.
+pub fn device_code_in(url: &str) -> Option<String> {
+    let url = Url::parse(url).ok()?;
+    url.query_pairs()
+        .find(|(name, _)| name == "code")
+        .map(|(_, code)| code.trim().to_string())
+        .filter(|code| !code.is_empty())
 }
 
 fn stop_loopback(_app: &AppHandle) {
@@ -180,20 +250,24 @@ pub async fn accounts_password_update(
         .map_err(|error| error.to_string())
 }
 
-/// The sign-in page with the challenge, the email and the app's port in
-/// its query.
+/// The sign-in page with the challenge, the email and where to return
+/// the code in its query.
 fn sign_in_page_with(
     page: &str,
     challenge: &str,
     email: Option<&str>,
-    app_port: Option<u16>,
+    app_return: Option<AppReturn>,
 ) -> String {
     let mut url = format!("{page}?challenge={}", encode(challenge));
     if let Some(email) = email.filter(|email| !email.is_empty()) {
         url.push_str(&format!("&email={}", encode(email)));
     }
-    if let Some(port) = app_port {
-        url.push_str(&format!("&app_port={port}"));
+    match app_return {
+        Some(AppReturn::Port(port)) => url.push_str(&format!("&app_port={port}")),
+        Some(AppReturn::Scheme(scheme)) => {
+            url.push_str(&format!("&app_scheme={}", encode(&scheme)))
+        }
+        None => {}
     }
     url
 }
@@ -225,10 +299,34 @@ mod tests {
             url,
             "http://localhost:5002/accounts/sign-in?challenge=abc123&email=alice%2B1%40example.com"
         );
-        let url = sign_in_page_with(page, "abc123", Some(""), Some(53122));
+        let url = sign_in_page_with(page, "abc123", Some(""), Some(AppReturn::Port(53122)));
         assert_eq!(
             url,
             "http://localhost:5002/accounts/sign-in?challenge=abc123&app_port=53122"
         );
+        let url = sign_in_page_with(
+            page,
+            "abc123",
+            None,
+            Some(AppReturn::Scheme("com.starterpack.app".to_string())),
+        );
+        assert_eq!(
+            url,
+            "http://localhost:5002/accounts/sign-in?challenge=abc123&app_scheme=com.starterpack.app"
+        );
+    }
+
+    #[test]
+    fn accounts_device_code_in_reads_the_code_from_the_query() {
+        assert_eq!(
+            device_code_in("http://127.0.0.1:53122/?code=abc123"),
+            Some("abc123".to_string())
+        );
+        assert_eq!(
+            device_code_in("com.starterpack.app://accounts/sign-in?code=abc123"),
+            Some("abc123".to_string())
+        );
+        assert_eq!(device_code_in("http://127.0.0.1:53122/favicon.ico"), None);
+        assert_eq!(device_code_in("http://127.0.0.1:53122/?code="), None);
     }
 }

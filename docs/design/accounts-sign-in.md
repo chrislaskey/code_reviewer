@@ -87,7 +87,7 @@ code, or made at sign-up (items 4, 5 and 22), read it as moved here.
   The code's answer carries `can_reset_password`, so the page shows the
   link only when it would work.
 
-## Since 2026-11-20: the desktop returns the code itself
+## Since 2026-11-20: the desktop and the iPhone return the code themselves
 
 On a desktop the person no longer pastes the code.
 `accounts_sign_in_start` starts a listener on `127.0.0.1`, on a port
@@ -100,7 +100,7 @@ a code nowhere but this computer. The listener answers its first
 request with a redirect to `/accounts/back-to-app` on the web and
 hands the URL to `tauri/src/accounts_loopback.rs`, which finishes the
 sign-in as a pasted code does, brings the window to the front, and
-emits `accounts-sign-in-finished` for the accounts page, `{result:
+emits `accounts-sign-in-returned` for the accounts page, `{result:
 "finished", finished}` or `{result: "failed", error}`. The page still
 shows the code under "Returning you to the app…", and the dialog keeps
 its field, so pasting stays the fallback: on a phone, when the
@@ -109,18 +109,31 @@ open. A new start, a cancel or a pasted finish stops the listener; a
 stray request to the port ends it with a code that is useless without
 the verifier.
 
-**On iOS, `ASWebAuthenticationSession` instead of universal links**,
-agreed 2026-11-20, the next step. iOS does not open the app from a
-universal link on the domain the person is already browsing, nor from a
-redirect they did not tap, and the end of a sign-in on the server's own
-pages is both. The system sheet opens the sign-in page inside the app,
-shares Safari's cookies, and hands the callback URL, a custom scheme,
-back to the session that opened it alone, so another app claiming the
-scheme gets nothing, and PKCE still guards the code. The `https`
-callback through associated domains, on newer systems, is the same
-`apple-app-site-association` file, which works on
-`starter-pack.fly.dev`. Universal links stay for links in emails,
-later.
+**On an iPhone, the sign-in sheet**, `ASWebAuthenticationSession`,
+in place of universal links. iOS does not open the app from a universal
+link on the domain the person is already browsing, nor from a redirect
+they did not tap, and the end of a sign-in on the server's own pages is
+both. `accounts_sign_in_start` opens the sign-in page in the sheet over
+the app, `tauri/src/accounts_sheet.rs` through our own plugin,
+`tauri/plugins/web-auth-session` (the published ones either drop the
+session, so the sheet can close at once, or are called only from
+JavaScript). The query carries `app_scheme`, the app's bundle
+identifier, and the page, done, goes to
+`com.starterpack.app://accounts/sign-in?code=…`; `accountsAppReturnUrl`
+takes that one scheme only, a constant in `routes.js` to change with
+the identifier in a fork. The sheet closes and hands the URL to the
+session that opened it alone, so another app claiming the scheme gets
+nothing, and PKCE still guards the code; the app finishes as with the
+loopback, with the same event, `accounts-sign-in-returned`. The sheet
+is private, `prefersEphemeralWebBrowserSession`, sharing no cookies
+with Safari, which a device sign-in never sets anyway, so iOS asks no
+"wants to use … to sign in" first. The person closing the sheet leaves
+the sign-in waiting with the dialog's field, so a code copied in the
+sheet can still be pasted; the dialog's Cancel ends it. The custom
+scheme needs no entry in `Info.plist` for the sheet; the `https`
+callback, iOS 17.4 and later, would need the associated domain, and the
+app supports iOS 15. Android still pastes. Universal links stay for
+links in emails, later.
 
 ## Before that
 
@@ -694,5 +707,5 @@ only, with the association files served by the web server.
 5. Rate limits: `governor` in the state, the per-address and
    per-resend keys, `tower_governor` on the accounts routes.
 6. Resend behind the feature, with `MAILER=resend`.
-7. Later, each its own step: the desktop loopback, built 2026-11-20;
-   `ASWebAuthenticationSession` on iOS; the suggestions list.
+7. Later, each its own step: the desktop loopback and the iPhone's
+   sign-in sheet, built 2026-11-20; the suggestions list.

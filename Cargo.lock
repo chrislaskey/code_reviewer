@@ -131,6 +131,7 @@ dependencies = [
  "tauri-plugin-oauth",
  "tauri-plugin-opener",
  "tauri-plugin-storekit",
+ "tauri-plugin-web-auth-session",
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
@@ -5453,6 +5454,17 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-storekit"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "tauri-plugin-web-auth-session"
 version = "0.1.0"
 dependencies = [
  "serde",

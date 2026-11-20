@@ -14,7 +14,7 @@
 
   const query = new URLSearchParams(window.location.search);
   const challenge = query.get("challenge") ?? "";
-  const appPort = query.get("app_port") ?? "";
+  const appReturn = { appPort: query.get("app_port") ?? "", appScheme: query.get("app_scheme") ?? "" };
 
   let email = $state(query.get("email") ?? "");
   let keepSignedIn = $state(KEEP_SIGNED_IN_CHECKED);
@@ -44,7 +44,7 @@
     <Text tone="muted">Signing in for the app on your device.</Text>
   {/if}
   {#if pending}
-    <AccountsSignInSteps {email} {pending} {challenge} {appPort} {keepSignedIn} onstartover={() => (pending = "")} />
+    <AccountsSignInSteps {email} {pending} {challenge} {appReturn} {keepSignedIn} onstartover={() => (pending = "")} />
   {:else}
     <AccountsForm bind:email bind:keepSignedIn withKeepSignedIn={!challenge} submitText="Sign in" {error} {busy} onsubmit={signIn} />
     <Text tone="muted">New here? <Link href={accountsSignUpUrl(email || undefined)}>Sign up</Link></Text>

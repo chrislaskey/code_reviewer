@@ -6,32 +6,21 @@
 //! hands its URL here; the code in it is useless without the verifier
 //! this app kept, so a stray request costs nothing. The app then
 //! finishes the sign-in as a pasted code does, comes to the front, and
-//! tells the accounts page with the `accounts-sign-in-finished` event.
+//! tells the accounts page, see `accounts::sign_in_returned_tell`.
 
 use std::sync::Mutex;
 
-use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, Url};
+use tauri::{AppHandle, Manager};
 use tauri_plugin_oauth::OauthConfig;
 
-use crate::device_accounts::SignInFinished;
 use crate::{MAIN_WINDOW, accounts, server_urls};
 
 const BACK_TO_APP_PATH: &str = "/accounts/back-to-app";
-const FINISHED_EVENT: &str = "accounts-sign-in-finished";
 
 /// The port of the listener waiting for the browser, one at a time.
 #[derive(Default)]
 pub struct AccountsLoopback {
     port: Mutex<Option<u16>>,
-}
-
-/// What the accounts page is told when the browser returned a code.
-#[derive(Clone, Debug, Serialize)]
-#[serde(tag = "result", rename_all = "snake_case")]
-enum LoopbackFinished {
-    Finished { finished: SignInFinished },
-    Failed { error: String },
 }
 
 /// Starts a listener for the browser to return the code to, in place of
@@ -71,28 +60,11 @@ fn returned(app: AppHandle, url: String) {
     if let Ok(mut current) = app.state::<AccountsLoopback>().port.lock() {
         *current = None;
     }
-    let Some(code) = code_in(&url) else {
-        log::warn!("the browser returned no sign-in code");
-        return;
-    };
     tauri::async_runtime::spawn(async move {
-        let finished = match accounts::sign_in_finish(&app, &code).await {
-            Ok(finished) => LoopbackFinished::Finished { finished },
-            Err(error) => LoopbackFinished::Failed { error },
-        };
+        let returned = accounts::sign_in_finish_returned(&app, &url).await;
         bring_to_front(&app);
-        if let Err(error) = app.emit(FINISHED_EVENT, finished) {
-            log::error!("could not tell the page the sign-in finished: {error}");
-        }
+        accounts::sign_in_returned_tell(&app, returned);
     });
-}
-
-fn code_in(url: &str) -> Option<String> {
-    let url = Url::parse(url).ok()?;
-    url.query_pairs()
-        .find(|(name, _)| name == "code")
-        .map(|(_, code)| code.trim().to_string())
-        .filter(|code| !code.is_empty())
 }
 
 fn bring_to_front(app: &AppHandle) {
@@ -140,16 +112,6 @@ mod tests {
         assert!(answer.starts_with("HTTP/1.1 302"), "{answer}");
         assert!(answer.contains("Location: https://server.test/accounts/back-to-app"));
         let url = received.recv_timeout(Duration::from_secs(5)).unwrap();
-        assert_eq!(code_in(&url), Some("abc123".to_string()));
-    }
-
-    #[test]
-    fn accounts_loopback_code_in_reads_the_code_from_the_query() {
-        assert_eq!(
-            code_in("http://127.0.0.1:53122/?code=abc123"),
-            Some("abc123".to_string())
-        );
-        assert_eq!(code_in("http://127.0.0.1:53122/favicon.ico"), None);
-        assert_eq!(code_in("http://127.0.0.1:53122/?code="), None);
+        assert_eq!(accounts::device_code_in(&url), Some("abc123".to_string()));
     }
 }

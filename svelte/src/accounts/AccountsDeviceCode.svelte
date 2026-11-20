@@ -1,13 +1,13 @@
-<!-- The end of a sign-in a device started in this browser: on a desktop,
-     the code returned to the app at once, else the code the person
-     pastes into the app, see docs/design/accounts-sign-in.md. -->
+<!-- The end of a sign-in a device started in this browser: on a desktop
+     or an iPhone, the code returned to the app at once, else the code
+     the person pastes into the app, see docs/design/accounts-sign-in.md. -->
 <script>
   import { Button, Text } from "../lib/components/index.js";
   import { accountsAppReturnUrl } from "../lib/routes.js";
-  /** @type {{code: string, appPort?: string}} */
-  let { code, appPort = "" } = $props();
+  /** @type {{code: string, appReturn?: {appPort?: string, appScheme?: string}}} */
+  let { code, appReturn = {} } = $props();
   let copied = $state(false);
-  const returnUrl = $derived(accountsAppReturnUrl(appPort, code));
+  const returnUrl = $derived(accountsAppReturnUrl(appReturn, code));
 
   $effect(() => {
     if (returnUrl) window.location.assign(returnUrl);
