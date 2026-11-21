@@ -422,7 +422,7 @@ shows the page at the path, swapped in place:
 | `/` | on the web the public website's home page, `public/index.html`, not the router's; in the apps the router sends it to `/home` |
 | `/home` | `home/HomePage.svelte` |
 | `/accounts/sign-up` | `accounts/AccountsSignUpPage.svelte`, on the web: the name and email, then the code, then a password to make or skip |
-| `/accounts/settings` | `accounts/AccountsSettingsPage.svelte`, the person's own account: their email and the way to their password |
+| `/accounts/current` | `accounts/current/AccountsCurrentShowPage.svelte`, the signed-in person's own account: their email and the way to their password |
 | `/accounts/password/edit` | `accounts/password/AccountsPasswordEditPage.svelte`, their first password or a new one; asks the server, so online only in the apps |
 | `/support` | `support/SupportIndexPage.svelte`, the support app: a placeholder |
 | `/forum` | `forum/ForumIndexPage.svelte`, the forum app: a placeholder |

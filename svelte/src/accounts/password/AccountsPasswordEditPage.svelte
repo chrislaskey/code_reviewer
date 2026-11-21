@@ -4,7 +4,7 @@
      one. The server keeps it, so in the app this needs a connection. -->
 <script>
   import { accountsPasswordUpdate, accountsSecondFactors } from "../../lib/core/index.js";
-  import { accountsSettingsUrl } from "../../lib/routes.js";
+  import { accountsCurrentShowUrl } from "../../lib/routes.js";
   import { Button, ErrorMessage, Heading, Input, Link, Page, Text } from "../../lib/components/index.js";
 
   /** Whether the account has a password; null until the server answered. */
@@ -65,7 +65,7 @@
       <ErrorMessage message={error} />
       <div class="flex flex-wrap items-center gap-3">
         <Button variant="primary" type="submit" disabled={busy}>{hasPassword ? "Change password" : "Create password"}</Button>
-        <Link size="sm" href={accountsSettingsUrl()}>Back to account</Link>
+        <Link size="sm" href={accountsCurrentShowUrl()}>Back to account</Link>
       </div>
     </form>
   {:else if error}

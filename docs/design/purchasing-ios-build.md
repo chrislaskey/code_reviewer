@@ -120,7 +120,7 @@ for the terms and the privacy policy.
       on success. The sync and the online calls treat `410` by removing
       that account and its file and showing "This account was deleted".
 - [x] `svelte/src/lib/core/` both files; `AccountsDeletionsNewPage` at
-      `/accounts/deletions/new`, linked from `AccountsSettingsPage`:
+      `/accounts/deletions/new`, linked from `AccountsCurrentShowPage`:
       what goes, the plan warning by store, Send code, the code, Delete
       my account. After it, the start page.
 - [x] Tests: the delete soft-deletes posts, files, memberships, the

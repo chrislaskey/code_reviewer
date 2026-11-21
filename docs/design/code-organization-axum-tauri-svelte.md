@@ -118,9 +118,10 @@ svelte/src/
   its whole name, resource then action then `Page`.
 - **RESTful paths.** A collection's pages are `index`, `show`, `new`
   and `edit`; a singular resource has no id, so the person's profile is
-  `/profile/edit` and their password `/accounts/password/edit`. The
+  `/profile/edit`, their password `/accounts/password/edit`, and their
+  account, the signed-in one, `/accounts/current`. The
   sign-in pages keep the names Phoenix's own `gen.auth` gives them,
-  `/accounts/sign-in`, `/accounts/sign-up`, `/accounts/settings`, as
+  `/accounts/sign-in` and `/accounts/sign-up`, as
   do `/accounts/trial` and `/accounts/back-to-app`, which are no
   resource's.
 - **`components/` beside the pages** holds a folder's pieces that more
@@ -167,9 +168,3 @@ URL is made by `POST .../uploads`: `/api/avatars/uploads` and
   quick picker; `AccountsNeeded` too, used by the accounts, support and
   forum pages. `FilesNewPage` (400 lines) and `AccountsIndexPage` (270)
   are the largest pages; each already has its pieces in `components/`.
-
-## Open
-
-- `/accounts/settings` keeps Phoenix's `gen.auth` name. Read RESTfully
-  it is the signed-in account's show page; renaming it is a choice for
-  the project owner.

@@ -12,7 +12,7 @@ export const ACCOUNTS_INDEX_PATH = "/accounts";
 export const ACCOUNTS_SIGN_UP_PATH = "/accounts/sign-up";
 export const ACCOUNTS_SIGN_IN_PATH = "/accounts/sign-in";
 export const ACCOUNTS_TRIAL_PATH = "/accounts/trial";
-export const ACCOUNTS_SETTINGS_PATH = "/accounts/settings";
+export const ACCOUNTS_CURRENT_SHOW_PATH = "/accounts/current";
 export const ACCOUNTS_PASSWORD_EDIT_PATH = "/accounts/password/edit";
 export const ACCOUNTS_DELETIONS_NEW_PATH = "/accounts/deletions/new";
 export const ACCOUNTS_PRODUCTS_INDEX_PATH = "/accounts/products";
@@ -204,8 +204,8 @@ export function profileEditUrl() {
 }
 
 /** The signed-in person's account: their email, and later their plan. */
-export function accountsSettingsUrl() {
-  return ACCOUNTS_SETTINGS_PATH;
+export function accountsCurrentShowUrl() {
+  return ACCOUNTS_CURRENT_SHOW_PATH;
 }
 
 /** Where the signed-in person makes or changes their password. */

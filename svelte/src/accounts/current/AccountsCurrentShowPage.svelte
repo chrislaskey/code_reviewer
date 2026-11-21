@@ -1,20 +1,20 @@
-<!-- The signed-in person's account, at /accounts/settings: their email,
+<!-- The signed-in person's account, at /accounts/current: their email,
      the way to their password, and what they can buy, see
      docs/design/purchasing.md. -->
 <script>
-  import PublicPagesLinks from "../lib/PublicPagesLinks.svelte";
-  import AccountsNeeded from "../lib/AccountsNeeded.svelte";
-  import { currentUserLoad } from "../lib/current_user.js";
+  import PublicPagesLinks from "../../lib/PublicPagesLinks.svelte";
+  import AccountsNeeded from "../../lib/AccountsNeeded.svelte";
+  import { currentUserLoad } from "../../lib/current_user.js";
   import {
     accountsDeletionsNewUrl,
     accountsPasswordEditUrl,
     accountsProductsIndexUrl,
     accountsPurchasesIndexUrl,
     accountsSubscriptionsIndexUrl,
-  } from "../lib/routes.js";
-  import { Heading, Link, Page, Text } from "../lib/components/index.js";
+  } from "../../lib/routes.js";
+  import { Heading, Link, Page, Text } from "../../lib/components/index.js";
 
-  /** @type {import("../lib/current_user.js").User | null} */
+  /** @type {import("../../lib/current_user.js").User | null} */
   let currentUser = $state(null);
 
   currentUserLoad().then(

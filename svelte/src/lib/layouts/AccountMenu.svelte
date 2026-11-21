@@ -15,7 +15,7 @@
   import { navigateToUrl } from "../router.js";
   import {
     accountsIndexUrl,
-    accountsSettingsUrl,
+    accountsCurrentShowUrl,
     accountsSignInUrl,
     accountsSignUpUrl,
     profileEditUrl,
@@ -86,7 +86,7 @@
         </li>
         {#if currentUser.kind === "full"}
           <li>
-            <a href={accountsSettingsUrl()} onclick={close}><Icon name="hero-cog-6-tooth" />{t`Account settings`}</a>
+            <a href={accountsCurrentShowUrl()} onclick={close}><Icon name="hero-cog-6-tooth" />{t`Account settings`}</a>
           </li>
         {/if}
         {#if hasDeviceAccounts}

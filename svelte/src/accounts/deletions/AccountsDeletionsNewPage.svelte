@@ -9,7 +9,7 @@
   import { accountsDeletionsCodeCreate, accountsDeletionsCreate, hasDeviceAccounts } from "../../lib/core/index.js";
   import { currentUserForget, currentUserLoad } from "../../lib/current_user.js";
   import { navigateToUrl } from "../../lib/router.js";
-  import { PUBLIC_HOME_PATH, accountsIndexUrl, accountsSettingsUrl } from "../../lib/routes.js";
+  import { PUBLIC_HOME_PATH, accountsIndexUrl, accountsCurrentShowUrl } from "../../lib/routes.js";
   import { Button, ErrorMessage, Heading, Input, Link, Page, Text } from "../../lib/components/index.js";
 
   /** Where each store's own subscriptions page is, to cancel a plan there. */
@@ -107,7 +107,7 @@
         {#if currentUser.kind === "trial" || codeSent}
           <Button variant="danger" type="submit" disabled={busy}>Delete my account</Button>
         {/if}
-        <Link size="sm" href={accountsSettingsUrl()}>Back to account</Link>
+        <Link size="sm" href={accountsCurrentShowUrl()}>Back to account</Link>
       </div>
     </form>
   {:else if error}
