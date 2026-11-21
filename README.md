@@ -280,7 +280,7 @@ database with its role, `Server` for the web server and `Device` for the
 apps, and own one `Transaction`, so a row and its event commit together.
 Internal record contexts under `core/src/data/` borrow that transaction
 and dispatch to private SQLite/PostgreSQL adapters (for example,
-`core/src/data/posts/sqlite.rs` and `postgres.rs`). Workflows compose
+`core/src/data/app_posts/sqlite.rs` and `postgres.rs`). Workflows compose
 contexts for authorization, sync and multi-resource changes. Atomic bulk
 lifecycle and maintenance operations are explicit exceptions documented
 in `docs/design/low-level-contexts.md`. The backend root modules contain

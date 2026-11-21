@@ -26,8 +26,8 @@
 //! `delete_unreferenced_on_device` in the account's folder, at the end
 //! of each sync.
 
-use crate::data::files as files_records;
-use crate::data::memberships as memberships_records;
+use crate::data::app_files;
+use crate::data::app_users_communities;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -311,7 +311,7 @@ impl From<serde_json::Error> for FileError {
 /// state, creator and communities.
 pub async fn list(deployment: &Deployment, user: &User) -> Result<Vec<FileWithState>, FileError> {
     let mut tx = deployment.begin().await?;
-    let files = files_records::list(&mut tx, user.id).await?;
+    let files = app_files::list(&mut tx, user.id).await?;
     let listed = with_states(&mut tx, deployment.role, user, files).await?;
     tx.commit().await?;
     Ok(listed)
@@ -343,7 +343,7 @@ pub async fn list_duplicates(
         return Ok(Vec::new());
     }
     let mut tx = deployment.begin().await?;
-    let files = files_records::list_with_sha256s(&mut tx, user.id, sha256s).await?;
+    let files = app_files::list_with_sha256s(&mut tx, user.id, sha256s).await?;
     let listed = with_states(&mut tx, deployment.role, user, files).await?;
     tx.commit().await?;
     Ok(listed)
@@ -365,7 +365,7 @@ pub async fn search(
         )));
     }
     let mut tx = deployment.begin().await?;
-    let (total, files) = files_records::search(
+    let (total, files) = app_files::search(
         &mut tx,
         user.id,
         &search.name,
@@ -795,7 +795,7 @@ pub async fn delete_unreferenced(
 ) -> Result<crate::app::avatars::DeleteUnreferencedReport, FileError> {
     let storage = bucket(deployment)?;
     let mut tx = deployment.begin().await?;
-    let referenced: BTreeSet<String> = files_records::maintenance::list_ids(&mut tx)
+    let referenced: BTreeSet<String> = app_files::maintenance::list_ids(&mut tx)
         .await?
         .into_iter()
         .map(|(id, created_by_id, _deleted)| storage_key(created_by_id, id))
@@ -830,7 +830,7 @@ pub async fn delete_unreferenced_on_device(
         return Ok(0);
     };
     let mut tx = deployment.begin().await?;
-    let rows = files_records::maintenance::list_ids(&mut tx).await?;
+    let rows = app_files::maintenance::list_ids(&mut tx).await?;
     tx.commit().await?;
 
     let cutoff = now - chrono::Duration::days(UNREFERENCED_DAYS);
@@ -918,13 +918,13 @@ pub(crate) async fn apply_server_row(tx: &mut Transaction, row: &Value) -> Resul
     if events::has_pending(tx, TABLE, file.id).await? {
         return Ok(false);
     }
-    files_records::replication::upsert(&mut *tx, AcceptedFile(&file)).await?;
+    app_files::replication::upsert(&mut *tx, AcceptedFile(&file)).await?;
     Ok(true)
 }
 
 /// Removes a device's row the server holds under another id.
 pub(crate) async fn delete_row(tx: &mut Transaction, id: Uuid) -> Result<(), FileError> {
-    Ok(files_records::maintenance::delete(tx, id).await?)
+    Ok(app_files::maintenance::delete(tx, id).await?)
 }
 
 /// A page of the rows the user sees that the server wrote after the
@@ -935,12 +935,12 @@ pub(crate) async fn list_synced_after(
     after: &Cursor,
     limit: usize,
 ) -> Result<Vec<File>, FileError> {
-    Ok(files_records::replication::list_synced_after(tx, user.id, after, limit).await?)
+    Ok(app_files::replication::list_synced_after(tx, user.id, after, limit).await?)
 }
 
 /// The row by its id, deleted or not, whoever sees it.
 pub(crate) async fn get_in(tx: &mut Transaction, id: Uuid) -> Result<Option<File>, FileError> {
-    Ok(files_records::replication::get(tx, id).await?)
+    Ok(app_files::replication::get(tx, id).await?)
 }
 
 /// Where the bytes of a file the user sees are on this device, fetched
@@ -1002,7 +1002,7 @@ pub(crate) async fn forget_in(tx: &mut Transaction, id: Uuid) -> Result<(), File
     for row in files_communities_of(tx, id).await? {
         events::delete_of_row(tx, files_communities::TABLE, row).await?;
     }
-    Ok(files_records::maintenance::delete(tx, id).await?)
+    Ok(app_files::maintenance::delete(tx, id).await?)
 }
 
 /// The ids of the file's rows in communities with events on this
@@ -1026,11 +1026,11 @@ async fn files_communities_of(tx: &mut Transaction, id: Uuid) -> Result<Vec<Uuid
 /// `delete_local_copy`.
 pub(crate) async fn prune(tx: &mut Transaction, user: &User) -> Result<Vec<Uuid>, FileError> {
     let mut pruned = Vec::new();
-    for id in files_records::maintenance::list_invisible_ids(tx, user.id).await? {
+    for id in app_files::maintenance::list_invisible_ids(tx, user.id).await? {
         if create_of(tx, id).await?.is_some() {
             continue;
         }
-        files_records::maintenance::delete(tx, id).await?;
+        app_files::maintenance::delete(tx, id).await?;
         pruned.push(id);
     }
     Ok(pruned)
@@ -1059,7 +1059,7 @@ pub(crate) async fn delete_with_last_community(
         file.version += 1;
         file.last_synced_at = Some(file.updated_at);
     }
-    files_records::update(&mut *tx, AcceptedFile(&file)).await?;
+    app_files::update(&mut *tx, AcceptedFile(&file)).await?;
     Ok(())
 }
 
@@ -1110,7 +1110,7 @@ async fn create_of(tx: &mut Transaction, id: Uuid) -> Result<Option<StoredEvent>
 /// The live file, if the user sees it; one they do not see is not
 /// found, as if it were not there.
 async fn get_visible(tx: &mut Transaction, user: &User, id: Uuid) -> Result<File, FileError> {
-    match files_records::get(tx, user.id, id).await? {
+    match app_files::get(tx, user.id, id).await? {
         Some(file) => Ok(file),
         _ => Err(FileError::NotFound { id }),
     }
@@ -1144,9 +1144,9 @@ async fn with_states(
         .map_err(|error| FileError::Malformed(error.to_string()))?;
     let mut members: Vec<(Uuid, Uuid)> = Vec::new();
     for community_id in &community_ids {
-        for membership in memberships_records::list(
+        for membership in app_users_communities::list(
             &mut *tx,
-            memberships_records::Filter::Community(*community_id),
+            app_users_communities::Filter::Community(*community_id),
         )
         .await?
         {
@@ -1350,7 +1350,7 @@ pub(crate) async fn apply_in(
         EventKind::Create => {
             if get_in(tx, event.row_id).await?.is_some() {
                 // A file the user does not see is none of their business
-                let existing = files_records::get(tx, user.id, event.row_id).await?;
+                let existing = app_files::get(tx, user.id, event.row_id).await?;
                 return rejected(event, "exists", existing);
             }
             let (version, last_synced_at) = match role {
@@ -1390,12 +1390,12 @@ pub(crate) async fn apply_in(
             if !uploaded {
                 return rejected(event, FILE_NOT_UPLOADED, None);
             }
-            files_records::create(&mut *tx, AcceptedFile(&file)).await?;
+            app_files::create(&mut *tx, AcceptedFile(&file)).await?;
             files_communities::create_with_file(tx, user, &file, &communities).await?;
             finish(tx, role, user, event, Conflicts::new(), file).await
         }
         EventKind::Update => {
-            let Some(file) = files_records::get(tx, user.id, event.row_id).await? else {
+            let Some(file) = app_files::get(tx, user.id, event.row_id).await? else {
                 return rejected(event, "unknown_file", None);
             };
             let (changes, conflicts) = events::merge(
@@ -1417,7 +1417,7 @@ pub(crate) async fn apply_in(
                     updated.version += 1;
                     updated.last_synced_at = Some(now);
                 }
-                files_records::update(&mut *tx, AcceptedFile(&updated)).await?;
+                app_files::update(&mut *tx, AcceptedFile(&updated)).await?;
                 updated
             };
             finish(tx, role, user, event, conflicts, file).await
@@ -1617,9 +1617,10 @@ pub(crate) mod tests {
     /// The user's own community on the deployment, made the first time.
     pub(crate) async fn personal(deployment: &Deployment, user: &User) -> Uuid {
         let mut tx = deployment.begin().await.expect("a transaction");
-        let mine = memberships_records::list(&mut tx, memberships_records::Filter::User(user.id))
-            .await
-            .expect("the memberships");
+        let mine =
+            app_users_communities::list(&mut tx, app_users_communities::Filter::User(user.id))
+                .await
+                .expect("the memberships");
         tx.commit().await.expect("committed");
         match mine.first() {
             Some(membership) => membership.community_id,
@@ -1724,13 +1725,13 @@ pub(crate) mod tests {
             let file = uploaded(&deployment, &storage, &alice, "notes.txt", b"x").await;
             let mut tx = deployment.begin().await.expect("transaction");
             assert!(
-                files_records::get(&mut tx, alice.id, file.id)
+                app_files::get(&mut tx, alice.id, file.id)
                     .await
                     .expect("owner")
                     .is_some()
             );
             assert!(
-                files_records::get(&mut tx, bob.id, file.id)
+                app_files::get(&mut tx, bob.id, file.id)
                     .await
                     .expect("other user")
                     .is_none()
@@ -1739,19 +1740,19 @@ pub(crate) mod tests {
             delete(&deployment, &alice, file.id).await.expect("delete");
             let mut tx = deployment.begin().await.expect("transaction");
             assert!(
-                files_records::get(&mut tx, alice.id, file.id)
+                app_files::get(&mut tx, alice.id, file.id)
                     .await
                     .expect("ordinary read")
                     .is_none()
             );
             assert!(
-                files_records::list(&mut tx, alice.id)
+                app_files::list(&mut tx, alice.id)
                     .await
                     .expect("list")
                     .is_empty()
             );
             assert!(
-                files_records::replication::get(&mut tx, file.id)
+                app_files::replication::get(&mut tx, file.id)
                     .await
                     .expect("read")
                     .expect("tombstone")
@@ -1759,7 +1760,7 @@ pub(crate) mod tests {
                     .is_some()
             );
             assert!(
-                files_records::maintenance::list_ids(&mut tx)
+                app_files::maintenance::list_ids(&mut tx)
                     .await
                     .expect("references")
                     .contains(&(file.id, alice.id, true))

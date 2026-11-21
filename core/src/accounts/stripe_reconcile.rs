@@ -6,8 +6,8 @@
 //! is fine for a small app; a big one would ask only for what changed.
 //! See `docs/design/purchasing.md`.
 
-use crate::data::accounts_checkouts as accounts_checkouts_records;
-use crate::data::accounts_subscriptions as accounts_subscriptions_records;
+use crate::data::accounts_checkouts;
+use crate::data::accounts_subscriptions;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -49,9 +49,9 @@ pub async fn run(
 
     let mut tx = deployment.begin().await?;
     let pending_session_ids =
-        accounts_checkouts_records::processing::list_pending_stripe_session_ids(&mut tx).await?;
+        accounts_checkouts::processing::list_pending_stripe_session_ids(&mut tx).await?;
     let of_deleted_accounts =
-        accounts_subscriptions_records::processing::list_live_store_ids_of_deleted_accounts(
+        accounts_subscriptions::processing::list_live_store_ids_of_deleted_accounts(
             &mut tx,
             Store::Stripe,
         )
@@ -63,8 +63,7 @@ pub async fn run(
     }
     let mut tx = deployment.begin().await?;
     let live_subscription_ids =
-        accounts_subscriptions_records::processing::list_live_store_ids(&mut tx, Store::Stripe)
-            .await?;
+        accounts_subscriptions::processing::list_live_store_ids(&mut tx, Store::Stripe).await?;
     tx.commit().await?;
 
     for session_id in &pending_session_ids {

@@ -10,7 +10,7 @@
 //! the purchase's revocation, which `store_transactions` marks through
 //! `purchases::refund_in`.
 
-use crate::data::accounts_app_store_notifications as accounts_app_store_notifications_records;
+use crate::data::accounts_app_store_notifications;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -83,7 +83,7 @@ pub async fn create(
 
     let now = now();
     let mut tx = deployment.begin().await?;
-    let inserted = accounts_app_store_notifications_records::create(
+    let inserted = accounts_app_store_notifications::create(
         &mut tx,
         AcceptedAppStoreNotification(&AppStoreNotification {
             id: id.to_string(),
@@ -103,7 +103,7 @@ pub async fn create(
             }
         }
     }
-    let recorded = accounts_app_store_notifications_records::get(&mut tx, id).await?;
+    let recorded = accounts_app_store_notifications::get(&mut tx, id).await?;
     tx.commit().await?;
     let recorded = recorded.ok_or(sqlx::Error::RowNotFound)?;
     if inserted == 0 {
@@ -119,7 +119,7 @@ pub async fn get(
     id: &str,
 ) -> Result<Option<AppStoreNotification>, sqlx::Error> {
     let mut tx = deployment.begin().await?;
-    let recorded = accounts_app_store_notifications_records::get(&mut tx, id).await?;
+    let recorded = accounts_app_store_notifications::get(&mut tx, id).await?;
     tx.commit().await?;
     Ok(recorded)
 }

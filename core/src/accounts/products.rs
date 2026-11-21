@@ -5,7 +5,7 @@
 //! for and whether it can be bought twice are the grant's. See
 //! `docs/design/purchasing.md`.
 
-use crate::data::accounts_products as accounts_products_records;
+use crate::data::accounts_products;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -141,7 +141,7 @@ pub async fn list(deployment: &Deployment) -> Result<Vec<ProductForSale>, Produc
         return Err(ProductError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let products = accounts_products_records::list(&mut tx).await?;
+    let products = accounts_products::list(&mut tx).await?;
     let prices = prices::list_in(&mut tx).await?;
     tx.commit().await?;
     let mut for_sale: Vec<ProductForSale> = products
@@ -174,7 +174,7 @@ pub(crate) async fn get_for_sale(
         return Err(ProductError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let product = accounts_products_records::get(&mut tx, id).await?;
+    let product = accounts_products::get(&mut tx, id).await?;
     let prices = prices::list_in(&mut tx).await?;
     tx.commit().await?;
     product
@@ -196,7 +196,7 @@ pub async fn sync(
     let stripe_prices = stripe.prices_list().await?;
     let now = now();
     let mut tx = deployment.begin().await?;
-    accounts_products_records::maintenance::deactivate_all(&mut tx, now).await?;
+    accounts_products::maintenance::deactivate_all(&mut tx, now).await?;
     prices::deactivate_all_in(&mut tx, now).await?;
     for stripe_product in &stripe_products {
         upsert_in(&mut tx, stripe_product, now).await?;
@@ -204,7 +204,7 @@ pub async fn sync(
     let mut prices_copied = 0;
     for stripe_price in &stripe_prices {
         let product =
-            accounts_products_records::get_by_stripe_id(&mut tx, &stripe_price.product_id).await?;
+            accounts_products::get_by_stripe_id(&mut tx, &stripe_price.product_id).await?;
         if let Some(product) = product {
             prices::upsert_in(&mut tx, product.id, stripe_price, now).await?;
             prices_copied += 1;
@@ -233,9 +233,8 @@ pub(crate) async fn upsert_in(
         inserted_at: now,
         updated_at: now,
     };
-    accounts_products_records::upsert(&mut *tx, AcceptedProduct(&product)).await?;
-    let upserted =
-        accounts_products_records::get_by_stripe_id(&mut *tx, &stripe_product.id).await?;
+    accounts_products::upsert(&mut *tx, AcceptedProduct(&product)).await?;
+    let upserted = accounts_products::get_by_stripe_id(&mut *tx, &stripe_product.id).await?;
     upserted
         .map(|product| product.id)
         .ok_or(sqlx::Error::RowNotFound)
@@ -247,7 +246,7 @@ pub(crate) async fn deactivate_by_stripe_id_in(
     stripe_id: &str,
     now: DateTime<Utc>,
 ) -> Result<(), sqlx::Error> {
-    accounts_products_records::deactivate_by_stripe_id(&mut *tx, stripe_id, now).await
+    accounts_products::deactivate_by_stripe_id(&mut *tx, stripe_id, now).await
 }
 
 /// The product with the prices of it the catalog sells, if any: active,

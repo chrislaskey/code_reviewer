@@ -3,7 +3,7 @@
 //! and copied as it is now, as `stripe_reconcile` does for Stripe's.
 //! Server only, on a server with the App Store.
 
-use crate::data::accounts_subscriptions as accounts_subscriptions_records;
+use crate::data::accounts_subscriptions;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -39,8 +39,7 @@ pub async fn run(
     }
     let mut tx = deployment.begin().await?;
     let live =
-        accounts_subscriptions_records::processing::list_live_store_ids(&mut tx, Store::AppStore)
-            .await?;
+        accounts_subscriptions::processing::list_live_store_ids(&mut tx, Store::AppStore).await?;
     tx.commit().await?;
 
     let mut left = 0;

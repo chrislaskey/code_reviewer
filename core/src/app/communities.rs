@@ -8,8 +8,8 @@
 //! only role yet. A delete takes every membership in the community along,
 //! and with them the posts' community rows, all at the one moment.
 
-use crate::data::communities as communities_records;
-use crate::data::memberships as memberships_records;
+use crate::data::app_communities;
+use crate::data::app_users_communities;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -98,9 +98,9 @@ pub async fn list(
     user: &User,
 ) -> Result<Vec<CommunityAndMembership>, CommunityError> {
     let mut tx = deployment.begin().await?;
-    let communities = communities_records::list(&mut tx, user.id).await?;
+    let communities = app_communities::list(&mut tx, user.id).await?;
     let memberships =
-        memberships_records::list(&mut tx, memberships_records::Filter::User(user.id)).await?;
+        app_users_communities::list(&mut tx, app_users_communities::Filter::User(user.id)).await?;
     tx.commit().await?;
     Ok(communities
         .into_iter()
@@ -122,7 +122,7 @@ pub async fn get(
     id: Uuid,
 ) -> Result<CommunityAndMembership, CommunityError> {
     let mut tx = deployment.begin().await?;
-    let community = communities_records::get(&mut tx, user.id, id)
+    let community = app_communities::get(&mut tx, user.id, id)
         .await?
         .ok_or(CommunityError::NotFound { id })?;
     let membership = memberships::get_live_in(&mut tx, user.id, id).await?;
@@ -243,12 +243,12 @@ pub(crate) async fn apply_server_row(
     if events::has_pending(tx, TABLE, community.id).await? {
         return Ok(false);
     }
-    communities_records::replication::upsert(&mut *tx, AcceptedCommunity(&community)).await?;
+    app_communities::replication::upsert(&mut *tx, AcceptedCommunity(&community)).await?;
     Ok(true)
 }
 
 pub(crate) async fn delete_row(tx: &mut Transaction, id: Uuid) -> Result<(), CommunityError> {
-    Ok(communities_records::maintenance::delete(tx, id).await?)
+    Ok(app_communities::maintenance::delete(tx, id).await?)
 }
 
 /// A page of the rows the server wrote after the cursor, deleted or not.
@@ -258,7 +258,7 @@ pub(crate) async fn list_synced_after(
     after: &Cursor,
     limit: usize,
 ) -> Result<Vec<Community>, CommunityError> {
-    Ok(communities_records::replication::list_synced_after(tx, user.id, after, limit).await?)
+    Ok(app_communities::replication::list_synced_after(tx, user.id, after, limit).await?)
 }
 
 pub(crate) async fn list_by_ids(
@@ -268,14 +268,14 @@ pub(crate) async fn list_by_ids(
     if ids.is_empty() {
         return Ok(Vec::new());
     }
-    Ok(communities_records::replication::list_by_ids(tx, ids).await?)
+    Ok(app_communities::replication::list_by_ids(tx, ids).await?)
 }
 
 pub(crate) async fn get_in(
     tx: &mut Transaction,
     id: Uuid,
 ) -> Result<Option<Community>, CommunityError> {
-    Ok(communities_records::replication::get(tx, id).await?)
+    Ok(app_communities::replication::get(tx, id).await?)
 }
 
 async fn get_live(tx: &mut Transaction, id: Uuid) -> Result<Community, CommunityError> {
@@ -369,7 +369,7 @@ pub(crate) async fn apply_in(
                 Ok(community) => community,
                 Err(error) => return rejected(event, format!("invalid: {error}"), None),
             };
-            communities_records::create(&mut *tx, AcceptedCommunity(&community)).await?;
+            app_communities::create(&mut *tx, AcceptedCommunity(&community)).await?;
             finish(tx, role, user, event, Conflicts::new(), community).await
         }
         EventKind::Update => {
@@ -406,7 +406,7 @@ pub(crate) async fn apply_in(
                 updated.version += 1;
                 updated.last_synced_at = Some(now);
             }
-            communities_records::update(&mut *tx, AcceptedCommunity(&updated)).await?;
+            app_communities::update(&mut *tx, AcceptedCommunity(&updated)).await?;
             if changes.contains_key("deleted_at") && updated.deleted_at.is_some() {
                 memberships::delete_with_community(tx, role, &updated).await?;
                 files_communities::delete_with_community(tx, role, &updated)
@@ -498,7 +498,7 @@ fn checked_name(name: &str) -> Result<String, CommunityError> {
 mod tests {
     use super::*;
     use crate::app::{posts, users};
-    use crate::data::posts_communities as posts_communities_records;
+    use crate::data::app_posts_communities;
     use crate::database::{Database, with_each_database};
 
     fn server(database: Database) -> Deployment {
@@ -532,13 +532,13 @@ mod tests {
             drop(tx);
             let mut tx = deployment.begin().await.expect("transaction");
             assert!(
-                communities_records::replication::get(&mut tx, community.id)
+                app_communities::replication::get(&mut tx, community.id)
                     .await
                     .expect("read")
                     .is_none()
             );
             assert!(
-                memberships_records::replication::get(&mut tx, membership.id)
+                app_users_communities::replication::get(&mut tx, membership.id)
                     .await
                     .expect("read")
                     .is_none()
@@ -569,28 +569,28 @@ mod tests {
                 .expect("delete");
             let mut tx = deployment.begin().await.expect("transaction");
             assert!(
-                communities_records::get(&mut tx, alice.id, community.id)
+                app_communities::get(&mut tx, alice.id, community.id)
                     .await
                     .expect("read")
                     .is_none()
             );
             assert!(
-                memberships_records::get(&mut tx, alice.id, community.id)
+                app_users_communities::get(&mut tx, alice.id, community.id)
                     .await
                     .expect("read")
                     .is_none()
             );
             assert!(
-                posts_communities_records::list(
+                app_posts_communities::list(
                     &mut tx,
-                    posts_communities_records::Filter::Posts(&[post.id])
+                    app_posts_communities::Filter::Posts(&[post.id])
                 )
                 .await
                 .expect("read")
                 .is_empty()
             );
             assert!(
-                communities_records::replication::get(&mut tx, community.id)
+                app_communities::replication::get(&mut tx, community.id)
                     .await
                     .expect("read")
                     .expect("tombstone")
@@ -598,7 +598,7 @@ mod tests {
                     .is_some()
             );
             assert!(
-                memberships_records::replication::get_by_user_and_community(
+                app_users_communities::replication::get_by_user_and_community(
                     &mut tx,
                     alice.id,
                     community.id
@@ -610,7 +610,7 @@ mod tests {
                 .is_some()
             );
             assert!(
-                posts_communities_records::replication::get_by_post_and_community(
+                app_posts_communities::replication::get_by_post_and_community(
                     &mut tx,
                     post.id,
                     community.id
@@ -818,7 +818,7 @@ mod tests {
                 .expect("kept");
             assert_eq!(row.deleted_by_id, Some(bob.id));
             for member in [&alice, &bob] {
-                let membership = memberships_records::replication::get_by_user_and_community(
+                let membership = app_users_communities::replication::get_by_user_and_community(
                     &mut tx,
                     member.id,
                     gardening.id,

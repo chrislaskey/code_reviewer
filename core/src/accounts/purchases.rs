@@ -4,7 +4,7 @@
 //! store's id for it, which is how a repeat of the same payment is
 //! recognized. A refunded purchase gives nothing.
 
-use crate::data::accounts_purchases as accounts_purchases_records;
+use crate::data::accounts_purchases;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -100,7 +100,7 @@ pub async fn list(
         return Err(PurchaseError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let purchases = accounts_purchases_records::list(&mut tx, user.id).await?;
+    let purchases = accounts_purchases::list(&mut tx, user.id).await?;
     tx.commit().await?;
     Ok(purchases)
 }
@@ -115,7 +115,7 @@ pub async fn get(
         return Err(PurchaseError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let purchase = accounts_purchases_records::get(&mut tx, user.id, id).await?;
+    let purchase = accounts_purchases::get(&mut tx, user.id, id).await?;
     tx.commit().await?;
     purchase.ok_or(PurchaseError::NotFound { id })
 }
@@ -125,7 +125,7 @@ pub(crate) async fn insert_if_missing_in(
     tx: &mut Transaction,
     purchase: &Purchase,
 ) -> Result<(), sqlx::Error> {
-    accounts_purchases_records::create(&mut *tx, AcceptedPurchase(purchase)).await
+    accounts_purchases::create(&mut *tx, AcceptedPurchase(purchase)).await
 }
 
 /// Whether the user has the product, bought and not refunded.
@@ -134,7 +134,7 @@ pub(crate) async fn owns_in(
     user_id: Uuid,
     product_id: Uuid,
 ) -> Result<bool, sqlx::Error> {
-    accounts_purchases_records::owns(&mut *tx, user_id, product_id).await
+    accounts_purchases::owns(&mut *tx, user_id, product_id).await
 }
 
 /// The store's payment refunded in full: the purchase gives nothing now.
@@ -144,5 +144,5 @@ pub(crate) async fn refund_in(
     store_id: &str,
     now: DateTime<Utc>,
 ) -> Result<(), sqlx::Error> {
-    accounts_purchases_records::refund(&mut *tx, store, store_id, now).await
+    accounts_purchases::refund(&mut *tx, store, store_id, now).await
 }

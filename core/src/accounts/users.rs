@@ -4,7 +4,7 @@
 //! apps sync of a person is `crate::app::users`, a row with the same id,
 //! written with this one at sign-up, see `docs/design/multi-app.md`.
 
-use crate::data::accounts_users as accounts_users_records;
+use crate::data::accounts_users;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -14,11 +14,11 @@ use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
 
 /// An account change accepted by this lifecycle workflow.
-pub(crate) struct AcceptedUpdate<'a>(accounts_users_records::Update<'a>);
+pub(crate) struct AcceptedUpdate<'a>(accounts_users::Update<'a>);
 
 impl AcceptedUpdate<'_> {
     /// Borrows the accepted lifecycle change.
-    pub(crate) fn value(&self) -> &accounts_users_records::Update<'_> {
+    pub(crate) fn value(&self) -> &accounts_users::Update<'_> {
         &self.0
     }
 }
@@ -111,7 +111,7 @@ async fn create_with_trial_in(
         updated_at: now,
         deleted_at: None,
     };
-    accounts_users_records::create(&mut *tx, AcceptedAccountUser(&account))
+    accounts_users::create(&mut *tx, AcceptedAccountUser(&account))
         .await
         .map_err(email_taken)?;
     Ok(account)
@@ -119,10 +119,10 @@ async fn create_with_trial_in(
 
 /// Marks the account's email as proved, now.
 pub(crate) async fn confirm_in(tx: &mut Transaction, id: Uuid) -> Result<(), AccountUserError> {
-    Ok(accounts_users_records::update(
+    Ok(accounts_users::update(
         &mut *tx,
         id,
-        AcceptedUpdate(accounts_users_records::Update::Confirm(now())),
+        AcceptedUpdate(accounts_users::Update::Confirm(now())),
     )
     .await?)
 }
@@ -134,10 +134,10 @@ pub(crate) async fn sign_up_trial_in(
     id: Uuid,
     email: &str,
 ) -> Result<(), AccountUserError> {
-    accounts_users_records::update(
+    accounts_users::update(
         &mut *tx,
         id,
-        AcceptedUpdate(accounts_users_records::Update::SignUp { email, at: now() }),
+        AcceptedUpdate(accounts_users::Update::SignUp { email, at: now() }),
     )
     .await
     .map_err(email_taken)
@@ -149,13 +149,13 @@ pub(crate) async fn delete_unconfirmed_in(
     tx: &mut Transaction,
     id: Uuid,
 ) -> Result<(), AccountUserError> {
-    Ok(accounts_users_records::maintenance::delete(&mut *tx, id).await?)
+    Ok(accounts_users::maintenance::delete(&mut *tx, id).await?)
 }
 
 /// Marks the account deleted: sign-in finds it no longer, and its
 /// email is free to sign up again, see `accounts::deletions`.
 pub(crate) async fn delete_in(tx: &mut Transaction, id: Uuid) -> Result<(), AccountUserError> {
-    Ok(accounts_users_records::delete(&mut *tx, id, now()).await?)
+    Ok(accounts_users::delete(&mut *tx, id, now()).await?)
 }
 
 /// The live account by its id.
@@ -163,7 +163,7 @@ pub(crate) async fn get_in(
     tx: &mut Transaction,
     id: Uuid,
 ) -> Result<Option<AccountUser>, AccountUserError> {
-    Ok(accounts_users_records::get(tx, id).await?)
+    Ok(accounts_users::get(tx, id).await?)
 }
 
 /// The live account with the email as `checked_email` would keep it.
@@ -171,7 +171,7 @@ pub(crate) async fn get_by_email_in(
     tx: &mut Transaction,
     email: &str,
 ) -> Result<Option<AccountUser>, AccountUserError> {
-    Ok(accounts_users_records::get_by_email(&mut *tx, &normalized_email(email)).await?)
+    Ok(accounts_users::get_by_email(&mut *tx, &normalized_email(email)).await?)
 }
 
 /// Deletes the accounts that never proved their email and were made
@@ -181,13 +181,13 @@ pub(crate) async fn delete_unconfirmed_before(
     tx: &mut Transaction,
     time: DateTime<Utc>,
 ) -> Result<u64, AccountUserError> {
-    Ok(accounts_users_records::maintenance::delete_unconfirmed_before(&mut *tx, time).await?)
+    Ok(accounts_users::maintenance::delete_unconfirmed_before(&mut *tx, time).await?)
 }
 
 /// Deletes the accounts whose user the purge removed, with their
 /// credentials and tokens; how many.
 pub(crate) async fn delete_without_user(tx: &mut Transaction) -> Result<u64, AccountUserError> {
-    Ok(accounts_users_records::maintenance::delete_without_user(&mut *tx).await?)
+    Ok(accounts_users::maintenance::delete_without_user(&mut *tx).await?)
 }
 
 /// The email as it is kept: `normalized_email`, with an @ and no

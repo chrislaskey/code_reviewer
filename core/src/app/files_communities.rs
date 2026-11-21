@@ -10,8 +10,8 @@
 //! revives it. A user sees only the rows of their own communities, so
 //! nothing tells them a file is elsewhere.
 
-use crate::data::files as files_records;
-use crate::data::files_communities as files_communities_records;
+use crate::data::app_files;
+use crate::data::app_files_communities;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -145,7 +145,7 @@ pub(crate) async fn create_in(
 ) -> Result<FileCommunity, FileCommunityError> {
     let file = visible_file(tx, user, file_id).await?;
     member_of(tx, user, community_id).await?;
-    let event = match files_communities_records::replication::get_by_file_and_community(
+    let event = match app_files_communities::replication::get_by_file_and_community(
         &mut *tx,
         file.id,
         community_id,
@@ -179,7 +179,7 @@ pub(crate) async fn delete_in(
     community_id: Uuid,
 ) -> Result<FileCommunity, FileCommunityError> {
     let file = visible_file(tx, user, file_id).await?;
-    let row = match files_communities_records::replication::get_by_file_and_community(
+    let row = match app_files_communities::replication::get_by_file_and_community(
         &mut *tx,
         file.id,
         community_id,
@@ -278,7 +278,7 @@ pub(crate) async fn create_with_file(
             deleted_at: None,
             deleted_by_id: None,
         };
-        files_communities_records::create(&mut *tx, AcceptedFileCommunity(&row)).await?;
+        app_files_communities::create(&mut *tx, AcceptedFileCommunity(&row)).await?;
     }
     Ok(())
 }
@@ -289,9 +289,9 @@ pub(crate) async fn list_visible_of_files(
     user: &User,
     file_ids: &[Uuid],
 ) -> Result<Vec<FileCommunity>, FileCommunityError> {
-    Ok(files_communities_records::list(
+    Ok(app_files_communities::list(
         tx,
-        files_communities_records::Filter::FilesVisibleTo {
+        app_files_communities::Filter::FilesVisibleTo {
             user_id: user.id,
             file_ids,
         },
@@ -306,9 +306,9 @@ pub(crate) async fn delete_with_community(
     role: Role,
     community: &Community,
 ) -> Result<(), FileCommunityError> {
-    for mut row in files_communities_records::list(
+    for mut row in app_files_communities::list(
         &mut *tx,
-        files_communities_records::Filter::Community(community.id),
+        app_files_communities::Filter::Community(community.id),
     )
     .await?
     {
@@ -332,25 +332,25 @@ pub(crate) async fn apply_server_row(
     if events::has_pending(tx, TABLE, row.id).await? {
         return Ok(false);
     }
-    if files_records::replication::get(tx, row.file_id)
+    if app_files::replication::get(tx, row.file_id)
         .await?
         .is_none()
     {
         return Ok(false);
     }
-    files_communities_records::replication::upsert(&mut *tx, AcceptedFileCommunity(&row)).await?;
+    app_files_communities::replication::upsert(&mut *tx, AcceptedFileCommunity(&row)).await?;
     Ok(true)
 }
 
 pub(crate) async fn delete_row(tx: &mut Transaction, id: Uuid) -> Result<(), FileCommunityError> {
-    Ok(files_communities_records::maintenance::delete(tx, id).await?)
+    Ok(app_files_communities::maintenance::delete(tx, id).await?)
 }
 
 pub(crate) async fn get_in(
     tx: &mut Transaction,
     id: Uuid,
 ) -> Result<Option<FileCommunity>, FileCommunityError> {
-    Ok(files_communities_records::replication::get(tx, id).await?)
+    Ok(app_files_communities::replication::get(tx, id).await?)
 }
 
 pub(crate) async fn list_synced_after(
@@ -359,10 +359,7 @@ pub(crate) async fn list_synced_after(
     after: &Cursor,
     limit: usize,
 ) -> Result<Vec<FileCommunity>, FileCommunityError> {
-    Ok(
-        files_communities_records::replication::list_synced_after(tx, user.id, after, limit)
-            .await?,
-    )
+    Ok(app_files_communities::replication::list_synced_after(tx, user.id, after, limit).await?)
 }
 
 /// A page of the community's live rows after the cursor: a backfill.
@@ -373,7 +370,7 @@ pub(crate) async fn list_live_of_community_after(
     limit: usize,
 ) -> Result<Vec<FileCommunity>, FileCommunityError> {
     Ok(
-        files_communities_records::replication::list_live_of_community_after(
+        app_files_communities::replication::list_live_of_community_after(
             tx,
             community_id,
             after,
@@ -389,7 +386,7 @@ async fn visible_file(
     user: &User,
     file_id: Uuid,
 ) -> Result<File, FileCommunityError> {
-    files_records::get(tx, user.id, file_id)
+    app_files::get(tx, user.id, file_id)
         .await?
         .ok_or(FileCommunityError::UnknownFile { id: file_id })
 }
@@ -462,7 +459,7 @@ async fn apply_in(
             let Some(community_id) = id_field(&event.changes, "community_id") else {
                 return rejected(event, "unknown_community", None);
             };
-            if files_records::get(tx, user.id, file_id).await?.is_none() {
+            if app_files::get(tx, user.id, file_id).await?.is_none() {
                 return rejected(event, "unknown_file", None);
             }
             if memberships::get_live_in(tx, user.id, community_id)
@@ -472,7 +469,7 @@ async fn apply_in(
             {
                 return rejected(event, "not_a_member", None);
             }
-            match files_communities_records::replication::get_by_file_and_community(
+            match app_files_communities::replication::get_by_file_and_community(
                 &mut *tx,
                 file_id,
                 community_id,
@@ -502,8 +499,7 @@ async fn apply_in(
                         deleted_at: None,
                         deleted_by_id: None,
                     };
-                    files_communities_records::create(&mut *tx, AcceptedFileCommunity(&row))
-                        .await?;
+                    app_files_communities::create(&mut *tx, AcceptedFileCommunity(&row)).await?;
                     row
                 }
             }
@@ -531,7 +527,7 @@ async fn apply_in(
             };
             match (row.deleted_at, deleted_at) {
                 (Some(_), None) => {
-                    let file = files_records::replication::get(tx, row.file_id).await?;
+                    let file = app_files::replication::get(tx, row.file_id).await?;
                     if file.is_none_or(|file| file.deleted_at.is_some()) {
                         return rejected(event, "unknown_file", Some(row));
                     }
@@ -582,9 +578,9 @@ async fn delete_file_if_in_none(
     role: Role,
     row: &FileCommunity,
 ) -> Result<(), FileCommunityError> {
-    let live = files_communities_records::list(
+    let live = app_files_communities::list(
         &mut *tx,
-        files_communities_records::Filter::Files(&[row.file_id]),
+        app_files_communities::Filter::Files(&[row.file_id]),
     )
     .await?;
     if !live.is_empty() {
@@ -608,7 +604,7 @@ async fn write_changed(
         row.version += 1;
         row.last_synced_at = Some(now);
     }
-    files_communities_records::update(&mut *tx, AcceptedFileCommunity(row)).await?;
+    app_files_communities::update(&mut *tx, AcceptedFileCommunity(row)).await?;
     Ok(())
 }
 
@@ -888,7 +884,7 @@ mod tests {
                 .await
                 .expect("read")
                 .expect("kept until the purge");
-            let last = files_communities_records::replication::get_by_file_and_community(
+            let last = app_files_communities::replication::get_by_file_and_community(
                 &mut tx, file.id, cooking,
             )
             .await

@@ -18,11 +18,11 @@
 //! as their trial would. A local user has no account on the server.
 
 #[cfg(feature = "stripe")]
-use crate::data::accounts_subscriptions as accounts_subscriptions_records;
+use crate::data::accounts_subscriptions;
 #[cfg(any(feature = "stripe", test))]
 use crate::data::accounts_users as accounts_users_records;
-use crate::data::memberships as memberships_records;
-use crate::data::ops_staff as ops_staff_records;
+use crate::data::app_users_communities;
+use crate::data::ops_staff;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -143,16 +143,18 @@ pub async fn create(
 /// staff row and the account.
 async fn delete_in(tx: &mut Transaction, user: &User) -> Result<(), DeletionError> {
     let role = Role::Server;
-    for post in crate::data::posts::list(tx, crate::data::posts::Filter::OwnedBy(user.id)).await? {
+    for post in
+        crate::data::app_posts::list(tx, crate::data::app_posts::Filter::OwnedBy(user.id)).await?
+    {
         let event = deleted_event(posts::TABLE, post.id, post.version);
         refused_unless_applied(&posts::apply_in(tx, role, user, &event).await?.answer)?;
     }
     for membership in
-        memberships_records::list(&mut *tx, memberships_records::Filter::User(user.id)).await?
+        app_users_communities::list(&mut *tx, app_users_communities::Filter::User(user.id)).await?
     {
-        let members = memberships_records::list(
+        let members = app_users_communities::list(
             &mut *tx,
-            memberships_records::Filter::Community(membership.community_id),
+            app_users_communities::Filter::Community(membership.community_id),
         )
         .await?;
         if members.iter().all(|member| member.user_id == user.id) {
@@ -162,7 +164,7 @@ async fn delete_in(tx: &mut Transaction, user: &User) -> Result<(), DeletionErro
         }
     }
     users::delete_in(tx, user.id).await?;
-    ops_staff_records::delete(&mut *tx, user.id).await?;
+    ops_staff::delete(&mut *tx, user.id).await?;
     accounts_users::delete_in(tx, user.id).await?;
     Ok(())
 }
@@ -247,7 +249,7 @@ async fn stripe_left_in(tx: &mut Transaction, user_id: Uuid) -> Result<StripeLef
     use crate::accounts::purchases::Store;
     use crate::accounts::subscriptions::SubscriptionStatus;
 
-    let subscription_ids = accounts_subscriptions_records::list(&mut *tx, user_id)
+    let subscription_ids = accounts_subscriptions::list(&mut *tx, user_id)
         .await?
         .into_iter()
         .map(|(subscription, _product_name)| subscription)

@@ -2,7 +2,7 @@
 //! each. Server only. Someone becomes staff from the server's command
 //! line, by their email, never from a page.
 
-use crate::data::ops_staff as ops_staff_records;
+use crate::data::ops_staff;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -50,7 +50,7 @@ pub async fn get(deployment: &Deployment, user: &User) -> Result<Staff, StaffErr
         return Err(StaffError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let staff = ops_staff_records::get(&mut tx, user.id).await?;
+    let staff = ops_staff::get(&mut tx, user.id).await?;
     tx.commit().await?;
     staff.ok_or(StaffError::NotStaff)
 }
@@ -62,7 +62,7 @@ pub async fn create(deployment: &Deployment, email: &str) -> Result<Staff, Staff
     }
     let mut tx = deployment.begin().await?;
     let account = account_with_email(&mut tx, email).await?;
-    ops_staff_records::create(
+    ops_staff::create(
         &mut tx,
         AcceptedStaff(&Staff {
             user_id: account.id,
@@ -70,7 +70,7 @@ pub async fn create(deployment: &Deployment, email: &str) -> Result<Staff, Staff
         }),
     )
     .await?;
-    let staff = ops_staff_records::get(&mut tx, account.id).await?;
+    let staff = ops_staff::get(&mut tx, account.id).await?;
     tx.commit().await?;
     staff.ok_or(StaffError::NotStaff)
 }
@@ -83,7 +83,7 @@ pub async fn delete(deployment: &Deployment, email: &str) -> Result<(), StaffErr
     }
     let mut tx = deployment.begin().await?;
     let account = account_with_email(&mut tx, email).await?;
-    let deleted = ops_staff_records::delete(&mut tx, account.id).await?;
+    let deleted = ops_staff::delete(&mut tx, account.id).await?;
     tx.commit().await?;
     if deleted == 0 {
         return Err(StaffError::NotStaff);

@@ -7,7 +7,7 @@
 //! fetched from Stripe and copied as it is now, so events out of order
 //! never leave an older state. See `docs/design/purchasing.md`.
 
-use crate::data::accounts_stripe_events as accounts_stripe_events_records;
+use crate::data::accounts_stripe_events;
 use chrono::{DateTime, Utc};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
@@ -137,7 +137,7 @@ pub async fn create(
 
     let now = now();
     let mut tx = deployment.begin().await?;
-    let inserted = accounts_stripe_events_records::create(
+    let inserted = accounts_stripe_events::create(
         &mut tx,
         AcceptedStripeEvent(&StripeEvent {
             id: id.to_string(),
@@ -149,7 +149,7 @@ pub async fn create(
     if inserted > 0 {
         apply_in(&mut tx, fetched, now).await?;
     }
-    let recorded = accounts_stripe_events_records::get(&mut tx, id).await?;
+    let recorded = accounts_stripe_events::get(&mut tx, id).await?;
     tx.commit().await?;
     let recorded = recorded.ok_or(sqlx::Error::RowNotFound)?;
     if inserted == 0 {
@@ -248,7 +248,7 @@ pub async fn get(
         return Err(StripeEventError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let event = accounts_stripe_events_records::get(&mut tx, id).await?;
+    let event = accounts_stripe_events::get(&mut tx, id).await?;
     tx.commit().await?;
     Ok(event)
 }
@@ -309,7 +309,7 @@ mod tests {
                 handled_at: now(),
             };
             assert_eq!(
-                accounts_stripe_events_records::create(&mut tx, AcceptedStripeEvent(&receipt))
+                accounts_stripe_events::create(&mut tx, AcceptedStripeEvent(&receipt))
                     .await
                     .expect("receipt"),
                 1

@@ -22,7 +22,7 @@ use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind
 use crate::app::posts_communities::{self, PostCommunityError};
 use crate::app::sync::{Cursor, TableRow};
 use crate::app::users::{self, User};
-use crate::data::posts as records;
+use crate::data::app_posts;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;
@@ -105,7 +105,7 @@ pub async fn list(
     user: &User,
 ) -> Result<Vec<PostWithOwnerAndCommunities>, PostError> {
     let mut tx = deployment.begin().await?;
-    let posts = records::list(&mut tx, records::Filter::VisibleTo(user.id)).await?;
+    let posts = app_posts::list(&mut tx, app_posts::Filter::VisibleTo(user.id)).await?;
     let listed = with_owners_and_communities(&mut tx, posts).await?;
     tx.commit().await?;
     Ok(listed)
@@ -227,19 +227,19 @@ pub(crate) async fn apply_server_row(tx: &mut Transaction, row: &Value) -> Resul
     if events::has_pending(tx, TABLE, post.id).await? {
         return Ok(false);
     }
-    records::replication::upsert(tx, AcceptedPost(&post)).await?;
+    app_posts::replication::upsert(tx, AcceptedPost(&post)).await?;
     Ok(true)
 }
 
 /// Removes a device's post whose create the server refused.
 pub(crate) async fn delete_row(tx: &mut Transaction, id: Uuid) -> Result<(), PostError> {
-    Ok(records::maintenance::delete(tx, id).await?)
+    Ok(app_posts::maintenance::delete(tx, id).await?)
 }
 
 /// Removes every post the user no longer sees from a device, after a
 /// pull: not theirs, and in no community they are in. How many went.
 pub(crate) async fn prune(tx: &mut Transaction, user: &User) -> Result<u64, PostError> {
-    Ok(records::maintenance::prune(tx, user.id).await?)
+    Ok(app_posts::maintenance::prune(tx, user.id).await?)
 }
 
 /// The posts with their owners and live communities, in the order given.
@@ -293,17 +293,17 @@ pub(crate) async fn list_synced_after(
     after: &Cursor,
     limit: usize,
 ) -> Result<Vec<Post>, PostError> {
-    Ok(records::replication::list(tx, user.id, after, limit).await?)
+    Ok(app_posts::replication::list(tx, user.id, after, limit).await?)
 }
 
 /// The row by its id, deleted or not, whoever sees it.
 pub(crate) async fn get_in(tx: &mut Transaction, id: Uuid) -> Result<Option<Post>, PostError> {
-    Ok(records::replication::get(tx, id).await?)
+    Ok(app_posts::replication::get(tx, id).await?)
 }
 
 /// The live post, if the user sees it.
 async fn get_live(tx: &mut Transaction, user: &User, id: Uuid) -> Result<Post, PostError> {
-    match records::get(tx, user.id, id).await? {
+    match app_posts::get(tx, user.id, id).await? {
         Some(post) if post.deleted_at.is_none() => Ok(post),
         _ => Err(PostError::NotFound { id }),
     }
@@ -391,7 +391,7 @@ pub(crate) async fn apply_in(
                 Ok(post) => post,
                 Err(error) => return rejected(event, format!("invalid: {error}"), None),
             };
-            records::create(tx, AcceptedPost(&post)).await?;
+            app_posts::create(tx, AcceptedPost(&post)).await?;
             finish(tx, role, user, event, Conflicts::new(), post).await?
         }
         EventKind::Update => {
@@ -423,7 +423,7 @@ pub(crate) async fn apply_in(
                     updated.version += 1;
                     updated.last_synced_at = Some(now);
                 }
-                records::update(tx, AcceptedPost(&updated)).await?;
+                app_posts::update(tx, AcceptedPost(&updated)).await?;
                 if changes.contains_key("deleted_at") && updated.deleted_at.is_some() {
                     posts_communities::delete_with_post(tx, role, &updated).await?;
                 }
@@ -555,13 +555,13 @@ mod tests {
                 .expect("post");
             let mut tx = deployment.begin().await.expect("transaction");
             assert!(
-                records::get(&mut tx, bob.id, post.id)
+                app_posts::get(&mut tx, bob.id, post.id)
                     .await
                     .expect("read")
                     .is_none()
             );
             assert!(
-                records::get(&mut tx, alice.id, post.id)
+                app_posts::get(&mut tx, alice.id, post.id)
                     .await
                     .expect("read")
                     .is_some()
@@ -570,13 +570,13 @@ mod tests {
             delete(&deployment, &alice, post.id).await.expect("delete");
             let mut tx = deployment.begin().await.expect("transaction");
             assert!(
-                records::get(&mut tx, alice.id, post.id)
+                app_posts::get(&mut tx, alice.id, post.id)
                     .await
                     .expect("read")
                     .is_none()
             );
             assert!(
-                records::replication::get(&mut tx, post.id)
+                app_posts::replication::get(&mut tx, post.id)
                     .await
                     .expect("tombstone")
                     .expect("row")

@@ -14,12 +14,12 @@
 //! it. Nothing a local user made exists anywhere else, so there is
 //! nothing to merge.
 
-use crate::data::communities as communities_records;
+use crate::data::app_communities;
+use crate::data::app_files;
+use crate::data::app_posts_communities;
+use crate::data::app_users_communities;
 use crate::data::device_settings as device_settings_records;
-use crate::data::files as files_records;
-use crate::data::local_users as local_users_records;
-use crate::data::memberships as memberships_records;
-use crate::data::posts_communities as posts_communities_records;
+use crate::data::local_users;
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Duration, Utc};
@@ -156,7 +156,7 @@ pub(crate) async fn is_signed_in_in(tx: &mut Transaction) -> Result<bool, sqlx::
 pub async fn count_items(deployment: &Deployment) -> Result<i64, LocalUserError> {
     let mut tx = deployment.begin().await?;
     let local = local_user_in(&mut tx).await?;
-    let count = local_users_records::count_items(&mut tx, local).await?;
+    let count = local_users::count_items(&mut tx, local).await?;
     tx.commit().await?;
     Ok(count)
 }
@@ -178,9 +178,9 @@ pub async fn move_to_account(
     let mut tx = deployment.begin().await?;
     let local = local_user_in(&mut tx).await?;
     users::upsert_in(&mut tx, &account).await?;
-    local_users_records::maintenance::give_rows_to_user(&mut tx, local, account.id).await?;
-    local_users_records::maintenance::delete_deleted_rows(&mut tx).await?;
-    local_users_records::maintenance::delete_user(&mut tx, local).await?;
+    local_users::maintenance::give_rows_to_user(&mut tx, local, account.id).await?;
+    local_users::maintenance::delete_deleted_rows(&mut tx).await?;
+    local_users::maintenance::delete_user(&mut tx, local).await?;
     let signed_in = SignedIn {
         user_id: account.id,
         token: Some(session.token),
@@ -250,7 +250,7 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
             ));
         };
 
-    for community in communities_records::list(&mut *tx, user.id).await? {
+    for community in app_communities::list(&mut *tx, user.id).await? {
         add(
             communities::TABLE,
             community.id,
@@ -260,7 +260,7 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
         );
     }
     for membership in
-        memberships_records::list(&mut *tx, memberships_records::Filter::User(user.id)).await?
+        app_users_communities::list(&mut *tx, app_users_communities::Filter::User(user.id)).await?
     {
         add(
             memberships::TABLE,
@@ -275,7 +275,8 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
         );
     }
     let posts =
-        crate::data::posts::list(tx, crate::data::posts::Filter::VisibleTo(user.id)).await?;
+        crate::data::app_posts::list(tx, crate::data::app_posts::Filter::VisibleTo(user.id))
+            .await?;
     let post_ids: Vec<Uuid> = posts.iter().map(|post| post.id).collect();
     for post in posts {
         add(
@@ -287,11 +288,9 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
         );
     }
     if !post_ids.is_empty() {
-        for row in posts_communities_records::list(
-            &mut *tx,
-            posts_communities_records::Filter::Posts(&post_ids),
-        )
-        .await?
+        for row in
+            app_posts_communities::list(&mut *tx, app_posts_communities::Filter::Posts(&post_ids))
+                .await?
         {
             add(
                 posts_communities::TABLE,
@@ -307,8 +306,8 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
         }
     }
     let memberships =
-        memberships_records::list(&mut *tx, memberships_records::Filter::User(user.id)).await?;
-    let files = files_records::list(&mut *tx, user.id).await?;
+        app_users_communities::list(&mut *tx, app_users_communities::Filter::User(user.id)).await?;
+    let files = app_files::list(&mut *tx, user.id).await?;
     let file_ids: Vec<Uuid> = files.iter().map(|file| file.id).collect();
     let files_communities = files_communities::list_visible_of_files(tx, user, &file_ids).await?;
     for file in files {

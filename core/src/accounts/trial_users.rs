@@ -7,9 +7,9 @@
 //! `trial_expires_at`:
 //!
 //! - nobody else sees their communities or joins them, and they join
-//!   nobody else's (`data::communities`, `memberships`), so nothing
+//!   nobody else's (`data::app_communities`, `memberships`), so nothing
 //!   of theirs ever reaches a device or another person;
-//! - they see only their own communities (`data::communities`);
+//! - they see only their own communities (`data::app_communities`);
 //! - they have no files and no picture (`files::create_upload`,
 //!   `avatars::create_upload`);
 //! - they make `MAX_WRITES` writes and no more (`events::record`);
@@ -20,7 +20,7 @@
 //! full one: nothing moves, since every row is already theirs.
 
 use crate::data::accounts_users as accounts_users_records;
-use crate::data::trial_users as trial_users_records;
+use crate::data::trial_users;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -99,7 +99,7 @@ pub async fn create(deployment: &Deployment, max: i64) -> Result<Session, TrialU
         return Err(TrialUserError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    if trial_users_records::count(&mut tx).await? >= max {
+    if trial_users::count(&mut tx).await? >= max {
         return Err(TrialUserError::Full);
     }
     let name = format!("{NAME_PREFIX}{}", random::letters_and_digits(11));
@@ -121,7 +121,7 @@ pub async fn create(deployment: &Deployment, max: i64) -> Result<Session, TrialU
 /// How many trial users there are, for the cap.
 pub async fn count(deployment: &Deployment) -> Result<i64, TrialUserError> {
     let mut tx = deployment.begin().await?;
-    let count = trial_users_records::count(&mut tx).await?;
+    let count = trial_users::count(&mut tx).await?;
     tx.commit().await?;
     Ok(count)
 }
@@ -143,7 +143,7 @@ pub(crate) async fn writes_are_full_in(
     if !account.is_some_and(|account| account.trial_expires_at.is_some()) {
         return Ok(false);
     }
-    Ok(trial_users_records::count_writes(tx, user_id).await? >= MAX_WRITES)
+    Ok(trial_users::count_writes(tx, user_id).await? >= MAX_WRITES)
 }
 
 /// Removes outright every trial user whose trial ended more than
@@ -159,8 +159,7 @@ pub async fn delete_expired(
     }
     let ended_before = now - Duration::hours(KEPT_AFTER_HOURS);
     let mut tx = deployment.begin().await?;
-    let users =
-        trial_users_records::maintenance::delete_expired_before(&mut tx, ended_before).await?;
+    let users = trial_users::maintenance::delete_expired_before(&mut tx, ended_before).await?;
     tx.commit().await?;
     Ok(TrialUsersDeleted { users })
 }
@@ -169,7 +168,7 @@ pub async fn delete_expired(
 /// `delete_expired` would later: a trial deleting itself, see
 /// `accounts::deletions`. Whether they were a trial.
 pub(crate) async fn delete_in(tx: &mut Transaction, user_id: Uuid) -> Result<bool, sqlx::Error> {
-    trial_users_records::maintenance::delete_one(tx, user_id).await
+    trial_users::maintenance::delete_one(tx, user_id).await
 }
 
 /// Shows a trial user's communities to everyone, once they signed up:
@@ -178,7 +177,7 @@ pub(crate) async fn show_communities_in(
     tx: &mut Transaction,
     user_id: Uuid,
 ) -> Result<(), sqlx::Error> {
-    trial_users_records::maintenance::touch_communities_of(tx, user_id, now()).await
+    trial_users::maintenance::touch_communities_of(tx, user_id, now()).await
 }
 
 #[cfg(test)]
@@ -358,7 +357,7 @@ mod tests {
             let server = server(database);
             let trial = create(&server, 10).await.expect("a trial").user;
             let mut tx = server.begin().await.expect("a transaction");
-            let made = trial_users_records::count_writes(&mut tx, trial.id)
+            let made = trial_users::count_writes(&mut tx, trial.id)
                 .await
                 .expect("counted");
             tx.commit().await.expect("committed");
@@ -400,7 +399,7 @@ mod tests {
                 "whatever the resource"
             );
             let mut tx = server.begin().await.expect("a transaction");
-            let recorded = trial_users_records::count_writes(&mut tx, trial.id)
+            let recorded = trial_users::count_writes(&mut tx, trial.id)
                 .await
                 .expect("counted");
             tx.commit().await.expect("committed");

@@ -7,8 +7,8 @@
 //! product id, which is the lookup key, one plan per user, and a
 //! product bought once only once.
 
-use crate::data::accounts_purchases as accounts_purchases_records;
-use crate::data::accounts_subscriptions as accounts_subscriptions_records;
+use crate::data::accounts_purchases;
+use crate::data::accounts_subscriptions;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -168,7 +168,7 @@ pub async fn apply_in(
     let store_id = transaction.details.store_id();
     let existing = match &transaction.details {
         StoreTransactionDetails::OneTime { .. } => {
-            accounts_purchases_records::processing::get_ids_by_store_id(
+            accounts_purchases::processing::get_ids_by_store_id(
                 &mut *tx,
                 transaction.store,
                 store_id,
@@ -176,7 +176,7 @@ pub async fn apply_in(
             .await?
         }
         StoreTransactionDetails::Subscription { .. } => {
-            accounts_subscriptions_records::processing::get_ids_by_store_id(
+            accounts_subscriptions::processing::get_ids_by_store_id(
                 &mut *tx,
                 transaction.store,
                 store_id,
@@ -227,7 +227,7 @@ pub async fn apply_in(
             if let Some(refunded_at) = refunded_at {
                 purchases::refund_in(tx, transaction.store, store_id, *refunded_at).await?;
             }
-            let (id, _) = accounts_purchases_records::processing::get_ids_by_store_id(
+            let (id, _) = accounts_purchases::processing::get_ids_by_store_id(
                 &mut *tx,
                 transaction.store,
                 store_id,
@@ -251,7 +251,7 @@ pub async fn apply_in(
             }
             let replaced = match replaced_store_id {
                 Some(replaced) => {
-                    accounts_subscriptions_records::processing::get_ids_by_store_id(
+                    accounts_subscriptions::processing::get_ids_by_store_id(
                         &mut *tx,
                         transaction.store,
                         replaced,
@@ -291,7 +291,7 @@ pub async fn apply_in(
             if let Some((replaced_id, _)) = replaced {
                 end_replaced_in(tx, replaced_id, now).await?;
             }
-            let (id, _) = accounts_subscriptions_records::processing::get_ids_by_store_id(
+            let (id, _) = accounts_subscriptions::processing::get_ids_by_store_id(
                 &mut *tx,
                 transaction.store,
                 store_id,
@@ -371,8 +371,7 @@ async fn end_replaced_in(
     id: Uuid,
     now: DateTime<Utc>,
 ) -> Result<(), sqlx::Error> {
-    let Some((replaced, _)) = accounts_subscriptions_records::processing::get(&mut *tx, id).await?
-    else {
+    let Some((replaced, _)) = accounts_subscriptions::processing::get(&mut *tx, id).await? else {
         return Ok(());
     };
     if replaced.ended_at.is_some() {

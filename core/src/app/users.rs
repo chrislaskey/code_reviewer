@@ -8,7 +8,7 @@
 //! `get_by_token`, and a device keeps who is signed in as a device
 //! setting, `signed_in`. Nobody acts until someone signs in.
 
-use crate::data::users as users_records;
+use crate::data::app_users;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -166,7 +166,7 @@ pub(crate) async fn create_in(
         deleted_by_id: None,
         avatar_url: None,
     };
-    users_records::create(&mut *tx, AcceptedUser(&user)).await?;
+    app_users::create(&mut *tx, AcceptedUser(&user)).await?;
     Ok(user)
 }
 
@@ -282,7 +282,7 @@ pub(crate) async fn apply_in(
         updated.version += 1;
         updated.last_synced_at = Some(now);
     }
-    users_records::update(&mut *tx, AcceptedUser(&updated)).await?;
+    app_users::update(&mut *tx, AcceptedUser(&updated)).await?;
     finish(tx, role, user, event, conflicts, updated).await
 }
 
@@ -334,7 +334,7 @@ pub(crate) async fn update_name_in(
         last_synced_at: Some(now),
         ..user
     };
-    users_records::update(&mut *tx, AcceptedUser(&updated)).await?;
+    app_users::update(&mut *tx, AcceptedUser(&updated)).await?;
     Ok(updated)
 }
 
@@ -364,7 +364,7 @@ pub(crate) async fn update_avatar_url_in(
         last_synced_at: Some(now),
         ..user
     };
-    users_records::update(&mut *tx, AcceptedUser(&updated)).await?;
+    app_users::update(&mut *tx, AcceptedUser(&updated)).await?;
     let answer = Answer::applied(
         event.id,
         updated.version,
@@ -410,7 +410,7 @@ pub(crate) async fn delete_in(tx: &mut Transaction, id: Uuid) -> Result<User, Us
         deleted_by_id: Some(id),
         ..user
     };
-    users_records::delete(&mut *tx, AcceptedUser(&deleted)).await?;
+    app_users::delete(&mut *tx, AcceptedUser(&deleted)).await?;
     let answer = Answer::applied(
         event.id,
         deleted.version,
@@ -425,7 +425,7 @@ pub(crate) async fn delete_in(tx: &mut Transaction, id: Uuid) -> Result<User, Us
 /// its file until the purge removes the row.
 #[cfg_attr(not(feature = "object-storage"), allow(dead_code))]
 pub(crate) async fn list_avatar_urls_in(tx: &mut Transaction) -> Result<Vec<String>, UserError> {
-    Ok(users_records::maintenance::list_avatar_urls(tx).await?)
+    Ok(app_users::maintenance::list_avatar_urls(tx).await?)
 }
 
 /// Deletes the users whose account never proved its email and was made
@@ -434,7 +434,7 @@ pub(crate) async fn delete_of_unconfirmed_accounts_before(
     tx: &mut Transaction,
     time: DateTime<Utc>,
 ) -> Result<(), UserError> {
-    Ok(users_records::maintenance::delete_of_unconfirmed_accounts_before(&mut *tx, time).await?)
+    Ok(app_users::maintenance::delete_of_unconfirmed_accounts_before(&mut *tx, time).await?)
 }
 
 /// The live user the token stands for, on the server; a token the
@@ -443,7 +443,7 @@ pub(crate) async fn delete_of_unconfirmed_accounts_before(
 pub async fn get_by_token(deployment: &Deployment, token: &str) -> Result<User, UserError> {
     let (api_made_after, session_made_after) = tokens::made_after_to_be_valid(now());
     let mut tx = deployment.begin().await?;
-    let user = users_records::authentication::get_by_token_hash(
+    let user = app_users::authentication::get_by_token_hash(
         &mut tx,
         &tokens::hash(token),
         api_made_after,
@@ -503,7 +503,7 @@ pub(crate) async fn apply_server_row(tx: &mut Transaction, row: &Value) -> Resul
 
 /// Writes the server's row, or inserts it.
 pub(crate) async fn upsert_in(tx: &mut Transaction, user: &User) -> Result<(), UserError> {
-    Ok(users_records::replication::upsert(&mut *tx, AcceptedUser(user)).await?)
+    Ok(app_users::replication::upsert(&mut *tx, AcceptedUser(user)).await?)
 }
 
 /// A page of the rows the server wrote after the cursor that the user
@@ -514,11 +514,11 @@ pub(crate) async fn list_synced_after(
     after: &Cursor,
     limit: usize,
 ) -> Result<Vec<User>, UserError> {
-    Ok(users_records::replication::list_synced_after(tx, user.id, after, limit).await?)
+    Ok(app_users::replication::list_synced_after(tx, user.id, after, limit).await?)
 }
 
 pub(crate) async fn get_in(tx: &mut Transaction, id: Uuid) -> Result<Option<User>, UserError> {
-    Ok(users_records::replication::get(tx, id).await?)
+    Ok(app_users::replication::get(tx, id).await?)
 }
 
 pub(crate) async fn list_by_ids(
@@ -528,11 +528,11 @@ pub(crate) async fn list_by_ids(
     if ids.is_empty() {
         return Ok(Vec::new());
     }
-    Ok(users_records::replication::list_by_ids(tx, ids).await?)
+    Ok(app_users::replication::list_by_ids(tx, ids).await?)
 }
 
 async fn get_live(tx: &mut Transaction, id: Uuid) -> Result<User, UserError> {
-    match users_records::get(tx, id).await? {
+    match app_users::get(tx, id).await? {
         Some(user) => Ok(user),
         _ => Err(UserError::NotFound { id }),
     }
@@ -559,7 +559,7 @@ pub(crate) async fn name_from_email_in(
             .take(MAX_NAME_LENGTH - suffix.len())
             .collect();
         let name = checked_name(&format!("{start}{suffix}"))?;
-        if !users_records::exists_by_name(&mut *tx, &name, id).await? {
+        if !app_users::exists_by_name(&mut *tx, &name, id).await? {
             return Ok(name);
         }
         number += 1;
@@ -675,7 +675,7 @@ pub(crate) mod tests {
             ));
             let mut tx = deployment.begin().await.expect("transaction");
             assert!(
-                users_records::get(&mut tx, alice.id)
+                app_users::get(&mut tx, alice.id)
                     .await
                     .expect("ordinary read")
                     .is_none()

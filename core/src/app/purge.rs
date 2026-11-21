@@ -13,8 +13,8 @@
 //!
 //! It runs daily, before the sweeps, see `jobs`.
 
-use crate::data::events as events_records;
-use crate::data::purges as purges_records;
+use crate::data::app_events;
+use crate::data::app_purges;
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Duration, Utc};
@@ -42,14 +42,14 @@ pub const RETENTION_DAYS: i64 = 90;
 pub const UNCONFIRMED_DAYS: i64 = 1;
 
 /// The tables purged, children first.
-const TABLES: &[purges_records::Table] = &[
-    purges_records::Table::PostsCommunities,
-    purges_records::Table::Posts,
-    purges_records::Table::FilesCommunities,
-    purges_records::Table::Files,
-    purges_records::Table::Memberships,
-    purges_records::Table::Communities,
-    purges_records::Table::Users,
+const TABLES: &[app_purges::Table] = &[
+    app_purges::Table::PostsCommunities,
+    app_purges::Table::Posts,
+    app_purges::Table::FilesCommunities,
+    app_purges::Table::Files,
+    app_purges::Table::Memberships,
+    app_purges::Table::Communities,
+    app_purges::Table::Users,
 ];
 
 /// One run as `app_purges` keeps it.
@@ -92,10 +92,10 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
     let mut removed = BTreeMap::new();
     for table in TABLES {
         let count =
-            purges_records::maintenance::delete_deleted_before(&mut tx, *table, horizon).await?;
+            app_purges::maintenance::delete_deleted_before(&mut tx, *table, horizon).await?;
         removed.insert(table.name().to_string(), count);
     }
-    let events = events_records::maintenance::delete_of_missing_rows(&mut tx).await?;
+    let events = app_events::maintenance::delete_of_missing_rows(&mut tx).await?;
     removed.insert("app_events".to_string(), events);
     let expired_tokens = tokens::delete_expired(&mut tx, now).await?;
     removed.insert("accounts_tokens".to_string(), expired_tokens);
@@ -111,7 +111,7 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
         horizon,
         inserted_at: now,
     };
-    purges_records::create(&mut tx, AcceptedPurge(&purge)).await?;
+    app_purges::create(&mut tx, AcceptedPurge(&purge)).await?;
     tx.commit().await?;
     Ok(PurgeReport { horizon, removed })
 }
@@ -120,7 +120,7 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
 /// learn of, or none before the first run.
 pub async fn horizon(deployment: &Deployment) -> Result<Option<DateTime<Utc>>, PurgeError> {
     let mut tx = deployment.begin().await?;
-    let horizon = purges_records::get(&mut tx).await?;
+    let horizon = app_purges::get(&mut tx).await?;
     tx.commit().await?;
     Ok(horizon)
 }

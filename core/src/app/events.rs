@@ -14,7 +14,7 @@
 //! a server or a bucket that is failing, so an outage of any length
 //! refuses nothing.
 
-use crate::data::events as events_records;
+use crate::data::app_events;
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
@@ -356,7 +356,7 @@ pub async fn record(
         last_error: answer.reason.clone(),
         attempts: 0,
     };
-    Ok(events_records::create(tx, AcceptedEvent(&stored)).await?)
+    Ok(app_events::create(tx, AcceptedEvent(&stored)).await?)
 }
 
 /// Queues an event a device applied, for the next push. A local user's
@@ -375,22 +375,22 @@ pub async fn queue(tx: &mut Transaction, user_id: Uuid, event: &Event) -> Result
         last_error: None,
         attempts: 0,
     };
-    events_records::create(tx, AcceptedEvent(&stored)).await
+    app_events::create(tx, AcceptedEvent(&stored)).await
 }
 
 pub async fn get(tx: &mut Transaction, id: Uuid) -> Result<Option<StoredEvent>, sqlx::Error> {
-    events_records::get(tx, id).await
+    app_events::get(tx, id).await
 }
 
 /// The events not yet answered, in the order they were made.
 pub async fn pending(tx: &mut Transaction) -> Result<Vec<StoredEvent>, sqlx::Error> {
-    events_records::list(tx, events_records::Filter::Status(EventStatus::Pending)).await
+    app_events::list(tx, app_events::Filter::Status(EventStatus::Pending)).await
 }
 
 /// The conflicts the person has not resolved, newest first.
 pub async fn conflicts(tx: &mut Transaction) -> Result<Vec<StoredEvent>, sqlx::Error> {
     let mut conflicts =
-        events_records::list(tx, events_records::Filter::Status(EventStatus::Conflict)).await?;
+        app_events::list(tx, app_events::Filter::Status(EventStatus::Conflict)).await?;
     conflicts.reverse();
     Ok(conflicts)
 }
@@ -400,11 +400,11 @@ pub async fn list_of_table(
     tx: &mut Transaction,
     table: &str,
 ) -> Result<Vec<StoredEvent>, sqlx::Error> {
-    events_records::list(tx, events_records::Filter::Table(table)).await
+    app_events::list(tx, app_events::Filter::Table(table)).await
 }
 
 pub async fn count(tx: &mut Transaction, status: EventStatus) -> Result<i64, sqlx::Error> {
-    events_records::count(tx, status).await
+    app_events::count(tx, status).await
 }
 
 /// Whether the row has an event not yet answered, in which case a row
@@ -414,11 +414,11 @@ pub async fn has_pending(
     table: &str,
     row_id: Uuid,
 ) -> Result<bool, sqlx::Error> {
-    events_records::has_pending(tx, table, row_id).await
+    app_events::has_pending(tx, table, row_id).await
 }
 
 pub async fn delete(tx: &mut Transaction, id: Uuid) -> Result<(), sqlx::Error> {
-    events_records::delete(tx, id).await
+    app_events::delete(tx, id).await
 }
 
 pub async fn delete_pending_of_row(
@@ -426,7 +426,7 @@ pub async fn delete_pending_of_row(
     table: &str,
     row_id: Uuid,
 ) -> Result<(), sqlx::Error> {
-    events_records::delete_pending_of_row(tx, table, row_id).await
+    app_events::delete_pending_of_row(tx, table, row_id).await
 }
 
 /// Removes every event of the row, whatever its status.
@@ -435,7 +435,7 @@ pub async fn delete_of_row(
     table: &str,
     row_id: Uuid,
 ) -> Result<(), sqlx::Error> {
-    events_records::delete_of_row(tx, table, row_id).await
+    app_events::delete_of_row(tx, table, row_id).await
 }
 
 pub async fn mark_conflict(
@@ -443,13 +443,13 @@ pub async fn mark_conflict(
     id: Uuid,
     conflicts: &Conflicts,
 ) -> Result<(), sqlx::Error> {
-    events_records::processing::mark_conflict(tx, id, conflicts).await
+    app_events::processing::mark_conflict(tx, id, conflicts).await
 }
 
 /// Keeps why a pending event did not go, without counting a try: the
 /// server or the bucket was not reached, or is failing.
 pub async fn mark_error(tx: &mut Transaction, id: Uuid, reason: &str) -> Result<(), sqlx::Error> {
-    events_records::processing::mark_error(tx, id, reason).await
+    app_events::processing::mark_error(tx, id, reason).await
 }
 
 /// Counts a try the server or the bucket said no to, with why. At
@@ -459,7 +459,7 @@ pub async fn count_attempt(
     id: Uuid,
     reason: &str,
 ) -> Result<bool, sqlx::Error> {
-    let attempts = events_records::processing::add_attempt(&mut *tx, id, reason).await?;
+    let attempts = app_events::processing::add_attempt(&mut *tx, id, reason).await?;
     if attempts < MAX_ATTEMPTS {
         return Ok(false);
     }
@@ -488,12 +488,12 @@ pub async fn refuse(tx: &mut Transaction, id: Uuid, reason: &str) -> Result<(), 
             )
         })
         .collect();
-    events_records::processing::mark_refused(tx, id, &conflicts, reason).await
+    app_events::processing::mark_refused(tx, id, &conflicts, reason).await
 }
 
 /// Puts a refused event back in the queue, its tries counted from none.
 pub async fn try_again(tx: &mut Transaction, id: Uuid) -> Result<(), sqlx::Error> {
-    events_records::processing::mark_pending(tx, id).await
+    app_events::processing::mark_pending(tx, id).await
 }
 
 #[cfg(test)]

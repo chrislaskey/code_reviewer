@@ -15,8 +15,8 @@
 //! offline, `set_offline`, a device setting, makes no request at all
 //! until it chooses otherwise.
 
-use crate::data::sync_backfills as sync_backfills_records;
-use crate::data::sync_state as sync_state_records;
+use crate::data::app_sync_backfills;
+use crate::data::app_sync_state;
 use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
 use std::path::Path;
@@ -1281,7 +1281,7 @@ pub async fn status(deployment: &Deployment) -> Result<Status, SyncError> {
         offline: device_settings::get(&mut tx, WORK_OFFLINE).await?,
         pending: events::count(&mut tx, EventStatus::Pending).await?,
         conflicts: events::count(&mut tx, EventStatus::Conflict).await?,
-        cursor: sync_state_records::get(&mut tx).await?,
+        cursor: app_sync_state::get(&mut tx).await?,
     };
     tx.commit().await?;
     Ok(status)
@@ -1495,7 +1495,7 @@ async fn pull_pages<T: Transport>(
         }
         report.pulled += page.rows.len();
         if let Some(cursor) = page.cursor {
-            sync_state_records::upsert(&mut tx, &cursor).await?;
+            app_sync_state::upsert(&mut tx, &cursor).await?;
         }
         tx.commit().await?;
         match page.next {
@@ -1519,7 +1519,7 @@ async fn pull_pages<T: Transport>(
 /// posts point at it.
 async fn reset(deployment: &Deployment, user: &User) -> Result<(), SyncError> {
     let mut tx = deployment.begin().await?;
-    sync_state_records::maintenance::reset(&mut tx, user.id).await?;
+    app_sync_state::maintenance::reset(&mut tx, user.id).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -1535,7 +1535,7 @@ async fn backfill_pending<T: Transport>(
     report: &mut Report,
 ) -> Result<(), SyncError> {
     let mut tx = deployment.begin().await?;
-    let communities = sync_backfills_records::list(&mut tx).await?;
+    let communities = app_sync_backfills::list(&mut tx).await?;
     tx.commit().await?;
     for community_id in communities {
         let mut after = None;
@@ -1556,7 +1556,7 @@ async fn backfill_pending<T: Transport>(
             }
             report.backfilled += page.rows.len();
             if page.next.is_none() {
-                sync_backfills_records::delete(&mut tx, community_id).await?;
+                app_sync_backfills::delete(&mut tx, community_id).await?;
             }
             tx.commit().await?;
             match page.next {
@@ -1608,7 +1608,7 @@ async fn apply_row(tx: &mut Transaction, user: &User, row: &TableRow) -> Result<
                     .is_none_or(|had| had.deleted_at.is_some() || had.last_synced_at.is_none());
             let written = memberships::apply_server_row(tx, &row.row).await?;
             if written && joined {
-                sync_backfills_records::create(&mut *tx, incoming.community_id).await?;
+                app_sync_backfills::create(&mut *tx, incoming.community_id).await?;
             }
             Ok(written)
         }
@@ -1739,7 +1739,7 @@ pub(crate) mod tests {
                 for row in &rows {
                     assert!(apply_row(&mut tx, &user, row).await.expect("apply"));
                 }
-                sync_state_records::upsert(&mut tx, &cursor)
+                app_sync_state::upsert(&mut tx, &cursor)
                     .await
                     .expect("cursor");
                 device_settings::set(&mut tx, device_settings::WORK_OFFLINE, &true)
@@ -1766,15 +1766,13 @@ pub(crate) mod tests {
                     commit
                 );
                 assert_eq!(
-                    sync_state_records::get(&mut tx)
+                    app_sync_state::get(&mut tx)
                         .await
                         .expect("cursor")
                         .is_some(),
                     commit
                 );
-                let backfills = sync_backfills_records::list(&mut tx)
-                    .await
-                    .expect("backfills");
+                let backfills = app_sync_backfills::list(&mut tx).await.expect("backfills");
                 assert_eq!(
                     backfills,
                     if commit {

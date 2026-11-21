@@ -8,7 +8,7 @@
 //! one runs it. A job that fails is recorded with its error and tried
 //! again once it is due; every job may be run again safely.
 
-use crate::data::jobs as jobs_records;
+use crate::data::app_jobs;
 use chrono::{DateTime, Duration, Utc};
 use serde_json::Value;
 use thiserror::Error;
@@ -173,7 +173,7 @@ pub async fn run_due(deployment: &Deployment, now: DateTime<Utc>) -> Result<Vec<
         }
         let mut tx = deployment.begin().await?;
         let claimed =
-            jobs_records::processing::claim_if_due(&mut tx, job, now, now - job.interval()).await?;
+            app_jobs::processing::claim_if_due(&mut tx, job, now, now - job.interval()).await?;
         tx.commit().await?;
         if !claimed {
             continue;
@@ -194,7 +194,7 @@ pub async fn run(deployment: &Deployment, job: Job, now: DateTime<Utc>) -> Resul
         return Err(JobError::NotSetUp(job));
     }
     let mut tx = deployment.begin().await?;
-    jobs_records::processing::claim(&mut tx, job, now).await?;
+    app_jobs::processing::claim(&mut tx, job, now).await?;
     tx.commit().await?;
     let result = perform(deployment, job, now).await;
     finish(deployment, job, &result).await?;
@@ -204,7 +204,7 @@ pub async fn run(deployment: &Deployment, job: Job, now: DateTime<Utc>) -> Resul
 /// The job's last run, or none before its first.
 pub async fn get(deployment: &Deployment, job: Job) -> Result<Option<JobRecord>, JobError> {
     let mut tx = deployment.begin().await?;
-    let record = jobs_records::get(&mut tx, job).await?;
+    let record = app_jobs::get(&mut tx, job).await?;
     tx.commit().await?;
     Ok(record)
 }
@@ -260,7 +260,7 @@ async fn finish(
     };
     let finished_at = crate::deployment::now();
     let mut tx = deployment.begin().await?;
-    jobs_records::processing::finish(&mut tx, job, finished_at, report, error.as_deref()).await?;
+    app_jobs::processing::finish(&mut tx, job, finished_at, report, error.as_deref()).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -286,7 +286,7 @@ mod tests {
             let due_after = now - Duration::days(1);
             let mut tx = deployment.begin().await.expect("transaction");
             assert!(
-                jobs_records::processing::claim_if_due(&mut tx, Job::Purge, now, due_after)
+                app_jobs::processing::claim_if_due(&mut tx, Job::Purge, now, due_after)
                     .await
                     .expect("claim")
             );
@@ -294,14 +294,14 @@ mod tests {
             assert!(get(&deployment, Job::Purge).await.expect("read").is_none());
             let mut tx = deployment.begin().await.expect("transaction");
             assert!(
-                jobs_records::processing::claim_if_due(&mut tx, Job::Purge, now, due_after)
+                app_jobs::processing::claim_if_due(&mut tx, Job::Purge, now, due_after)
                     .await
                     .expect("reclaim")
             );
             tx.commit().await.expect("commit");
             let mut tx = deployment.begin().await.expect("transaction");
             assert!(
-                !jobs_records::processing::claim_if_due(&mut tx, Job::Purge, now, due_after)
+                !app_jobs::processing::claim_if_due(&mut tx, Job::Purge, now, due_after)
                     .await
                     .expect("already claimed")
             );
@@ -361,9 +361,9 @@ mod tests {
             let a_day_ago = now - Duration::days(1);
             let mut tx = deployment.begin().await.expect("a transaction");
             let first =
-                jobs_records::processing::claim_if_due(&mut tx, Job::Purge, now, a_day_ago).await;
+                app_jobs::processing::claim_if_due(&mut tx, Job::Purge, now, a_day_ago).await;
             let second =
-                jobs_records::processing::claim_if_due(&mut tx, Job::Purge, now, a_day_ago).await;
+                app_jobs::processing::claim_if_due(&mut tx, Job::Purge, now, a_day_ago).await;
             tx.commit().await.expect("committed");
             assert!(first.expect("a claim"));
             assert!(!second.expect("a claim"), "the first one runs it");

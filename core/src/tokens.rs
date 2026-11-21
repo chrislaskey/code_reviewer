@@ -12,7 +12,7 @@
 //! `accounts::deletions`.
 //! Made and deleted there; the expired ones go with the purge.
 
-use crate::data::tokens as tokens_records;
+use crate::data::accounts_tokens;
 use chrono::{DateTime, Duration, Utc};
 use uuid::Uuid;
 
@@ -230,7 +230,7 @@ pub(crate) fn delete_code_hash(user_id: Uuid) -> String {
 /// and its wrong attempts forgotten; the code to email.
 pub(crate) async fn reset_code(tx: &mut Transaction, id: Uuid) -> Result<String, sqlx::Error> {
     let code = random::digits(6);
-    tokens_records::update_code(&mut *tx, id, AcceptedCodeHash(&hash(&code)), now()).await?;
+    accounts_tokens::update_code(&mut *tx, id, AcceptedCodeHash(&hash(&code)), now()).await?;
     Ok(code)
 }
 
@@ -242,7 +242,7 @@ pub(crate) async fn get_valid(
     context: Context,
     now: DateTime<Utc>,
 ) -> Result<Option<Token>, sqlx::Error> {
-    tokens_records::get(
+    accounts_tokens::get(
         &mut *tx,
         token_hash,
         context,
@@ -254,11 +254,11 @@ pub(crate) async fn get_valid(
 /// Counts one more wrong code against the pending sign-in; the attempts
 /// so far, this one included.
 pub(crate) async fn count_attempt(tx: &mut Transaction, id: Uuid) -> Result<i64, sqlx::Error> {
-    tokens_records::increment_attempts(&mut *tx, id).await
+    accounts_tokens::increment_attempts(&mut *tx, id).await
 }
 
 pub(crate) async fn delete_by_id(tx: &mut Transaction, id: Uuid) -> Result<(), sqlx::Error> {
-    tokens_records::delete(&mut *tx, id).await
+    accounts_tokens::delete(&mut *tx, id).await
 }
 
 /// Deletes the user's tokens of the context.
@@ -267,13 +267,13 @@ pub(crate) async fn delete_of_user(
     user_id: Uuid,
     context: Context,
 ) -> Result<u64, sqlx::Error> {
-    tokens_records::delete_of_user(&mut *tx, user_id, context).await
+    accounts_tokens::delete_of_user(&mut *tx, user_id, context).await
 }
 
 /// Deletes an app's or the browser's token, so it no longer stands for
 /// anyone; whether it did.
 pub(crate) async fn delete(tx: &mut Transaction, token: &str) -> Result<bool, sqlx::Error> {
-    tokens_records::delete_signed_in_by_hash(&mut *tx, &hash(token)).await
+    accounts_tokens::delete_signed_in_by_hash(&mut *tx, &hash(token)).await
 }
 
 /// Deletes the tokens that have expired as of `now`, each context by its
@@ -284,7 +284,7 @@ pub(crate) async fn delete_expired(
 ) -> Result<u64, sqlx::Error> {
     let mut deleted = 0;
     for context in Context::ALL {
-        deleted += tokens_records::maintenance::delete_made_before(
+        deleted += accounts_tokens::maintenance::delete_made_before(
             &mut *tx,
             context,
             context.made_after_to_be_valid(now),
@@ -332,7 +332,7 @@ async fn insert(
         sent_to: sent_to.map(str::to_string),
         inserted_at: now(),
     };
-    tokens_records::create(&mut *tx, AcceptedToken(&row)).await
+    accounts_tokens::create(&mut *tx, AcceptedToken(&row)).await
 }
 
 #[cfg(test)]

@@ -4,7 +4,7 @@
 //! Argon2id with the crate's defaults; hashing and checking run off the
 //! async runtime's threads, since each takes a moment by design.
 
-use crate::data::credentials as credentials_records;
+use crate::data::accounts_credentials;
 use argon2::Argon2;
 use argon2::password_hash::{PasswordHasher, PasswordVerifier};
 use thiserror::Error;
@@ -50,7 +50,7 @@ pub(crate) async fn set(
     password: &str,
 ) -> Result<(), CredentialError> {
     let password_hash = checked_hash(password).await?;
-    credentials_records::upsert(
+    accounts_credentials::upsert(
         &mut *tx,
         user_id,
         AcceptedPasswordHash(&password_hash),
@@ -62,7 +62,9 @@ pub(crate) async fn set(
 
 /// Whether the user has a password.
 pub(crate) async fn is_set(tx: &mut Transaction, user_id: Uuid) -> Result<bool, CredentialError> {
-    Ok(credentials_records::get(&mut *tx, user_id).await?.is_some())
+    Ok(accounts_credentials::get(&mut *tx, user_id)
+        .await?
+        .is_some())
 }
 
 /// The hash of the password, once checked for length.
@@ -85,7 +87,7 @@ pub(crate) async fn verify(
     password: &str,
 ) -> Result<bool, CredentialError> {
     let password_hash = match user_id {
-        Some(user_id) => credentials_records::get(&mut *tx, user_id).await?,
+        Some(user_id) => accounts_credentials::get(&mut *tx, user_id).await?,
         None => None,
     };
     let nobody = password_hash.is_none();

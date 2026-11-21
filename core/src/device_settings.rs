@@ -5,7 +5,7 @@
 //! brings a device up to date with that list when the app starts, so a
 //! setting is always there to read. Never synced.
 
-use crate::data::device_settings as device_settings_records;
+use crate::data::device_settings;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -69,8 +69,8 @@ pub async fn upgrade(deployment: &Deployment) -> Result<usize, DeviceSettingsErr
     let mut tx = deployment.begin().await?;
     let mut added = 0;
     for (key, value) in defaults() {
-        if device_settings_records::get(&mut tx, key).await?.is_none() {
-            device_settings_records::upsert(&mut tx, key, &value).await?;
+        if device_settings::get(&mut tx, key).await?.is_none() {
+            device_settings::upsert(&mut tx, key, &value).await?;
             added += 1;
         }
     }
@@ -83,7 +83,7 @@ pub async fn get<T: DeserializeOwned>(
     tx: &mut Transaction,
     key: &str,
 ) -> Result<T, DeviceSettingsError> {
-    let value = device_settings_records::get(&mut *tx, key)
+    let value = device_settings::get(&mut *tx, key)
         .await?
         .ok_or_else(|| DeviceSettingsError::Missing(key.to_string()))?;
     serde_json::from_value(value).map_err(|source| DeviceSettingsError::Invalid {
@@ -101,7 +101,7 @@ pub async fn set<T: Serialize>(
         key: key.to_string(),
         source,
     })?;
-    Ok(device_settings_records::upsert(&mut *tx, key, &value).await?)
+    Ok(device_settings::upsert(&mut *tx, key, &value).await?)
 }
 
 #[cfg(test)]
