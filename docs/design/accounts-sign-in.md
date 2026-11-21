@@ -129,9 +129,12 @@ nothing, and PKCE still guards the code; the app finishes as with the
 loopback, with the same event, `accounts-sign-in-returned`. The sheet
 is private, `prefersEphemeralWebBrowserSession`, sharing no cookies
 with Safari, which a device sign-in never sets anyway, so iOS asks no
-"wants to use … to sign in" first. The person closing the sheet leaves
-the sign-in waiting with the dialog's field, so a code copied in the
-sheet can still be pasted; the dialog's Cancel ends it. The custom
+"wants to use … to sign in" first. The accounts page shows no paste
+dialog behind the sheet, `accounts_sign_in_start` answering `in_sheet`
+(since 2026-11-20; it flickered under the sheet before): the person
+closing the sheet ends the sign-in, `{result: "cancelled"}`, and a
+failure does too, so they start again with Sign in. The pages in the
+sheet, which carry `app_scheme`, do not zoom, as the app's own do not. The custom
 scheme needs no entry in `Info.plist` for the sheet; the `https`
 callback, iOS 17.4 and later, would need the associated domain, and the
 app supports iOS 15. Android still pastes. Universal links stay for

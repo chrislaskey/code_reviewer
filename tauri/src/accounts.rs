@@ -41,8 +41,23 @@ enum AppReturn {
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "result", rename_all = "snake_case")]
 pub enum SignInReturned {
-    Finished { finished: SignInFinished },
-    Failed { error: String },
+    Finished {
+        finished: SignInFinished,
+    },
+    Failed {
+        error: String,
+    },
+    /// The person closed the iPhone's sign-in sheet, which ends the sign-in.
+    #[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+    Cancelled,
+}
+
+/// Where the sign-in page opened.
+#[derive(Clone, Debug, Serialize)]
+pub struct SignInStarted {
+    /// In the iPhone's sign-in sheet over the app, which returns the code
+    /// itself, so the page shows no dialog to paste it in.
+    pub in_sheet: bool,
 }
 
 /// Keeps a verifier and opens the sign-in page, with the email filled
@@ -53,7 +68,7 @@ pub async fn accounts_sign_in_start(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     email: Option<String>,
-) -> Result<(), String> {
+) -> Result<SignInStarted, String> {
     let (verifier, challenge) = accounts::verifier_and_challenge();
     device
         .sign_in_start(&verifier, email.as_deref())
@@ -65,7 +80,10 @@ pub async fn accounts_sign_in_start(
         email.as_deref(),
         app_return(&app),
     );
-    sign_in_page_open(&app, url)
+    sign_in_page_open(&app, url, verifier)?;
+    Ok(SignInStarted {
+        in_sheet: cfg!(target_os = "ios"),
+    })
 }
 
 /// Where the page returns the code to; none on Android, or when the
@@ -89,14 +107,14 @@ fn app_return(_app: &AppHandle) -> Option<AppReturn> {
 }
 
 #[cfg(target_os = "ios")]
-fn sign_in_page_open(app: &AppHandle, url: String) -> Result<(), String> {
+fn sign_in_page_open(app: &AppHandle, url: String, verifier: String) -> Result<(), String> {
     log::info!("opening the sign-in sheet at {url}");
-    crate::accounts_sheet::open(app, url);
+    crate::accounts_sheet::open(app, url, verifier);
     Ok(())
 }
 
 #[cfg(not(target_os = "ios"))]
-fn sign_in_page_open(app: &AppHandle, url: String) -> Result<(), String> {
+fn sign_in_page_open(app: &AppHandle, url: String, _verifier: String) -> Result<(), String> {
     log::info!("opening the browser to sign in at {url}");
     app.opener()
         .open_url(url, None::<&str>)

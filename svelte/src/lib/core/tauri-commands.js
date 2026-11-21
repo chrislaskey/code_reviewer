@@ -130,8 +130,11 @@ export function accountsCodeResend(_pending) {
 
 /**
  * Opens the browser on the web's sign-in page, with the email filled in
- * for an account signed out on this device, and waits for its code.
+ * for an account signed out on this device, and waits for its code;
+ * on an iPhone the page opens in the sign-in sheet over the app,
+ * answered `{in_sheet: true}`, which returns the code itself.
  * @param {string} [email]
+ * @returns {Promise<{in_sheet: boolean}>}
  */
 export function accountsSignInStart(email) {
   return invoke("accounts_sign_in_start", { email: email || null });
@@ -163,8 +166,10 @@ export function accountsSignInCancel() {
  * Calls back when the code came back to the app by itself, from the
  * desktop's browser or the iPhone's sign-in sheet, and the sign-in
  * finished: `{result: "finished", finished}`, with what
- * accountsSignInFinish answers, or `{result: "failed", error}`.
- * @param {(returned: {result: "finished", finished: any} | {result: "failed", error: string}) => void} callback
+ * accountsSignInFinish answers, or `{result: "failed", error}`; or
+ * `{result: "cancelled"}` when the person closed the iPhone's sheet.
+ * Failed and cancelled end the sheet's sign-in.
+ * @param {(returned: {result: "finished", finished: any} | {result: "failed", error: string} | {result: "cancelled"}) => void} callback
  * @returns {() => void} stops listening
  */
 export function onAccountsSignInReturned(callback) {

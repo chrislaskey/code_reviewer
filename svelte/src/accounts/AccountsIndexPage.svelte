@@ -2,8 +2,9 @@
      one, the others to switch to or sign in to, each to remove from the
      device, and Add account. The device section of the app: no account
      is open while the person adds one, which happens in the browser,
-     with the dialog waiting for its code, pasted or returned by itself,
-     on a desktop by the browser, on an iPhone by the sign-in sheet. On a device with no account,
+     with the dialog waiting for its code, pasted or returned by itself
+     by a desktop's browser; on an iPhone the sign-in sheet over the app
+     returns it, with no dialog behind it. On a device with no account,
      Skip makes a local user, on this device only; when they later sign
      up or in, they are asked whether what they made moves into the
      account, see docs/design/accounts-local-and-trial-users.md. -->
@@ -40,7 +41,7 @@
   let removing = $state(null);
   /** @type {{pending: number, conflicts: number} | null} */
   let loss = $state(null);
-  /** @type {{email: string | null} | null} */
+  /** @type {{email: string | null, in_sheet?: boolean} | null} */
   let signingIn = $state(null);
   let signInError = $state("");
   let canSkip = $state(false);
@@ -94,8 +95,8 @@
       await deviceAccountsDeactivate();
       currentUserForget();
       signInError = "";
-      await accountsSignInStart(email ?? undefined);
-      signingIn = { email };
+      const started = await accountsSignInStart(email ?? undefined);
+      signingIn = { email, in_sheet: started.in_sheet };
       accounts = await deviceAccountsList();
     });
   }
@@ -130,6 +131,12 @@
   $effect(() =>
     onAccountsSignInReturned((returned) =>
       doThen(async () => {
+        if (returned.result === "cancelled" || (returned.result === "failed" && signingIn?.in_sheet)) {
+          signingIn = null;
+          if (returned.result === "failed") error = returned.error;
+          accounts = await deviceAccountsList();
+          return;
+        }
         if (returned.result === "failed") {
           signInError = returned.error;
           return;
@@ -239,7 +246,7 @@
   </div>
 
   <AccountsSignInDialog
-    pending={signingIn}
+    pending={signingIn?.in_sheet ? null : signingIn}
     error={signInError}
     {busy}
     onfinish={finishSignIn}
