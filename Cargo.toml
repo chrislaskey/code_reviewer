@@ -2,7 +2,7 @@
 # so app_core compiles once for the web server and the Tauri app.
 [workspace]
 resolver = "3"
-members = ["core", "axum", "tauri", "tauri/plugins/storekit", "tauri/plugins/web-auth-session"]
+members = ["core", "axum", "tauri", "framework_check", "tauri/plugins/storekit", "tauri/plugins/web-auth-session"]
 
 [workspace.package]
 version = "0.1.0"

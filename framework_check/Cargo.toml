@@ -1,0 +1,13 @@
+[package]
+name = "framework_check"
+description = "Checks an app's copy of the template's own files against framework.lock, see docs/design/template-and-apps.md"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+glob = "0.3"
+serde = { workspace = true }
+sha2 = "0.10"
+thiserror = { workspace = true }
+toml = "1"
+walkdir = "2"

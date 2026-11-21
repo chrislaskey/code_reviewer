@@ -1,6 +1,6 @@
 # Template and apps
 
-Status: planned 2026-11-21; steps 1 to 5 built the same day.
+Status: planned 2026-11-21; steps 1 to 6 built the same day.
 
 ## Request
 
@@ -277,6 +277,13 @@ reason = "Larger pull pages for big files; upstream once settled"
   upstream.
 - **Seams and examples** are not checked. Seams are kept small by
   design, and examples are the app's to change.
+- **As built**: the `framework_check` crate. Its test,
+  `framework_check_finds_the_framework_files_as_locked`, runs with the
+  workspace's; `cargo run -p framework_check -- check` runs it alone and
+  `-- lock` rewrites the lock. It walks the files itself, skipping
+  `target`, `node_modules`, `dist` and `.git`, so it needs no git.
+  `framework.lock` is one `<sha256>  <path>` a line, so a merge of two
+  template updates conflicts only where both changed the same file.
 
 ### At the moment of the edit
 
