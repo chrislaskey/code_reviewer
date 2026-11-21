@@ -362,7 +362,7 @@ person will ask for first.
       the CAPTCHA.
 
 14. **How often the delete runs.** **Agreed: an hourly job**, one more
-    `Job` in `core/src/app/jobs.rs` beside the purge and the sweeps, run
+    a `RecurringJob` in `core/src/jobs.rs` beside the purge and the sweeps, run
     by the same loop and by `app_web jobs run`, see `jobs.md`.
 
 15. **Build order.** Recommended: staying signed in (11); a community

@@ -155,7 +155,7 @@ with no refund, and deletes the Stripe customer; built 2026-11-12, see
   overwrites a newer state.
 - **The return page fetches too**, P3, so a person never waits for a
   webhook.
-- **A daily job**, `stripe_reconcile` in `Job::ALL`, copies the catalog
+- **A daily job**, `stripe_reconcile` among the template's jobs in `core/src/jobs.rs`, copies the catalog
   again, asks Stripe for every checkout still open or processing, and
   copies every subscription not ended, for a webhook that never came.
   Every live subscription is fine for a small app; a big one would ask

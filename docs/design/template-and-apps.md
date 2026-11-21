@@ -1,6 +1,6 @@
 # Template and apps
 
-Status: planned 2026-11-21; steps 1 to 4 built the same day.
+Status: planned 2026-11-21; steps 1 to 5 built the same day.
 
 ## Request
 
@@ -241,9 +241,10 @@ that split possible later.
 
 ### Jobs follow the same pattern
 
-`app/jobs.rs` names avatars, files and purge. The runner is framework,
-and the list of jobs becomes an app-owned registry, as with synced
-tables.
+The runner and the template's jobs are `core/src/jobs.rs`, each job a
+`RecurringJob`; an app's own are listed in `core/src/app/jobs.rs`, as
+with synced tables, and run after the template's. `app_jobs` keeps a
+row per job by its name.
 
 ### The manifest and its check
 

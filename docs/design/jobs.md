@@ -8,8 +8,10 @@ call.
 
 ## Core decides what is due
 
-`core/src/app/jobs.rs` holds every job, `Job` (named in `core/src/data/app_jobs/`), with the role it runs on,
-how often, and the order: `Job::ALL`. Today they are the server's:
+`core/src/jobs.rs` runs every job, each a `RecurringJob` with its name in
+`app_jobs`, the role it runs on and how often. The template's are listed
+there; an app's own, in `core/src/app/jobs.rs`, run after them, in the
+order `jobs::list` gives. Today they are the server's:
 
 | Job | Runs | Order |
 |---|---|---|

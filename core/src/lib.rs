@@ -23,6 +23,7 @@ pub mod data;
 pub mod database;
 pub mod deployment;
 pub mod helpers;
+pub mod jobs;
 pub mod ops;
 pub mod services;
 pub mod sync;

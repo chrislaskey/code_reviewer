@@ -1,9 +1,8 @@
 //! `app_web jobs ...`: the recurring jobs run from the command line, for
-//! a scheduler outside the server, see `app_core::app::jobs`.
+//! a scheduler outside the server, see `app_core::jobs`.
 
-use app_core::app::jobs;
-use app_core::data::app_jobs::Job;
 use app_core::deployment::{self, Deployment};
+use app_core::jobs;
 
 /// `jobs run`, the jobs due now, or `jobs run <name>`, that job now,
 /// printing what each did.
@@ -33,7 +32,7 @@ pub async fn run(deployment: &Deployment, words: &[&str]) -> Result<(), String> 
             Ok(())
         }
         ["run", name] => {
-            let job = Job::from_name(name).ok_or_else(usage)?;
+            let job = jobs::get(name).ok_or_else(usage)?;
             let report = jobs::run(deployment, job, now)
                 .await
                 .map_err(|error| error.to_string())?;
@@ -45,6 +44,6 @@ pub async fn run(deployment: &Deployment, words: &[&str]) -> Result<(), String> 
 }
 
 fn usage() -> String {
-    let names: Vec<&str> = Job::ALL.into_iter().map(Job::name).collect();
+    let names: Vec<&str> = jobs::list().into_iter().map(|job| job.name()).collect();
     format!("commands: jobs run, jobs run <{}>", names.join("|"))
 }

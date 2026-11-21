@@ -362,7 +362,8 @@ design, carried over from the Phoenix version, is
   `POST /api/sync/backfill` for everything in each community the user
   just joined; then prunes the posts the user no longer sees. A row from
   the server never replaces a row with an event still pending.
-* **Recurring jobs** (`core/src/app/jobs.rs`, `docs/design/jobs.md`): the
+* **Recurring jobs** (`core/src/jobs.rs`, an app's own in
+  `core/src/app/jobs.rs`, `docs/design/jobs.md`): the
   purge, then the sweeps of both buckets, daily on the server. The
   server runs those due every 15 minutes; `cargo run -p app_web -- jobs
   run` does the same once, for a scheduler outside it, and `jobs run

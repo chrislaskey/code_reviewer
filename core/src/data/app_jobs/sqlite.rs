@@ -5,13 +5,13 @@ use serde_json::Value;
 use sqlx::SqliteConnection;
 use sqlx::types::Json;
 
-use super::{Job, JobRecord};
+use super::JobRecord;
 
 /// Starts the job's run at `now` unless one started after `due_after`;
 /// whether it did, so of two servers asking at once only one runs it.
 pub async fn claim_if_due(
     connection: &mut SqliteConnection,
-    job: Job,
+    name: &str,
     now: DateTime<Utc>,
     due_after: DateTime<Utc>,
 ) -> Result<bool, sqlx::Error> {
@@ -21,7 +21,7 @@ pub async fn claim_if_due(
            started_at = excluded.started_at, finished_at = NULL
          WHERE app_jobs.started_at <= $3",
     )
-    .bind(job.name())
+    .bind(name)
     .bind(now)
     .bind(due_after)
     .execute(connection)
@@ -32,7 +32,7 @@ pub async fn claim_if_due(
 /// Starts the job's run at `now`, due or not.
 pub async fn claim(
     connection: &mut SqliteConnection,
-    job: Job,
+    name: &str,
     now: DateTime<Utc>,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
@@ -40,7 +40,7 @@ pub async fn claim(
          ON CONFLICT (name) DO UPDATE SET
            started_at = excluded.started_at, finished_at = NULL",
     )
-    .bind(job.name())
+    .bind(name)
     .bind(now)
     .execute(connection)
     .await?;
@@ -50,7 +50,7 @@ pub async fn claim(
 /// Records the end of the job's run: its report, or its error.
 pub async fn finish(
     connection: &mut SqliteConnection,
-    job: Job,
+    name: &str,
     finished_at: DateTime<Utc>,
     last_report: Option<&Value>,
     last_error: Option<&str>,
@@ -59,7 +59,7 @@ pub async fn finish(
         "UPDATE app_jobs SET finished_at = $2, last_report = $3, last_error = $4
          WHERE name = $1",
     )
-    .bind(job.name())
+    .bind(name)
     .bind(finished_at)
     .bind(last_report.map(Json))
     .bind(last_error)
@@ -70,7 +70,7 @@ pub async fn finish(
 
 pub async fn get(
     connection: &mut SqliteConnection,
-    job: Job,
+    name: &str,
 ) -> Result<Option<JobRecord>, sqlx::Error> {
     type Row = (
         DateTime<Utc>,
@@ -81,12 +81,12 @@ pub async fn get(
     let row: Option<Row> = sqlx::query_as(
         "SELECT started_at, finished_at, last_report, last_error FROM app_jobs WHERE name = $1",
     )
-    .bind(job.name())
+    .bind(name)
     .fetch_optional(connection)
     .await?;
     Ok(row.map(
         |(started_at, finished_at, last_report, last_error)| JobRecord {
-            job,
+            name: name.to_string(),
             started_at,
             finished_at,
             last_report: last_report.map(|Json(report)| report),
