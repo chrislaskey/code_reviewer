@@ -111,16 +111,49 @@ pub enum CheckError {
     Lock { line: usize },
 }
 
+/// Which of `framework.toml`'s kinds a file is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Kind {
+    Framework,
+    Seam,
+    Example,
+    /// Named nowhere: the app's own.
+    App,
+}
+
+impl fmt::Display for Kind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Kind::Framework => "framework",
+            Kind::Seam => "seam",
+            Kind::Example => "example",
+            Kind::App => "app",
+        })
+    }
+}
+
+/// The kind of the file at the path, from the root. Seams and examples
+/// take precedence over framework.
+pub fn kind_of(manifest: &Manifest, path: &str) -> Result<Kind, CheckError> {
+    Ok(if matches_any(&patterns(&manifest.seams)?, path) {
+        Kind::Seam
+    } else if matches_any(&patterns(&manifest.examples)?, path) {
+        Kind::Example
+    } else if matches_any(&patterns(&manifest.framework)?, path) {
+        Kind::Framework
+    } else {
+        Kind::App
+    })
+}
+
 /// Whether the path, from the root, is a framework file that no
 /// divergence declares: what an edit to it should stop and think about.
 pub fn is_undeclared_framework_file(manifest: &Manifest, path: &str) -> Result<bool, CheckError> {
-    let framework = patterns(&manifest.framework)?;
-    let exceptions = patterns(manifest.seams.iter().chain(&manifest.examples))?;
     let declared = manifest
         .divergence
         .iter()
         .any(|divergence| divergence.path == path);
-    Ok(matches_any(&framework, path) && !matches_any(&exceptions, path) && !declared)
+    Ok(kind_of(manifest, path)? == Kind::Framework && !declared)
 }
 
 /// What a Claude Code `PreToolUse` hook answers for an edit of the file,
@@ -407,6 +440,21 @@ mod tests {
         assert!(!undeclared("core/src/app/posts.rs"));
         assert!(!undeclared("core/src/sync.rs"));
         assert!(!undeclared("svelte/src/home/HomePage.svelte"));
+    }
+
+    #[test]
+    fn framework_check_kind_of_lets_seams_and_examples_win_over_framework() {
+        let manifest = Manifest {
+            framework: vec!["core/src/**".to_string()],
+            seams: vec!["core/src/app.rs".to_string()],
+            examples: vec!["core/src/app/posts.rs".to_string()],
+            ..Manifest::default()
+        };
+        let kind = |path| kind_of(&manifest, path).expect("the globs");
+        assert_eq!(kind("core/src/jobs.rs"), Kind::Framework);
+        assert_eq!(kind("core/src/app.rs"), Kind::Seam);
+        assert_eq!(kind("core/src/app/posts.rs"), Kind::Example);
+        assert_eq!(kind("svelte/src/home/HomePage.svelte"), Kind::App);
     }
 
     #[test]

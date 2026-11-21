@@ -1,15 +1,17 @@
-//! `cargo run -p framework_check -- check|lock|hook`: checks the
-//! template's own files against `framework.lock`, rewrites the lock, or
-//! answers a Claude Code `PreToolUse` hook about one edit, from the
-//! repository's root, see the library.
+//! `cargo run -p framework_check -- check|lock|hook|classify`: checks
+//! the template's own files against `framework.lock`, rewrites the lock,
+//! answers a Claude Code `PreToolUse` hook about one edit, or prints the
+//! kind of each path given, from the repository's root, see the library.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap_or(Path::new("."));
+    let Some(root) = repository_root() else {
+        eprintln!("no {} here or in a folder above", framework_check::MANIFEST);
+        return ExitCode::FAILURE;
+    };
+    let root = root.as_path();
     let command = std::env::args().nth(1);
     match command.as_deref() {
         Some("check") | None => check(root),
@@ -24,11 +26,23 @@ fn main() -> ExitCode {
             }
         },
         Some("hook") => hook(root),
+        Some("classify") => classify(root, std::env::args().skip(2).collect()),
         Some(other) => {
-            eprintln!("unknown command {other}; commands: check, lock, hook");
+            eprintln!("unknown command {other}; commands: check, lock, hook, classify");
             ExitCode::FAILURE
         }
     }
+}
+
+/// The nearest folder at or above the current one that holds
+/// `framework.toml`: the checkout the command was run in, wherever the
+/// binary was built.
+fn repository_root() -> Option<PathBuf> {
+    let current = std::env::current_dir().ok()?;
+    current
+        .ancestors()
+        .find(|folder| folder.join(framework_check::MANIFEST).is_file())
+        .map(Path::to_path_buf)
 }
 
 /// Reads the hook's JSON on stdin and prints its answer, if any. A hook
@@ -46,6 +60,28 @@ fn hook(root: &Path) -> ExitCode {
     };
     if let Ok(Some(answer)) = framework_check::hook_answer(root, Path::new(file_path)) {
         println!("{answer}");
+    }
+    ExitCode::SUCCESS
+}
+
+/// Prints `<kind> <path>` for each path, from the root: what
+/// `bin/framework` asks.
+fn classify(root: &Path, paths: Vec<String>) -> ExitCode {
+    let manifest = match framework_check::manifest(root) {
+        Ok(manifest) => manifest,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    for path in paths {
+        match framework_check::kind_of(&manifest, &path) {
+            Ok(kind) => println!("{kind} {path}"),
+            Err(error) => {
+                eprintln!("{error}");
+                return ExitCode::FAILURE;
+            }
+        }
     }
     ExitCode::SUCCESS
 }
