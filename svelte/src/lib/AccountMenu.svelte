@@ -6,7 +6,7 @@
      in the app, to the device's accounts; and Sign out. A local user and a
      trial user have no sign-out, having nothing to sign back in with, and
      no account settings. A visitor sees Sign in and Sign up on the web,
-     and Accounts in the app. -->
+     and Sign in in the app, to the device's accounts. -->
 <script>
   import { t } from "ttag";
   import HeaderMenu from "./HeaderMenu.svelte";
@@ -106,7 +106,7 @@
     {/snippet}
   </HeaderMenu>
 {:else if hasDeviceAccounts}
-  <Link href={accountsIndexUrl()}>{t`Accounts`}</Link>
+  <Button variant="primary" size="sm" href={accountsIndexUrl()}>{t`Sign in`}</Button>
 {:else}
   <Link href={accountsSignInUrl()}>{t`Sign in`}</Link>
   <Button variant="primary" size="sm" href={accountsSignUpUrl()}>{t`Sign up`}</Button>
