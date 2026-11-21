@@ -2,7 +2,8 @@
 //! for the user signed in on this device. A command is named resource
 //! first, `posts_list`, like the page's `postsList`, since the commands
 //! are one namespace across resources, and that is its name on the wire.
-//! A command's error is the message the page shows. A write starts a
+//! A command's error is a `CommandError`, its message the one the page
+//! shows, see `command_error`. A write starts a
 //! sync in the background once it is on the device, see `sync`.
 
 use tauri::{AppHandle, State};
@@ -11,6 +12,7 @@ use uuid::Uuid;
 use app_core::app::posts::{self, PostWithOwnerAndCommunities};
 use app_core::data::app_posts::Post;
 
+use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
 use crate::sync;
 use crate::user_auth::signed_in;
@@ -18,22 +20,18 @@ use crate::user_auth::signed_in;
 #[tauri::command]
 pub async fn posts_list(
     device: State<'_, DeviceAccounts>,
-) -> Result<Vec<PostWithOwnerAndCommunities>, String> {
+) -> Result<Vec<PostWithOwnerAndCommunities>, CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    posts::list(&deployment, &user)
-        .await
-        .map_err(|error| error.to_string())
+    Ok(posts::list(&deployment, &user).await?)
 }
 
 #[tauri::command]
 pub async fn posts_get(
     device: State<'_, DeviceAccounts>,
     id: Uuid,
-) -> Result<PostWithOwnerAndCommunities, String> {
+) -> Result<PostWithOwnerAndCommunities, CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    posts::get(&deployment, &user, id)
-        .await
-        .map_err(|error| error.to_string())
+    Ok(posts::get(&deployment, &user, id).await?)
 }
 
 #[tauri::command]
@@ -42,11 +40,9 @@ pub async fn posts_create(
     device: State<'_, DeviceAccounts>,
     body: String,
     community_ids: Vec<Uuid>,
-) -> Result<Post, String> {
+) -> Result<Post, CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    let post = posts::create(&deployment, &user, &body, &community_ids)
-        .await
-        .map_err(|error| error.to_string())?;
+    let post = posts::create(&deployment, &user, &body, &community_ids).await?;
     sync::spawn(app);
     Ok(post)
 }
@@ -58,11 +54,9 @@ pub async fn posts_update(
     id: Uuid,
     body: String,
     community_ids: Vec<Uuid>,
-) -> Result<Post, String> {
+) -> Result<Post, CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    let post = posts::update(&deployment, &user, id, &body, &community_ids)
-        .await
-        .map_err(|error| error.to_string())?;
+    let post = posts::update(&deployment, &user, id, &body, &community_ids).await?;
     sync::spawn(app);
     Ok(post)
 }
@@ -72,11 +66,9 @@ pub async fn posts_delete(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     id: Uuid,
-) -> Result<(), String> {
+) -> Result<(), CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    posts::delete(&deployment, &user, id)
-        .await
-        .map_err(|error| error.to_string())?;
+    posts::delete(&deployment, &user, id).await?;
     sync::spawn(app);
     Ok(())
 }

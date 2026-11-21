@@ -6,6 +6,7 @@ use serde::Deserialize;
 use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
 
+use crate::command_error::CommandError;
 use crate::server_urls;
 
 /// A public page the app may open.
@@ -27,9 +28,10 @@ impl PublicPage {
 
 /// Opens the public page in the system browser.
 #[tauri::command]
-pub async fn public_pages_open(app: AppHandle, page: PublicPage) -> Result<(), String> {
+pub async fn public_pages_open(app: AppHandle, page: PublicPage) -> Result<(), CommandError> {
     let url = server_urls::browser_page_url(&app, page.path())?;
     app.opener()
         .open_url(url, None::<&str>)
-        .map_err(|error| format!("could not open the browser: {error}"))
+        .map_err(|error| format!("could not open the browser: {error}"))?;
+    Ok(())
 }

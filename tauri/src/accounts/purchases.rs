@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use app_core::accounts::online;
 
+use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
 use crate::sync::{self, SyncServer};
 
@@ -16,8 +17,8 @@ pub async fn accounts_purchases_list(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
-) -> Result<Value, String> {
-    let deployment = device.active().await.map_err(|error| error.to_string())?;
+) -> Result<Value, CommandError> {
+    let deployment = device.active().await?;
     online::purchases_list(&deployment, server.transport())
         .await
         .map_err(|error| sync::online_error(&app, error))
@@ -29,8 +30,8 @@ pub async fn accounts_purchases_get(
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
     id: Uuid,
-) -> Result<Value, String> {
-    let deployment = device.active().await.map_err(|error| error.to_string())?;
+) -> Result<Value, CommandError> {
+    let deployment = device.active().await?;
     online::purchases_get(&deployment, server.transport(), id)
         .await
         .map_err(|error| sync::online_error(&app, error))

@@ -8,6 +8,7 @@ use uuid::Uuid;
 use app_core::app::memberships;
 use app_core::data::app_users_communities::Membership;
 
+use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
 use crate::sync;
 use crate::user_auth::signed_in;
@@ -17,11 +18,9 @@ pub async fn memberships_join(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     community_id: Uuid,
-) -> Result<Membership, String> {
+) -> Result<Membership, CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    let membership = memberships::join(&deployment, &user, community_id)
-        .await
-        .map_err(|error| error.to_string())?;
+    let membership = memberships::join(&deployment, &user, community_id).await?;
     sync::spawn(app);
     Ok(membership)
 }
@@ -31,11 +30,9 @@ pub async fn memberships_leave(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     community_id: Uuid,
-) -> Result<(), String> {
+) -> Result<(), CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    memberships::leave(&deployment, &user, community_id)
-        .await
-        .map_err(|error| error.to_string())?;
+    memberships::leave(&deployment, &user, community_id).await?;
     sync::spawn(app);
     Ok(())
 }

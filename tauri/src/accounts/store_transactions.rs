@@ -10,6 +10,7 @@ use serde_json::{Value, json};
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 
+use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
 use crate::sync::SyncServer;
 
@@ -39,13 +40,13 @@ pub async fn accounts_store_transactions_create(
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
     price_id: Uuid,
-) -> Result<Value, String> {
+) -> Result<Value, CommandError> {
     #[cfg(mobile)]
     return on_phone::create(&app, &device, &server, price_id).await;
     #[cfg(desktop)]
     {
         let _ = (app, device, server, price_id);
-        Err(ON_THE_DESKTOP.to_string())
+        Err(ON_THE_DESKTOP.into())
     }
 }
 
@@ -57,13 +58,13 @@ pub async fn accounts_store_transactions_restore(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
-) -> Result<Value, String> {
+) -> Result<Value, CommandError> {
     #[cfg(mobile)]
     return on_phone::restore(&app, &device, &server).await;
     #[cfg(desktop)]
     {
         let _ = (app, device, server);
-        Err(ON_THE_DESKTOP.to_string())
+        Err(ON_THE_DESKTOP.into())
     }
 }
 
@@ -93,6 +94,7 @@ mod on_phone {
     use crate::accounts::store_sheet::{
         self, StoreSheet, StoreSheetPurchase, StoreSheetTransaction,
     };
+    use crate::command_error::CommandError;
     use crate::device_accounts::DeviceAccounts;
     use crate::sync::{SyncServer, online_error};
 
@@ -101,8 +103,8 @@ mod on_phone {
         device: &DeviceAccounts,
         server: &SyncServer,
         price_id: Uuid,
-    ) -> Result<Value, String> {
-        let deployment = device.active().await.map_err(|error| error.to_string())?;
+    ) -> Result<Value, CommandError> {
+        let deployment = device.active().await?;
         let user_id = device.active_user_id().await.ok_or("Nobody is signed in")?;
         let lookup_key = lookup_key_of(app, &deployment, server, price_id).await?;
         let sheet = store_sheet::of(app);
@@ -122,8 +124,8 @@ mod on_phone {
         app: &AppHandle,
         device: &DeviceAccounts,
         server: &SyncServer,
-    ) -> Result<Value, String> {
-        let deployment = device.active().await.map_err(|error| error.to_string())?;
+    ) -> Result<Value, CommandError> {
+        let deployment = device.active().await?;
         let sheet = store_sheet::of(app);
         let mut recorded = 0;
         let mut refused = Vec::new();
@@ -171,7 +173,7 @@ mod on_phone {
         deployment: &Deployment,
         server: &SyncServer,
         transaction: &StoreSheetTransaction,
-    ) -> Result<Value, String> {
+    ) -> Result<Value, CommandError> {
         let recorded =
             online::store_transactions_create(deployment, server.transport(), &transaction.proof)
                 .await
@@ -186,7 +188,7 @@ mod on_phone {
         deployment: &Deployment,
         server: &SyncServer,
         price_id: Uuid,
-    ) -> Result<String, String> {
+    ) -> Result<String, CommandError> {
         let products = online::products_list(deployment, server.transport())
             .await
             .map_err(|error| online_error(app, error))?;
@@ -199,7 +201,7 @@ mod on_phone {
             .find(|price| price["id"].as_str() == Some(price_id.as_str()))
             .and_then(|price| price["lookup_key"].as_str())
             .map(str::to_string)
-            .ok_or_else(|| "That price is not for sale".to_string())
+            .ok_or_else(|| "That price is not for sale".into())
     }
 }
 

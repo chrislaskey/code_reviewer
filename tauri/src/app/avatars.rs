@@ -9,7 +9,7 @@ use tauri::State;
 use app_core::app::avatars::{self, AvatarUpdate, AvatarUpload, AvatarUploadNew};
 use app_core::data::app_users::User;
 
-use crate::command_error::FormError;
+use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
 use crate::sync::SyncServer;
 
@@ -19,8 +19,8 @@ pub async fn avatars_create_upload(
     server: State<'_, SyncServer>,
     content_type: String,
     size: u64,
-) -> Result<AvatarUpload, FormError> {
-    let deployment = device.active().await.map_err(|error| error.to_string())?;
+) -> Result<AvatarUpload, CommandError> {
+    let deployment = device.active().await?;
     let request = AvatarUploadNew { content_type, size };
     Ok(avatars::create_upload_on_device(&deployment, server.transport(), &request).await?)
 }
@@ -30,8 +30,8 @@ pub async fn avatars_update(
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
     key: String,
-) -> Result<User, FormError> {
-    let deployment = device.active().await.map_err(|error| error.to_string())?;
+) -> Result<User, CommandError> {
+    let deployment = device.active().await?;
     let request = AvatarUpdate { key };
     Ok(avatars::update_on_device(&deployment, server.transport(), &request).await?)
 }

@@ -20,6 +20,8 @@ use app_core::app::files::{FileSearch, FileSearchResults};
 use tauri::AppHandle;
 use uuid::Uuid;
 
+use crate::command_error::CommandError;
+
 pub use popup::register;
 
 /// A page of the user's images the clipboard takes whose names contain
@@ -29,14 +31,14 @@ pub use popup::register;
 pub async fn quick_picker_files_search(
     app: AppHandle,
     search: FileSearch,
-) -> Result<FileSearchResults, String> {
+) -> Result<FileSearchResults, CommandError> {
     popup::files_search(&app, search).await
 }
 
 /// Copies the file's image, closes the picker and pastes into the app it
 /// opened over.
 #[tauri::command]
-pub async fn quick_picker_paste(app: AppHandle, id: Uuid) -> Result<(), String> {
+pub async fn quick_picker_paste(app: AppHandle, id: Uuid) -> Result<(), CommandError> {
     popup::paste(&app, id).await
 }
 
@@ -49,7 +51,7 @@ pub fn quick_picker_close(app: AppHandle) {
 /// Closes the picker and brings the app's window to the front, on its
 /// accounts page, where a sign-in starts.
 #[tauri::command]
-pub fn quick_picker_open_app(app: AppHandle) -> Result<(), String> {
+pub fn quick_picker_open_app(app: AppHandle) -> Result<(), CommandError> {
     popup::open_app(&app)
 }
 

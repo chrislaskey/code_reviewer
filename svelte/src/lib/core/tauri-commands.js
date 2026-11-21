@@ -1,5 +1,5 @@
 // app_core over the Tauri app's commands (../../../../tauri/src/).
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { FormError } from "./form_error.js";
 
@@ -27,27 +27,28 @@ export function currentCommunityUpdate(communityId) {
 }
 
 /**
- * A form's command, whose error is `{error, errors}`, thrown as the
- * browser's would be.
+ * A command, whose error, `{error, errors}`, is thrown as the browser's
+ * would be: a FormError when fields were wrong, else an Error.
  * @param {string} command
- * @param {Record<string, unknown>} args
+ * @param {import("@tauri-apps/api/core").InvokeArgs} [args]
+ * @param {import("@tauri-apps/api/core").InvokeOptions} [options]
  */
-async function invokeForm(command, args) {
+async function invoke(command, args, options) {
   try {
-    return await invoke(command, args);
+    return await tauriInvoke(command, args, options);
   } catch (problem) {
-    throw formErrorOf(problem);
+    throw errorOf(problem);
   }
 }
 
 /**
- * A command's `{error, errors}` as a FormError; anything else as it is.
+ * A command's `{error, errors}` as an Error; anything else as it is.
  * @param {unknown} problem
  */
-function formErrorOf(problem) {
+function errorOf(problem) {
   if (problem && typeof problem === "object" && "error" in problem) {
     const { error, errors } = /** @type {{error: string, errors?: Record<string, string[]>}} */ (problem);
-    return new FormError(error, errors);
+    return errors ? new FormError(error, errors) : new Error(error);
   }
   return problem;
 }
@@ -59,7 +60,7 @@ function formErrorOf(problem) {
  * @returns {Promise<{upload_url: string, content_type: string, key: string}>}
  */
 export function avatarsCreateUpload(contentType, size) {
-  return invokeForm("avatars_create_upload", { contentType, size });
+  return invoke("avatars_create_upload", { contentType, size });
 }
 
 /**
@@ -68,7 +69,7 @@ export function avatarsCreateUpload(contentType, size) {
  * @param {string} key
  */
 export function avatarsUpdate(key) {
-  return invokeForm("avatars_update", { key });
+  return invoke("avatars_update", { key });
 }
 
 // The app asks for no password at a sign-in: it happens in the system
@@ -368,7 +369,7 @@ export function filesGet(id) {
  * @param {string[]} communityIds its communities among the user's, exactly
  */
 export function filesUpdate(id, name, communityIds) {
-  return invokeForm("files_update", { id, name, communityIds });
+  return invoke("files_update", { id, name, communityIds });
 }
 
 /** @param {string} id */
@@ -396,11 +397,7 @@ export async function filesCreate(file, name, communityIds, _onProgress, _sha256
     "x-file-content-type": file.type,
     "x-file-community-ids": communityIds.join(","),
   };
-  try {
-    return await invoke("files_create", bytes, { headers });
-  } catch (problem) {
-    throw formErrorOf(problem);
-  }
+  return invoke("files_create", bytes, { headers });
 }
 
 /**
@@ -464,7 +461,7 @@ export function communitiesGet(id) {
 
 /** @param {string} name */
 export function communitiesCreate(name) {
-  return invokeForm("communities_create", { name });
+  return invoke("communities_create", { name });
 }
 
 /**
@@ -472,7 +469,7 @@ export function communitiesCreate(name) {
  * @param {string} name
  */
 export function communitiesUpdate(id, name) {
-  return invokeForm("communities_update", { id, name });
+  return invoke("communities_update", { id, name });
 }
 
 /** @param {string} id */

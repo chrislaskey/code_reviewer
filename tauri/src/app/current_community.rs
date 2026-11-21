@@ -8,26 +8,23 @@ use uuid::Uuid;
 use app_core::app::current_community;
 use app_core::data::app_communities::Community;
 
+use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
 use crate::user_auth::signed_in;
 
 #[tauri::command]
 pub async fn current_community_get(
     device: State<'_, DeviceAccounts>,
-) -> Result<Option<Community>, String> {
+) -> Result<Option<Community>, CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    current_community::get_on_device(&deployment, &user)
-        .await
-        .map_err(|error| error.to_string())
+    Ok(current_community::get_on_device(&deployment, &user).await?)
 }
 
 #[tauri::command]
 pub async fn current_community_update(
     device: State<'_, DeviceAccounts>,
     community_id: Uuid,
-) -> Result<Community, String> {
+) -> Result<Community, CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    current_community::update_on_device(&deployment, &user, community_id)
-        .await
-        .map_err(|error| error.to_string())
+    Ok(current_community::update_on_device(&deployment, &user, community_id).await?)
 }

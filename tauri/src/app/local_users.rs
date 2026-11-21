@@ -9,16 +9,16 @@ use tauri::{AppHandle, State};
 
 use app_core::data::app_users::User;
 
+use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
 use crate::sync::{self, SyncServer};
 
 /// Whether the accounts page shows Skip.
 #[tauri::command]
-pub async fn local_users_can_create(device: State<'_, DeviceAccounts>) -> Result<bool, String> {
-    device
-        .local_user_can_create()
-        .await
-        .map_err(|error| error.to_string())
+pub async fn local_users_can_create(
+    device: State<'_, DeviceAccounts>,
+) -> Result<bool, CommandError> {
+    Ok(device.local_user_can_create().await?)
 }
 
 /// Skip: the device's local user, made and active.
@@ -26,12 +26,9 @@ pub async fn local_users_can_create(device: State<'_, DeviceAccounts>) -> Result
 pub async fn local_users_create(
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
-) -> Result<User, String> {
+) -> Result<User, CommandError> {
     let _no_sync_meanwhile = server.hold().await;
-    device
-        .local_user_create(&device_name())
-        .await
-        .map_err(|error| error.to_string())
+    Ok(device.local_user_create(&device_name()).await?)
 }
 
 /// Moves what the local user made into the account whose sign-in
@@ -41,13 +38,10 @@ pub async fn local_users_move(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
-) -> Result<User, String> {
+) -> Result<User, CommandError> {
     let user = {
         let _no_sync_meanwhile = server.hold().await;
-        device
-            .local_user_move()
-            .await
-            .map_err(|error| error.to_string())?
+        device.local_user_move().await?
     };
     sync::spawn(app);
     Ok(user)
@@ -60,13 +54,10 @@ pub async fn local_users_keep_separate(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
-) -> Result<User, String> {
+) -> Result<User, CommandError> {
     let user = {
         let _no_sync_meanwhile = server.hold().await;
-        device
-            .local_user_keep_separate()
-            .await
-            .map_err(|error| error.to_string())?
+        device.local_user_keep_separate().await?
     };
     sync::spawn(app);
     Ok(user)

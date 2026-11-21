@@ -13,6 +13,7 @@ use uuid::Uuid;
 use app_core::accounts::online;
 
 use crate::accounts::{plans, stripe_pages};
+use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
 use crate::sync::{self, SyncServer};
 
@@ -24,9 +25,9 @@ pub async fn accounts_checkouts_create(
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
     price_id: Uuid,
-) -> Result<Value, String> {
+) -> Result<Value, CommandError> {
     stripe_pages::refused_on_a_phone()?;
-    let deployment = device.active().await.map_err(|error| error.to_string())?;
+    let deployment = device.active().await?;
     let created = online::checkouts_create(&deployment, server.transport(), price_id)
         .await
         .map_err(|error| sync::online_error(&app, error))?;
@@ -42,8 +43,8 @@ pub async fn accounts_checkouts_get(
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
     id: Uuid,
-) -> Result<Value, String> {
-    let deployment = device.active().await.map_err(|error| error.to_string())?;
+) -> Result<Value, CommandError> {
+    let deployment = device.active().await?;
     let checkout = online::checkouts_get(&deployment, server.transport(), id)
         .await
         .map_err(|error| sync::online_error(&app, error))?;

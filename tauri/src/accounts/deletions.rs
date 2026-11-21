@@ -9,6 +9,7 @@ use tauri::{AppHandle, State};
 
 use app_core::accounts::online;
 
+use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
 use crate::sync::SyncServer;
 
@@ -18,8 +19,8 @@ pub async fn accounts_deletions_code_create(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
-) -> Result<(), String> {
-    let deployment = device.active().await.map_err(|error| error.to_string())?;
+) -> Result<(), CommandError> {
+    let deployment = device.active().await?;
     online::deletions_code_create(&deployment, server.transport())
         .await
         .map_err(|error| crate::sync::online_error(&app, error))
@@ -33,16 +34,13 @@ pub async fn accounts_deletions_create(
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
     code: String,
-) -> Result<(), String> {
-    let deployment = device.active().await.map_err(|error| error.to_string())?;
+) -> Result<(), CommandError> {
+    let deployment = device.active().await?;
     let user_id = device.active_user_id().await.ok_or("Nobody is signed in")?;
     online::deletions_create(&deployment, server.transport(), &code)
         .await
         .map_err(|error| crate::sync::online_error(&app, error))?;
     let _no_sync_meanwhile = server.hold().await;
-    device
-        .remove(server.transport(), user_id, true)
-        .await
-        .map_err(|error| error.to_string())?;
+    device.remove(server.transport(), user_id, true).await?;
     Ok(())
 }

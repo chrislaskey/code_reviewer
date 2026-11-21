@@ -37,8 +37,10 @@ pub mod subscriptions;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, Url};
+#[cfg(not(target_os = "ios"))]
 use tauri_plugin_opener::OpenerExt;
 
+use crate::command_error::CommandError;
 use crate::device_accounts::{DeviceAccounts, PendingSignIn, SignInFinished};
 use crate::server_urls;
 use crate::sync::{self, SyncServer};
@@ -50,6 +52,7 @@ const SIGN_IN_RETURNED_EVENT: &str = "accounts-sign-in-returned";
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum AppReturn {
     /// To `sign_in_loopback`'s listener on this computer.
+    #[cfg_attr(not(desktop), allow(dead_code))]
     Port(u16),
     /// To the app's scheme, which closes the iPhone's sign-in sheet.
     #[cfg_attr(not(target_os = "ios"), allow(dead_code))]
@@ -87,12 +90,9 @@ pub async fn accounts_sign_in_start(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     email: Option<String>,
-) -> Result<SignInStarted, String> {
+) -> Result<SignInStarted, CommandError> {
     let (verifier, challenge) = accounts::verifier_and_challenge();
-    device
-        .sign_in_start(&verifier, email.as_deref())
-        .await
-        .map_err(|error| error.to_string())?;
+    device.sign_in_start(&verifier, email.as_deref()).await?;
     let url = sign_in_page_with(
         &server_urls::browser_sign_in_url(&app),
         &challenge,
@@ -145,11 +145,8 @@ fn sign_in_page_open(app: &AppHandle, url: String, _verifier: String) -> Result<
 #[tauri::command]
 pub async fn accounts_sign_in_pending(
     device: State<'_, DeviceAccounts>,
-) -> Result<Option<PendingSignIn>, String> {
-    device
-        .sign_in_pending()
-        .await
-        .map_err(|error| error.to_string())
+) -> Result<Option<PendingSignIn>, CommandError> {
+    Ok(device.sign_in_pending().await?)
 }
 
 /// Exchanges the code the browser showed, with the verifier kept at the
@@ -160,8 +157,8 @@ pub async fn accounts_sign_in_pending(
 pub async fn accounts_sign_in_finish(
     app: AppHandle,
     code: String,
-) -> Result<SignInFinished, String> {
-    sign_in_finish(&app, code.trim()).await
+) -> Result<SignInFinished, CommandError> {
+    Ok(sign_in_finish(&app, code.trim()).await?)
 }
 
 /// The finish of a sign-in, with a pasted code or one that came back
@@ -198,13 +195,10 @@ pub async fn sign_in_finish(app: &AppHandle, code: &str) -> Result<SignInFinishe
 pub async fn accounts_sign_in_cancel(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
-) -> Result<(), String> {
+) -> Result<(), CommandError> {
     stop_loopback(&app);
     device.move_offered_forget().await;
-    device
-        .sign_in_clear()
-        .await
-        .map_err(|error| error.to_string())
+    Ok(device.sign_in_clear().await?)
 }
 
 /// The finish of a sign-in with the URL the page handed back, which
@@ -247,15 +241,12 @@ pub async fn accounts_sign_out(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
-) -> Result<(), String> {
+) -> Result<(), CommandError> {
     // Reported by the sync itself; what it could not push waits in the
     // account's file for the next sign-in.
     let _ = sync::run(&app).await;
     let _no_sync_meanwhile = server.hold().await;
-    device
-        .sign_out(server.transport())
-        .await
-        .map_err(|error| error.to_string())
+    Ok(device.sign_out(server.transport()).await?)
 }
 
 /// What the signed-in user's account asks for after the emailed code,
@@ -264,11 +255,9 @@ pub async fn accounts_sign_out(
 pub async fn accounts_second_factors(
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
-) -> Result<Vec<SecondFactor>, String> {
-    let deployment = device.active().await.map_err(|error| error.to_string())?;
-    accounts::second_factors_on_device(&deployment, server.transport())
-        .await
-        .map_err(|error| error.to_string())
+) -> Result<Vec<SecondFactor>, CommandError> {
+    let deployment = device.active().await?;
+    Ok(accounts::second_factors_on_device(&deployment, server.transport()).await?)
 }
 
 /// The signed-in user's password, their first or a new one, kept by
@@ -279,12 +268,10 @@ pub async fn accounts_password_update(
     server: State<'_, SyncServer>,
     current: Option<String>,
     password: String,
-) -> Result<(), String> {
-    let deployment = device.active().await.map_err(|error| error.to_string())?;
+) -> Result<(), CommandError> {
+    let deployment = device.active().await?;
     let update = PasswordUpdate { current, password };
-    accounts::password_update_on_device(&deployment, server.transport(), &update)
-        .await
-        .map_err(|error| error.to_string())
+    Ok(accounts::password_update_on_device(&deployment, server.transport(), &update).await?)
 }
 
 /// The sign-in page with the challenge, the email and where to return

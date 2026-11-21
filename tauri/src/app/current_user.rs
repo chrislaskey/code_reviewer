@@ -11,6 +11,7 @@ use app_core::accounts::online;
 use app_core::app::users::{self, Kind, UserError};
 use app_core::data::app_users::User;
 
+use crate::command_error::CommandError;
 use crate::device_accounts::{DeviceAccounts, DeviceAccountsError};
 use crate::sync;
 use crate::user_auth::signed_in;
@@ -35,16 +36,16 @@ pub struct CurrentUserShown {
 #[tauri::command]
 pub async fn current_user_get(
     device: State<'_, DeviceAccounts>,
-) -> Result<Option<CurrentUserShown>, String> {
+) -> Result<Option<CurrentUserShown>, CommandError> {
     let deployment = match device.active().await {
         Ok(deployment) => deployment,
         Err(DeviceAccountsError::NobodyActive) => return Ok(None),
-        Err(error) => return Err(error.to_string()),
+        Err(error) => return Err(error.into()),
     };
     let user = match users::signed_in(&deployment).await {
         Ok(user) => user,
         Err(UserError::NotSignedIn) => return Ok(None),
-        Err(error) => return Err(error.to_string()),
+        Err(error) => return Err(error.into()),
     };
     shown(&device, user).await.map(Some)
 }
@@ -56,17 +57,15 @@ pub async fn current_user_update(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     name: String,
-) -> Result<CurrentUserShown, String> {
+) -> Result<CurrentUserShown, CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    let user = users::update(&deployment, &user, &name)
-        .await
-        .map_err(|error| error.to_string())?;
+    let user = users::update(&deployment, &user, &name).await?;
     sync::spawn(app);
     shown(&device, user).await
 }
 
-async fn shown(device: &DeviceAccounts, user: User) -> Result<CurrentUserShown, String> {
-    let accounts = device.list().await.map_err(|error| error.to_string())?;
+async fn shown(device: &DeviceAccounts, user: User) -> Result<CurrentUserShown, CommandError> {
+    let accounts = device.list().await?;
     let account = accounts
         .into_iter()
         .find(|account| account.user_id == user.id)
@@ -75,10 +74,8 @@ async fn shown(device: &DeviceAccounts, user: User) -> Result<CurrentUserShown, 
         true => Kind::Local,
         false => Kind::Full,
     };
-    let deployment = device.active().await.map_err(|error| error.to_string())?;
-    let kept = online::plan_kept(&deployment)
-        .await
-        .map_err(|error| error.to_string())?;
+    let deployment = device.active().await?;
+    let kept = online::plan_kept(&deployment).await?;
     Ok(CurrentUserShown {
         user,
         email: account.email,

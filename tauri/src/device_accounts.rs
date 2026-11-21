@@ -36,6 +36,7 @@ use app_core::database::{Database, DatabaseError};
 use app_core::deployment::{Deployment, FileStore, Role, now};
 use app_core::services::web_server::Transport;
 
+use crate::command_error::CommandError;
 use crate::sync::SyncServer;
 
 static MIGRATOR: Migrator = sqlx::migrate!("./migrations/device");
@@ -713,8 +714,8 @@ fn delete_folder(path: &Path) -> std::io::Result<()> {
 #[tauri::command]
 pub async fn device_accounts_list(
     device: State<'_, DeviceAccounts>,
-) -> Result<Vec<DeviceAccount>, String> {
-    device.list().await.map_err(|error| error.to_string())
+) -> Result<Vec<DeviceAccount>, CommandError> {
+    Ok(device.list().await?)
 }
 
 /// Switches to a signed-in account, which then syncs.
@@ -724,13 +725,10 @@ pub async fn device_accounts_switch(
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
     user_id: Uuid,
-) -> Result<User, String> {
+) -> Result<User, CommandError> {
     let user = {
         let _no_sync_meanwhile = server.hold().await;
-        device
-            .activate(user_id)
-            .await
-            .map_err(|error| error.to_string())?
+        device.activate(user_id).await?
     };
     crate::sync::spawn(app);
     Ok(user)
@@ -742,9 +740,9 @@ pub async fn device_accounts_switch(
 pub async fn device_accounts_deactivate(
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
-) -> Result<(), String> {
+) -> Result<(), CommandError> {
     let _no_sync_meanwhile = server.hold().await;
-    device.deactivate().await.map_err(|error| error.to_string())
+    Ok(device.deactivate().await?)
 }
 
 /// Removes an account from the device, syncing the active one first so
@@ -756,17 +754,16 @@ pub async fn device_accounts_remove(
     server: State<'_, SyncServer>,
     user_id: Uuid,
     losing_changes: bool,
-) -> Result<Removal, String> {
+) -> Result<Removal, CommandError> {
     if device.active_user_id().await == Some(user_id) {
         // Reported by the sync itself; what it could not push is
         // answered as changes that would be lost.
         let _ = crate::sync::run(&app).await;
     }
     let _no_sync_meanwhile = server.hold().await;
-    device
+    Ok(device
         .remove(server.transport(), user_id, losing_changes)
-        .await
-        .map_err(|error| error.to_string())
+        .await?)
 }
 
 #[cfg(test)]

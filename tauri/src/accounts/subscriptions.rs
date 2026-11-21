@@ -11,6 +11,7 @@ use uuid::Uuid;
 use app_core::accounts::online;
 
 use crate::accounts::{plans, stripe_pages};
+use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
 use crate::sync::{self, SyncServer};
 
@@ -19,8 +20,8 @@ pub async fn accounts_subscriptions_list(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
-) -> Result<Value, String> {
-    let deployment = device.active().await.map_err(|error| error.to_string())?;
+) -> Result<Value, CommandError> {
+    let deployment = device.active().await?;
     online::subscriptions_list(&deployment, server.transport())
         .await
         .map_err(|error| sync::online_error(&app, error))
@@ -32,8 +33,8 @@ pub async fn accounts_subscriptions_get(
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
     id: Uuid,
-) -> Result<Value, String> {
-    let deployment = device.active().await.map_err(|error| error.to_string())?;
+) -> Result<Value, CommandError> {
+    let deployment = device.active().await?;
     online::subscriptions_get(&deployment, server.transport(), id)
         .await
         .map_err(|error| sync::online_error(&app, error))
@@ -47,9 +48,9 @@ pub async fn accounts_subscriptions_update(
     server: State<'_, SyncServer>,
     id: Uuid,
     change: Value,
-) -> Result<Value, String> {
+) -> Result<Value, CommandError> {
     stripe_pages::refused_on_a_phone()?;
-    let deployment = device.active().await.map_err(|error| error.to_string())?;
+    let deployment = device.active().await?;
     let changed = online::subscriptions_update(&deployment, server.transport(), id, &change)
         .await
         .map_err(|error| sync::online_error(&app, error))?;
@@ -64,9 +65,9 @@ pub async fn accounts_subscriptions_portal_create(
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
     id: Uuid,
-) -> Result<Value, String> {
+) -> Result<Value, CommandError> {
     stripe_pages::refused_on_a_phone()?;
-    let deployment = device.active().await.map_err(|error| error.to_string())?;
+    let deployment = device.active().await?;
     let portal = online::subscriptions_portal_create(&deployment, server.transport(), id)
         .await
         .map_err(|error| sync::online_error(&app, error))?;
@@ -77,17 +78,17 @@ pub async fn accounts_subscriptions_portal_create(
 /// The store's own page of subscriptions, where a plan bought there is
 /// cancelled or resumed.
 #[tauri::command]
-pub async fn accounts_subscriptions_manage_open(app: AppHandle) -> Result<(), String> {
+pub async fn accounts_subscriptions_manage_open(app: AppHandle) -> Result<(), CommandError> {
     #[cfg(mobile)]
     {
         use crate::accounts::store_sheet::StoreSheet;
-        return crate::accounts::store_sheet::of(&app)
+        return Ok(crate::accounts::store_sheet::of(&app)
             .subscriptions_manage_open()
-            .await;
+            .await?);
     }
     #[cfg(desktop)]
     {
         let _ = app;
-        Err(crate::accounts::store_transactions::ON_THE_DESKTOP.to_string())
+        Err(crate::accounts::store_transactions::ON_THE_DESKTOP.into())
     }
 }

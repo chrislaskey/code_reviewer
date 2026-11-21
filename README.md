@@ -86,7 +86,8 @@ from the same Rust types, so the page never knows which it is on. The
 rules live there too: a post's body is trimmed and may not be blank, and
 only its owner edits or deletes it. The server answers an error as a
 status, 404 for a missing post, 403 for someone else's and 422 for a
-blank one, and `{"error": "..."}`; the app answers the message; and the
+blank one, and `{"error": "..."}`; the app's command answers the same
+object, its `CommandError` (`tauri/src/command_error.rs`); and the
 page shows the message either way.
 
 To add to a resource, or add one: the function in `core/`, its handler

@@ -32,6 +32,7 @@ use app_core::accounts::online;
 use app_core::app::sync::{self, Report, Status, SyncError};
 use app_core::services::web_server::Http;
 
+use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
 use crate::server_urls;
 
@@ -87,14 +88,14 @@ pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
 
 /// An online call's error for the pages; one answered 410 starts a
 /// sync, which removes the deleted account as it does for its own.
-pub fn online_error(app: &AppHandle, error: online::OnlineError) -> String {
+pub fn online_error(app: &AppHandle, error: online::OnlineError) -> CommandError {
     if matches!(
         error,
         online::OnlineError::Server(SyncError::AccountDeleted)
     ) {
         spawn(app.clone());
     }
-    error.to_string()
+    error.into()
 }
 
 /// Starts a sync in the background, unless one started so is still
@@ -194,8 +195,8 @@ async fn run_after_waiting(app: &AppHandle, spawned: bool) -> Result<Report, Str
 }
 
 #[tauri::command]
-pub async fn sync_run(app: AppHandle) -> Result<Report, String> {
-    run(&app).await
+pub async fn sync_run(app: AppHandle) -> Result<Report, CommandError> {
+    Ok(run(&app).await?)
 }
 
 /// Works offline, or online again, which syncs at once.
@@ -204,11 +205,9 @@ pub async fn sync_set_offline(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     offline: bool,
-) -> Result<(), String> {
-    let deployment = device.active().await.map_err(|error| error.to_string())?;
-    sync::set_offline(&deployment, offline)
-        .await
-        .map_err(|error| error.to_string())?;
+) -> Result<(), CommandError> {
+    let deployment = device.active().await?;
+    sync::set_offline(&deployment, offline).await?;
     if !offline {
         spawn(app);
     }
@@ -216,12 +215,10 @@ pub async fn sync_set_offline(
 }
 
 #[tauri::command]
-pub async fn sync_status(device: State<'_, DeviceAccounts>) -> Result<Status, String> {
+pub async fn sync_status(device: State<'_, DeviceAccounts>) -> Result<Status, CommandError> {
     let deployment = match device.active().await {
         Ok(deployment) => deployment,
         Err(_) => return Ok(Status::default()),
     };
-    sync::status(&deployment)
-        .await
-        .map_err(|error| error.to_string())
+    Ok(sync::status(&deployment).await?)
 }

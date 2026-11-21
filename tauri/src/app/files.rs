@@ -19,7 +19,7 @@ use uuid::Uuid;
 use app_core::app::files::{self, FileSearch, FileSearchResults, FileWithState, FilesCache};
 use app_core::data::app_files::{self, File};
 
-use crate::command_error::FormError;
+use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
 use crate::sync::{self, SyncServer};
 use crate::user_auth::signed_in;
@@ -36,11 +36,9 @@ const FILE_COMMUNITY_IDS_HEADER: &str = "x-file-community-ids";
 pub async fn files_search(
     device: State<'_, DeviceAccounts>,
     search: FileSearch,
-) -> Result<FileSearchResults, String> {
+) -> Result<FileSearchResults, CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    files::search(&deployment, &user, &search)
-        .await
-        .map_err(|error| error.to_string())
+    Ok(files::search(&deployment, &user, &search).await?)
 }
 
 /// The files the user sees on this device with any of these checksums.
@@ -48,22 +46,18 @@ pub async fn files_search(
 pub async fn files_list_duplicates(
     device: State<'_, DeviceAccounts>,
     sha256s: Vec<String>,
-) -> Result<Vec<FileWithState>, String> {
+) -> Result<Vec<FileWithState>, CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    files::list_duplicates(&deployment, &user, &sha256s)
-        .await
-        .map_err(|error| error.to_string())
+    Ok(files::list_duplicates(&deployment, &user, &sha256s).await?)
 }
 
 #[tauri::command]
 pub async fn files_get(
     device: State<'_, DeviceAccounts>,
     id: Uuid,
-) -> Result<FileWithState, String> {
+) -> Result<FileWithState, CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    files::get(&deployment, &user, id)
-        .await
-        .map_err(|error| error.to_string())
+    Ok(files::get(&deployment, &user, id).await?)
 }
 
 /// Creates the file the person picked: its bytes are the command's raw
@@ -75,9 +69,9 @@ pub async fn files_create(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     request: Request<'_>,
-) -> Result<File, FormError> {
+) -> Result<File, CommandError> {
     let InvokeBody::Raw(bytes) = request.body() else {
-        return Err(FormError::from(
+        return Err(CommandError::from(
             "the file's bytes are the command's body".to_string(),
         ));
     };
@@ -94,7 +88,7 @@ pub async fn files_create(
         .filter(|id| !id.is_empty())
         .map(Uuid::parse_str)
         .collect::<Result<Vec<Uuid>, _>>()
-        .map_err(|error| FormError::from(error.to_string()))?;
+        .map_err(|error| CommandError::from(error.to_string()))?;
     let (deployment, user) = signed_in(&device).await?;
     let file = files::create_with_bytes(
         &deployment,
@@ -116,7 +110,7 @@ pub async fn files_update(
     id: Uuid,
     name: String,
     community_ids: Vec<Uuid>,
-) -> Result<File, FormError> {
+) -> Result<File, CommandError> {
     let (deployment, user) = signed_in(&device).await?;
     let file = files::update(&deployment, &user, id, &name, &community_ids).await?;
     sync::spawn(app);
@@ -128,31 +122,29 @@ pub async fn files_delete(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     id: Uuid,
-) -> Result<(), String> {
+) -> Result<(), CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    files::delete(&deployment, &user, id)
-        .await
-        .map_err(|error| error.to_string())?;
+    files::delete(&deployment, &user, id).await?;
     sync::spawn(app);
     Ok(())
 }
 
 /// The copies this device keeps of files the server holds too.
 #[tauri::command]
-pub async fn files_cache_get(device: State<'_, DeviceAccounts>) -> Result<FilesCache, String> {
+pub async fn files_cache_get(
+    device: State<'_, DeviceAccounts>,
+) -> Result<FilesCache, CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    files::cache_get(&deployment, &user)
-        .await
-        .map_err(|error| error.to_string())
+    Ok(files::cache_get(&deployment, &user).await?)
 }
 
 /// Removes those copies, and answers what went.
 #[tauri::command]
-pub async fn files_cache_delete(device: State<'_, DeviceAccounts>) -> Result<FilesCache, String> {
+pub async fn files_cache_delete(
+    device: State<'_, DeviceAccounts>,
+) -> Result<FilesCache, CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    files::cache_delete(&deployment, &user)
-        .await
-        .map_err(|error| error.to_string())
+    Ok(files::cache_delete(&deployment, &user).await?)
 }
 
 /// Whether this build copies an image to the clipboard: macOS and iOS
@@ -165,22 +157,18 @@ pub fn files_copy_supported() -> bool {
 /// Copies the image to the clipboard, from this device's copy of it,
 /// fetched first when there is none.
 #[tauri::command]
-pub async fn files_copy(app: AppHandle, id: Uuid) -> Result<(), String> {
+pub async fn files_copy(app: AppHandle, id: Uuid) -> Result<(), CommandError> {
     copy_to_clipboard(&app, id).await
 }
 
 /// `files_copy`, for the quick picker too.
-pub async fn copy_to_clipboard(app: &AppHandle, id: Uuid) -> Result<(), String> {
+pub async fn copy_to_clipboard(app: &AppHandle, id: Uuid) -> Result<(), CommandError> {
     let device = app.state::<DeviceAccounts>();
     let server = app.state::<SyncServer>();
     let (deployment, user) = signed_in(&device).await?;
-    let shown = files::get(&deployment, &user, id)
-        .await
-        .map_err(|error| error.to_string())?;
-    let path = files::local_copy(&deployment, server.transport(), &user, id)
-        .await
-        .map_err(|error| error.to_string())?;
-    copy_image(app, &shown.file, path).await
+    let shown = files::get(&deployment, &user, id).await?;
+    let path = files::local_copy(&deployment, server.transport(), &user, id).await?;
+    Ok(copy_image(app, &shown.file, path).await?)
 }
 
 /// AppKit's and UIKit's pasteboards and images are the main thread's.
@@ -289,26 +277,18 @@ pub async fn files_download(
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
     id: Uuid,
-) -> Result<String, String> {
+) -> Result<String, CommandError> {
     if !cfg!(desktop) {
-        return Err("Downloading is not available on this device yet".to_string());
+        return Err("Downloading is not available on this device yet".into());
     }
     let (deployment, user) = signed_in(&device).await?;
-    let shown = files::get(&deployment, &user, id)
-        .await
-        .map_err(|error| error.to_string())?;
-    let from = files::local_copy(&deployment, server.transport(), &user, id)
-        .await
-        .map_err(|error| error.to_string())?;
-    let downloads = app
-        .path()
-        .download_dir()
-        .map_err(|error| error.to_string())?;
+    let shown = files::get(&deployment, &user, id).await?;
+    let from = files::local_copy(&deployment, server.transport(), &user, id).await?;
+    let downloads = app.path().download_dir()?;
     let to = tokio::task::spawn_blocking(move || {
         copy_under_a_free_name(&from, &downloads, &shown.file.name)
     })
-    .await
-    .map_err(|error| error.to_string())?
+    .await?
     .map_err(|error| format!("could not save the file: {error}"))?;
     Ok(to.display().to_string())
 }

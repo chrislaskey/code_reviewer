@@ -16,6 +16,7 @@ use app_core::app::files::{self as core_files, FileSearch, FileSearchResults};
 use crate::MAIN_WINDOW;
 use crate::app::files;
 use crate::clipboard;
+use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
 use crate::macos::ScreenRect;
 use crate::macos::running_app::{self, RunningApp};
@@ -85,16 +86,14 @@ pub fn register(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
 pub async fn files_search(
     app: &AppHandle,
     search: FileSearch,
-) -> Result<FileSearchResults, String> {
+) -> Result<FileSearchResults, CommandError> {
     let device = app.state::<DeviceAccounts>();
     let (deployment, user) = signed_in(&device).await?;
     let images = FileSearch {
         content_types: clipboard::image_content_types(),
         ..search
     };
-    core_files::search(&deployment, &user, &images)
-        .await
-        .map_err(|error| error.to_string())
+    Ok(core_files::search(&deployment, &user, &images).await?)
 }
 
 /// Opens the picker, or closes it when it's open. Main thread only.
@@ -152,20 +151,20 @@ pub fn close(app: &AppHandle) {
 }
 
 /// Main thread only.
-pub fn open_app(app: &AppHandle) -> Result<(), String> {
+pub fn open_app(app: &AppHandle) -> Result<(), CommandError> {
     close(app);
     let window = app
         .get_webview_window(MAIN_WINDOW)
         .ok_or("the app's window is gone")?;
-    let mut url = window.url().map_err(|error| error.to_string())?;
+    let mut url = window.url()?;
     if url.path() != ACCOUNTS_PATH {
         url.set_path(ACCOUNTS_PATH);
         url.set_query(None);
-        window.navigate(url).map_err(|error| error.to_string())?;
+        window.navigate(url)?;
     }
-    window.unminimize().map_err(|error| error.to_string())?;
-    window.show().map_err(|error| error.to_string())?;
-    window.set_focus().map_err(|error| error.to_string())
+    window.unminimize()?;
+    window.show()?;
+    Ok(window.set_focus()?)
 }
 
 pub fn accessibility_request() -> bool {
@@ -175,13 +174,12 @@ pub fn accessibility_request() -> bool {
 /// Copies the image to the clipboard, closes the picker and presses ⌘V
 /// in the app the picker opened over. Without Accessibility access, or
 /// when that app cannot be brought back, the image is copied only.
-pub async fn paste(app: &AppHandle, id: Uuid) -> Result<(), String> {
+pub async fn paste(app: &AppHandle, id: Uuid) -> Result<(), CommandError> {
     files::copy_to_clipboard(app, id).await?;
     let previous_app = state(app).previous_app.clone();
 
     let to_close = app.clone();
-    app.run_on_main_thread(move || close(&to_close))
-        .map_err(|error| error.to_string())?;
+    app.run_on_main_thread(move || close(&to_close))?;
 
     if !accessibility::is_trusted(false) {
         log::info!("the quick picker copied without pasting: no Accessibility access");
@@ -192,7 +190,7 @@ pub async fn paste(app: &AppHandle, id: Uuid) -> Result<(), String> {
         return Ok(());
     }
     tokio::time::sleep(PASTE_DELAY).await;
-    keyboard::press_paste_shortcut()
+    Ok(keyboard::press_paste_shortcut()?)
 }
 
 /// The non-activating panel normally leaves the previous app in front.
