@@ -19,17 +19,16 @@
 //! Signing up, `accounts::sign_up_from_trial`, makes the same user a
 //! full one: nothing moves, since every row is already theirs.
 
-use crate::data::accounts_users as accounts_users_records;
 use crate::data::trial_users;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::accounts::users::{self as accounts_users, AccountUserError};
 use crate::accounts::{AccountError, Session};
 use crate::app::communities::{self, CommunityError};
 use crate::app::users::{self, UserError};
+use crate::data::accounts_users::{self, AccountUserError};
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
@@ -107,7 +106,7 @@ pub async fn create(deployment: &Deployment, max: i64) -> Result<Session, TrialU
     let email = format!("{name}@{EMAIL_DOMAIN}");
     let trial_expires_at = now() + Duration::hours(SHOWN_HOURS);
     let account =
-        accounts_users::create_trial_in(&mut tx, Uuid::now_v7(), &email, trial_expires_at).await?;
+        accounts_users::create_trial(&mut tx, Uuid::now_v7(), &email, trial_expires_at).await?;
     let user = users::create_in(&mut tx, account.id, &name).await?;
     communities::create_in(&mut tx, Role::Server, &user, COMMUNITY_NAME).await?;
     let token = tokens::create(&mut tx, user.id, Context::Session).await?;
@@ -130,7 +129,7 @@ pub async fn count(deployment: &Deployment) -> Result<i64, TrialUserError> {
 /// Whether the user is a trial user. On a device, never.
 pub async fn is_trial(deployment: &Deployment, user: &User) -> Result<bool, sqlx::Error> {
     let mut tx = deployment.begin().await?;
-    let account = accounts_users_records::lifecycle::get(&mut tx, user.id).await?;
+    let account = accounts_users::lifecycle::get(&mut tx, user.id).await?;
     tx.commit().await?;
     Ok(account.is_some_and(|account| account.trial_expires_at.is_some()))
 }
@@ -140,7 +139,7 @@ pub(crate) async fn writes_are_full_in(
     tx: &mut Transaction,
     user_id: Uuid,
 ) -> Result<bool, sqlx::Error> {
-    let account = accounts_users_records::lifecycle::get(&mut *tx, user_id).await?;
+    let account = accounts_users::lifecycle::get(&mut *tx, user_id).await?;
     if !account.is_some_and(|account| account.trial_expires_at.is_some()) {
         return Ok(false);
     }
@@ -247,7 +246,9 @@ mod tests {
                 .expect("the session's user");
             assert_eq!(user, session.user);
             assert!(is_trial(&server, &user).await.expect("asked"));
-            let account = accounts_users::get(&server, user.id).await.expect("theirs");
+            let account = crate::accounts::users::get(&server, user.id)
+                .await
+                .expect("theirs");
             assert_eq!(account.confirmed_at, None);
             let expires = account.trial_expires_at.expect("a trial");
             assert!(expires >= before + Duration::hours(SHOWN_HOURS));
@@ -471,7 +472,7 @@ mod tests {
             assert_eq!(signed_up.user.id, trial.id, "the same user");
             assert_eq!(signed_up.user.name, "bob", "named from the address");
             assert_eq!(signed_up.email, "bob@example.com");
-            let account = accounts_users::get(&server, trial.id)
+            let account = crate::accounts::users::get(&server, trial.id)
                 .await
                 .expect("theirs");
             assert_eq!(account.trial_expires_at, None);
@@ -555,7 +556,7 @@ mod tests {
             let trial = create(&server, 10).await.expect("a trial").user;
             let step = signed_up(&server, &trial, "bob@example.com").await;
             assert!(matches!(step, SignInStep::Next { .. }));
-            let account = accounts_users::get(&server, trial.id)
+            let account = crate::accounts::users::get(&server, trial.id)
                 .await
                 .expect("theirs");
             assert_eq!(account.email, "bob@example.com");
@@ -597,7 +598,7 @@ mod tests {
                 Err(UserError::NotFound { .. })
             ));
             assert!(matches!(
-                accounts_users::get(&server, trial.id).await,
+                crate::accounts::users::get(&server, trial.id).await,
                 Err(AccountUserError::NotFound { .. })
             ));
             let mut tx = server.begin().await.expect("a transaction");

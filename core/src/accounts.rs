@@ -67,7 +67,7 @@ use crate::services::mailer::mails;
 use crate::services::mailer::{MailError, Mailer};
 use crate::tokens::{self, Context};
 
-use self::users::{AccountUser, AccountUserError};
+use crate::data::accounts_users::{self, AccountUser, AccountUserError};
 
 /// Wrong codes a pending sign-in takes before it is deleted, and wrong
 /// passwords after the code.
@@ -219,9 +219,9 @@ pub async fn sign_up(
     if deployment.role != Role::Server {
         return Err(AccountError::ServerOnly);
     }
-    let email = users::checked_email(email)?;
+    let email = accounts_users::checked_email(email)?;
     let mut tx = deployment.begin().await?;
-    let existing = users::get_by_email_in(&mut tx, &email).await?;
+    let existing = accounts_users::get_by_email(&mut tx, &email).await?;
     let (mail, pending) = match existing {
         Some(account) if account.confirmed_at.is_some() => {
             let mail = mails::already_signed_up(&account.email);
@@ -232,7 +232,7 @@ pub async fn sign_up(
             (mails::sign_in_code(&account.email, &code), pending)
         }
         None => {
-            let account = users::create_in(&mut tx, Uuid::now_v7(), &email, false).await?;
+            let account = accounts_users::create(&mut tx, Uuid::now_v7(), &email, false).await?;
             let name = crate::app::users::name_from_email_in(&mut tx, &email, account.id).await?;
             crate::app::users::create_in(&mut tx, account.id, &name).await?;
             let (pending, code) = tokens::create_sign_in_code(&mut tx, account.id, None).await?;
@@ -255,9 +255,9 @@ pub async fn sign_in(
     if deployment.role != Role::Server {
         return Err(AccountError::ServerOnly);
     }
-    let email = users::checked_email(email)?;
+    let email = accounts_users::checked_email(email)?;
     let mut tx = deployment.begin().await?;
-    let (mail, pending) = match users::get_by_email_in(&mut tx, &email).await? {
+    let (mail, pending) = match accounts_users::get_by_email(&mut tx, &email).await? {
         // A trial user's address is made up: nothing to send, nobody to tell
         Some(account) if account.trial_expires_at.is_some() => (None, random::hex(32)),
         Some(account) => {
@@ -290,13 +290,13 @@ pub async fn sign_up_from_trial(
     if deployment.role != Role::Server {
         return Err(AccountError::ServerOnly);
     }
-    let email = users::checked_email(email)?;
+    let email = accounts_users::checked_email(email)?;
     let mut tx = deployment.begin().await?;
     let account = live_account_in(&mut tx, trial.id).await?;
     if account.trial_expires_at.is_none() {
         return Err(AccountError::NotATrial);
     }
-    let (mail, pending) = match users::get_by_email_in(&mut tx, &email).await? {
+    let (mail, pending) = match accounts_users::get_by_email(&mut tx, &email).await? {
         Some(taken) if taken.confirmed_at.is_some() => {
             let mail = mails::already_signed_up(&taken.email);
             (mail, random::hex(32))
@@ -538,7 +538,7 @@ pub async fn sign_in_with_device_code(
         .await?
         .ok_or(AccountError::UnknownDeviceCode)?;
     tokens::delete_by_id(&mut tx, row.id).await?;
-    let account = users::get_in(&mut tx, row.user_id)
+    let account = accounts_users::get(&mut tx, row.user_id)
         .await?
         .ok_or(AccountError::UnknownDeviceCode)?;
     let user = live_user_in(&mut tx, row.user_id)
@@ -765,7 +765,7 @@ async fn match_code_in(
     let account = match row.sent_to.as_deref() {
         Some(email) => sign_up_trial_in(tx, account, email).await?,
         None if first_sign_in => {
-            users::confirm_in(tx, account.id).await?;
+            accounts_users::confirm(tx, account.id).await?;
             let user = live_user_in(tx, account.id)
                 .await?
                 .ok_or(AccountError::CodeDoesNotMatch)?;
@@ -795,13 +795,13 @@ async fn sign_up_trial_in(
     if account.trial_expires_at.is_none() {
         return Err(AccountError::CodeDoesNotMatch);
     }
-    if let Some(other) = users::get_by_email_in(tx, email).await? {
+    if let Some(other) = accounts_users::get_by_email(tx, email).await? {
         if other.confirmed_at.is_some() {
             return Err(AccountError::CodeDoesNotMatch);
         }
-        users::delete_unconfirmed_in(tx, other.id).await?;
+        accounts_users::delete_unconfirmed(tx, other.id).await?;
     }
-    users::sign_up_trial_in(tx, account.id, email).await?;
+    accounts_users::sign_up_trial(tx, account.id, email).await?;
     crate::accounts::trial_users::show_communities_in(tx, account.id).await?;
     tokens::delete_of_user(tx, account.id, Context::Session).await?;
     live_account_in(tx, account.id).await
@@ -903,7 +903,7 @@ async fn finish_in(
 }
 
 async fn live_account_in(tx: &mut Transaction, id: Uuid) -> Result<AccountUser, AccountError> {
-    users::get_in(tx, id)
+    accounts_users::get(tx, id)
         .await?
         .ok_or(AccountError::CodeDoesNotMatch)
 }

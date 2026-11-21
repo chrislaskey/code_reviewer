@@ -19,7 +19,7 @@ pub(crate) mod accounts_stripe_events;
 #[cfg(feature = "stripe")]
 pub(crate) mod accounts_subscriptions;
 pub(crate) mod accounts_tokens;
-pub(crate) mod accounts_users;
+pub mod accounts_users;
 pub mod app_communities;
 pub(crate) mod app_events;
 pub mod app_files;

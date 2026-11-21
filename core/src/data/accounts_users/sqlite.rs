@@ -6,7 +6,7 @@ use sqlx::{FromRow, SqliteConnection};
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
-use crate::accounts::users::AccountUser;
+use super::AccountUser;
 
 #[derive(FromRow)]
 struct AccountUserRow {

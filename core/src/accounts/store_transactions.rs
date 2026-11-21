@@ -18,7 +18,7 @@ use crate::accounts::prices::{self, Price};
 use crate::accounts::products::{Grant, ProductKind};
 use crate::accounts::purchases::{self, Purchase, Store};
 use crate::accounts::subscriptions::{self, Subscription, SubscriptionStatus};
-use crate::accounts::users as accounts_users;
+use crate::data::accounts_users;
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
@@ -325,7 +325,7 @@ async fn live_full_account_in(
     tx: &mut Transaction,
     user_id: Uuid,
 ) -> Result<(), StoreTransactionError> {
-    let account = accounts_users::get_in(tx, user_id)
+    let account = accounts_users::get(tx, user_id)
         .await
         .map_err(|_| StoreTransactionError::NoAccount)?
         .ok_or(StoreTransactionError::NoAccount)?;

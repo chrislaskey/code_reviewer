@@ -19,7 +19,6 @@
 
 use crate::data::accounts_subscriptions;
 #[cfg(any(feature = "stripe", test))]
-use crate::data::accounts_users as accounts_users_records;
 use crate::data::app_communities;
 #[cfg(feature = "stripe")]
 use crate::data::app_posts;
@@ -29,13 +28,13 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::accounts::trial_users;
-use crate::accounts::users::{self as accounts_users, AccountUser, AccountUserError};
 use crate::accounts::{AccountError, MAX_CODE_ATTEMPTS};
 use crate::app::communities::{self, CommunityError};
 use crate::app::events::{Answer, AnswerStatus, Event, Fields};
 use crate::app::memberships::{self, MembershipError};
 use crate::app::posts::{self, PostError};
 use crate::app::users::{self, UserError};
+use crate::data::accounts_users::{self, AccountUser, AccountUserError};
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
@@ -168,7 +167,7 @@ async fn delete_in(tx: &mut Transaction, user: &User) -> Result<(), DeletionErro
     }
     users::delete_in(tx, user.id).await?;
     ops_staff::delete(&mut *tx, user.id).await?;
-    accounts_users::delete_in(tx, user.id).await?;
+    accounts_users::delete(tx, user.id).await?;
     Ok(())
 }
 
@@ -234,7 +233,7 @@ async fn match_code_in(
 }
 
 async fn live_account_in(tx: &mut Transaction, id: Uuid) -> Result<AccountUser, DeletionError> {
-    accounts_users::get_in(tx, id)
+    accounts_users::get(tx, id)
         .await?
         .ok_or_else(|| AccountUserError::NotFound { id }.into())
 }
@@ -266,8 +265,7 @@ async fn stripe_left_in(tx: &mut Transaction, user_id: Uuid) -> Result<StripeLef
         })
         .map(|subscription| subscription.store_id)
         .collect();
-    let customer_id =
-        accounts_users_records::billing::get_stripe_customer_id(&mut *tx, user_id).await?;
+    let customer_id = accounts_users::billing::get_stripe_customer_id(&mut *tx, user_id).await?;
     Ok(StripeLeft {
         subscription_ids,
         customer_id,
@@ -607,7 +605,7 @@ mod tests {
                     .is_none()
             );
             assert!(
-                accounts_users_records::lifecycle::get(&mut tx, alice.user.id)
+                accounts_users::lifecycle::get(&mut tx, alice.user.id)
                     .await
                     .expect("read")
                     .is_none(),

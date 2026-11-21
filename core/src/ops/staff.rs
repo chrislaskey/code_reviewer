@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::accounts::users::{self as accounts_users, AccountUserError};
+use crate::data::accounts_users::{self, AccountUserError};
 use crate::data::app_users::User;
 use crate::deployment::{Deployment, Role, now};
 
@@ -95,7 +95,7 @@ async fn account_with_email(
     tx: &mut crate::database::Transaction,
     email: &str,
 ) -> Result<accounts_users::AccountUser, StaffError> {
-    accounts_users::get_by_email_in(tx, email)
+    accounts_users::get_by_email(tx, email)
         .await?
         .ok_or_else(|| StaffError::NoAccount {
             email: email.to_string(),

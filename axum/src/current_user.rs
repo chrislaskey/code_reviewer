@@ -12,7 +12,6 @@ use axum_extra::extract::CookieJar;
 use serde::{Deserialize, Serialize};
 
 use app_core::accounts::plans::{self, Plan};
-use app_core::accounts::users as accounts_users;
 use app_core::app::users::{self, Kind};
 use app_core::data::app_users::User;
 use app_core::deployment::Deployment;
@@ -114,7 +113,7 @@ pub async fn update(
 }
 
 async fn shown(deployment: &Deployment, user: User) -> Result<CurrentUserShown, ApiError> {
-    let account = accounts_users::get(deployment, user.id).await?;
+    let account = app_core::accounts::users::get(deployment, user.id).await?;
     let is_staff = match staff::get(deployment, &user).await {
         Ok(_) => true,
         Err(StaffError::NotStaff) => false,

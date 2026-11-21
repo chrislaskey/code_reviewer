@@ -15,9 +15,9 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::accounts::users::{self as accounts_users, AccountUserError};
 use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
 use crate::app::sync::{Cursor, TableRow};
+use crate::data::accounts_users::{self, AccountUserError};
 use crate::data::device_settings::{self, DeviceSettingsError, SIGNED_IN};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
@@ -108,7 +108,7 @@ pub async fn create(deployment: &Deployment, email: &str, name: &str) -> Result<
     }
     let mut tx = deployment.begin().await?;
     let id = Uuid::now_v7();
-    accounts_users::create_in(&mut tx, id, email, true).await?;
+    accounts_users::create(&mut tx, id, email, true).await?;
     let user = create_in(&mut tx, id, name).await?;
     tx.commit().await?;
     Ok(user)
@@ -672,7 +672,7 @@ pub(crate) mod tests {
             assert_eq!(user.last_synced_at, Some(user.updated_at));
             assert_eq!(get(&deployment, user.id).await.expect("the user"), user);
 
-            let account = accounts_users::get(&deployment, user.id)
+            let account = crate::accounts::users::get(&deployment, user.id)
                 .await
                 .expect("their account");
             assert_eq!(account.email, "alice@example.com", "trimmed and lowercased");

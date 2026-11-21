@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgConnection};
 use uuid::Uuid;
 
-use crate::accounts::users::AccountUser;
+use super::AccountUser;
 
 #[derive(FromRow)]
 struct AccountUserRow {

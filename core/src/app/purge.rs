@@ -23,8 +23,9 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::app::users;
+use crate::data::accounts_users;
 use crate::deployment::{Deployment, Role};
-use crate::{accounts, tokens};
+use crate::tokens;
 
 /// How long a deleted row is kept, and how long a device may stay away.
 pub const RETENTION_DAYS: i64 = 90;
@@ -58,7 +59,7 @@ pub enum PurgeError {
     #[error(transparent)]
     User(#[from] crate::app::users::UserError),
     #[error(transparent)]
-    AccountUser(#[from] crate::accounts::users::AccountUserError),
+    AccountUser(#[from] crate::data::accounts_users::AccountUserError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -84,10 +85,10 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
     let unconfirmed_before = now - Duration::days(UNCONFIRMED_DAYS);
     users::delete_of_unconfirmed_accounts_before(&mut tx, unconfirmed_before).await?;
     let unconfirmed =
-        accounts::users::delete_unconfirmed_before(&mut tx, unconfirmed_before).await?;
+        accounts_users::maintenance::delete_unconfirmed_before(&mut tx, unconfirmed_before).await?;
     removed.insert("accounts_users unconfirmed".to_string(), unconfirmed);
-    let accounts = accounts::users::delete_without_user(&mut tx).await?;
-    removed.insert(accounts::users::TABLE.to_string(), accounts);
+    let accounts = accounts_users::maintenance::delete_without_user(&mut tx).await?;
+    removed.insert(accounts_users::TABLE.to_string(), accounts);
     let purge = Purge {
         id: Uuid::now_v7(),
         horizon,
@@ -197,7 +198,7 @@ mod tests {
                 .await
                 .expect("bob signed up and stopped there");
             let mut tx = deployment.begin().await.expect("a transaction");
-            let bob = crate::accounts::users::get_by_email_in(&mut tx, "bob@example.com")
+            let bob = crate::data::accounts_users::get_by_email(&mut tx, "bob@example.com")
                 .await
                 .expect("looked")
                 .expect("bob's account");
@@ -217,7 +218,7 @@ mod tests {
             assert_eq!(report.removed["accounts_users unconfirmed"], 1);
             let mut tx = deployment.begin().await.expect("a transaction");
             assert!(
-                crate::accounts::users::get_by_email_in(&mut tx, "bob@example.com")
+                crate::data::accounts_users::get_by_email(&mut tx, "bob@example.com")
                     .await
                     .expect("looked")
                     .is_none(),
