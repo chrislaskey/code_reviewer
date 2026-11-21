@@ -18,7 +18,7 @@
     filesUpdate,
   } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
-  import { currentCommunityLoad } from "../lib/current_community.js";
+  import { currentCommunityLoad } from "../lib/current_community.svelte.js";
   import { navigateToUrl } from "../lib/router.js";
   import { filesIndexUrl, filesShowUrl } from "../lib/routes.js";
   import { Alert, Button, FileInput, Heading, Label, Link, Page, Text } from "../lib/components/index.js";

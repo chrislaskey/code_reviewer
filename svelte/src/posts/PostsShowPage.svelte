@@ -4,14 +4,13 @@
   import { postsDelete, postsGet } from "../lib/core/index.js";
   import { loaded } from "../lib/loaded.svelte.js";
   import { errorMessageOf } from "../lib/error_message.js";
-  import { currentUserLoad } from "../lib/current_user.js";
+  import { currentUser } from "../lib/current_user.svelte.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { postsEditUrl, postsIndexUrl } from "../lib/routes.js";
   import { Button, ErrorMessage, Heading, Link, Page, Panel, Text } from "../lib/components/index.js";
 
   const id = pathParams().id;
   const shown = loaded(() => postsGet(id), { reloadOnSync: true });
-  const currentUser = loaded(currentUserLoad);
   let error = $state("");
 
   async function remove() {

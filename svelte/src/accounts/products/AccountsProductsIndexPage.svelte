@@ -7,7 +7,7 @@
   import { accountsProductsList, accountsStoreTransactionsRestore } from "../../lib/core/index.js";
   import { loaded } from "../../lib/loaded.svelte.js";
   import { errorMessageOf } from "../../lib/error_message.js";
-  import { currentUserReload } from "../../lib/current_user.js";
+  import { currentUserReload } from "../../lib/current_user.svelte.js";
   import { accountsProductsShowUrl } from "../../lib/routes.js";
   import { priceFormat } from "../money.js";
   import { storePriceFormat } from "../stores.js";

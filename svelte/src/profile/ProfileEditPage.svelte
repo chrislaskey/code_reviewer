@@ -7,7 +7,7 @@
 <script>
   import { FormError, avatarsUpload, currentUserGet, currentUserUpdate } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
-  import { currentUserForget } from "../lib/current_user.js";
+  import { currentUserForget } from "../lib/current_user.svelte.js";
   import { accountsIndexUrl } from "../lib/routes.js";
   import { Alert, Button, ErrorMessage, FieldErrors, FileInput, Heading, Input, Label, Page, Text } from "../lib/components/index.js";
 

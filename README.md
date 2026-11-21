@@ -453,15 +453,17 @@ The New and Edit pages share `posts/components/PostsForm.svelte`, the body and a
 checkbox per community the person is in. A write that worked navigates
 to the post, or the list after a delete, through `navigateToUrl` in
 `router.js`. The post page shows Edit and Delete to the owner, which it
-tells by the current user, `currentUserLoad()`, asked once per visit
-and kept in `svelte/src/lib/current_user.js`; the nav shows who is
-signed in with Sign out, or Sign in and Sign up.
+tells by the current user, `currentUser.value`, shared reactive state
+in `svelte/src/lib/current_user.svelte.js`, asked once per visit by
+`currentUserLoad()`; every component reading it, the nav's Sign out or
+Sign in and Sign up among them, shows a change at once.
 
 The nav also shows the current community, the one community the person
 works in (`core/src/app/current_community.rs`), and a click opens a dialog
 of their communities to switch to, which reloads the page. Any page
-asks for it with `currentCommunityLoad()` from
-`svelte/src/lib/current_community.js`; none filters by it yet. It is
+reads it as `currentCommunity.value` from
+`svelte/src/lib/current_community.svelte.js`, asked again by
+`currentCommunityLoad()`; none filters by it yet. It is
 the chosen one while the person is a member of it, else their first by
 name, which is then stored, or null when they are in none. The app
 keeps the choice as the device setting `current_community_id` of the

@@ -5,7 +5,7 @@
 <script>
   import { accountsTrialCreate, accountsTrialGet } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
-  import { currentUserForget } from "../lib/current_user.js";
+  import { currentUserForget } from "../lib/current_user.svelte.js";
   import { navigateToUrl } from "../lib/router.js";
   import { accountsSignInUrl, accountsSignUpUrl, postsIndexUrl } from "../lib/routes.js";
   import { Button, ErrorMessage, Heading, Link, Page, Text } from "../lib/components/index.js";

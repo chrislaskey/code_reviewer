@@ -3,22 +3,15 @@
      or a trial user is told it needs an account. -->
 <script>
   import AccountsNeeded from "../lib/AccountsNeeded.svelte";
-  import { currentUserLoad } from "../lib/current_user.js";
+  import { currentUser } from "../lib/current_user.svelte.js";
   import { Heading, Page, Text } from "../lib/components/index.js";
 
-  /** @type {import("../lib/current_user.js").User | null} */
-  let currentUser = $state(null);
-
-  currentUserLoad().then(
-    (user) => (currentUser = user),
-    () => (currentUser = null),
-  );
 </script>
 
 <Page>
   <Heading level={1}>Forum</Heading>
-  {#if currentUser && currentUser.kind !== "full"}
-    <AccountsNeeded kind={currentUser.kind} />
+  {#if currentUser.value && currentUser.value.kind !== "full"}
+    <AccountsNeeded kind={currentUser.value.kind} />
   {:else}
     <Text tone="muted">Nothing here yet.</Text>
   {/if}

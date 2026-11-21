@@ -17,9 +17,8 @@
     navigationHistory,
     trackNavigationHistory,
   } from "./navigation_history.svelte.js";
+  import { currentUser } from "../current_user.svelte.js";
 
-  /** @type {{ currentUser: import("../current_user.js").User | null }} */
-  let { currentUser } = $props();
 
   $effect(() => trackNavigationHistory());
 </script>
@@ -50,12 +49,12 @@
       <Icon name="hero-chevron-right" class="size-5" />
     </Button>
   </div>
-  {#if currentUser}
+  {#if currentUser.value}
     <CurrentCommunityMenu />
   {/if}
   <span class="grow self-stretch" data-tauri-drag-region></span>
-  {#if currentUser}
+  {#if currentUser.value}
     <SyncMenu />
   {/if}
-  <AccountMenu {currentUser} />
+  <AccountMenu />
 </header>

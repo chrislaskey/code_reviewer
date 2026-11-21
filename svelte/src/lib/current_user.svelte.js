@@ -1,6 +1,7 @@
-// The user signed in, as the pages and the nav show them: asked of the
-// application once, `currentUserGet()`, and kept until a sign-out or a
-// sign-in says otherwise. Null when nobody is signed in, which is what
+// The user signed in, as the pages and the nav show them, `currentUser.value`,
+// reactive, so every component reading it shows the change at once: asked
+// of the application once, `currentUserLoad()`, and kept until a sign-out
+// or a sign-in says otherwise. Null when nobody is signed in, which is what
 // sends a visitor to the sign-in page (router.js); an error only when the
 // application could not tell, which the page shows.
 //
@@ -20,6 +21,9 @@ import { currentUserGet } from "./core/index.js";
  * @typedef {{id: string, name: string, email: string, kind: "full" | "local" | "trial", trial_expires_at?: string | null, is_staff?: boolean, avatar_url?: string | null, plan?: Plan | null, payment_failed_subscription_id?: string | null}} User
  */
 
+/** The user signed in; null until asked and while nobody is. */
+export const currentUser = $state({ value: /** @type {User | null} */ (null) });
+
 /** @type {Promise<User | null> | null} */
 let current = null;
 
@@ -36,11 +40,13 @@ export function currentUserLoad() {
   current ??= currentUserGet().then(
     (user) => {
       if (!user) current = null;
+      currentUser.value = user;
       rememberSignedIn(Boolean(user));
       return user;
     },
     (problem) => {
       current = null;
+      currentUser.value = null;
       throw problem;
     },
   );
@@ -59,5 +65,6 @@ export function currentUserReload() {
 
 export function currentUserForget() {
   current = null;
+  currentUser.value = null;
   rememberSignedIn(false);
 }

@@ -7,12 +7,10 @@
 <script>
   import { communitiesList, currentCommunityUpdate, onSynced } from "../core/index.js";
   import { errorMessageOf } from "../error_message.js";
-  import { currentCommunityLoad, onCurrentCommunityChanged } from "../current_community.js";
+  import { currentCommunity, currentCommunityLoad } from "../current_community.svelte.js";
   import { communitiesIndexUrl } from "../routes.js";
   import { Button, Dialog, ErrorMessage, Heading, Icon, Input, Link } from "../components/index.js";
 
-  /** @type {{id: string, name: string} | null} */
-  let currentCommunity = $state(null);
   /** @type {{id: string, name: string}[]} */
   let mine = $state([]);
   let filter = $state("");
@@ -27,12 +25,8 @@
     mine.filter((community) => community.name.toLowerCase().includes(filter.trim().toLowerCase())),
   );
 
-  async function load() {
-    try {
-      currentCommunity = await currentCommunityLoad();
-    } catch {
-      currentCommunity = null;
-    }
+  function load() {
+    currentCommunityLoad().catch(() => (currentCommunity.value = null));
   }
 
   async function open() {
@@ -67,13 +61,12 @@
   }
 
   $effect(() => onSynced(load));
-  $effect(() => onCurrentCommunityChanged(load));
   load();
 </script>
 
 <Button variant="ghost" size="sm" class="gap-1" onclick={open}>
   <Icon name="hero-user-group-mini" class="size-5" />
-  {currentCommunity ? currentCommunity.name : "No community"}
+  {currentCommunity.value?.name ?? "No community"}
   <Icon name="hero-chevron-down-mini" class="size-4" />
 </Button>
 
@@ -98,12 +91,12 @@
       <li>
         <button
           type="button"
-          class={community.id === currentCommunity?.id ? "menu-active" : ""}
+          class={community.id === currentCommunity.value?.id ? "menu-active" : ""}
           onclick={() => choose(community.id)}
           disabled={busy}
         >
           {community.name}
-          {#if community.id === currentCommunity?.id}
+          {#if community.id === currentCommunity.value?.id}
             <Icon name="hero-check-mini" class="size-4" />
           {/if}
         </button>

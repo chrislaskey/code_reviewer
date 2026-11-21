@@ -11,7 +11,7 @@
   import HeaderMenu from "./HeaderMenu.svelte";
   import { onSynced, syncRun, syncSetOffline, syncStatus } from "../core/index.js";
   import { errorMessageOf } from "../error_message.js";
-  import { currentUserForget } from "../current_user.js";
+  import { currentUserForget } from "../current_user.svelte.js";
   import { navigateToUrl } from "../router.js";
   import { accountsIndexUrl, conflictsIndexUrl } from "../routes.js";
   import { Button, Icon, Link, Text } from "../components/index.js";

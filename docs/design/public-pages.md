@@ -23,7 +23,7 @@ the file as it is; nothing is drawn by a script.
 - **Signed in**, the header shows "Open the app" in place of Sign in
   and Sign up. The session cookie is not readable by a page, so the
   app's pages keep a hint in localStorage, `app:signed-in`
-  (`svelte/src/lib/current_user.js`), and a script in the header reads
+  (`svelte/src/lib/current_user.svelte.js`), and a script in the header reads
   it before the links paint. A stale hint costs a click: `/home` shows
   Sign in.
 

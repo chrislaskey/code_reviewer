@@ -3,7 +3,7 @@
 <script>
   import { membershipsJoin, membershipsLeave } from "../../lib/core/index.js";
   import { errorMessageOf } from "../../lib/error_message.js";
-  import { currentCommunityChanged } from "../../lib/current_community.js";
+  import { currentCommunity, currentCommunityLoad } from "../../lib/current_community.svelte.js";
   import { Button } from "../../lib/components/index.js";
 
   /**
@@ -23,7 +23,7 @@
     busy = true;
     try {
       await (membership ? membershipsLeave(communityId) : membershipsJoin(communityId));
-      currentCommunityChanged();
+      currentCommunityLoad().catch(() => (currentCommunity.value = null));
       onchange();
     } catch (problem) {
       onerror(errorMessageOf(problem));

@@ -11,7 +11,7 @@
 import { Navigation, createRouter } from "sv-router";
 import AppLayout from "./layouts/AppLayout.svelte";
 import { hasDeviceAccounts } from "./core/index.js";
-import { currentUserLoad } from "./current_user.js";
+import { currentUserLoad } from "./current_user.svelte.js";
 import { errorMessageOf } from "./error_message.js";
 import { pageLoadErrorClear, pageLoadErrorShow } from "./page_load_error.svelte.js";
 import {

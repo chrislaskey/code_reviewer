@@ -25,7 +25,7 @@
     onAccountsSignInReturned,
   } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
-  import { currentUserForget } from "../lib/current_user.js";
+  import { currentUserForget } from "../lib/current_user.svelte.js";
   import { navigateToUrl } from "../lib/router.js";
   import { postsIndexUrl } from "../lib/routes.js";
   import AccountsMoveDialog from "./components/AccountsMoveDialog.svelte";

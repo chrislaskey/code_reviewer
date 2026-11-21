@@ -18,7 +18,7 @@
   } from "../../lib/core/index.js";
   import { loaded } from "../../lib/loaded.svelte.js";
   import { errorMessageOf } from "../../lib/error_message.js";
-  import { currentUserLoad, currentUserReload } from "../../lib/current_user.js";
+  import { currentUser, currentUserReload } from "../../lib/current_user.svelte.js";
   import { navigateToUrl, pathParams } from "../../lib/router.js";
   import {
     accountsCheckoutsShowUrl,
@@ -32,9 +32,7 @@
 
   const id = pathParams().id;
   const shown = loaded(() => accountsProductsGet(id));
-  const user = loaded(currentUserLoad);
   let product = $derived(shown.value);
-  let currentUser = $derived(user.value ?? null);
   let buying = $state(false);
   let pending = $state(false);
   let error = $state("");
@@ -43,7 +41,7 @@
 
   /** @param {string} priceId */
   async function planSwitch(priceId) {
-    const plan = currentUser?.plan;
+    const plan = currentUser.value?.plan;
     if (!plan) return;
     buying = true;
     error = "";
@@ -97,7 +95,7 @@
 
 <Page>
 
-  <ErrorMessage message={error || shown.error || user.error} />
+  <ErrorMessage message={error || shown.error} />
   {#if product}
     <Heading level={1}>{product.name}</Heading>
     {#if product.description}
@@ -106,15 +104,15 @@
     {#if product.free_days}
       <Text tone="muted">The first {product.free_days} days are free.</Text>
     {/if}
-    {#if currentUser && currentUser.kind !== "full"}
+    {#if currentUser.value && currentUser.value.kind !== "full"}
       <ul>
         {#each product.prices as price (price.id)}
           <li>{storePriceFormat(price, priceFormat)}</li>
         {/each}
       </ul>
-      <AccountsNeeded kind={currentUser.kind} />
-    {:else if product.kind === "plan" && currentUser?.plan}
-      {@const plan = currentUser.plan}
+      <AccountsNeeded kind={currentUser.value.kind} />
+    {:else if product.kind === "plan" && currentUser.value?.plan}
+      {@const plan = currentUser.value.plan}
       <Text>You are on {plan.product_name}.</Text>
       {#if plan.store !== store}
         <Text tone="muted">It was bought in {storeName(plan.store)}: manage it {storeManagedWhere(plan.store)}.</Text>

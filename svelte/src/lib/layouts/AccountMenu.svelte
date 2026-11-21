@@ -12,7 +12,7 @@
   import HeaderMenu from "./HeaderMenu.svelte";
   import { accountsSignOut, hasDeviceAccounts } from "../core/index.js";
   import { errorMessageOf } from "../error_message.js";
-  import { currentUserForget } from "../current_user.js";
+  import { currentUser, currentUserForget } from "../current_user.svelte.js";
   import { navigateToUrl } from "../router.js";
   import {
     accountsIndexUrl,
@@ -23,14 +23,12 @@
   } from "../routes.js";
   import { Button, ErrorMessage, Icon, Link } from "../components/index.js";
 
-  /** @type {{ currentUser: import("../current_user.js").User | null }} */
-  let { currentUser } = $props();
 
   let busy = $state(false);
   let error = $state("");
 
   let initials = $derived(
-    (currentUser?.name ?? "")
+    (currentUser.value?.name ?? "")
       .split(/\s+/)
       .filter(Boolean)
       .slice(0, 2)
@@ -53,11 +51,11 @@
   }
 </script>
 
-{#if currentUser}
+{#if currentUser.value}
   <HeaderMenu label={t`Account`} buttonClass="btn-circle">
     {#snippet button()}
-      {#if currentUser.avatar_url}
-        <img src={currentUser.avatar_url} alt="" class="size-7 rounded-full object-cover" />
+      {#if currentUser.value.avatar_url}
+        <img src={currentUser.value.avatar_url} alt="" class="size-7 rounded-full object-cover" />
       {:else if initials}
         <span class="avatar-initials">{initials}</span>
       {:else}
@@ -66,15 +64,15 @@
     {/snippet}
     {#snippet children(close)}
       <div class="flex flex-col px-3 pt-2 pb-1">
-        {#if currentUser.kind === "trial"}
+        {#if currentUser.value.kind === "trial"}
           <span class="font-semibold">{t`Trial`}</span>
           <span class="muted">{t`Sign up to keep what you make.`}</span>
         {:else}
-          <span class="truncate font-semibold">{currentUser.name}</span>
-          <span class="muted truncate">{currentUser.kind === "local" ? t`On this device only` : currentUser.email}</span>
+          <span class="truncate font-semibold">{currentUser.value.name}</span>
+          <span class="muted truncate">{currentUser.value.kind === "local" ? t`On this device only` : currentUser.value.email}</span>
         {/if}
       </div>
-      {#if currentUser.kind === "trial"}
+      {#if currentUser.value.kind === "trial"}
         <div class="px-3 py-1">
           <Button variant="primary" size="sm" class="w-full" href={accountsSignUpUrl("")} onclick={close}>
             {t`Sign up`}
@@ -85,7 +83,7 @@
         <li>
           <a href={profileEditUrl()} onclick={close}><Icon name="hero-user-circle" />{t`Profile`}</a>
         </li>
-        {#if currentUser.kind === "full"}
+        {#if currentUser.value.kind === "full"}
           <li>
             <a href={accountsCurrentShowUrl()} onclick={close}><Icon name="hero-cog-6-tooth" />{t`Account settings`}</a>
           </li>
@@ -95,7 +93,7 @@
             <a href={accountsIndexUrl()} onclick={close}><Icon name="hero-users" />{t`Switch account`}</a>
           </li>
         {/if}
-        {#if currentUser.kind === "full"}
+        {#if currentUser.value.kind === "full"}
           <li>
             <button type="button" onclick={signOut} disabled={busy}>
               <Icon name="hero-arrow-right-start-on-rectangle" />{t`Sign out`}

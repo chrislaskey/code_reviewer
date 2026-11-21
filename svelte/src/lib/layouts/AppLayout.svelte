@@ -9,35 +9,30 @@
   import AppHeader from "./AppHeader.svelte";
   import AppNav from "./AppNav.svelte";
   import RemountPageOnNavigation from "./RemountPageOnNavigation.svelte";
-  import { currentUserLoad } from "../current_user.js";
+  import { currentUser, currentUserLoad } from "../current_user.svelte.js";
   import { currentPathname } from "../router.js";
 
   let { children } = $props();
 
-  /** @type {import("../current_user.js").User | null} */
-  let currentUser = $state(null);
-
-  // Asked again on every page, so a sign-in or a sign-out shows here.
+  // Asked again on every page, so a sign-in or a sign-out shows here; a
+  // failure leaves nobody shown, and the page that needs someone says why.
   $effect(() => {
     currentPathname();
-    currentUserLoad().then(
-      (user) => (currentUser = user),
-      () => (currentUser = null),
-    );
+    currentUserLoad().catch(() => {});
   });
 </script>
 
-<AppHeader {currentUser} />
-<AppNav {currentUser} />
+<AppHeader />
+<AppNav />
 <div class="app-layout">
-  {#if currentUser?.kind === "trial" && currentUser.trial_expires_at}
+  {#if currentUser.value?.kind === "trial" && currentUser.value.trial_expires_at}
     <div class="app-banner">
-      <AccountsTrialBanner trialExpiresAt={currentUser.trial_expires_at} />
+      <AccountsTrialBanner trialExpiresAt={currentUser.value.trial_expires_at} />
     </div>
   {/if}
-  {#if currentUser?.payment_failed_subscription_id}
+  {#if currentUser.value?.payment_failed_subscription_id}
     <div class="app-banner">
-      <AccountsPaymentFailedBanner subscriptionId={currentUser.payment_failed_subscription_id} />
+      <AccountsPaymentFailedBanner subscriptionId={currentUser.value.payment_failed_subscription_id} />
     </div>
   {/if}
   <RemountPageOnNavigation>

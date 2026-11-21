@@ -22,16 +22,15 @@
     postsIndexUrl,
     supportIndexUrl,
   } from "../routes.js";
+  import { currentUser } from "../current_user.svelte.js";
 
   /** @typedef {{ id: string, label: string, icon: string, href: string, target?: string }} Link */
 
-  /** @type {{ currentUser: import("../current_user.js").User | null }} */
-  let { currentUser } = $props();
 
   /** @type {Link[]} */
   let links = $derived([
     { id: "home", label: t`Home`, icon: "hero-home", href: homeUrl() },
-    ...(currentUser
+    ...(currentUser.value
       ? [
           { id: "posts", label: t`Posts`, icon: "hero-document-text", href: postsIndexUrl() },
           { id: "files", label: t`Files`, icon: "hero-folder", href: filesIndexUrl() },
@@ -40,7 +39,7 @@
           { id: "forum", label: t`Forum`, icon: "hero-chat-bubble-left-right", href: forumIndexUrl() },
         ]
       : []),
-    ...(currentUser?.is_staff
+    ...(currentUser.value?.is_staff
       ? [{ id: "ops", label: t`Ops`, icon: "hero-wrench-screwdriver", href: opsHomeUrl(), target: "_self" }]
       : []),
   ]);

@@ -7,7 +7,7 @@
 <script>
   import { accountsCheckoutsGet, hasDeviceAccounts } from "../../lib/core/index.js";
   import { errorMessageOf } from "../../lib/error_message.js";
-  import { currentUserReload } from "../../lib/current_user.js";
+  import { currentUserReload } from "../../lib/current_user.svelte.js";
   import { pathParams } from "../../lib/router.js";
   import {
     accountsProductsShowUrl,
