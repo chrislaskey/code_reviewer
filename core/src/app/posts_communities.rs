@@ -19,9 +19,9 @@ use uuid::Uuid;
 
 use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind};
 use crate::app::memberships::{self, Membership, id_field};
-use crate::app::posts::Post;
 use crate::app::sync::{Cursor, TableRow};
 use crate::app::users::User;
+use crate::data::app_posts::Post;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;

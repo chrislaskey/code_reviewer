@@ -7,7 +7,7 @@ use sqlx::{FromRow, SqliteConnection};
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
-use crate::app::posts::Post;
+use super::Post;
 use crate::app::sync::Cursor;
 
 #[derive(FromRow)]

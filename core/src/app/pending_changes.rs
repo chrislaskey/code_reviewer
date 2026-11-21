@@ -14,6 +14,7 @@ use crate::app::files::{self, FileError};
 use crate::app::files_communities;
 use crate::app::posts::{self, PostError};
 use crate::app::users::{self, UserError};
+use crate::data::app_posts;
 use crate::deployment::Deployment;
 
 /// A change waiting to reach the server, as the page shows it.
@@ -52,7 +53,7 @@ pub async fn list(deployment: &Deployment) -> Result<Vec<PendingChange>, Pending
     let mut changes = Vec::new();
     for stored in events::pending(&mut tx).await? {
         let about = match stored.event.table.as_str() {
-            posts::TABLE => posts::get_in(&mut tx, stored.event.row_id)
+            app_posts::TABLE => posts::get_in(&mut tx, stored.event.row_id)
                 .await?
                 .map(|post| post.body.lines().next().unwrap_or_default().to_string()),
             files::TABLE => files::get_in(&mut tx, stored.event.row_id)

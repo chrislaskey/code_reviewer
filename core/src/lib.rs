@@ -16,7 +16,7 @@
 pub mod accounts;
 pub mod app;
 pub mod credentials;
-mod data;
+pub mod data;
 pub mod database;
 pub mod deployment;
 pub mod device_settings;

@@ -1146,7 +1146,7 @@ mod tests {
     #[tokio::test]
     async fn posts_create_refuses_a_body_over_the_maximum_length() {
         let (router, _) = test_router().await;
-        let too_long = "a".repeat(app_core::app::posts::MAX_BODY_LENGTH + 1);
+        let too_long = "a".repeat(app_core::data::app_posts::MAX_BODY_LENGTH + 1);
         let (status, body) = send(
             &router,
             Method::POST,
@@ -1898,7 +1898,7 @@ mod tests {
                 "made_at": "2026-11-08T10:00:00Z"
             })
         };
-        let longest = "a".repeat(app_core::app::posts::MAX_BODY_LENGTH);
+        let longest = "a".repeat(app_core::data::app_posts::MAX_BODY_LENGTH);
         let four_megabytes: Vec<Value> = (0..400).map(|_| event(longest.clone())).collect();
         let (status, body) = send(
             &router,

@@ -518,7 +518,7 @@ mod tests {
                 .await
                 .expect("user");
             let event = Event::create(
-                crate::app::posts::TABLE,
+                crate::data::app_posts::TABLE,
                 Uuid::now_v7(),
                 fields(json!({"body": "pending"})),
                 crate::deployment::now(),

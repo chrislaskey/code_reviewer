@@ -6,7 +6,8 @@ use axum::http::StatusCode;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use app_core::app::posts::{self, Post, PostWithOwnerAndCommunities};
+use app_core::app::posts::{self, PostWithOwnerAndCommunities};
+use app_core::data::app_posts::Post;
 use app_core::deployment::Deployment;
 
 use crate::api_error::ApiError;

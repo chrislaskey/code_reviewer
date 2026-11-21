@@ -35,10 +35,11 @@ use crate::app::events::{self, Answer, AnswerStatus, Event, EventKind, EventStat
 use crate::app::files::{self, File, FileError, FileUpload, FileUploadNew};
 use crate::app::files_communities::{self, FileCommunity, FileCommunityError};
 use crate::app::memberships::{self, Membership, MembershipError};
-use crate::app::posts::{self, Post, PostError};
+use crate::app::posts::{self, PostError};
 use crate::app::posts_communities::{self, PostCommunity, PostCommunityError};
 use crate::app::purge::{self, PurgeError};
 use crate::app::users::{self, User, UserError};
+use crate::data::app_posts::{self, Post};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
 use crate::device_settings::{self, DeviceSettingsError, WORK_OFFLINE};
@@ -206,7 +207,7 @@ pub async fn push(
             users::TABLE => users::apply_event(deployment, user, event).await?,
             communities::TABLE => communities::apply_event(deployment, user, event).await?,
             memberships::TABLE => memberships::apply_event(deployment, user, event).await?,
-            posts::TABLE => posts::apply_event(deployment, user, event).await?,
+            app_posts::TABLE => posts::apply_event(deployment, user, event).await?,
             files::TABLE => files::apply_event(deployment, user, event).await?,
             files_communities::TABLE => {
                 files_communities::apply_event(deployment, user, event).await?
@@ -460,7 +461,7 @@ async fn with_parents(
                     send(
                         &mut out,
                         &mut sent,
-                        posts::TABLE,
+                        app_posts::TABLE,
                         post.id,
                         SyncedRow::Post(post),
                     )?;
@@ -483,7 +484,7 @@ async fn with_parents(
             SyncedRow::User(user) => (users::TABLE, user.id),
             SyncedRow::Community(community) => (communities::TABLE, community.id),
             SyncedRow::Membership(membership) => (memberships::TABLE, membership.id),
-            SyncedRow::Post(post) => (posts::TABLE, post.id),
+            SyncedRow::Post(post) => (app_posts::TABLE, post.id),
             SyncedRow::PostCommunity(row) => (posts_communities::TABLE, row.id),
             SyncedRow::File(file) => (files::TABLE, file.id),
             SyncedRow::FileCommunity(row) => (files_communities::TABLE, row.id),
@@ -548,7 +549,7 @@ fn table_rank(table: &str) -> usize {
         users::TABLE => 0,
         communities::TABLE => 1,
         memberships::TABLE => 2,
-        posts::TABLE => 3,
+        app_posts::TABLE => 3,
         posts_communities::TABLE => 4,
         files::TABLE => 5,
         files_communities::TABLE => 6,
@@ -1612,7 +1613,7 @@ async fn apply_row(tx: &mut Transaction, user: &User, row: &TableRow) -> Result<
             }
             Ok(written)
         }
-        posts::TABLE => Ok(posts::apply_server_row(tx, &row.row).await?),
+        app_posts::TABLE => Ok(posts::apply_server_row(tx, &row.row).await?),
         posts_communities::TABLE => Ok(posts_communities::apply_server_row(tx, &row.row).await?),
         files::TABLE => Ok(files::apply_server_row(tx, &row.row).await?),
         files_communities::TABLE => Ok(files_communities::apply_server_row(tx, &row.row).await?),
@@ -1626,7 +1627,7 @@ async fn delete_row(tx: &mut Transaction, table: &str, id: Uuid) -> Result<(), S
     match table {
         communities::TABLE => Ok(communities::delete_row(tx, id).await?),
         memberships::TABLE => Ok(memberships::delete_row(tx, id).await?),
-        posts::TABLE => Ok(posts::delete_row(tx, id).await?),
+        app_posts::TABLE => Ok(posts::delete_row(tx, id).await?),
         posts_communities::TABLE => Ok(posts_communities::delete_row(tx, id).await?),
         files::TABLE => Ok(files::delete_row(tx, id).await?),
         files_communities::TABLE => Ok(files_communities::delete_row(tx, id).await?),
@@ -2247,7 +2248,7 @@ pub(crate) mod tests {
             let server = Deployment::new(database, Role::Server);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let a = device_of(&alice, &token).await;
-            let longest = "é".repeat(posts::MAX_BODY_LENGTH);
+            let longest = "é".repeat(app_posts::MAX_BODY_LENGTH);
             for _ in 0..PUSH_BATCH {
                 posts::create(&a, &alice, &longest, &[])
                     .await
@@ -2273,7 +2274,7 @@ pub(crate) mod tests {
     #[test]
     fn sync_a_push_request_holds_one_event_at_least_whatever_its_size() {
         let huge = Event::create(
-            posts::TABLE,
+            app_posts::TABLE,
             Uuid::now_v7(),
             events::Fields::from_iter([("body".to_string(), json!("a".repeat(MAX_PUSH_BYTES)))]),
             now(),
@@ -2299,7 +2300,7 @@ pub(crate) mod tests {
             let (alice, _token) = user_with_token(&server, "alice@example.com").await;
             let last_week = now() - Duration::days(7);
             let offline = Event::create(
-                posts::TABLE,
+                app_posts::TABLE,
                 Uuid::now_v7(),
                 events::Fields::from_iter([("body".to_string(), json!("written offline"))]),
                 last_week,
@@ -2316,7 +2317,7 @@ pub(crate) mod tests {
 
             let before = now();
             let ahead = Event::create(
-                posts::TABLE,
+                app_posts::TABLE,
                 Uuid::now_v7(),
                 events::Fields::from_iter([("body".to_string(), json!("a clock set ahead"))]),
                 now() + Duration::days(7),
@@ -3295,8 +3296,10 @@ pub(crate) mod tests {
             .await
             .expect("the row")
             .remove(0);
-            assert!(position(users::TABLE, alice.id) < position(posts::TABLE, post.id));
-            assert!(position(posts::TABLE, post.id) < position(posts_communities::TABLE, row.id));
+            assert!(position(users::TABLE, alice.id) < position(app_posts::TABLE, post.id));
+            assert!(
+                position(app_posts::TABLE, post.id) < position(posts_communities::TABLE, row.id)
+            );
             assert!(
                 position(communities::TABLE, gardening.id)
                     < position(posts_communities::TABLE, row.id)
@@ -3308,7 +3311,7 @@ pub(crate) mod tests {
             assert_eq!(
                 page.rows
                     .iter()
-                    .filter(|row| row.table == posts::TABLE)
+                    .filter(|row| row.table == app_posts::TABLE)
                     .count(),
                 1,
                 "sent once"
@@ -3362,7 +3365,7 @@ pub(crate) mod tests {
         )
         .await;
         let report = purge::run(server, now()).await.expect("purged");
-        assert_eq!(report.removed[posts::TABLE], 1);
+        assert_eq!(report.removed[app_posts::TABLE], 1);
     }
 
     /// Makes the device's last pull look older than the purge window.
@@ -3587,7 +3590,7 @@ pub(crate) mod tests {
                 .await
                 .expect("a page");
             assert!(
-                page.rows.iter().all(|row| row.table != posts::TABLE),
+                page.rows.iter().all(|row| row.table != app_posts::TABLE),
                 "the post is in cooking only, which bob is not in"
             );
             let device = device_of(&bob, &bobs_token).await;

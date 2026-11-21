@@ -11,7 +11,6 @@
 //! and is recorded as `deleted_by_id` on what they delete, which takes
 //! the post's community rows with it.
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use thiserror::Error;
@@ -22,45 +21,15 @@ use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind
 use crate::app::posts_communities::{self, PostCommunityError};
 use crate::app::sync::{Cursor, TableRow};
 use crate::app::users::{self, User};
-use crate::data::app_posts;
+use crate::data::app_posts::{self, AcceptedPost, MAX_BODY_LENGTH, Post, PostInvalid, TABLE};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;
 
-pub const TABLE: &str = "app_posts";
-pub const MAX_BODY_LENGTH: usize = 10_000;
 /// The fields an event may set when it creates a post.
 const CREATE_FIELDS: &[&str] = &["body"];
 /// The fields an event may change on a post.
 const UPDATE_FIELDS: &[&str] = &["body", "deleted_at"];
-
-/// A post as the pages show it, with the sync columns every synced row
-/// carries, see `docs/design/offline-sync.md`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Post {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub body: String,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    /// The server's version, 0 on a device's post not yet pushed.
-    pub version: i64,
-    /// When the server last wrote it; none on a device's post not yet pushed.
-    pub last_synced_at: Option<DateTime<Utc>>,
-    pub deleted_at: Option<DateTime<Utc>>,
-    pub deleted_by_id: Option<Uuid>,
-}
-
-/// A row accepted by the post event handler or authoritative replication path.
-/// Only this module can construct it; persistence cannot bypass those checks.
-pub(crate) struct AcceptedPost<'a>(&'a Post);
-
-impl AcceptedPost<'_> {
-    /// Borrows the accepted row for persistence.
-    pub(crate) fn row(&self) -> &Post {
-        self.0
-    }
-}
 
 /// A post as the pages show it: with who wrote it and where it is.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,6 +59,15 @@ pub enum PostError {
     Record(#[from] crate::app::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
+}
+
+impl From<PostInvalid> for PostError {
+    fn from(invalid: PostInvalid) -> PostError {
+        match invalid {
+            PostInvalid::BlankBody => PostError::BlankBody,
+            PostInvalid::BodyTooLong => PostError::BodyTooLong,
+        }
+    }
 }
 
 impl From<serde_json::Error> for PostError {
@@ -133,7 +111,7 @@ pub async fn create(
     body: &str,
     community_ids: &[Uuid],
 ) -> Result<Post, PostError> {
-    let body = checked_body(body)?;
+    let body = app_posts::checked_body(body)?;
     let event = Event::create(
         TABLE,
         Uuid::now_v7(),
@@ -158,7 +136,7 @@ pub async fn update(
     body: &str,
     community_ids: &[Uuid],
 ) -> Result<Post, PostError> {
-    let body = checked_body(body)?;
+    let body = app_posts::checked_body(body)?;
     let mut tx = deployment.begin().await?;
     let post = get_own(&mut tx, user, id).await?;
     let post = if post.body == body {
@@ -227,7 +205,7 @@ pub(crate) async fn apply_server_row(tx: &mut Transaction, row: &Value) -> Resul
     if events::has_pending(tx, TABLE, post.id).await? {
         return Ok(false);
     }
-    app_posts::replication::upsert(tx, AcceptedPost(&post)).await?;
+    app_posts::replication::upsert(tx, &post).await?;
     Ok(true)
 }
 
@@ -387,12 +365,15 @@ pub(crate) async fn apply_in(
                 deleted_at: None,
                 deleted_by_id: None,
             };
-            let post = match blank.with_fields(&event.changes) {
+            let accepted = blank
+                .with_fields(&event.changes)
+                .and_then(|post| Ok(AcceptedPost::new(post)?));
+            let post = match accepted {
                 Ok(post) => post,
                 Err(error) => return rejected(event, format!("invalid: {error}"), None),
             };
-            app_posts::create(tx, AcceptedPost(&post)).await?;
-            finish(tx, role, user, event, Conflicts::new(), post).await?
+            app_posts::create(tx, &post).await?;
+            finish(tx, role, user, event, Conflicts::new(), post.into_row()).await?
         }
         EventKind::Update => {
             let Some(post) = get_in(tx, event.row_id).await? else {
@@ -423,7 +404,12 @@ pub(crate) async fn apply_in(
                     updated.version += 1;
                     updated.last_synced_at = Some(now);
                 }
-                app_posts::update(tx, AcceptedPost(&updated)).await?;
+                let updated = match AcceptedPost::new(updated) {
+                    Ok(updated) => updated,
+                    Err(error) => return rejected(event, format!("invalid: {error}"), Some(post)),
+                };
+                app_posts::update(tx, &updated).await?;
+                let updated = updated.into_row();
                 if changes.contains_key("deleted_at") && updated.deleted_at.is_some() {
                     posts_communities::delete_with_post(tx, role, &updated).await?;
                 }
@@ -475,30 +461,14 @@ impl Post {
         Ok(all)
     }
 
-    /// The post with the fields written over it, checked.
+    /// The post with the fields written over it, not yet checked.
     fn with_fields(&self, changes: &Fields) -> Result<Post, PostError> {
         let mut all = json::object_fields(serde_json::to_value(self)?);
         for (name, value) in changes {
             all.insert(name.clone(), value.clone());
         }
-        let post: Post = serde_json::from_value(Value::Object(all))?;
-        Ok(Post {
-            body: checked_body(&post.body)?,
-            ..post
-        })
+        Ok(serde_json::from_value(Value::Object(all))?)
     }
-}
-
-/// The body as it is kept: trimmed, not blank and not too long.
-fn checked_body(body: &str) -> Result<String, PostError> {
-    let body = body.trim();
-    if body.is_empty() {
-        return Err(PostError::BlankBody);
-    }
-    if body.chars().count() > MAX_BODY_LENGTH {
-        return Err(PostError::BodyTooLong);
-    }
-    Ok(body.to_string())
 }
 
 #[cfg(test)]

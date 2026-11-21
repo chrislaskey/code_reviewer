@@ -1,10 +1,77 @@
-//! Post records. Ordinary reads exclude tombstones; protocol and physical
-//! deletion operations are explicit. Callers own and commit the transaction.
+//! Post records: the `Post` schema, its baseline validation, and the
+//! reads and writes of `app_posts`. Ordinary reads exclude tombstones;
+//! protocol and physical deletion operations are explicit. Callers own
+//! and commit the transaction. Writes are crate-private: a post syncs, so
+//! each write is an event applied by `app::posts`.
 
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::posts::{AcceptedPost, Post};
 use crate::database::Transaction;
+
+pub const TABLE: &str = "app_posts";
+pub const MAX_BODY_LENGTH: usize = 10_000;
+
+/// A post as the pages show it, with the sync columns every synced row
+/// carries, see `docs/design/offline-sync.md`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Post {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub body: String,
+    pub inserted_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    /// The server's version, 0 on a device's post not yet pushed.
+    pub version: i64,
+    /// When the server last wrote it; none on a device's post not yet pushed.
+    pub last_synced_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<DateTime<Utc>>,
+    pub deleted_by_id: Option<Uuid>,
+}
+
+/// Why a post may not be written.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum PostInvalid {
+    #[error("a post needs some text")]
+    BlankBody,
+    #[error("a post has {MAX_BODY_LENGTH} characters at most")]
+    BodyTooLong,
+}
+
+/// A post that passed validation, which `create` and `update` require.
+pub struct AcceptedPost(Post);
+
+impl AcceptedPost {
+    /// Checks the post, with its body as it is kept.
+    pub fn new(post: Post) -> Result<AcceptedPost, PostInvalid> {
+        let body = checked_body(&post.body)?;
+        Ok(AcceptedPost(Post { body, ..post }))
+    }
+
+    /// The accepted post.
+    pub fn row(&self) -> &Post {
+        &self.0
+    }
+
+    /// The accepted post, owned.
+    pub fn into_row(self) -> Post {
+        self.0
+    }
+}
+
+/// The body as it is kept: trimmed, not blank and not too long.
+pub fn checked_body(body: &str) -> Result<String, PostInvalid> {
+    let body = body.trim();
+    if body.is_empty() {
+        return Err(PostInvalid::BlankBody);
+    }
+    if body.chars().count() > MAX_BODY_LENGTH {
+        return Err(PostInvalid::BodyTooLong);
+    }
+    Ok(body.to_string())
+}
 
 #[cfg(feature = "postgres")]
 mod postgres;
@@ -21,7 +88,7 @@ macro_rules! query {
 }
 
 /// A required read scope, with the existing ordering for each query.
-pub(crate) enum Filter {
+pub enum Filter {
     /// Visible posts, newest first, with an ID tie-breaker.
     VisibleTo(Uuid),
     /// Owned posts, oldest first, with an ID tie-breaker.
@@ -29,7 +96,7 @@ pub(crate) enum Filter {
 }
 
 /// Lists live rows within the required scope.
-pub(crate) async fn list(tx: &mut Transaction, filter: Filter) -> Result<Vec<Post>, sqlx::Error> {
+pub async fn list(tx: &mut Transaction, filter: Filter) -> Result<Vec<Post>, sqlx::Error> {
     match filter {
         Filter::VisibleTo(user_id) => query!(tx, list_visible(user_id)),
         Filter::OwnedBy(user_id) => query!(tx, list_live_of_user(user_id)),
@@ -37,7 +104,7 @@ pub(crate) async fn list(tx: &mut Transaction, filter: Filter) -> Result<Vec<Pos
 }
 
 /// Gets a visible live row; inaccessible and deleted rows are absent.
-pub(crate) async fn get(
+pub async fn get(
     tx: &mut Transaction,
     user_id: Uuid,
     id: Uuid,
@@ -46,33 +113,27 @@ pub(crate) async fn get(
 }
 
 /// Persists a create accepted by the event handler.
-pub(crate) async fn create(
-    tx: &mut Transaction,
-    post: AcceptedPost<'_>,
-) -> Result<(), sqlx::Error> {
+pub(crate) async fn create(tx: &mut Transaction, post: &AcceptedPost) -> Result<(), sqlx::Error> {
     query!(tx, insert(post.row()))
 }
 
 /// Persists an accepted update, including a soft delete.
-pub(crate) async fn update(
-    tx: &mut Transaction,
-    post: AcceptedPost<'_>,
-) -> Result<bool, sqlx::Error> {
+pub(crate) async fn update(tx: &mut Transaction, post: &AcceptedPost) -> Result<bool, sqlx::Error> {
     query!(tx, update(post.row()))
 }
 
 /// Protocol reads include tombstones; authoritative writes retain server versions.
-pub(crate) mod replication {
+pub mod replication {
     use super::*;
     use crate::app::sync::Cursor;
 
     /// Gets a row regardless of visibility or deletion for event processing.
-    pub(crate) async fn get(tx: &mut Transaction, id: Uuid) -> Result<Option<Post>, sqlx::Error> {
+    pub async fn get(tx: &mut Transaction, id: Uuid) -> Result<Option<Post>, sqlx::Error> {
         query!(tx, get(id))
     }
 
     /// Lists a visible page including tombstones in cursor order.
-    pub(crate) async fn list(
+    pub async fn list(
         tx: &mut Transaction,
         user_id: Uuid,
         after: &Cursor,
@@ -81,12 +142,10 @@ pub(crate) mod replication {
         query!(tx, list_synced_after(user_id, after, limit))
     }
 
-    /// Persists an authoritative row after the caller checks pending changes.
-    pub(crate) async fn upsert(
-        tx: &mut Transaction,
-        post: AcceptedPost<'_>,
-    ) -> Result<(), sqlx::Error> {
-        query!(tx, upsert(post.row()))
+    /// Persists the server's row as it is, the server being the system of
+    /// record, after the caller checks pending changes.
+    pub(crate) async fn upsert(tx: &mut Transaction, post: &Post) -> Result<(), sqlx::Error> {
+        query!(tx, upsert(post))
     }
 }
 

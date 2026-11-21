@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgConnection};
 use uuid::Uuid;
 
-use crate::app::posts::Post;
+use super::Post;
 use crate::app::sync::Cursor;
 
 #[derive(FromRow)]

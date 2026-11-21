@@ -16,6 +16,7 @@
 
 use crate::data::app_communities;
 use crate::data::app_files;
+use crate::data::app_posts;
 use crate::data::app_posts_communities;
 use crate::data::app_users_communities;
 use crate::data::device_settings as device_settings_records;
@@ -33,7 +34,7 @@ use crate::app::communities::{self, CommunityError};
 use crate::app::events::{self, Event};
 use crate::app::files_communities::{self, FileCommunityNew};
 use crate::app::users::{self, SignedIn, User, UserError};
-use crate::app::{files, memberships, posts, posts_communities};
+use crate::app::{files, memberships, posts_communities};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::device_settings::{self, DeviceSettingsError, LOCAL_USER_MOVED, SIGNED_IN};
@@ -274,13 +275,11 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
             }),
         );
     }
-    let posts =
-        crate::data::app_posts::list(tx, crate::data::app_posts::Filter::VisibleTo(user.id))
-            .await?;
+    let posts = app_posts::list(tx, app_posts::Filter::VisibleTo(user.id)).await?;
     let post_ids: Vec<Uuid> = posts.iter().map(|post| post.id).collect();
     for post in posts {
         add(
-            posts::TABLE,
+            app_posts::TABLE,
             post.id,
             post.inserted_at,
             &[],
@@ -358,6 +357,7 @@ mod tests {
     use super::*;
     use crate::accounts;
     use crate::app::files::tests::server;
+    use crate::app::posts;
     use crate::app::sync::{self, InProcess};
     use crate::database::with_each_database;
     use crate::deployment::FileStore;
@@ -448,9 +448,9 @@ mod tests {
     /// community, a post in none, a second community, a file, and a
     /// post since deleted.
     struct Made {
-        in_community: posts::Post,
-        in_none: posts::Post,
-        deleted: posts::Post,
+        in_community: app_posts::Post,
+        in_none: app_posts::Post,
+        deleted: app_posts::Post,
         file: files::File,
     }
 
@@ -502,8 +502,8 @@ mod tests {
             .collect()
     }
 
-    async fn posts_of(deployment: &Deployment, user: &User) -> Vec<posts::Post> {
-        let mut posts: Vec<posts::Post> = posts::list(deployment, user)
+    async fn posts_of(deployment: &Deployment, user: &User) -> Vec<app_posts::Post> {
+        let mut posts: Vec<app_posts::Post> = posts::list(deployment, user)
             .await
             .expect("the posts")
             .into_iter()

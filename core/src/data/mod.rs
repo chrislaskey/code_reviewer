@@ -25,7 +25,7 @@ pub(crate) mod app_events;
 pub(crate) mod app_files;
 pub(crate) mod app_files_communities;
 pub(crate) mod app_jobs;
-pub(crate) mod app_posts;
+pub mod app_posts;
 pub(crate) mod app_posts_communities;
 pub(crate) mod app_purges;
 pub(crate) mod app_sync_backfills;

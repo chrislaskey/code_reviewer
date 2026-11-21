@@ -17,10 +17,11 @@
 //! A trial user needs no code, having no real email, and goes outright,
 //! as their trial would. A local user has no account on the server.
 
-#[cfg(feature = "stripe")]
 use crate::data::accounts_subscriptions;
 #[cfg(any(feature = "stripe", test))]
 use crate::data::accounts_users as accounts_users_records;
+#[cfg(feature = "stripe")]
+use crate::data::app_posts;
 use crate::data::app_users_communities;
 use crate::data::ops_staff;
 use thiserror::Error;
@@ -146,7 +147,7 @@ async fn delete_in(tx: &mut Transaction, user: &User) -> Result<(), DeletionErro
     for post in
         crate::data::app_posts::list(tx, crate::data::app_posts::Filter::OwnedBy(user.id)).await?
     {
-        let event = deleted_event(posts::TABLE, post.id, post.version);
+        let event = deleted_event(app_posts::TABLE, post.id, post.version);
         refused_unless_applied(&posts::apply_in(tx, role, user, &event).await?.answer)?;
     }
     for membership in

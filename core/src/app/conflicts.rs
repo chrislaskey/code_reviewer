@@ -18,6 +18,7 @@ use crate::app::events::{self, AnswerStatus, Event, EventKind, EventStatus, Fiel
 use crate::app::files::{self, FileError};
 use crate::app::posts::{self, PostError};
 use crate::app::users::{self, User, UserError};
+use crate::data::app_posts;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
 
@@ -205,7 +206,7 @@ struct Row {
 /// shown; none when it is gone or deleted.
 async fn row_of(tx: &mut Transaction, event: &Event) -> Result<Option<Row>, ConflictError> {
     Ok(match event.table.as_str() {
-        posts::TABLE => posts::get_in(tx, event.row_id)
+        app_posts::TABLE => posts::get_in(tx, event.row_id)
             .await?
             .filter(|post| post.deleted_at.is_none())
             .map(|post| {

@@ -8,7 +8,8 @@
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 
-use app_core::app::posts::{self, Post, PostWithOwnerAndCommunities};
+use app_core::app::posts::{self, PostWithOwnerAndCommunities};
+use app_core::data::app_posts::Post;
 
 use crate::current_user::signed_in;
 use crate::device_accounts::DeviceAccounts;

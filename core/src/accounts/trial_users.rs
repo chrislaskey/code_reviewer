@@ -186,6 +186,7 @@ mod tests {
     use crate::accounts::{self, NextStep, SignInStep};
     use crate::app::sync::{self, PullRequest};
     use crate::app::{memberships, posts};
+    use crate::data::app_posts;
     use crate::database::with_each_database;
     use crate::services::mailer::Mailer;
     use crate::services::mailer::mails;
@@ -380,7 +381,7 @@ mod tests {
                 "This trial has reached its limit. Sign up to keep going."
             );
             let pushed = crate::app::events::Event::create(
-                posts::TABLE,
+                app_posts::TABLE,
                 Uuid::now_v7(),
                 crate::app::events::Fields::from_iter([("body".to_string(), "pushed".into())]),
                 now(),
@@ -609,7 +610,7 @@ mod tests {
                     .is_none()
             );
             assert_eq!(
-                crate::app::events::list_of_table(&mut tx, posts::TABLE)
+                crate::app::events::list_of_table(&mut tx, app_posts::TABLE)
                     .await
                     .expect("the log")
                     .len(),

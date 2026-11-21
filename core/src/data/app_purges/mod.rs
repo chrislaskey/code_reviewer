@@ -35,7 +35,7 @@ impl Table {
     pub(crate) fn name(self) -> &'static str {
         match self {
             Self::PostsCommunities => crate::app::posts_communities::TABLE,
-            Self::Posts => crate::app::posts::TABLE,
+            Self::Posts => crate::data::app_posts::TABLE,
             Self::FilesCommunities => crate::app::files_communities::TABLE,
             Self::Files => crate::app::files::TABLE,
             Self::Memberships => crate::app::memberships::TABLE,
