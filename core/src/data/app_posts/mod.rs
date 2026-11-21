@@ -126,7 +126,7 @@ pub(crate) async fn update(tx: &mut Transaction, post: &AcceptedPost) -> Result<
 /// Protocol reads include tombstones; authoritative writes retain server versions.
 pub mod replication {
     use super::*;
-    use crate::app::sync::Cursor;
+    use crate::data::app_sync_state::Cursor;
 
     /// Gets a row regardless of visibility or deletion for event processing.
     pub async fn get(tx: &mut Transaction, id: Uuid) -> Result<Option<Post>, sqlx::Error> {

@@ -111,9 +111,9 @@ pub async fn horizon(deployment: &Deployment) -> Result<Option<DateTime<Utc>>, P
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::events::{self, EventStatus};
     use crate::app::{communities, posts};
     use crate::data::app_communities;
+    use crate::data::app_events::EventStatus;
     use crate::data::app_posts;
     use crate::data::app_posts_communities;
     use crate::database::{Database, with_each_database};
@@ -174,7 +174,7 @@ mod tests {
                     .is_some()
             );
             assert_eq!(
-                events::count(&mut tx, EventStatus::Applied)
+                app_events::count(&mut tx, EventStatus::Applied)
                     .await
                     .expect("counted"),
                 4,

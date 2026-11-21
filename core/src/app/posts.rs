@@ -17,12 +17,14 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::app::communities;
-use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
+use crate::app::events::{self, Answer, AnswerStatus};
 use crate::app::posts_communities::{self, PostCommunityError};
-use crate::app::sync::{Cursor, TableRow};
+use crate::app::sync::TableRow;
 use crate::app::users;
 use crate::data::app_communities::Community;
+use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
 use crate::data::app_posts::{self, AcceptedPost, Post, PostInvalid, TABLE};
+use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
@@ -193,7 +195,7 @@ pub fn table_row(post: &Post) -> Result<TableRow, PostError> {
 /// device's for it is still pending; true when it was written.
 pub(crate) async fn apply_server_row(tx: &mut Transaction, row: &Value) -> Result<bool, PostError> {
     let post: Post = serde_json::from_value(row.clone())?;
-    if events::has_pending(tx, TABLE, post.id).await? {
+    if app_events::has_pending(tx, TABLE, post.id).await? {
         return Ok(false);
     }
     app_posts::replication::upsert(tx, &post).await?;
@@ -316,7 +318,7 @@ pub(crate) async fn apply_in(
     event: &Event,
 ) -> Result<Applied, PostError> {
     if role == Role::Server
-        && let Some(recorded) = events::get(tx, event.id).await?
+        && let Some(recorded) = app_events::get(tx, event.id).await?
     {
         let post = get_in(tx, event.row_id).await?;
         let server = post.as_ref().map(table_row).transpose()?;
@@ -465,8 +467,8 @@ impl Post {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::events::EventStatus;
     use crate::app::users;
+    use crate::data::app_events::EventStatus;
     use crate::database::{Database, with_each_database};
 
     fn server(database: Database) -> Deployment {
@@ -482,7 +484,7 @@ mod tests {
 
     async fn events_with_status(deployment: &Deployment, status: EventStatus) -> i64 {
         let mut tx = deployment.begin().await.expect("a transaction");
-        events::count(&mut tx, status).await.expect("a count")
+        app_events::count(&mut tx, status).await.expect("a count")
     }
 
     #[tokio::test]
@@ -692,7 +694,7 @@ mod tests {
                 0
             );
             let mut tx = deployment.begin().await.expect("a transaction");
-            let logged = events::conflicts(&mut tx).await.expect("none");
+            let logged = app_events::conflicts(&mut tx).await.expect("none");
             assert!(logged.is_empty());
         })
         .await;
@@ -713,7 +715,7 @@ mod tests {
             1
         );
         let mut tx = deployment.begin().await.expect("a transaction");
-        let pending = events::pending(&mut tx).await.expect("the queue");
+        let pending = app_events::pending(&mut tx).await.expect("the queue");
         assert_eq!(pending[0].user_id, alice.id);
     }
 

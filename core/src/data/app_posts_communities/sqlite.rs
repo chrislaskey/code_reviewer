@@ -8,7 +8,7 @@ use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
 use super::PostCommunity;
-use crate::app::sync::Cursor;
+use crate::data::app_sync_state::Cursor;
 
 #[derive(FromRow)]
 struct PostCommunityRow {

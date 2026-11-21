@@ -18,10 +18,12 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
+use crate::app::events::{self, Answer, AnswerStatus};
 use crate::app::posts_communities;
-use crate::app::sync::{Cursor, TableRow};
+use crate::app::sync::TableRow;
 use crate::data::app_communities::Community;
+use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
+use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
@@ -185,7 +187,7 @@ pub(crate) async fn apply_server_row(
     row: &Value,
 ) -> Result<bool, MembershipError> {
     let membership: Membership = serde_json::from_value(row.clone())?;
-    if events::has_pending(tx, TABLE, membership.id).await? {
+    if app_events::has_pending(tx, TABLE, membership.id).await? {
         return Ok(false);
     }
     app_users_communities::replication::upsert(&mut *tx, &membership).await?;
@@ -233,7 +235,7 @@ async fn apply_in(
     event: &Event,
 ) -> Result<Applied, MembershipError> {
     if role == Role::Server
-        && let Some(recorded) = events::get(tx, event.id).await?
+        && let Some(recorded) = app_events::get(tx, event.id).await?
     {
         let membership = get_in(tx, event.row_id).await?;
         let server = membership.as_ref().map(table_row).transpose()?;

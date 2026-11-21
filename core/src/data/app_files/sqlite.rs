@@ -9,7 +9,7 @@ use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
 use super::File;
-use crate::app::sync::Cursor;
+use crate::data::app_sync_state::Cursor;
 
 #[derive(FromRow)]
 struct FileRow {

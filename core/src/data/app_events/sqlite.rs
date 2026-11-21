@@ -7,7 +7,7 @@ use sqlx::{FromRow, SqliteConnection};
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
-use crate::app::events::{Conflicts, Event, EventKind, EventStatus, Fields, StoredEvent};
+use super::{Conflicts, Event, EventKind, EventStatus, Fields, StoredEvent};
 
 #[derive(FromRow)]
 struct EventRow {

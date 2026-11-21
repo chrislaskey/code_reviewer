@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use sqlx::PgConnection;
 use uuid::Uuid;
 
-use crate::app::sync::Cursor;
+use super::Cursor;
 
 pub async fn cursor(connection: &mut PgConnection) -> Result<Option<Cursor>, sqlx::Error> {
     let row: Option<(DateTime<Utc>, Uuid)> =

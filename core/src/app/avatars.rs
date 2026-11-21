@@ -363,7 +363,7 @@ fn is_avatar_size(size: &u64, _context: &()) -> garde::Result {
 #[cfg(all(test, feature = "object-storage"))]
 mod tests {
     use super::*;
-    use crate::app::events::{self, EventStatus};
+    use crate::data::app_events::{self, EventStatus};
     use crate::database::{Database, with_each_database};
 
     const PNG: &[u8] = b"\x89PNG\r\n\x1a\nthe rest of a picture";
@@ -465,7 +465,7 @@ mod tests {
                 updated
             );
             let mut tx = deployment.begin().await.expect("a transaction");
-            let applied = events::count(&mut tx, EventStatus::Applied)
+            let applied = app_events::count(&mut tx, EventStatus::Applied)
                 .await
                 .expect("a count");
             assert_eq!(applied, 1, "the change is in the server's log");

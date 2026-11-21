@@ -3,7 +3,7 @@
 //! `docs/design/offline-sync.md`. Two kinds end up here. A change to a
 //! field someone else changed first, which the person reapplies or lets
 //! go. And a change the server refused, or said no to
-//! `events::MAX_ATTEMPTS` times: for a file added on this device, whose
+//! `app_events::MAX_ATTEMPTS` times: for a file added on this device, whose
 //! bytes are still here, the person tries again or lets it go, see
 //! `docs/design/offline-files-decisions.md`.
 
@@ -14,11 +14,12 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::app::communities::{self, CommunityError};
-use crate::app::events::{self, AnswerStatus, Event, EventKind, EventStatus, Fields, StoredEvent};
+use crate::app::events::AnswerStatus;
 use crate::app::files::{self, FileError};
 use crate::app::posts::{self, PostError};
 use crate::app::users::{self, UserError};
 use crate::data::app_communities;
+use crate::data::app_events::{self, Event, EventKind, EventStatus, Fields, StoredEvent};
 use crate::data::app_files;
 use crate::data::app_posts;
 use crate::data::app_users::{self, User};
@@ -91,7 +92,7 @@ pub enum ConflictError {
 pub async fn list(deployment: &Deployment) -> Result<Vec<Conflict>, ConflictError> {
     let mut tx = deployment.begin().await?;
     let mut conflicts = Vec::new();
-    for stored in events::conflicts(&mut tx).await? {
+    for stored in app_events::conflicts(&mut tx).await? {
         let row = row_of(&mut tx, &stored.event).await?;
         conflicts.push(conflict(stored, row));
     }
@@ -150,7 +151,7 @@ pub async fn reapply(deployment: &Deployment, user: &User, id: Uuid) -> Result<(
     if answer.status == AnswerStatus::Rejected {
         return Err(ConflictError::Rejected(answer.reason.unwrap_or_default()));
     }
-    events::delete(&mut tx, id).await?;
+    app_events::delete(&mut tx, id).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -164,7 +165,7 @@ pub async fn try_again(deployment: &Deployment, id: Uuid) -> Result<(), Conflict
     if stored.event.kind != EventKind::Create {
         return Err(ConflictError::NotTriedAgain);
     }
-    events::try_again(&mut tx, id).await?;
+    app_events::try_again(&mut tx, id).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -180,7 +181,7 @@ pub async fn let_go(deployment: &Deployment, id: Uuid) -> Result<(), ConflictErr
     if refused_file {
         files::forget_in(&mut tx, stored.event.row_id).await?;
     } else {
-        events::delete(&mut tx, id).await?;
+        app_events::delete(&mut tx, id).await?;
     }
     tx.commit().await?;
     if refused_file {
@@ -190,7 +191,7 @@ pub async fn let_go(deployment: &Deployment, id: Uuid) -> Result<(), ConflictErr
 }
 
 async fn get(tx: &mut Transaction, id: Uuid) -> Result<StoredEvent, ConflictError> {
-    match events::get(tx, id).await? {
+    match app_events::get(tx, id).await? {
         Some(stored) if stored.status == EventStatus::Conflict => Ok(stored),
         _ => Err(ConflictError::NotFound { id }),
     }

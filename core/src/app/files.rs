@@ -43,13 +43,15 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::app::communities;
-use crate::app::events::{
-    self, Answer, AnswerStatus, Conflicts, Event, EventKind, EventStatus, Fields, StoredEvent,
-};
+use crate::app::events::{self, Answer, AnswerStatus};
 use crate::app::files_communities::{self, FileCommunityError, FileCommunityNew};
-use crate::app::sync::{Cursor, SyncError, TableRow};
+use crate::app::sync::{SyncError, TableRow};
 use crate::app::users;
 use crate::data::app_communities::Community;
+use crate::data::app_events::{
+    self, Conflicts, Event, EventKind, EventStatus, Fields, StoredEvent,
+};
+use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::data::device_settings::{self, WORK_OFFLINE};
 use crate::database::Transaction;
@@ -602,7 +604,7 @@ pub async fn ask_about_waiting<T: Transport>(
     token: Option<&str>,
 ) -> Result<Vec<WaitingFile>, SyncError> {
     let mut tx = deployment.begin().await?;
-    let creates: Vec<StoredEvent> = events::pending(&mut tx)
+    let creates: Vec<StoredEvent> = app_events::pending(&mut tx)
         .await?
         .into_iter()
         .filter(|stored| stored.event.table == TABLE && stored.event.kind == EventKind::Create)
@@ -661,14 +663,14 @@ pub async fn held_back(
         .map(|file| file.id)
         .collect();
     let mut tx = deployment.begin().await?;
-    let refused = events::conflicts(&mut tx)
+    let refused = app_events::conflicts(&mut tx)
         .await?
         .into_iter()
         .filter(|stored| stored.event.table == TABLE && stored.event.kind == EventKind::Create)
         .map(|stored| stored.event.row_id);
     held_back.extend(refused);
     let mut rows = BTreeSet::new();
-    for stored in events::pending(&mut tx).await? {
+    for stored in app_events::pending(&mut tx).await? {
         if stored.event.table != app_files_communities::TABLE {
             continue;
         }
@@ -717,7 +719,7 @@ pub async fn upload_waiting<T: Transport>(
             }
             Err(SyncError::Refused(reason)) => {
                 let mut tx = deployment.begin().await?;
-                events::count_attempt(&mut tx, file.create_id, &reason).await?;
+                app_events::count_attempt(&mut tx, file.create_id, &reason).await?;
                 tx.commit().await?;
             }
             Err(error @ SyncError::Transport(_)) => {
@@ -733,7 +735,7 @@ pub async fn upload_waiting<T: Transport>(
 /// Stops trying a waiting file, with why: kept for the person.
 async fn refuse(deployment: &Deployment, create_id: Uuid, reason: &str) -> Result<(), SyncError> {
     let mut tx = deployment.begin().await?;
-    events::refuse(&mut tx, create_id, reason).await?;
+    app_events::refuse(&mut tx, create_id, reason).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -745,7 +747,7 @@ async fn note_error(
     reason: &str,
 ) -> Result<(), SyncError> {
     let mut tx = deployment.begin().await?;
-    events::mark_error(&mut tx, create_id, reason).await?;
+    app_events::mark_error(&mut tx, create_id, reason).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -888,7 +890,7 @@ pub fn storage_key(created_by_id: Uuid, id: Uuid) -> String {
 /// device's for it is still pending; true when it was written.
 pub(crate) async fn apply_server_row(tx: &mut Transaction, row: &Value) -> Result<bool, FileError> {
     let file: File = serde_json::from_value(row.clone())?;
-    if events::has_pending(tx, TABLE, file.id).await? {
+    if app_events::has_pending(tx, TABLE, file.id).await? {
         return Ok(false);
     }
     app_files::replication::upsert(&mut *tx, &file).await?;
@@ -971,9 +973,9 @@ pub async fn local_copy<T: Transport>(
 /// server, on a device, its rows in communities with it; its bytes go
 /// once this is committed, see `delete_local_copy`.
 pub(crate) async fn forget_in(tx: &mut Transaction, id: Uuid) -> Result<(), FileError> {
-    events::delete_of_row(tx, TABLE, id).await?;
+    app_events::delete_of_row(tx, TABLE, id).await?;
     for row in files_communities_of(tx, id).await? {
-        events::delete_of_row(tx, app_files_communities::TABLE, row).await?;
+        app_events::delete_of_row(tx, app_files_communities::TABLE, row).await?;
     }
     Ok(app_files::maintenance::delete(tx, id).await?)
 }
@@ -982,7 +984,7 @@ pub(crate) async fn forget_in(tx: &mut Transaction, id: Uuid) -> Result<(), File
 /// device: those its create wrote, and those written since.
 async fn files_communities_of(tx: &mut Transaction, id: Uuid) -> Result<Vec<Uuid>, FileError> {
     let mut rows = Vec::new();
-    for stored in events::list_of_table(tx, app_files_communities::TABLE).await? {
+    for stored in app_events::list_of_table(tx, app_files_communities::TABLE).await? {
         if let Some(row) = files_communities::get_in(tx, stored.event.row_id).await?
             && row.file_id == id
         {
@@ -1075,7 +1077,7 @@ async fn delete_local(path: &Path) -> Result<(), FileError> {
 /// The create of a file that has not reached the server, on a device:
 /// pending while the file waits, a conflict once the server refused it.
 async fn create_of(tx: &mut Transaction, id: Uuid) -> Result<Option<StoredEvent>, FileError> {
-    Ok(events::list_of_table(tx, TABLE)
+    Ok(app_events::list_of_table(tx, TABLE)
         .await?
         .into_iter()
         .find(|stored| stored.event.row_id == id && stored.event.kind == EventKind::Create))
@@ -1103,7 +1105,7 @@ async fn with_states(
 ) -> Result<Vec<FileWithState>, FileError> {
     let creates: Vec<StoredEvent> = match role {
         Role::Server => Vec::new(),
-        Role::Device => events::list_of_table(tx, TABLE)
+        Role::Device => app_events::list_of_table(tx, TABLE)
             .await?
             .into_iter()
             .filter(|stored| stored.event.kind == EventKind::Create)
@@ -1300,7 +1302,7 @@ pub(crate) async fn apply_in(
     uploaded: bool,
 ) -> Result<Applied, FileError> {
     if role == Role::Server
-        && let Some(recorded) = events::get(tx, event.id).await?
+        && let Some(recorded) = app_events::get(tx, event.id).await?
     {
         let file = get_in(tx, event.row_id).await?;
         let server = file.as_ref().map(table_row).transpose()?;
@@ -1706,7 +1708,7 @@ pub(crate) mod tests {
                 .expect("applied");
             assert_eq!(applied.file.expect("file").name, "after.txt");
             assert!(
-                events::get(&mut tx, event.id)
+                app_events::get(&mut tx, event.id)
                     .await
                     .expect("event")
                     .is_some()
@@ -1721,7 +1723,7 @@ pub(crate) mod tests {
             );
             let mut tx = deployment.begin().await.expect("transaction");
             assert!(
-                events::get(&mut tx, event.id)
+                app_events::get(&mut tx, event.id)
                     .await
                     .expect("event")
                     .is_none()
@@ -1776,7 +1778,7 @@ pub(crate) mod tests {
         let mut tx = device.begin().await.expect("a transaction");
         assert!(get_in(&mut tx, file.id).await.expect("looked").is_none());
         assert!(
-            events::list_of_table(&mut tx, TABLE)
+            app_events::list_of_table(&mut tx, TABLE)
                 .await
                 .expect("the events")
                 .is_empty(),
@@ -2268,7 +2270,7 @@ pub(crate) mod tests {
                 ..Faulty::new(&server)
             };
 
-            for _ in 1..events::MAX_ATTEMPTS {
+            for _ in 1..app_events::MAX_ATTEMPTS {
                 let report = sync::run(&a, &wrong).await.expect("a sync");
                 assert_eq!(report.conflicts, 0);
             }
@@ -2341,7 +2343,7 @@ pub(crate) mod tests {
                 ..Faulty::new(&server)
             };
 
-            for _ in 0..events::MAX_ATTEMPTS + 5 {
+            for _ in 0..app_events::MAX_ATTEMPTS + 5 {
                 sync::run(&a, &down).await.expect("a sync");
             }
             let (state, error) = state_of(&a, &alice, file.id).await;

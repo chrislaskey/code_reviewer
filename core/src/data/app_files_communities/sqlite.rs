@@ -8,7 +8,7 @@ use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
 use super::FileCommunity;
-use crate::app::sync::Cursor;
+use crate::data::app_sync_state::Cursor;
 
 #[derive(FromRow)]
 struct FileCommunityRow {

@@ -30,9 +30,10 @@ use uuid::Uuid;
 
 use crate::accounts::Session;
 use crate::app::communities::{self, CommunityError};
-use crate::app::events::{self, Event};
+use crate::app::events;
 use crate::app::files_communities::{self, FileCommunityNew};
 use crate::app::users::{self, SignedIn, UserError};
+use crate::data::app_events::Event;
 use crate::data::app_users::{self, User};
 use crate::data::device_settings::{self, DeviceSettingsError, LOCAL_USER_MOVED, SIGNED_IN};
 use crate::database::Transaction;

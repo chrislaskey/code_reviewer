@@ -6,7 +6,7 @@ use sqlx::{FromRow, PgConnection};
 use uuid::Uuid;
 
 use super::Membership;
-use crate::app::sync::Cursor;
+use crate::data::app_sync_state::Cursor;
 
 #[derive(FromRow)]
 struct MembershipRow {

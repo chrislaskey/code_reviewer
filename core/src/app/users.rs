@@ -15,10 +15,12 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
-use crate::app::sync::{Cursor, TableRow};
+use crate::app::events::{self, Answer, AnswerStatus};
+use crate::app::sync::TableRow;
 use crate::data::accounts_tokens;
 use crate::data::accounts_users::{self, AccountUserError};
+use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
+use crate::data::app_sync_state::Cursor;
 use crate::data::device_settings::{self, DeviceSettingsError, SIGNED_IN};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
@@ -206,7 +208,7 @@ pub(crate) async fn apply_in(
     event: &Event,
 ) -> Result<Applied, UserError> {
     if role == Role::Server
-        && let Some(recorded) = events::get(tx, event.id).await?
+        && let Some(recorded) = app_events::get(tx, event.id).await?
     {
         let row = get_in(tx, event.row_id).await?;
         let server = row.as_ref().map(table_row).transpose()?;
@@ -474,7 +476,7 @@ pub fn table_row(user: &User) -> Result<TableRow, UserError> {
 /// device's for it is still pending; true when it was written.
 pub(crate) async fn apply_server_row(tx: &mut Transaction, row: &Value) -> Result<bool, UserError> {
     let user: User = serde_json::from_value(row.clone())?;
-    if events::has_pending(tx, TABLE, user.id).await? {
+    if app_events::has_pending(tx, TABLE, user.id).await? {
         return Ok(false);
     }
     upsert_in(tx, &user).await?;
@@ -612,7 +614,7 @@ pub(crate) mod tests {
             let deleted = delete_in(&mut tx, alice.id).await.expect("deleted");
             assert!(deleted.deleted_at.is_some());
             assert_eq!(
-                events::count(&mut tx, events::EventStatus::Applied)
+                app_events::count(&mut tx, app_events::EventStatus::Applied)
                     .await
                     .expect("events"),
                 1
@@ -621,7 +623,7 @@ pub(crate) mod tests {
             assert_eq!(get(&deployment, alice.id).await.expect("restored"), alice);
             let mut tx = deployment.begin().await.expect("transaction");
             assert_eq!(
-                events::count(&mut tx, events::EventStatus::Applied)
+                app_events::count(&mut tx, app_events::EventStatus::Applied)
                     .await
                     .expect("events"),
                 0

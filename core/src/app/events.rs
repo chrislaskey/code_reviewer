@@ -4,7 +4,8 @@
 //! server answers a pushed event the same way, since both run the
 //! resource's `apply_event`. The `app_events` table is the server's log
 //! of every event answered and a device's queue of events not yet
-//! answered, with the conflicts the person has not resolved.
+//! answered, with the conflicts the person has not resolved; its records
+//! are `data::app_events`.
 //!
 //! An event in the queue is tried by every sync, but not for ever: each
 //! time the server or the bucket says no to it and it stays pending
@@ -14,129 +15,17 @@
 //! a server or a bucket that is failing, so an outage of any length
 //! refuses nothing.
 
-use crate::data::app_events;
-use std::collections::BTreeMap;
+use crate::data::app_events::{
+    self, Conflicts, Event, EventStatus, FieldConflict, Fields, StoredEvent,
+};
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use serde_json::Value;
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::app::sync::TableRow;
 use crate::database::Transaction;
-
-/// A record assembled by this resource's workflow.
-pub(crate) struct AcceptedEvent<'a>(&'a StoredEvent);
-
-impl AcceptedEvent<'_> {
-    /// Borrows the assembled record for persistence.
-    pub(crate) fn row(&self) -> &StoredEvent {
-        self.0
-    }
-}
-
-/// How many times the server or the bucket may say no to an event
-/// before a device stops trying it.
-pub const MAX_ATTEMPTS: i64 = 30;
-
-/// A row's fields as they travel on the wire, by name.
-pub type Fields = Map<String, Value>;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum EventKind {
-    Create,
-    Update,
-}
-
-impl EventKind {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            EventKind::Create => "create",
-            EventKind::Update => "update",
-        }
-    }
-
-    pub fn parse(text: &str) -> Option<EventKind> {
-        match text {
-            "create" => Some(EventKind::Create),
-            "update" => Some(EventKind::Update),
-            _ => None,
-        }
-    }
-}
-
-/// One change, sent once and answered once.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Event {
-    /// From the device that made it: the idempotency key.
-    pub id: Uuid,
-    pub table: String,
-    pub row_id: Uuid,
-    #[serde(rename = "type")]
-    pub kind: EventKind,
-    /// The row's version the change started from, 0 for a create.
-    pub base_version: i64,
-    /// The changed fields' values as the device saw them before the change.
-    pub base: Fields,
-    /// The values the person chose.
-    pub changes: Fields,
-    /// The clock of the device that made it, for ordering and display only.
-    pub made_at: DateTime<Utc>,
-}
-
-impl Event {
-    pub fn create(table: &str, row_id: Uuid, changes: Fields, made_at: DateTime<Utc>) -> Event {
-        Event {
-            id: Uuid::now_v7(),
-            table: table.to_string(),
-            row_id,
-            kind: EventKind::Create,
-            base_version: 0,
-            base: Fields::new(),
-            changes,
-            made_at,
-        }
-    }
-
-    /// When the row a create makes was made: the clock of the device
-    /// the person made it on, so a row made offline keeps its time, or
-    /// this deployment's `now` when the device's clock is ahead of it.
-    pub fn row_inserted_at(&self, now: DateTime<Utc>) -> DateTime<Utc> {
-        self.made_at.min(now)
-    }
-
-    pub fn update(
-        table: &str,
-        row_id: Uuid,
-        base_version: i64,
-        base: Fields,
-        changes: Fields,
-        made_at: DateTime<Utc>,
-    ) -> Event {
-        Event {
-            id: Uuid::now_v7(),
-            table: table.to_string(),
-            row_id,
-            kind: EventKind::Update,
-            base_version,
-            base,
-            changes,
-            made_at,
-        }
-    }
-}
-
-/// A field someone else changed first: the person's value, and the
-/// server's that stays.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FieldConflict {
-    pub yours: Value,
-    pub server: Value,
-}
-
-pub type Conflicts = BTreeMap<String, FieldConflict>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -192,60 +81,6 @@ impl Answer {
             server,
         }
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum EventStatus {
-    /// On a device: not yet answered by the server.
-    Pending,
-    Applied,
-    Conflict,
-    Rejected,
-}
-
-impl EventStatus {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            EventStatus::Pending => "pending",
-            EventStatus::Applied => "applied",
-            EventStatus::Conflict => "conflict",
-            EventStatus::Rejected => "rejected",
-        }
-    }
-
-    pub fn parse(text: &str) -> Option<EventStatus> {
-        match text {
-            "pending" => Some(EventStatus::Pending),
-            "applied" => Some(EventStatus::Applied),
-            "conflict" => Some(EventStatus::Conflict),
-            "rejected" => Some(EventStatus::Rejected),
-            _ => None,
-        }
-    }
-}
-
-/// An event as `app_events` keeps it: with its answer on the server, or
-/// its place in the queue on a device.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct StoredEvent {
-    #[serde(flatten)]
-    pub event: Event,
-    /// Who made it: on the server the user the token stood for, on a
-    /// device the user signed in.
-    pub user_id: Uuid,
-    pub status: EventStatus,
-    #[serde(default)]
-    pub conflicts: Conflicts,
-    /// On the server, the row's version after the event.
-    pub version: Option<i64>,
-    /// On the server, why it was rejected; on a device, the reason of a
-    /// rejection that kept the event pending, or why it was refused.
-    pub last_error: Option<String>,
-    /// On a device, how many times the server or the bucket said no to
-    /// it while it stayed pending.
-    #[serde(default)]
-    pub attempts: i64,
 }
 
 impl StoredEvent {
@@ -356,7 +191,7 @@ pub async fn record(
         last_error: answer.reason.clone(),
         attempts: 0,
     };
-    Ok(app_events::create(tx, AcceptedEvent(&stored)).await?)
+    Ok(app_events::create(tx, &stored).await?)
 }
 
 /// Queues an event a device applied, for the next push. A local user's
@@ -375,125 +210,7 @@ pub async fn queue(tx: &mut Transaction, user_id: Uuid, event: &Event) -> Result
         last_error: None,
         attempts: 0,
     };
-    app_events::create(tx, AcceptedEvent(&stored)).await
-}
-
-pub async fn get(tx: &mut Transaction, id: Uuid) -> Result<Option<StoredEvent>, sqlx::Error> {
-    app_events::get(tx, id).await
-}
-
-/// The events not yet answered, in the order they were made.
-pub async fn pending(tx: &mut Transaction) -> Result<Vec<StoredEvent>, sqlx::Error> {
-    app_events::list(tx, app_events::Filter::Status(EventStatus::Pending)).await
-}
-
-/// The conflicts the person has not resolved, newest first.
-pub async fn conflicts(tx: &mut Transaction) -> Result<Vec<StoredEvent>, sqlx::Error> {
-    let mut conflicts =
-        app_events::list(tx, app_events::Filter::Status(EventStatus::Conflict)).await?;
-    conflicts.reverse();
-    Ok(conflicts)
-}
-
-/// The events of the table's rows, in the order they were made.
-pub async fn list_of_table(
-    tx: &mut Transaction,
-    table: &str,
-) -> Result<Vec<StoredEvent>, sqlx::Error> {
-    app_events::list(tx, app_events::Filter::Table(table)).await
-}
-
-pub async fn count(tx: &mut Transaction, status: EventStatus) -> Result<i64, sqlx::Error> {
-    app_events::count(tx, status).await
-}
-
-/// Whether the row has an event not yet answered, in which case a row
-/// from the server must not replace it.
-pub async fn has_pending(
-    tx: &mut Transaction,
-    table: &str,
-    row_id: Uuid,
-) -> Result<bool, sqlx::Error> {
-    app_events::has_pending(tx, table, row_id).await
-}
-
-pub async fn delete(tx: &mut Transaction, id: Uuid) -> Result<(), sqlx::Error> {
-    app_events::delete(tx, id).await
-}
-
-pub async fn delete_pending_of_row(
-    tx: &mut Transaction,
-    table: &str,
-    row_id: Uuid,
-) -> Result<(), sqlx::Error> {
-    app_events::delete_pending_of_row(tx, table, row_id).await
-}
-
-/// Removes every event of the row, whatever its status.
-pub async fn delete_of_row(
-    tx: &mut Transaction,
-    table: &str,
-    row_id: Uuid,
-) -> Result<(), sqlx::Error> {
-    app_events::delete_of_row(tx, table, row_id).await
-}
-
-pub async fn mark_conflict(
-    tx: &mut Transaction,
-    id: Uuid,
-    conflicts: &Conflicts,
-) -> Result<(), sqlx::Error> {
-    app_events::processing::mark_conflict(tx, id, conflicts).await
-}
-
-/// Keeps why a pending event did not go, without counting a try: the
-/// server or the bucket was not reached, or is failing.
-pub async fn mark_error(tx: &mut Transaction, id: Uuid, reason: &str) -> Result<(), sqlx::Error> {
-    app_events::processing::mark_error(tx, id, reason).await
-}
-
-/// Counts a try the server or the bucket said no to, with why. At
-/// `MAX_ATTEMPTS` the event is refused; true when it now is.
-pub async fn count_attempt(
-    tx: &mut Transaction,
-    id: Uuid,
-    reason: &str,
-) -> Result<bool, sqlx::Error> {
-    let attempts = app_events::processing::add_attempt(&mut *tx, id, reason).await?;
-    if attempts < MAX_ATTEMPTS {
-        return Ok(false);
-    }
-    refuse(tx, id, &format!("tried {attempts} times: {reason}")).await?;
-    Ok(true)
-}
-
-/// Stops trying a pending event: it is kept as a conflict with nothing
-/// on the server's side, and why, until the person tries it again or
-/// lets it go.
-pub async fn refuse(tx: &mut Transaction, id: Uuid, reason: &str) -> Result<(), sqlx::Error> {
-    let Some(stored) = get(tx, id).await? else {
-        return Ok(());
-    };
-    let conflicts: Conflicts = stored
-        .event
-        .changes
-        .iter()
-        .map(|(field, yours)| {
-            (
-                field.clone(),
-                FieldConflict {
-                    yours: yours.clone(),
-                    server: Value::Null,
-                },
-            )
-        })
-        .collect();
-    app_events::processing::mark_refused(tx, id, &conflicts, reason).await
-}
-
-/// Puts a refused event back in the queue, its tries counted from none.
-pub async fn try_again(tx: &mut Transaction, id: Uuid) -> Result<(), sqlx::Error> {
-    app_events::processing::mark_pending(tx, id).await
+    app_events::create(tx, &stored).await
 }
 
 #[cfg(test)]
@@ -527,29 +244,42 @@ mod tests {
             queue(&mut tx, user.id, &event).await.expect("queue");
             tx.commit().await.expect("commit");
             let mut tx = deployment.begin().await.expect("transaction");
-            for attempt in 1..=MAX_ATTEMPTS {
+            for attempt in 1..=app_events::MAX_ATTEMPTS {
                 assert_eq!(
-                    count_attempt(&mut tx, event.id, "refused")
+                    app_events::count_attempt(&mut tx, event.id, "refused")
                         .await
                         .expect("attempt"),
-                    attempt == MAX_ATTEMPTS
+                    attempt == app_events::MAX_ATTEMPTS
                 );
             }
-            let refused = get(&mut tx, event.id).await.expect("read").expect("event");
+            let refused = app_events::get(&mut tx, event.id)
+                .await
+                .expect("read")
+                .expect("event");
             assert_eq!(refused.status, EventStatus::Conflict);
-            assert_eq!(refused.attempts, MAX_ATTEMPTS);
+            assert_eq!(refused.attempts, app_events::MAX_ATTEMPTS);
             assert!(!refused.conflicts.is_empty());
             drop(tx);
             let mut tx = deployment.begin().await.expect("transaction");
-            let pending = get(&mut tx, event.id).await.expect("read").expect("event");
+            let pending = app_events::get(&mut tx, event.id)
+                .await
+                .expect("read")
+                .expect("event");
             assert_eq!(pending.status, EventStatus::Pending);
             assert_eq!(pending.attempts, 0);
             assert!(pending.last_error.is_none());
-            refuse(&mut tx, event.id, "refused").await.expect("refuse");
-            try_again(&mut tx, event.id).await.expect("retry");
+            app_events::refuse(&mut tx, event.id, "refused")
+                .await
+                .expect("refuse");
+            app_events::try_again(&mut tx, event.id)
+                .await
+                .expect("retry");
             tx.commit().await.expect("commit");
             let mut tx = deployment.begin().await.expect("transaction");
-            let retried = get(&mut tx, event.id).await.expect("read").expect("event");
+            let retried = app_events::get(&mut tx, event.id)
+                .await
+                .expect("read")
+                .expect("event");
             assert_eq!(retried.status, EventStatus::Pending);
             assert_eq!(retried.attempts, 0);
             assert!(retried.conflicts.is_empty());

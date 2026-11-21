@@ -26,7 +26,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::app::communities::{self, CommunityError};
-use crate::app::events::{self, Answer, AnswerStatus, Event, EventKind, EventStatus, StoredEvent};
+use crate::app::events::{Answer, AnswerStatus};
 use crate::app::files::{self, FileError};
 use crate::app::files_communities::{self, FileCommunityError};
 use crate::app::memberships::{self, MembershipError};
@@ -35,10 +35,12 @@ use crate::app::posts_communities::{self, PostCommunityError};
 use crate::app::purge::{self, PurgeError};
 use crate::app::users::{self, UserError};
 use crate::data::app_communities::{self, Community};
+use crate::data::app_events::{self, Event, EventKind, EventStatus, StoredEvent};
 use crate::data::app_files::{self, File};
 use crate::data::app_files_communities::{self, FileCommunity};
 use crate::data::app_posts::{self, Post};
 use crate::data::app_posts_communities::{self, PostCommunity};
+use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::{self, User};
 use crate::data::app_users_communities::{self, Membership};
 use crate::data::device_settings::{self, DeviceSettingsError, WORK_OFFLINE};
@@ -52,23 +54,7 @@ pub const OVERLAP_SECONDS: i64 = 60;
 pub const DEFAULT_LIMIT: usize = 200;
 pub const MAX_LIMIT: usize = 500;
 
-/// A place in the pull order: the server's write time and the id of a
-/// row, the last one pulled.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct Cursor {
-    pub last_synced_at: DateTime<Utc>,
-    pub id: Uuid,
-}
-
 impl Cursor {
-    /// Before every row.
-    pub fn start() -> Cursor {
-        Cursor {
-            last_synced_at: DateTime::<Utc>::UNIX_EPOCH,
-            id: Uuid::nil(),
-        }
-    }
-
     /// The row's place in the pull order, from its wire form.
     pub fn of_row(row: &TableRow) -> Option<Cursor> {
         let last_synced_at = row.row.get("last_synced_at")?.as_str()?;
@@ -701,8 +687,8 @@ pub async fn status(deployment: &Deployment) -> Result<Status, SyncError> {
         local: signed_in.as_ref().is_some_and(|user| user.token.is_none()),
         signed_in: signed_in.is_some(),
         offline: device_settings::get(&mut tx, WORK_OFFLINE).await?,
-        pending: events::count(&mut tx, EventStatus::Pending).await?,
-        conflicts: events::count(&mut tx, EventStatus::Conflict).await?,
+        pending: app_events::count(&mut tx, EventStatus::Pending).await?,
+        conflicts: app_events::count(&mut tx, EventStatus::Conflict).await?,
         cursor: app_sync_state::get(&mut tx).await?,
     };
     tx.commit().await?;
@@ -740,7 +726,7 @@ async fn push_pending<T: Transport>(
         // Read again each time: the answers to one batch can remove
         // events that were waiting behind it
         let mut tx = deployment.begin().await?;
-        let mut batch = events::pending(&mut tx).await?;
+        let mut batch = app_events::pending(&mut tx).await?;
         tx.commit().await?;
         batch.retain(|stored| !held_back.contains(&stored.event.row_id));
         let waiting =
@@ -800,11 +786,11 @@ async fn push_batch<T: Transport>(
         let server = answer.server;
         match answer.status {
             AnswerStatus::Applied => {
-                events::delete(&mut tx, event.id).await?;
+                app_events::delete(&mut tx, event.id).await?;
                 report.pushed += 1;
             }
             AnswerStatus::Conflict => {
-                events::mark_conflict(&mut tx, event.id, &answer.conflicts).await?;
+                app_events::mark_conflict(&mut tx, event.id, &answer.conflicts).await?;
                 report.conflicts += 1;
             }
             AnswerStatus::Rejected => {
@@ -812,15 +798,15 @@ async fn push_batch<T: Transport>(
                 let reason = answer.reason.unwrap_or_else(|| "rejected".to_string());
                 match (event.kind, server.is_some()) {
                     // The server's row wins
-                    (_, true) => events::delete(&mut tx, event.id).await?,
+                    (_, true) => app_events::delete(&mut tx, event.id).await?,
                     // A file is the only copy of its bytes, so it is never
                     // dropped: it waits while the server only lacks the
                     // bytes, and is kept for the person otherwise
                     (EventKind::Create, false) if event.table == app_files::TABLE => {
                         let refused = if reason == files::FILE_NOT_UPLOADED {
-                            events::count_attempt(&mut tx, event.id, &reason).await?
+                            app_events::count_attempt(&mut tx, event.id, &reason).await?
                         } else {
-                            events::refuse(&mut tx, event.id, &reason).await?;
+                            app_events::refuse(&mut tx, event.id, &reason).await?;
                             true
                         };
                         if refused {
@@ -830,8 +816,9 @@ async fn push_batch<T: Transport>(
                     }
                     // The server will never have this row: drop it
                     (EventKind::Create, false) => {
-                        events::delete(&mut tx, event.id).await?;
-                        events::delete_pending_of_row(&mut tx, &event.table, event.row_id).await?;
+                        app_events::delete(&mut tx, event.id).await?;
+                        app_events::delete_pending_of_row(&mut tx, &event.table, event.row_id)
+                            .await?;
                         delete_row(&mut tx, &event.table, event.row_id).await?;
                         continue;
                     }
@@ -847,21 +834,21 @@ async fn push_batch<T: Transport>(
                             .map(|(field, yours)| {
                                 (
                                     field.clone(),
-                                    events::FieldConflict {
+                                    app_events::FieldConflict {
                                         yours: yours.clone(),
                                         server: Value::Null,
                                     },
                                 )
                             })
                             .collect();
-                        events::mark_conflict(&mut tx, event.id, &conflicts).await?;
+                        app_events::mark_conflict(&mut tx, event.id, &conflicts).await?;
                         report.conflicts += 1;
                         continue;
                     }
                     // Kept pending with the reason, and tried again by the
                     // next sync, up to the limit
                     (EventKind::Update, false) => {
-                        if events::count_attempt(&mut tx, event.id, &reason).await? {
+                        if app_events::count_attempt(&mut tx, event.id, &reason).await? {
                             report.conflicts += 1;
                         }
                         continue;
@@ -874,7 +861,7 @@ async fn push_batch<T: Transport>(
             // membership revived rather than made again: the device's goes
             let server_id = server.id().unwrap_or(event.row_id);
             if server_id != event.row_id {
-                events::delete_pending_of_row(&mut tx, &event.table, event.row_id).await?;
+                app_events::delete_pending_of_row(&mut tx, &event.table, event.row_id).await?;
                 delete_row(&mut tx, &event.table, event.row_id).await?;
             }
             answered.insert((table_rank(&server.table), server_id), server);
@@ -1092,10 +1079,10 @@ pub(crate) mod tests {
             communities::delete_row(&mut tx, membership.community_id)
                 .await
                 .expect("removed");
-            events::delete_of_row(&mut tx, app_communities::TABLE, membership.community_id)
+            app_events::delete_of_row(&mut tx, app_communities::TABLE, membership.community_id)
                 .await
                 .expect("removed");
-            events::delete_of_row(&mut tx, app_users_communities::TABLE, membership.id)
+            app_events::delete_of_row(&mut tx, app_users_communities::TABLE, membership.id)
                 .await
                 .expect("removed");
         }
@@ -1221,7 +1208,7 @@ pub(crate) mod tests {
                     commit.then_some(serde_json::json!(true))
                 );
                 assert!(
-                    events::pending(&mut tx)
+                    app_events::pending(&mut tx)
                         .await
                         .expect("no new local events")
                         .is_empty()
@@ -1708,14 +1695,17 @@ pub(crate) mod tests {
         let huge = Event::create(
             app_posts::TABLE,
             Uuid::now_v7(),
-            events::Fields::from_iter([("body".to_string(), json!("a".repeat(MAX_PUSH_BYTES)))]),
+            app_events::Fields::from_iter([(
+                "body".to_string(),
+                json!("a".repeat(MAX_PUSH_BYTES)),
+            )]),
             now(),
         );
         let stored = |event: &Event| StoredEvent {
             event: event.clone(),
             user_id: Uuid::now_v7(),
-            status: events::EventStatus::Pending,
-            conflicts: events::Conflicts::new(),
+            status: app_events::EventStatus::Pending,
+            conflicts: app_events::Conflicts::new(),
             version: None,
             last_error: None,
             attempts: 0,
@@ -1734,7 +1724,7 @@ pub(crate) mod tests {
             let offline = Event::create(
                 app_posts::TABLE,
                 Uuid::now_v7(),
-                events::Fields::from_iter([("body".to_string(), json!("written offline"))]),
+                app_events::Fields::from_iter([("body".to_string(), json!("written offline"))]),
                 last_week,
             );
             posts::apply_event(&server, &alice, &offline)
@@ -1751,7 +1741,7 @@ pub(crate) mod tests {
             let ahead = Event::create(
                 app_posts::TABLE,
                 Uuid::now_v7(),
-                events::Fields::from_iter([("body".to_string(), json!("a clock set ahead"))]),
+                app_events::Fields::from_iter([("body".to_string(), json!("a clock set ahead"))]),
                 now() + Duration::days(7),
             );
             posts::apply_event(&server, &alice, &ahead)
@@ -2245,7 +2235,12 @@ pub(crate) mod tests {
             let alice = users::create(&server, "alice@example.com", "Alice")
                 .await
                 .expect("a user");
-            let event = Event::create("app_nothing", Uuid::now_v7(), events::Fields::new(), now());
+            let event = Event::create(
+                "app_nothing",
+                Uuid::now_v7(),
+                app_events::Fields::new(),
+                now(),
+            );
             let response = push(
                 &server,
                 &alice,
@@ -2273,16 +2268,16 @@ pub(crate) mod tests {
             {
                 // Rewrite the queued create to one the server refuses
                 let mut tx = a.begin().await.expect("a transaction");
-                let stored = events::pending(&mut tx)
+                let stored = app_events::pending(&mut tx)
                     .await
                     .expect("the events")
                     .remove(0);
-                events::delete(&mut tx, stored.event.id)
+                app_events::delete(&mut tx, stored.event.id)
                     .await
                     .expect("deleted");
                 let mut broken = stored.event.clone();
                 broken.changes = fields(json!({ "body": "x", "version": 5 }));
-                events::queue(&mut tx, alice.id, &broken)
+                crate::app::events::queue(&mut tx, alice.id, &broken)
                     .await
                     .expect("queued");
                 tx.commit().await.expect("committed");
@@ -2299,7 +2294,7 @@ pub(crate) mod tests {
         .await;
     }
 
-    fn fields(value: Value) -> events::Fields {
+    fn fields(value: Value) -> app_events::Fields {
         match value {
             Value::Object(fields) => fields,
             _ => panic!("fields are an object"),
@@ -2451,8 +2446,14 @@ pub(crate) mod tests {
                 app_users::TABLE,
                 alice.id,
                 on_server.version,
-                crate::app::events::Fields::from_iter([("name".to_string(), json!("Alice B"))]),
-                crate::app::events::Fields::from_iter([("name".to_string(), json!("Mallory"))]),
+                crate::data::app_events::Fields::from_iter([(
+                    "name".to_string(),
+                    json!("Alice B"),
+                )]),
+                crate::data::app_events::Fields::from_iter([(
+                    "name".to_string(),
+                    json!("Mallory"),
+                )]),
                 now(),
             );
             let answer = users::apply_event(&server, &bob, &event)

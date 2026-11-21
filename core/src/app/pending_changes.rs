@@ -9,12 +9,12 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::app::communities::{self, CommunityError};
-use crate::app::events::{self, EventKind, Fields, StoredEvent};
 use crate::app::files::{self, FileError};
 use crate::app::files_communities;
 use crate::app::posts::{self, PostError};
 use crate::app::users::{self, UserError};
 use crate::data::app_communities;
+use crate::data::app_events::{self, EventKind, Fields, StoredEvent};
 use crate::data::app_files;
 use crate::data::app_files_communities;
 use crate::data::app_posts;
@@ -55,7 +55,7 @@ pub enum PendingChangeError {
 pub async fn list(deployment: &Deployment) -> Result<Vec<PendingChange>, PendingChangeError> {
     let mut tx = deployment.begin().await?;
     let mut changes = Vec::new();
-    for stored in events::pending(&mut tx).await? {
+    for stored in app_events::pending(&mut tx).await? {
         let about = match stored.event.table.as_str() {
             app_posts::TABLE => posts::get_in(&mut tx, stored.event.row_id)
                 .await?

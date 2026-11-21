@@ -15,10 +15,12 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
+use crate::app::events::{self, Answer, AnswerStatus};
 use crate::app::files_communities;
 use crate::app::memberships::{self, MembershipError};
-use crate::app::sync::{Cursor, TableRow};
+use crate::app::sync::TableRow;
+use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
+use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::data::app_users_communities::Membership;
 use crate::database::Transaction;
@@ -219,7 +221,7 @@ pub(crate) async fn apply_server_row(
     row: &Value,
 ) -> Result<bool, CommunityError> {
     let community: Community = serde_json::from_value(row.clone())?;
-    if events::has_pending(tx, TABLE, community.id).await? {
+    if app_events::has_pending(tx, TABLE, community.id).await? {
         return Ok(false);
     }
     app_communities::replication::upsert(&mut *tx, &community).await?;
@@ -305,7 +307,7 @@ pub(crate) async fn apply_in(
     event: &Event,
 ) -> Result<Applied, CommunityError> {
     if role == Role::Server
-        && let Some(recorded) = events::get(tx, event.id).await?
+        && let Some(recorded) = app_events::get(tx, event.id).await?
     {
         let community = get_in(tx, event.row_id).await?;
         let server = community.as_ref().map(table_row).transpose()?;
@@ -493,7 +495,7 @@ mod tests {
             let deployment = server(database);
             let alice = user(&deployment, "alice@example.com").await;
             let mut tx = deployment.begin().await.expect("transaction");
-            let before = events::count(&mut tx, events::EventStatus::Applied)
+            let before = app_events::count(&mut tx, app_events::EventStatus::Applied)
                 .await
                 .expect("count");
             tx.commit().await.expect("commit");
@@ -520,7 +522,7 @@ mod tests {
                     .is_none()
             );
             assert_eq!(
-                events::count(&mut tx, events::EventStatus::Applied)
+                app_events::count(&mut tx, app_events::EventStatus::Applied)
                     .await
                     .expect("count"),
                 before

@@ -6,7 +6,7 @@ use sqlx::types::Json;
 use sqlx::{FromRow, PgConnection};
 use uuid::Uuid;
 
-use crate::app::events::{Conflicts, Event, EventKind, EventStatus, Fields, StoredEvent};
+use super::{Conflicts, Event, EventKind, EventStatus, Fields, StoredEvent};
 
 #[derive(FromRow)]
 struct EventRow {

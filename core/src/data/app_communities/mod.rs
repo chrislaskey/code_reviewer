@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::app::sync::Cursor;
+use crate::data::app_sync_state::Cursor;
 use crate::database::Transaction;
 use crate::helpers::field_errors::FieldErrors;
 
