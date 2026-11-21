@@ -51,9 +51,9 @@ use crate::app::sync::{Cursor, SyncError, TableRow, Transport};
 use crate::app::users;
 use crate::data::app_communities::Community;
 use crate::data::app_users::User;
+use crate::data::device_settings::{self, WORK_OFFLINE};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, FileStore, Role, now};
-use crate::device_settings::{self, WORK_OFFLINE};
 use crate::helpers::field_errors::FieldErrors;
 #[cfg(feature = "object-storage")]
 use crate::helpers::{json, sha256};

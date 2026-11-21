@@ -31,9 +31,9 @@ use app_core::app::local_users::{self, LocalUserError, Moved};
 use app_core::app::sync::{self, SyncError, Transport};
 use app_core::app::users::{self, UserError};
 use app_core::data::app_users::User;
+use app_core::data::device_settings::{self, DeviceSettingsError};
 use app_core::database::{Database, DatabaseError};
 use app_core::deployment::{Deployment, FileStore, Role, now};
-use app_core::device_settings::{self, DeviceSettingsError};
 
 use crate::sync::SyncServer;
 

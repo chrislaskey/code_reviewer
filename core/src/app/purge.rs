@@ -14,7 +14,7 @@
 //! It runs daily, before the sweeps, see `jobs`.
 
 use crate::data::app_events;
-use crate::data::app_purges;
+use crate::data::app_purges::{self, Purge};
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Duration, Utc};
@@ -25,16 +25,6 @@ use uuid::Uuid;
 use crate::app::users;
 use crate::deployment::{Deployment, Role};
 use crate::{accounts, tokens};
-
-/// A record assembled by this resource's workflow.
-pub(crate) struct AcceptedPurge<'a>(&'a Purge);
-
-impl AcceptedPurge<'_> {
-    /// Borrows the assembled record for persistence.
-    pub(crate) fn row(&self) -> &Purge {
-        self.0
-    }
-}
 
 /// How long a deleted row is kept, and how long a device may stay away.
 pub const RETENTION_DAYS: i64 = 90;
@@ -51,14 +41,6 @@ const TABLES: &[app_purges::Table] = &[
     app_purges::Table::Communities,
     app_purges::Table::Users,
 ];
-
-/// One run as `app_purges` keeps it.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Purge {
-    pub id: Uuid,
-    pub horizon: DateTime<Utc>,
-    pub inserted_at: DateTime<Utc>,
-}
 
 /// What a run removed.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -111,7 +93,7 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
         horizon,
         inserted_at: now,
     };
-    app_purges::create(&mut tx, AcceptedPurge(&purge)).await?;
+    app_purges::create(&mut tx, &purge).await?;
     tx.commit().await?;
     Ok(PurgeReport { horizon, removed })
 }

@@ -5,7 +5,8 @@
 
 use std::time::Duration;
 
-use app_core::app::jobs::{self, Job};
+use app_core::app::jobs;
+use app_core::data::app_jobs::Job;
 use app_core::deployment::{self, Deployment};
 
 /// How often the loop asks for the jobs due.

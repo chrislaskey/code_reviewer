@@ -1,8 +1,19 @@
-//! Transaction-scoped purges storage. Workflows own policy and commits.
+//! Purge records: the `Purge` schema, one row per run, and the reads and
+//! writes of `app_purges`, with the bulk removals a run makes. Callers own
+//! and commit the transaction.
 
-use crate::app::purge::AcceptedPurge;
-use crate::database::Transaction;
 use chrono::{DateTime, Utc};
+use uuid::Uuid;
+
+use crate::database::Transaction;
+
+/// One run as `app_purges` keeps it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Purge {
+    pub id: Uuid,
+    pub horizon: DateTime<Utc>,
+    pub inserted_at: DateTime<Utc>,
+}
 
 #[cfg(feature = "postgres")]
 mod postgres;
@@ -46,15 +57,12 @@ impl Table {
 }
 
 /// Persists the record accepted by its workflow.
-pub(crate) async fn create(
-    tx: &mut Transaction,
-    purge: AcceptedPurge<'_>,
-) -> Result<(), sqlx::Error> {
-    query!(tx, insert(purge.row()))
+pub async fn create(tx: &mut Transaction, purge: &Purge) -> Result<(), sqlx::Error> {
+    query!(tx, insert(purge))
 }
 
 /// Gets the most recent purge horizon, or none before the first purge.
-pub(crate) async fn get(tx: &mut Transaction) -> Result<Option<DateTime<Utc>>, sqlx::Error> {
+pub async fn get(tx: &mut Transaction) -> Result<Option<DateTime<Utc>>, sqlx::Error> {
     query!(tx, latest_horizon())
 }
 

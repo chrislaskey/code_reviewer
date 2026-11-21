@@ -19,7 +19,6 @@ pub mod credentials;
 pub mod data;
 pub mod database;
 pub mod deployment;
-pub mod device_settings;
 pub mod helpers;
 pub mod ops;
 #[cfg(feature = "postgres")]

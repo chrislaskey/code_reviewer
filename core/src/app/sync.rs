@@ -46,9 +46,9 @@ use crate::data::app_posts::{self, Post};
 use crate::data::app_posts_communities::{self, PostCommunity};
 use crate::data::app_users::{self, User};
 use crate::data::app_users_communities::{self, Membership};
+use crate::data::device_settings::{self, DeviceSettingsError, WORK_OFFLINE};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
-use crate::device_settings::{self, DeviceSettingsError, WORK_OFFLINE};
 
 /// How far back from its cursor's time a pull starts, so a row written
 /// in a transaction that committed after a later one is not missed.
@@ -1795,7 +1795,7 @@ pub(crate) mod tests {
                     }
                 );
                 assert_eq!(
-                    crate::data::device_settings::get(&mut tx, device_settings::WORK_OFFLINE)
+                    device_settings::get_stored(&mut tx, device_settings::WORK_OFFLINE)
                         .await
                         .expect("setting"),
                     commit.then_some(serde_json::json!(true))

@@ -19,7 +19,6 @@ use crate::data::app_files;
 use crate::data::app_posts;
 use crate::data::app_posts_communities;
 use crate::data::app_users_communities;
-use crate::data::device_settings as device_settings_records;
 use crate::data::local_users;
 use std::collections::BTreeMap;
 
@@ -35,9 +34,9 @@ use crate::app::events::{self, Event};
 use crate::app::files_communities::{self, FileCommunityNew};
 use crate::app::users::{self, SignedIn, UserError};
 use crate::data::app_users::{self, User};
+use crate::data::device_settings::{self, DeviceSettingsError, LOCAL_USER_MOVED, SIGNED_IN};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
-use crate::device_settings::{self, DeviceSettingsError, LOCAL_USER_MOVED, SIGNED_IN};
 use crate::helpers::{json, random};
 
 /// Whether a device offers to skip signing in. The app's choice, to
@@ -146,7 +145,7 @@ pub async fn is_signed_in(deployment: &Deployment) -> Result<bool, LocalUserErro
 /// `is_signed_in` in the caller's transaction: someone is signed in and
 /// has no token. On a server, and with nobody signed in, false.
 pub(crate) async fn is_signed_in_in(tx: &mut Transaction) -> Result<bool, sqlx::Error> {
-    let signed_in = device_settings_records::get(&mut *tx, SIGNED_IN).await?;
+    let signed_in = device_settings::get_stored(&mut *tx, SIGNED_IN).await?;
     Ok(signed_in.is_some_and(|signed_in| {
         signed_in.is_object() && signed_in.get("token").is_none_or(Value::is_null)
     }))

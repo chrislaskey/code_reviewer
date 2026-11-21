@@ -20,8 +20,8 @@ use uuid::Uuid;
 
 use crate::app::sync::SyncError;
 use crate::app::users::UserError;
+use crate::data::device_settings::{self, DeviceSettingsError, PLAN};
 use crate::deployment::{Deployment, now};
-use crate::device_settings::{self, DeviceSettingsError, PLAN};
 
 /// Where Stripe's pages come back to: the web page that asked, or, for
 /// the app, a page saying to go back to it, as the browser that paid is
@@ -99,8 +99,8 @@ mod on_server {
     use super::{OnlineError, PlanKept, ReturnTo};
     use crate::app::sync::Http;
     use crate::app::users;
+    use crate::data::device_settings::{self, PLAN};
     use crate::deployment::{Deployment, now};
-    use crate::device_settings::{self, PLAN};
 
     async fn ask(
         deployment: &Deployment,

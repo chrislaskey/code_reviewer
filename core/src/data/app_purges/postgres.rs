@@ -5,7 +5,7 @@
 use chrono::{DateTime, Utc};
 use sqlx::PgConnection;
 
-use crate::app::purge::Purge;
+use super::Purge;
 
 pub async fn delete_deleted_before(
     connection: &mut PgConnection,

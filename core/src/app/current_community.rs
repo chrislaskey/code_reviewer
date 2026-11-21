@@ -14,9 +14,9 @@ use uuid::Uuid;
 use crate::app::communities::{self, CommunityError};
 use crate::data::app_communities::Community;
 use crate::data::app_users::User;
+use crate::data::device_settings::{self, CURRENT_COMMUNITY, DeviceSettingsError};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role};
-use crate::device_settings::{self, CURRENT_COMMUNITY, DeviceSettingsError};
 
 #[derive(Debug, Error)]
 pub enum CurrentCommunityError {

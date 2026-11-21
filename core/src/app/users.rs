@@ -18,9 +18,9 @@ use uuid::Uuid;
 use crate::accounts::users::{self as accounts_users, AccountUserError};
 use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
 use crate::app::sync::{Cursor, TableRow};
+use crate::data::device_settings::{self, DeviceSettingsError, SIGNED_IN};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
-use crate::device_settings::{self, DeviceSettingsError, SIGNED_IN};
 use crate::tokens;
 
 /// What a person changes of their own row; the rest is the server's.

@@ -8,7 +8,7 @@
 //! one runs it. A job that fails is recorded with its error and tried
 //! again once it is due; every job may be run again safely.
 
-use crate::data::app_jobs;
+use crate::data::app_jobs::{self, Job, JobRecord};
 use chrono::{DateTime, Duration, Utc};
 use serde_json::Value;
 use thiserror::Error;
@@ -18,53 +18,7 @@ use crate::app::files::FileError;
 use crate::app::purge::{self, PurgeError};
 use crate::deployment::{Deployment, Role};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Job {
-    /// `purge::run`, before the sweeps, so the files of the rows it
-    /// removes go in the same day.
-    Purge,
-    /// `trial_users::delete_expired`, hourly, so a trial user is gone
-    /// within the hour after their time is up.
-    TrialUsersDelete,
-    /// `avatars::delete_unreferenced`.
-    AvatarsDeleteUnreferenced,
-    /// `files::delete_unreferenced`.
-    FilesDeleteUnreferenced,
-    /// `accounts::stripe_reconcile::run`, on a server with Stripe: what a
-    /// missed webhook left behind.
-    StripeReconcile,
-    /// `accounts::app_store_reconcile::run`, on a server with the App
-    /// Store: what a missed notification left behind.
-    AppStoreReconcile,
-}
-
 impl Job {
-    /// Every job, in the order `run_due` runs them.
-    pub const ALL: [Job; 6] = [
-        Job::Purge,
-        Job::TrialUsersDelete,
-        Job::AvatarsDeleteUnreferenced,
-        Job::FilesDeleteUnreferenced,
-        Job::StripeReconcile,
-        Job::AppStoreReconcile,
-    ];
-
-    /// Its name in `app_jobs` and on the command line.
-    pub fn name(self) -> &'static str {
-        match self {
-            Job::Purge => "purge",
-            Job::TrialUsersDelete => "trial_users_delete",
-            Job::AvatarsDeleteUnreferenced => "avatars_delete_unreferenced",
-            Job::FilesDeleteUnreferenced => "files_delete_unreferenced",
-            Job::StripeReconcile => "stripe_reconcile",
-            Job::AppStoreReconcile => "app_store_reconcile",
-        }
-    }
-
-    pub fn from_name(name: &str) -> Option<Job> {
-        Job::ALL.into_iter().find(|job| job.name() == name)
-    }
-
     /// The role of the deployments it runs on.
     pub fn role(self) -> Role {
         match self {
@@ -116,17 +70,6 @@ impl Job {
             Job::AppStoreReconcile => false,
         }
     }
-}
-
-/// A job's last run, as `app_jobs` keeps it.
-#[derive(Clone, Debug, PartialEq)]
-pub struct JobRecord {
-    pub job: Job,
-    pub started_at: DateTime<Utc>,
-    /// None while it runs, or when it stopped before recording its end.
-    pub finished_at: Option<DateTime<Utc>>,
-    pub last_report: Option<Value>,
-    pub last_error: Option<String>,
 }
 
 /// One run by `run_due`: the job's report, or its error.
