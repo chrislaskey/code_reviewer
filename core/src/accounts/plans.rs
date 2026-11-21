@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::accounts::prices;
 use crate::accounts::products::Grant;
 use crate::accounts::subscriptions;
+use crate::data::accounts_prices;
 use crate::data::accounts_purchases::Store;
 use crate::data::accounts_subscriptions::SubscriptionStatus;
 use crate::data::app_users::User;
@@ -53,7 +53,7 @@ pub async fn current(deployment: &Deployment, user: &User) -> Result<Option<Plan
         if !subscription.status.gives_plan() {
             continue;
         }
-        let price = prices::get_in(&mut tx, subscription.price_id).await?;
+        let price = accounts_prices::get(&mut tx, subscription.price_id).await?;
         let Some(grant) = price
             .and_then(|price| price.lookup_key)
             .and_then(|lookup_key| Grant::from_lookup_key(&lookup_key))

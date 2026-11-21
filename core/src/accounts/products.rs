@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use crate::accounts::prices;
 use crate::accounts::purchases;
-use crate::data::accounts_prices::Price;
+use crate::data::accounts_prices::{self, Price};
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
@@ -118,7 +118,7 @@ pub async fn list(deployment: &Deployment) -> Result<Vec<ProductForSale>, Produc
     }
     let mut tx = deployment.begin().await?;
     let products = accounts_products::list(&mut tx).await?;
-    let prices = prices::list_in(&mut tx).await?;
+    let prices = accounts_prices::list(&mut tx).await?;
     tx.commit().await?;
     let mut for_sale: Vec<ProductForSale> = products
         .into_iter()
@@ -151,7 +151,7 @@ pub(crate) async fn get_for_sale(
     }
     let mut tx = deployment.begin().await?;
     let product = accounts_products::get(&mut tx, id).await?;
-    let prices = prices::list_in(&mut tx).await?;
+    let prices = accounts_prices::list(&mut tx).await?;
     tx.commit().await?;
     product
         .and_then(|product| for_sale(product, &prices))
@@ -173,7 +173,7 @@ pub async fn sync(
     let now = now();
     let mut tx = deployment.begin().await?;
     accounts_products::maintenance::deactivate_all(&mut tx, now).await?;
-    prices::deactivate_all_in(&mut tx, now).await?;
+    accounts_prices::maintenance::deactivate_all(&mut tx, now).await?;
     for stripe_product in &stripe_products {
         upsert_in(&mut tx, stripe_product, now).await?;
     }

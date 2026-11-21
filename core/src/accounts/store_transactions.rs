@@ -14,11 +14,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::accounts::prices;
 use crate::accounts::products::{Grant, ProductKind};
 use crate::accounts::purchases;
 use crate::accounts::subscriptions;
-use crate::data::accounts_prices::Price;
+use crate::data::accounts_prices::{self, Price};
 use crate::data::accounts_purchases::{Purchase, Store};
 use crate::data::accounts_subscriptions::{Subscription, SubscriptionStatus};
 use crate::data::accounts_users;
@@ -343,7 +342,7 @@ async fn price_for_sale_in(
     tx: &mut Transaction,
     lookup_key: &str,
 ) -> Result<Price, StoreTransactionError> {
-    prices::list_in(tx)
+    accounts_prices::list(tx)
         .await?
         .into_iter()
         .find(|price| price.active && price.lookup_key.as_deref() == Some(lookup_key))

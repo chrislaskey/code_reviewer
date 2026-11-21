@@ -1,11 +1,12 @@
 //! A product's prices, one row of `accounts_prices` each, copied from
 //! Stripe's catalog with the product, see `products`. Server only. A
 //! price the catalog cannot sell, with no fixed amount, or billed every
-//! few months, is kept inactive.
+//! few months, is kept inactive. The records are `data::accounts_prices`.
 
-use crate::data::accounts_prices::{self, Price, PriceInterval};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
+
+use crate::data::accounts_prices::{self, Price, PriceInterval};
 
 use crate::database::Transaction;
 use crate::services::stripe::StripePrice;
@@ -33,22 +34,4 @@ pub(crate) async fn upsert_in(
         updated_at: now,
     };
     accounts_prices::upsert(&mut *tx, &price).await
-}
-
-/// Every price, active or not.
-pub(crate) async fn list_in(tx: &mut Transaction) -> Result<Vec<Price>, sqlx::Error> {
-    accounts_prices::list(&mut *tx).await
-}
-
-pub(crate) async fn get_in(tx: &mut Transaction, id: Uuid) -> Result<Option<Price>, sqlx::Error> {
-    accounts_prices::get(&mut *tx, id).await
-}
-
-/// Every price inactive, before a sync makes active again what Stripe
-/// still has.
-pub(crate) async fn deactivate_all_in(
-    tx: &mut Transaction,
-    now: DateTime<Utc>,
-) -> Result<(), sqlx::Error> {
-    accounts_prices::maintenance::deactivate_all(&mut *tx, now).await
 }

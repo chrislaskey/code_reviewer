@@ -17,7 +17,6 @@ use uuid::Uuid;
 
 use crate::accounts::checkouts::BACK_TO_APP_PATH;
 use crate::accounts::online::ReturnTo;
-use crate::accounts::prices;
 use crate::accounts::products::{self, ProductError, ProductKind};
 use crate::data::accounts_prices::{Price, PriceInterval};
 use crate::data::accounts_purchases::Store;
@@ -325,11 +324,11 @@ async fn shown_in(
     subscription: Subscription,
     product_name: String,
 ) -> Result<SubscriptionShown, sqlx::Error> {
-    let price = prices::get_in(tx, subscription.price_id)
+    let price = accounts_prices::get(tx, subscription.price_id)
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
     let scheduled_price = match subscription.scheduled_price_id {
-        Some(price_id) => prices::get_in(tx, price_id).await?,
+        Some(price_id) => accounts_prices::get(tx, price_id).await?,
         None => None,
     };
     let gives_plan = subscription.status.gives_plan();

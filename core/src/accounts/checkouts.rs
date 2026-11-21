@@ -9,6 +9,7 @@
 //! `docs/design/purchasing.md`, P2 and P3.
 
 use crate::data::accounts_checkouts::{self, Checkout, CheckoutStatus};
+use crate::data::accounts_prices;
 use crate::data::accounts_products;
 use crate::data::accounts_purchases;
 use crate::data::accounts_users;
@@ -18,7 +19,6 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::accounts::online::ReturnTo;
-use crate::accounts::prices;
 use crate::accounts::products::{self, ProductError, ProductKind};
 use crate::accounts::purchases;
 use crate::accounts::{plans, subscriptions};
@@ -134,7 +134,7 @@ pub async fn create(
     if account.trial_expires_at.is_some() || account.confirmed_at.is_none() {
         return Err(CheckoutError::NeedsAccount);
     }
-    let price = prices::get_in(&mut tx, price_id)
+    let price = accounts_prices::get(&mut tx, price_id)
         .await?
         .ok_or(CheckoutError::PriceNotForSale)?;
     let owned = purchases::owns_in(&mut tx, user.id, price.product_id).await?;
@@ -223,7 +223,7 @@ pub async fn get(
     }
     let checkout = checkout_of(deployment, user, id).await?;
     let mut tx = deployment.begin().await?;
-    let price = prices::get_in(&mut tx, checkout.price_id)
+    let price = accounts_prices::get(&mut tx, checkout.price_id)
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
     let product = accounts_products::get(&mut tx, price.product_id)
@@ -271,7 +271,7 @@ pub(crate) async fn apply_session_in(
     else {
         return Ok(());
     };
-    let price = prices::get_in(&mut *tx, checkout.price_id)
+    let price = accounts_prices::get(&mut *tx, checkout.price_id)
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
     let purchase = Purchase {
