@@ -128,7 +128,10 @@ membership), `app_posts`, `app_posts_communities` (a post in a
 community, under the owner's membership there), `app_files` (a file's
 row; its bytes travel apart, see `offline-files-decisions.md`),
 `app_files_communities` (a file in a community, the community's, see
-`files-communities.md`). Their foreign keys are
+`files-communities.md`). The list is `core/src/app/synced_tables.rs`,
+each table implementing `SyncedTable` in its own module, which is how
+sync, conflicts, purge and a local user's move reach every table
+without naming one, see `template-and-apps.md`. Their foreign keys are
 real on every deployment, with `on delete cascade`, which is what a
 device's prune leans on.
 

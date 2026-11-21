@@ -127,7 +127,7 @@ which the cleanup removes, and never a row without a file.
   the server holds the user to the key's prefix, their own: nobody else
   writes or claims a file before its row exists.
 - The `Transport` trait carries the asking, the sending and the
-  fetching (`files_create_upload`, `files_upload`, `files_download`),
+  fetching (`bytes_create_upload`, `bytes_upload`, `bytes_download`),
   so tests run the exchange in one process against the in-memory
   bucket.
 - On the web there is no queue: the page asks for an upload without an
@@ -180,7 +180,7 @@ or a frame:
 
 - **In the app**, a custom protocol handled in Rust: it serves the local
   copy with the row's content type, and when there is none fetches the
-  file first, `files::local_copy`, written under a temporary name and
+  file first, `bytes::local_copy`, written under a temporary name and
   renamed when whole. A file that cannot be had, the server out of
   reach or the device working offline, is a 404 and the page shows a
   placeholder.

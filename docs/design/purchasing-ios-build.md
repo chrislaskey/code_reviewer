@@ -179,7 +179,7 @@ transactions as plain values, so tests need no Apple-signed data.
 - [x] Routes `POST /api/accounts/store-transactions` (signed in, full
       user) and `POST /api/accounts/app-store-notifications` (no
       session, 404 unless configured).
-- [x] `Job::AppStoreReconcile`, `app_store_reconcile`, daily, when the
+- [x] The `AppStoreReconcile` job, `app_store_reconcile`, daily, when the
       deployment has the App Store: every live App Store subscription
       asked again.
 - [x] Tests with the fake: a purchase, a subscription, a renewal, a

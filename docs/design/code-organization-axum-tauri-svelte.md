@@ -55,6 +55,7 @@ axum/src/
   command_line.rs   `app_web <command>`; command_line/: jobs, ops_staff,
   command_line/     accounts_products
   public_pages.rs   the public website's pages
+  sync.rs, sync/    sync's routes: push, pull, backfill, and the bytes of synced rows
   app.rs, app/      the app's routes, one module per resource
   accounts.rs, accounts/   the accounts app's
   ops.rs, ops/      the ops app's: the staff gate, its API and pages
@@ -69,7 +70,8 @@ tauri/src/
   command_error.rs  FormError, a command's error as a form shows it
   user_auth.rs      signed_in, the active account's user
   device_accounts.rs  the accounts on this device and their files
-  sync.rs           the sync runner and its commands
+  sync.rs, sync/    the sync runner and its commands, with conflicts and
+                    pending changes
   server_urls.rs    where the web server is
   public_pages.rs   the public pages, opened in the browser
   app.rs, app/      the app's commands, one module per resource

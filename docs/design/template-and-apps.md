@@ -1,6 +1,6 @@
 # Template and apps
 
-Status: planned 2026-11-21; steps 1 to 8 built the same day.
+Status: built 2026-11-21, steps 1 to 9.
 
 ## Request
 
@@ -20,23 +20,23 @@ extend it from the app's own files, change it upstream and pull it down,
 or diverge on purpose and say why. A warning or a failed check, like a
 linter, never a block.
 
-## How it works today
+## Why
 
 Decided 2026-11-18: an app is a copy of the template with the template
 as a second git remote, `template`. Updates arrive by merging
 `template/main`. Generic changes go in their own commits, prefixed
 `template:`, and are cherry-picked back.
 
-That works, but two things make it rough:
+Two things decide whether that stays smooth:
 
-1. Nothing says which files are the template's, so nobody notices when
-   an edit makes the next merge harder.
-2. The sync machinery names the example resources. `app/sync.rs`,
-   `app/conflicts.rs`, `app/pending_changes.rs`, `app/local_users.rs` and
-   `app/purge.rs` each `match` on `app_posts::TABLE`, `app_files::TABLE`
-   and the rest, ten places in all. An app that adds `recipes` or removes
-   `posts` edits every one of them, so the most delicate code in the
-   template becomes the worst merge conflict.
+1. **Knowing which files are the template's**, so an edit that makes
+   the next merge harder is noticed when it is made.
+2. **Machinery that names no app resource.** Were sync, conflicts,
+   pending changes, purge and a local user's move to `match` on
+   `app_posts::TABLE`, `app_files::TABLE` and the rest, an app adding
+   `recipes` or removing `posts` would edit every one of them, and the
+   most delicate code in the template would be the worst merge
+   conflict.
 
 ## Three kinds of files
 
@@ -116,14 +116,13 @@ pub fn list() -> &'static [&'static dyn SyncedTable] {
 - **A table left out of the list** is the one mistake the compiler
   cannot catch. A test catches it instead: every `app_` table with a
   `last_synced_at` column must be registered.
-- **`SyncedRow` goes.** Rows travel as `TableRow` (table and JSON), and
-  their order comes from `Cursor::of_row`, which already reads it from
-  the wire form. `with_parents` asks each table for its `parents`.
-- **Errors.** `SyncError` now has a `From` for each resource's error
-  (`PostError`, `FileError`, …), which is another place the framework
-  names the examples. It becomes one variant carrying the table and a
-  boxed source. Callers that match on a specific resource error are
-  found during the conversion.
+- **Rows travel as `TableRow`** (table and JSON), ordered by their place
+  in the pull, `(last_synced_at, id)`. A pull sends each row after the
+  rows it points at, asking each table for its `parents`.
+- **Errors.** A table's own error reaches sync as one variant,
+  `SyncError::Table`, a boxed source, so sync names no resource's error
+  type. The web server answers it as a 500: a refusal travels inside
+  the push's answer, not as an error.
 - **`async-trait`**, already in `Cargo.lock` through a dependency.
   `dyn SyncedTable` needs boxed futures, which native `async fn` in
   traits does not give.
@@ -156,21 +155,20 @@ work.
 
 Decided 2026-11-21.
 
-`app/files.rs` holds two things:
+A file is two things:
 
 - **The bytes of a synced row**: kept in the bucket and on the device
   apart from the row, checked by SHA-256, uploaded before the row's
   create is pushed, never dropped when refused (a device may hold the
   only copy), fetched on first view, cached, and cleaned up once no row
   points at them. This is the hard part, and any app with media wants
-  it as is. Today it is written for `app_files` alone: `held_back` reads
-  `app_files_communities`, `push_batch` checks `app_files::TABLE`.
+  it as is.
 - **A file as a resource**: a name, its communities, search,
   duplicates, the Files pages. An app may have none of this, or videos
   and images as separate resources instead.
 
-So the bytes become a capability any synced table can have, and `files`
-becomes one example of a table that has it. An app with `app_videos`
+So the bytes are a capability any synced table can have, and `files`
+is one example of a table that has it. An app with `app_videos`
 and `app_images` gives each the capability and gets the same offline
 handling, with no `files` table at all:
 
@@ -214,12 +212,12 @@ wait through `parents`, not through a check that names
   same functions. The checks of a content type and a SHA-256 are in
   `helpers/`, each table's largest size in `SyncedBytes::max_bytes`.
 
-### Sync moves to `core/src/sync/`
+### Sync is `core/src/sync/`
 
-`sync`, `events`, `conflicts`, `pending_changes`, `purge` and the
-`SyncedTable` trait move from `core/src/app/` to `core/src/sync/`,
-beside `database.rs` and `deployment.rs`, the foundation. Callers are
-renamed (`app_core::sync::conflicts`), with no re-exports, as in
+`sync`, `events`, `conflicts`, `pending_changes`, `purge`, `bytes` and
+the `SyncedTable` trait are `core/src/sync/`, beside `database.rs` and
+`deployment.rs`, the foundation. Callers name them there
+(`app_core::sync::conflicts`), with no re-exports, as in
 `code-organization.md`. `local_users` keeps its user-facing operations
 in `app/`, and its move of rows goes through the registry.
 
@@ -229,10 +227,9 @@ in `app/`, and its move of rows goes through the registry.
   the framework (see above).
 - `core/` reads badly as `app_core::core::sync`.
 
-Axum and Tauri mirror the new path: `axum/src/app/sync.rs` becomes
-`axum/src/sync.rs`, beside `tauri/src/sync.rs`, already at its crate's
-root. `tauri/src/app/conflicts.rs` and `pending_changes.rs` move to
-`tauri/src/sync/`.
+Axum and Tauri mirror it: `axum/src/sync.rs` and `axum/src/sync/`,
+`tauri/src/sync.rs` and `tauri/src/sync/` with the conflicts and
+pending changes commands.
 
 A separate workspace crate (`app_sync`) would let the compiler refuse
 any import of an example. It first needs `Deployment`, `database` and

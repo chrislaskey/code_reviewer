@@ -8,7 +8,10 @@ private file is a file in the person's `Personal` community, where they
 are the only member.
 
 `offline-files-decisions.md` holds how a file's bytes are kept, sent and
-fetched; this holds who a file belongs to and who sees it. All three
+fetched; this holds who a file belongs to and who sees it. The bytes are
+the template's for any synced table, `core/src/sync/bytes.rs`; files is
+the example of a table that has them, answering `SyncedBytes` with who
+may read a file and which files are live. All three
 phases are built, in `core/src/app/files_communities.rs` and
 `core/src/app/files.rs`, see "Build order".
 

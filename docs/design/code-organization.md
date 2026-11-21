@@ -16,15 +16,17 @@ Organize `core/` as the project owner's Elixir applications are:
 ```
 core/src/
   lib.rs, database.rs, deployment.rs   the foundation: connection, transaction, migrations, deployment
+  jobs.rs      the recurring jobs: the runner and the template's jobs
+  sync.rs, sync/   push, pull, events, conflicts, pending changes, purge, bytes, and the SyncedTable trait
   data/        schemas and low-level contexts, one per table
   services/    stripe, app_store, mailer (+ mails), storage, web_server (a device's client of our server)
-  helpers/     field_errors, fields, sha256, random
-  app/         the app's high-level contexts, jobs included
+  helpers/     field_errors, content_type, json, sha256, random
+  app/         the app's high-level contexts, its synced tables (synced_tables.rs) and its own jobs (jobs.rs)
   accounts/    the accounts app's, trial_users included
   ops/         the ops app's
 ```
 
-`database.rs` (with the embedded migrations) and `deployment.rs` fit none of the four, as Elixir's `Repo` and `Application` sit outside them; they stay at the root.
+`database.rs` (with the embedded migrations) and `deployment.rs` fit none of the four, as Elixir's `Repo` and `Application` sit outside them; they stay at the root, and so do the template's machinery every app shares, `jobs.rs` and `sync/`, which reach the app's tables and jobs through the lists in `app/`, see `template-and-apps.md`.
 
 ## Decisions
 
@@ -46,7 +48,7 @@ core/src/
 ## As built
 
 - A module that already was a table's low-level context moved into `data` whole, its functions becoming the context's: `accounts::users` (only the deployment's `get` stays there), `tokens`, `credentials`, `device_settings`. Their `create` and `get` check and normalize their input themselves, as an Ecto context does.
-- An enum that names a column's values moves with its schema (`Job`, `CheckoutStatus`, `Store`, `SubscriptionStatus`, `PriceInterval`); methods on it that translate a service's types or decide policy stay in the app's module as a second `impl` (`CheckoutStatus::of`, `Job::interval`).
+- An enum that names a column's values moves with its schema (`CheckoutStatus`, `Store`, `SubscriptionStatus`, `PriceInterval`); methods on it that translate a service's types or decide policy stay in the app's module as a second `impl` (`CheckoutStatus::of`).
 - `Cursor` is the schema of `app_sync_state`; `Event`, `StoredEvent` and the queue's reads and writes are `data/app_events`. Merging and answering an event stay in `sync::events`. `data` imports nothing from the apps or services.
 - `services/web_server` holds the `Transport` a sync and a sign-in go through: `Http` for the apps, `InProcess` for tests.
 
