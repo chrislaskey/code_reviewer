@@ -57,8 +57,8 @@ use crate::data::device_settings::{self, WORK_OFFLINE};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, FileStore, Role, now};
 use crate::helpers::field_errors::FieldErrors;
-#[cfg(feature = "object-storage")]
 use crate::helpers::{json, sha256};
+#[cfg(feature = "object-storage")]
 use crate::services::storage::{Storage, StorageError};
 use crate::services::web_server::Transport;
 

@@ -17,10 +17,9 @@
 //! A trial user needs no code, having no real email, and goes outright,
 //! as their trial would. A local user has no account on the server.
 
-use crate::data::accounts_subscriptions;
-#[cfg(any(feature = "stripe", test))]
-use crate::data::app_communities;
 #[cfg(feature = "stripe")]
+use crate::data::accounts_subscriptions;
+use crate::data::app_communities;
 use crate::data::app_posts;
 use crate::data::app_users_communities;
 use crate::data::ops_staff;
