@@ -8,7 +8,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 
 use app_core::app::avatars::{self, AvatarUpdate, AvatarUpload, AvatarUploadNew};
-use app_core::app::users::User;
+use app_core::data::app_users::User;
 use app_core::deployment::Deployment;
 
 use crate::api_error::ApiError;

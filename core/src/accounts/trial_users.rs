@@ -29,7 +29,8 @@ use uuid::Uuid;
 use crate::accounts::users::{self as accounts_users, AccountUserError};
 use crate::accounts::{AccountError, Session};
 use crate::app::communities::{self, CommunityError};
-use crate::app::users::{self, User, UserError};
+use crate::app::users::{self, UserError};
+use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::random;
@@ -186,6 +187,7 @@ mod tests {
     use crate::accounts::{self, NextStep, SignInStep};
     use crate::app::sync::{self, PullRequest};
     use crate::app::{memberships, posts};
+    use crate::data::app_communities;
     use crate::data::app_posts;
     use crate::database::with_each_database;
     use crate::services::mailer::Mailer;
@@ -502,7 +504,9 @@ mod tests {
             .await
             .expect("a page");
             assert!(
-                page.rows.iter().any(|row| row.table == communities::TABLE),
+                page.rows
+                    .iter()
+                    .any(|row| row.table == app_communities::TABLE),
                 "and it reaches a device that had pulled before"
             );
 

@@ -18,12 +18,12 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::communities::Community;
 use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind};
 use crate::app::files::{self, File};
 use crate::app::memberships::{self, id_field};
 use crate::app::sync::{Cursor, TableRow};
-use crate::app::users::User;
+use crate::data::app_communities::Community;
+use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;

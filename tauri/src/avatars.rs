@@ -8,7 +8,7 @@ use serde::Serialize;
 use tauri::State;
 
 use app_core::app::avatars::{self, AvatarError, AvatarUpdate, AvatarUpload, AvatarUploadNew};
-use app_core::app::users::User;
+use app_core::data::app_users::User;
 use app_core::helpers::field_errors::FieldErrors;
 
 use crate::device_accounts::DeviceAccounts;

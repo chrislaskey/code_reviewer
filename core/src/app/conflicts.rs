@@ -17,8 +17,10 @@ use crate::app::communities::{self, CommunityError};
 use crate::app::events::{self, AnswerStatus, Event, EventKind, EventStatus, Fields, StoredEvent};
 use crate::app::files::{self, FileError};
 use crate::app::posts::{self, PostError};
-use crate::app::users::{self, User, UserError};
+use crate::app::users::{self, UserError};
+use crate::data::app_communities;
 use crate::data::app_posts;
+use crate::data::app_users::{self, User};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
 
@@ -128,12 +130,12 @@ pub async fn reapply(deployment: &Deployment, user: &User, id: Uuid) -> Result<(
                 .await?
                 .answer
         }
-        communities::TABLE => {
+        app_communities::TABLE => {
             communities::apply_in(&mut tx, deployment.role, user, &event)
                 .await?
                 .answer
         }
-        users::TABLE => {
+        app_users::TABLE => {
             users::apply_in(&mut tx, deployment.role, user, &event)
                 .await?
                 .answer
@@ -228,7 +230,7 @@ async fn row_of(tx: &mut Transaction, event: &Event) -> Result<Option<Row>, Conf
                 })
             })
             .transpose()?,
-        communities::TABLE => communities::get_in(tx, event.row_id)
+        app_communities::TABLE => communities::get_in(tx, event.row_id)
             .await?
             .filter(|community| community.deleted_at.is_none())
             .map(|community| {
@@ -239,7 +241,7 @@ async fn row_of(tx: &mut Transaction, event: &Event) -> Result<Option<Row>, Conf
                 })
             })
             .transpose()?,
-        users::TABLE => users::get_in(tx, event.row_id)
+        app_users::TABLE => users::get_in(tx, event.row_id)
             .await?
             .filter(|user| user.deleted_at.is_none())
             .map(|user| Row {

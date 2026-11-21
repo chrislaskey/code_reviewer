@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use crate::accounts::prices::{self, Price};
 use crate::accounts::purchases;
-use crate::app::users::User;
+use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::services::stripe::{Stripe, StripeError, StripeProduct};

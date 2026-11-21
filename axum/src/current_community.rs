@@ -12,8 +12,8 @@ use serde::Deserialize;
 use time::Duration;
 use uuid::Uuid;
 
-use app_core::app::communities::Community;
 use app_core::app::current_community;
+use app_core::data::app_communities::Community;
 use app_core::deployment::Deployment;
 
 use crate::accounts::is_localhost;

@@ -130,6 +130,7 @@ mod tests {
     use super::*;
     use crate::app::events::{self, EventStatus};
     use crate::app::{communities, posts, posts_communities};
+    use crate::data::app_communities;
     use crate::data::app_posts;
     use crate::database::{Database, with_each_database};
     use crate::deployment::now;
@@ -170,7 +171,7 @@ mod tests {
             let report = run(&deployment, later).await.expect("purged");
             assert_eq!(report.removed[app_posts::TABLE], 1);
             assert_eq!(report.removed[posts_communities::TABLE], 1);
-            assert_eq!(report.removed[communities::TABLE], 0);
+            assert_eq!(report.removed[app_communities::TABLE], 0);
             assert_eq!(
                 report.removed["app_events"], 3,
                 "the post's create, delete and its row's"

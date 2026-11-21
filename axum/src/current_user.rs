@@ -13,7 +13,8 @@ use serde::{Deserialize, Serialize};
 
 use app_core::accounts::plans::{self, Plan};
 use app_core::accounts::users as accounts_users;
-use app_core::app::users::{self, Kind, User};
+use app_core::app::users::{self, Kind};
+use app_core::data::app_users::User;
 use app_core::deployment::Deployment;
 use app_core::ops::staff::{self, StaffError};
 use chrono::{DateTime, Utc};

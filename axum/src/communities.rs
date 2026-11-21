@@ -7,7 +7,8 @@ use axum::http::StatusCode;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use app_core::app::communities::{self, Community, CommunityAndMembership};
+use app_core::app::communities::{self, CommunityAndMembership};
+use app_core::data::app_communities::Community;
 use app_core::deployment::Deployment;
 
 use crate::api_error::ApiError;

@@ -20,7 +20,7 @@ use crate::accounts::online::ReturnTo;
 use crate::accounts::prices::{self, Price, PriceInterval};
 use crate::accounts::products::{self, ProductError, ProductKind};
 use crate::accounts::purchases::Store;
-use crate::app::users::User;
+use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::services::stripe::{Stripe, StripeError, StripeSubscription};

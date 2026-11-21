@@ -56,8 +56,9 @@ use uuid::Uuid;
 
 use crate::app::communities::{self, CommunityError};
 use crate::app::sync::{SyncError, Transport};
-use crate::app::users::{SignedIn, User, UserError};
+use crate::app::users::{SignedIn, UserError};
 use crate::credentials::{self, CredentialError};
+use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::device_settings::{self, DeviceSettingsError, SIGNED_IN};

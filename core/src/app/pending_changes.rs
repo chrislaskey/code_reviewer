@@ -14,7 +14,9 @@ use crate::app::files::{self, FileError};
 use crate::app::files_communities;
 use crate::app::posts::{self, PostError};
 use crate::app::users::{self, UserError};
+use crate::data::app_communities;
 use crate::data::app_posts;
+use crate::data::app_users;
 use crate::deployment::Deployment;
 
 /// A change waiting to reach the server, as the page shows it.
@@ -70,10 +72,10 @@ pub async fn list(deployment: &Deployment) -> Result<Vec<PendingChange>, Pending
                     None => None,
                 }
             }
-            communities::TABLE => communities::get_in(&mut tx, stored.event.row_id)
+            app_communities::TABLE => communities::get_in(&mut tx, stored.event.row_id)
                 .await?
                 .map(|community| community.name),
-            users::TABLE => users::get_in(&mut tx, stored.event.row_id)
+            app_users::TABLE => users::get_in(&mut tx, stored.event.row_id)
                 .await?
                 .map(|user| user.name),
             _ => None,

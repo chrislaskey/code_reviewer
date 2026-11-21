@@ -25,10 +25,7 @@ use crate::app::sync::SyncError;
 use crate::app::users::UserError;
 use crate::helpers::field_errors::FieldErrors;
 #[cfg(any(feature = "object-storage", feature = "sync-http"))]
-use crate::{
-    app::users::{self, User},
-    deployment::Deployment,
-};
+use crate::{app::users, data::app_users::User, deployment::Deployment};
 #[cfg(feature = "object-storage")]
 use crate::{
     deployment::Role,

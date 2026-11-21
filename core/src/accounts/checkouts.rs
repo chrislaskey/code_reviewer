@@ -22,7 +22,7 @@ use crate::accounts::prices;
 use crate::accounts::products::{self, ProductError, ProductKind};
 use crate::accounts::purchases::{self, Purchase, Store};
 use crate::accounts::{plans, subscriptions};
-use crate::app::users::User;
+use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::services::stripe::{

@@ -5,8 +5,8 @@
 use tauri::State;
 use uuid::Uuid;
 
-use app_core::app::communities::Community;
 use app_core::app::current_community;
+use app_core::data::app_communities::Community;
 
 use crate::current_user::signed_in;
 use crate::device_accounts::DeviceAccounts;

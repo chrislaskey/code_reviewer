@@ -211,7 +211,7 @@ impl From<UserError> for ApiError {
                 StatusCode::UNAUTHORIZED
             }
             UserError::AccountDeleted => return ApiError::account_deleted(),
-            UserError::InvalidName | UserError::Invalid(_) | UserError::Rejected(_) => {
+            UserError::Validation(_) | UserError::Invalid(_) | UserError::Rejected(_) => {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
             UserError::AccountUser(error) => return error.into(),

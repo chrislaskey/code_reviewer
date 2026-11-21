@@ -16,12 +16,14 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::communities::{self, Community};
+use crate::app::communities;
 use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
 use crate::app::posts_communities::{self, PostCommunityError};
 use crate::app::sync::{Cursor, TableRow};
-use crate::app::users::{self, User};
+use crate::app::users;
+use crate::data::app_communities::Community;
 use crate::data::app_posts::{self, AcceptedPost, Post, PostInvalid, TABLE};
+use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;

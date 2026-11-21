@@ -7,7 +7,7 @@
 
 use tauri::{AppHandle, State};
 
-use app_core::app::users::User;
+use app_core::data::app_users::User;
 
 use crate::device_accounts::DeviceAccounts;
 use crate::sync::{self, SyncServer};

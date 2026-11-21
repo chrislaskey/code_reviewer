@@ -5,8 +5,8 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgConnection};
 use uuid::Uuid;
 
+use super::User;
 use crate::app::sync::Cursor;
-use crate::app::users::User;
 
 #[derive(FromRow)]
 struct UserRow {

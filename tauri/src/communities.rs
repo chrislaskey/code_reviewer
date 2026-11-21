@@ -5,7 +5,8 @@
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 
-use app_core::app::communities::{self, Community, CommunityAndMembership, CommunityError};
+use app_core::app::communities::{self, CommunityAndMembership, CommunityError};
+use app_core::data::app_communities::Community;
 
 use crate::avatars::FormError;
 use crate::current_user::signed_in;

@@ -30,7 +30,7 @@ use uuid::Uuid;
 use crate::accounts::{self, AccountError, Session};
 #[cfg(feature = "sync-http")]
 use crate::app::avatars::{AvatarUpdate, AvatarUpload, AvatarUploadNew};
-use crate::app::communities::{self, Community, CommunityError};
+use crate::app::communities::{self, CommunityError};
 use crate::app::events::{self, Answer, AnswerStatus, Event, EventKind, EventStatus, StoredEvent};
 use crate::app::files::{self, File, FileError, FileUpload, FileUploadNew};
 use crate::app::files_communities::{self, FileCommunity, FileCommunityError};
@@ -38,8 +38,10 @@ use crate::app::memberships::{self, Membership, MembershipError};
 use crate::app::posts::{self, PostError};
 use crate::app::posts_communities::{self, PostCommunity, PostCommunityError};
 use crate::app::purge::{self, PurgeError};
-use crate::app::users::{self, User, UserError};
+use crate::app::users::{self, UserError};
+use crate::data::app_communities::{self, Community};
 use crate::data::app_posts::{self, Post};
+use crate::data::app_users::{self, User};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
 use crate::device_settings::{self, DeviceSettingsError, WORK_OFFLINE};
@@ -204,8 +206,8 @@ pub async fn push(
     let mut answers = Vec::with_capacity(request.events.len());
     for event in &request.events {
         let answer = match event.table.as_str() {
-            users::TABLE => users::apply_event(deployment, user, event).await?,
-            communities::TABLE => communities::apply_event(deployment, user, event).await?,
+            app_users::TABLE => users::apply_event(deployment, user, event).await?,
+            app_communities::TABLE => communities::apply_event(deployment, user, event).await?,
             memberships::TABLE => memberships::apply_event(deployment, user, event).await?,
             app_posts::TABLE => posts::apply_event(deployment, user, event).await?,
             files::TABLE => files::apply_event(deployment, user, event).await?,
@@ -481,8 +483,8 @@ async fn with_parents(
             SyncedRow::User(_) | SyncedRow::Community(_) | SyncedRow::File(_) => {}
         }
         let (table, id) = match &row {
-            SyncedRow::User(user) => (users::TABLE, user.id),
-            SyncedRow::Community(community) => (communities::TABLE, community.id),
+            SyncedRow::User(user) => (app_users::TABLE, user.id),
+            SyncedRow::Community(community) => (app_communities::TABLE, community.id),
             SyncedRow::Membership(membership) => (memberships::TABLE, membership.id),
             SyncedRow::Post(post) => (app_posts::TABLE, post.id),
             SyncedRow::PostCommunity(row) => (posts_communities::TABLE, row.id),
@@ -500,11 +502,11 @@ async fn send_user(
     sent: &mut BTreeSet<(&'static str, Uuid)>,
     id: Uuid,
 ) -> Result<(), SyncError> {
-    if sent.contains(&(users::TABLE, id)) {
+    if sent.contains(&(app_users::TABLE, id)) {
         return Ok(());
     }
     if let Some(user) = users::get_in(tx, id).await? {
-        send(out, sent, users::TABLE, id, SyncedRow::User(user))?;
+        send(out, sent, app_users::TABLE, id, SyncedRow::User(user))?;
     }
     Ok(())
 }
@@ -515,14 +517,14 @@ async fn send_community(
     sent: &mut BTreeSet<(&'static str, Uuid)>,
     id: Uuid,
 ) -> Result<(), SyncError> {
-    if sent.contains(&(communities::TABLE, id)) {
+    if sent.contains(&(app_communities::TABLE, id)) {
         return Ok(());
     }
     if let Some(community) = communities::get_in(tx, id).await? {
         send(
             out,
             sent,
-            communities::TABLE,
+            app_communities::TABLE,
             id,
             SyncedRow::Community(community),
         )?;
@@ -546,8 +548,8 @@ fn send(
 /// The order rows are written in on a device, parents first.
 fn table_rank(table: &str) -> usize {
     match table {
-        users::TABLE => 0,
-        communities::TABLE => 1,
+        app_users::TABLE => 0,
+        app_communities::TABLE => 1,
         memberships::TABLE => 2,
         app_posts::TABLE => 3,
         posts_communities::TABLE => 4,
@@ -1597,8 +1599,8 @@ async fn prune(deployment: &Deployment, user: &User, report: &mut Report) -> Res
 /// had left, records the community to backfill.
 async fn apply_row(tx: &mut Transaction, user: &User, row: &TableRow) -> Result<bool, SyncError> {
     match row.table.as_str() {
-        users::TABLE => Ok(users::apply_server_row(tx, &row.row).await?),
-        communities::TABLE => Ok(communities::apply_server_row(tx, &row.row).await?),
+        app_users::TABLE => Ok(users::apply_server_row(tx, &row.row).await?),
+        app_communities::TABLE => Ok(communities::apply_server_row(tx, &row.row).await?),
         memberships::TABLE => {
             let incoming: Membership = serde_json::from_value(row.row.clone())
                 .map_err(|error| SyncError::Malformed(error.to_string()))?;
@@ -1625,7 +1627,7 @@ async fn apply_row(tx: &mut Transaction, user: &User, row: &TableRow) -> Result<
 
 async fn delete_row(tx: &mut Transaction, table: &str, id: Uuid) -> Result<(), SyncError> {
     match table {
-        communities::TABLE => Ok(communities::delete_row(tx, id).await?),
+        app_communities::TABLE => Ok(communities::delete_row(tx, id).await?),
         memberships::TABLE => Ok(memberships::delete_row(tx, id).await?),
         app_posts::TABLE => Ok(posts::delete_row(tx, id).await?),
         posts_communities::TABLE => Ok(posts_communities::delete_row(tx, id).await?),
@@ -1660,7 +1662,7 @@ pub(crate) mod tests {
             communities::delete_row(&mut tx, membership.community_id)
                 .await
                 .expect("removed");
-            events::delete_of_row(&mut tx, communities::TABLE, membership.community_id)
+            events::delete_of_row(&mut tx, app_communities::TABLE, membership.community_id)
                 .await
                 .expect("removed");
             events::delete_of_row(&mut tx, memberships::TABLE, membership.id)
@@ -1705,7 +1707,7 @@ pub(crate) mod tests {
             users::upsert_in(&mut tx, &user).await.expect("user");
             tx.commit().await.expect("commit");
             let now = crate::deployment::now();
-            let community = communities::Community {
+            let community = app_communities::Community {
                 id: Uuid::now_v7(),
                 name: "Gardening".to_string(),
                 inserted_at: now,
@@ -3016,7 +3018,7 @@ pub(crate) mod tests {
             );
 
             let event = Event::update(
-                users::TABLE,
+                app_users::TABLE,
                 alice.id,
                 on_server.version,
                 crate::app::events::Fields::from_iter([("name".to_string(), json!("Alice B"))]),
@@ -3296,12 +3298,12 @@ pub(crate) mod tests {
             .await
             .expect("the row")
             .remove(0);
-            assert!(position(users::TABLE, alice.id) < position(app_posts::TABLE, post.id));
+            assert!(position(app_users::TABLE, alice.id) < position(app_posts::TABLE, post.id));
             assert!(
                 position(app_posts::TABLE, post.id) < position(posts_communities::TABLE, row.id)
             );
             assert!(
-                position(communities::TABLE, gardening.id)
+                position(app_communities::TABLE, gardening.id)
                     < position(posts_communities::TABLE, row.id)
             );
             assert!(

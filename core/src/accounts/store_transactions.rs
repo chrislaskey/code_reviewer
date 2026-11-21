@@ -19,7 +19,7 @@ use crate::accounts::products::{Grant, ProductKind};
 use crate::accounts::purchases::{self, Purchase, Store};
 use crate::accounts::subscriptions::{self, Subscription, SubscriptionStatus};
 use crate::accounts::users as accounts_users;
-use crate::app::users::User;
+use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 

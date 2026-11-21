@@ -9,7 +9,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::accounts::users::{self as accounts_users, AccountUserError};
-use crate::app::users::User;
+use crate::data::app_users::User;
 use crate::deployment::{Deployment, Role, now};
 
 /// A record accepted by this resource's workflow.

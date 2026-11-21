@@ -11,8 +11,9 @@ use crate::data::app_users_communities;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::communities::{self, Community, CommunityError};
-use crate::app::users::User;
+use crate::app::communities::{self, CommunityError};
+use crate::data::app_communities::Community;
+use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role};
 use crate::device_settings::{self, CURRENT_COMMUNITY, DeviceSettingsError};

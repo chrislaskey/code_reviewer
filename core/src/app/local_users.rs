@@ -33,8 +33,9 @@ use crate::accounts::Session;
 use crate::app::communities::{self, CommunityError};
 use crate::app::events::{self, Event};
 use crate::app::files_communities::{self, FileCommunityNew};
-use crate::app::users::{self, SignedIn, User, UserError};
+use crate::app::users::{self, SignedIn, UserError};
 use crate::app::{files, memberships, posts_communities};
+use crate::data::app_users::{self, User};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::device_settings::{self, DeviceSettingsError, LOCAL_USER_MOVED, SIGNED_IN};
@@ -107,7 +108,7 @@ pub async fn create(
     let now = now();
     let user = User {
         id,
-        name: users::checked_name(name)?,
+        name: app_users::checked_name(name).map_err(UserError::from)?,
         inserted_at: now,
         updated_at: now,
         version: 0,
@@ -120,7 +121,7 @@ pub async fn create(
         "" => COMMUNITY_NAME_WITHOUT_A_DEVICE_NAME.to_string(),
         device_name => device_name
             .chars()
-            .take(communities::MAX_NAME_LENGTH)
+            .take(app_communities::MAX_NAME_LENGTH)
             .collect(),
     };
     let mut tx = deployment.begin().await?;
@@ -253,7 +254,7 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
 
     for community in app_communities::list(&mut *tx, user.id).await? {
         add(
-            communities::TABLE,
+            app_communities::TABLE,
             community.id,
             community.inserted_at,
             &[],

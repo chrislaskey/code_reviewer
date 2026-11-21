@@ -20,6 +20,7 @@
 use crate::data::accounts_subscriptions;
 #[cfg(any(feature = "stripe", test))]
 use crate::data::accounts_users as accounts_users_records;
+use crate::data::app_communities;
 #[cfg(feature = "stripe")]
 use crate::data::app_posts;
 use crate::data::app_users_communities;
@@ -34,7 +35,8 @@ use crate::app::communities::{self, CommunityError};
 use crate::app::events::{Answer, AnswerStatus, Event, Fields};
 use crate::app::memberships::{self, MembershipError};
 use crate::app::posts::{self, PostError};
-use crate::app::users::{self, User, UserError};
+use crate::app::users::{self, UserError};
+use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::services::mailer::mails;
@@ -179,7 +181,7 @@ async fn community_delete_in(
     let Some(community) = communities::get_in(tx, id).await? else {
         return Ok(());
     };
-    let event = deleted_event(communities::TABLE, id, community.version);
+    let event = deleted_event(app_communities::TABLE, id, community.version);
     let applied = communities::apply_in(tx, Role::Server, user, &event).await?;
     refused_unless_applied(&applied.answer)
 }

@@ -8,7 +8,8 @@ use tauri::{AppHandle, State};
 use uuid::Uuid;
 
 use app_core::accounts::online;
-use app_core::app::users::{self, Kind, User, UserError};
+use app_core::app::users::{self, Kind, UserError};
+use app_core::data::app_users::User;
 use app_core::deployment::Deployment;
 
 use crate::device_accounts::{DeviceAccounts, DeviceAccountsError};

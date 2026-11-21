@@ -14,7 +14,7 @@ use crate::accounts::prices;
 use crate::accounts::products::Grant;
 use crate::accounts::purchases::Store;
 use crate::accounts::subscriptions::{self, SubscriptionStatus};
-use crate::app::users::User;
+use crate::data::app_users::User;
 use crate::deployment::{Deployment, Role};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

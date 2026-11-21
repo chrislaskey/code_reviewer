@@ -133,7 +133,8 @@ mod tests {
     use crate::accounts::store_transactions::{StoreProof, StoreRow};
     use crate::accounts::subscriptions::SubscriptionStatus;
     use crate::accounts::{app_store_reconcile, plans, purchases, subscriptions};
-    use crate::app::users::{self, User};
+    use crate::app::users;
+    use crate::data::app_users::User;
     use crate::database::with_each_database;
     use crate::services::app_store::{
         AppStoreEnvironment, AppStoreNotification as Signed, AppStoreRenewal, AppStoreStatus,

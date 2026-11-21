@@ -8,9 +8,8 @@
 //! only role yet. A delete takes every membership in the community along,
 //! and with them the posts' community rows, all at the one moment.
 
-use crate::data::app_communities;
+use crate::data::app_communities::{self, AcceptedCommunity, Community, TABLE};
 use crate::data::app_users_communities;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use thiserror::Error;
@@ -20,41 +19,14 @@ use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind
 use crate::app::files_communities;
 use crate::app::memberships::{self, Membership, MembershipError};
 use crate::app::sync::{Cursor, TableRow};
-use crate::app::users::User;
+use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::field_errors::FieldErrors;
 use crate::helpers::json;
 
-/// A row accepted by this resource's event or replication workflow.
-/// Only this module can construct an accepted write.
-pub(crate) struct AcceptedCommunity<'a>(&'a Community);
-
-impl AcceptedCommunity<'_> {
-    /// Borrows the accepted row for persistence.
-    pub(crate) fn row(&self) -> &Community {
-        self.0
-    }
-}
-
-pub const TABLE: &str = "app_communities";
-pub const MAX_NAME_LENGTH: usize = 80;
 const CREATE_FIELDS: &[&str] = &["name"];
 pub(crate) const UPDATE_FIELDS: &[&str] = &["name", "deleted_at"];
-
-/// A community as the pages show it, with the sync columns every synced
-/// row carries.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Community {
-    pub id: Uuid,
-    pub name: String,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub version: i64,
-    pub last_synced_at: Option<DateTime<Utc>>,
-    pub deleted_at: Option<DateTime<Utc>>,
-    pub deleted_by_id: Option<Uuid>,
-}
 
 /// A community as the pages show it: with the user's membership when
 /// they are in it.
@@ -82,6 +54,12 @@ pub enum CommunityError {
     Record(#[from] crate::app::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
+}
+
+impl From<FieldErrors> for CommunityError {
+    fn from(errors: FieldErrors) -> CommunityError {
+        CommunityError::Invalid(errors)
+    }
 }
 
 impl From<serde_json::Error> for CommunityError {
@@ -153,7 +131,7 @@ pub(crate) async fn create_in(
     user: &User,
     name: &str,
 ) -> Result<Community, CommunityError> {
-    let name = checked_name(name)?;
+    let name = app_communities::checked_name(name)?;
     let event = Event::create(
         TABLE,
         Uuid::now_v7(),
@@ -172,7 +150,7 @@ pub async fn update(
     id: Uuid,
     name: &str,
 ) -> Result<Community, CommunityError> {
-    let name = checked_name(name)?;
+    let name = app_communities::checked_name(name)?;
     let mut tx = deployment.begin().await?;
     let community = get_as_member(&mut tx, user, id).await?;
     if community.name == name {
@@ -243,7 +221,7 @@ pub(crate) async fn apply_server_row(
     if events::has_pending(tx, TABLE, community.id).await? {
         return Ok(false);
     }
-    app_communities::replication::upsert(&mut *tx, AcceptedCommunity(&community)).await?;
+    app_communities::replication::upsert(&mut *tx, &community).await?;
     Ok(true)
 }
 
@@ -365,12 +343,23 @@ pub(crate) async fn apply_in(
                 deleted_at: None,
                 deleted_by_id: None,
             };
-            let community = match blank.with_fields(&event.changes) {
+            let accepted = blank
+                .with_fields(&event.changes)
+                .and_then(|community| Ok(AcceptedCommunity::new(community)?));
+            let community = match accepted {
                 Ok(community) => community,
                 Err(error) => return rejected(event, format!("invalid: {error}"), None),
             };
-            app_communities::create(&mut *tx, AcceptedCommunity(&community)).await?;
-            finish(tx, role, user, event, Conflicts::new(), community).await
+            app_communities::create(&mut *tx, &community).await?;
+            finish(
+                tx,
+                role,
+                user,
+                event,
+                Conflicts::new(),
+                community.into_row(),
+            )
+            .await
         }
         EventKind::Update => {
             let Some(community) = get_in(tx, event.row_id).await? else {
@@ -406,7 +395,14 @@ pub(crate) async fn apply_in(
                 updated.version += 1;
                 updated.last_synced_at = Some(now);
             }
-            app_communities::update(&mut *tx, AcceptedCommunity(&updated)).await?;
+            let updated = match AcceptedCommunity::new(updated) {
+                Ok(updated) => updated,
+                Err(error) => {
+                    return rejected(event, format!("invalid: {error}"), Some(community));
+                }
+            };
+            app_communities::update(&mut *tx, &updated).await?;
+            let updated = updated.into_row();
             if changes.contains_key("deleted_at") && updated.deleted_at.is_some() {
                 memberships::delete_with_community(tx, role, &updated).await?;
                 files_communities::delete_with_community(tx, role, &updated)
@@ -463,35 +459,14 @@ impl Community {
         Ok(all)
     }
 
-    /// The community with the fields written over it, checked.
+    /// The community with the fields written over it, not yet checked.
     fn with_fields(&self, changes: &Fields) -> Result<Community, CommunityError> {
         let mut all = json::object_fields(serde_json::to_value(self)?);
         for (name, value) in changes {
             all.insert(name.clone(), value.clone());
         }
-        let community: Community = serde_json::from_value(Value::Object(all))?;
-        Ok(Community {
-            name: checked_name(&community.name)?,
-            ..community
-        })
+        Ok(serde_json::from_value(Value::Object(all))?)
     }
-}
-
-/// The name as it is kept: trimmed, not blank and not too long.
-fn checked_name(name: &str) -> Result<String, CommunityError> {
-    let name = name.trim();
-    if name.is_empty() {
-        return Err(CommunityError::Invalid(FieldErrors::one(
-            "name", "is blank",
-        )));
-    }
-    if name.chars().count() > MAX_NAME_LENGTH {
-        return Err(CommunityError::Invalid(FieldErrors::one(
-            "name",
-            format!("has {MAX_NAME_LENGTH} characters at most"),
-        )));
-    }
-    Ok(name.to_string())
 }
 
 #[cfg(test)]
@@ -652,10 +627,10 @@ mod tests {
             assert!(
                 matches!(error, CommunityError::Invalid(errors) if errors == FieldErrors::one("name", "is blank"))
             );
-            create(&deployment, &alice, &"é".repeat(MAX_NAME_LENGTH))
+            create(&deployment, &alice, &"é".repeat(app_communities::MAX_NAME_LENGTH))
                 .await
                 .expect("the maximum, counted in characters");
-            let error = create(&deployment, &alice, &"é".repeat(MAX_NAME_LENGTH + 1))
+            let error = create(&deployment, &alice, &"é".repeat(app_communities::MAX_NAME_LENGTH + 1))
                 .await
                 .expect_err("one more");
             assert!(

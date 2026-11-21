@@ -39,8 +39,8 @@ impl Table {
             Self::FilesCommunities => crate::app::files_communities::TABLE,
             Self::Files => crate::app::files::TABLE,
             Self::Memberships => crate::app::memberships::TABLE,
-            Self::Communities => crate::app::communities::TABLE,
-            Self::Users => crate::app::users::TABLE,
+            Self::Communities => crate::data::app_communities::TABLE,
+            Self::Users => crate::data::app_users::TABLE,
         }
     }
 }

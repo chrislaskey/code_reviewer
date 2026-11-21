@@ -8,7 +8,7 @@
 //! `get_by_token`, and a device keeps who is signed in as a device
 //! setting, `signed_in`. Nobody acts until someone signs in.
 
-use crate::data::app_users;
+use crate::data::app_users::{self, AcceptedUser, MAX_NAME_LENGTH, TABLE, User, UserInvalid};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -23,41 +23,8 @@ use crate::deployment::{Deployment, Role, now};
 use crate::device_settings::{self, DeviceSettingsError, SIGNED_IN};
 use crate::tokens;
 
-/// A row accepted by this resource's event, lifecycle or replication workflow.
-/// Only this module can construct an accepted write.
-pub(crate) struct AcceptedUser<'a>(&'a User);
-
-impl AcceptedUser<'_> {
-    /// Borrows the accepted row for persistence.
-    pub(crate) fn row(&self) -> &User {
-        self.0
-    }
-}
-
-pub const TABLE: &str = "app_users";
-
-pub const MAX_NAME_LENGTH: usize = 80;
-
 /// What a person changes of their own row; the rest is the server's.
 pub(crate) const UPDATE_FIELDS: &[&str] = &["name"];
-
-/// A user as the pages show one, with the sync columns every synced row
-/// carries, see `docs/design/offline-sync.md`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct User {
-    pub id: Uuid,
-    /// What the pages show them by.
-    pub name: String,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub version: i64,
-    pub last_synced_at: Option<DateTime<Utc>>,
-    pub deleted_at: Option<DateTime<Utc>>,
-    pub deleted_by_id: Option<Uuid>,
-    /// The public URL of their picture in object storage, see `avatars`.
-    #[serde(default)]
-    pub avatar_url: Option<String>,
-}
 
 /// Who is signed in on a device, and the token the device sends the
 /// server for them: the `signed_in` device setting, written by a
@@ -89,8 +56,8 @@ pub enum Kind {
 pub enum UserError {
     #[error("user {id} not found")]
     NotFound { id: Uuid },
-    #[error("A name is needed, {MAX_NAME_LENGTH} characters at most")]
-    InvalidName,
+    #[error(transparent)]
+    Validation(#[from] UserInvalid),
     #[error(transparent)]
     AccountUser(#[from] AccountUserError),
     #[error("only the server creates users")]
@@ -157,7 +124,7 @@ pub(crate) async fn create_in(
     let now = now();
     let user = User {
         id,
-        name: checked_name(name)?,
+        name: name.to_string(),
         inserted_at: now,
         updated_at: now,
         version: 1,
@@ -166,7 +133,9 @@ pub(crate) async fn create_in(
         deleted_by_id: None,
         avatar_url: None,
     };
-    app_users::create(&mut *tx, AcceptedUser(&user)).await?;
+    let user = AcceptedUser::new(user)?;
+    app_users::create(&mut *tx, &user).await?;
+    let user = user.into_row();
     Ok(user)
 }
 
@@ -175,7 +144,7 @@ pub(crate) async fn create_in(
 /// writes it offline and the next sync carries it, see
 /// `docs/design/offline-sync.md`.
 pub async fn update(deployment: &Deployment, user: &User, name: &str) -> Result<User, UserError> {
-    let name = checked_name(name)?;
+    let name = app_users::checked_name(name)?;
     let mut tx = deployment.begin().await?;
     let current = get_live(&mut tx, user.id).await?;
     if current.name == name {
@@ -269,7 +238,10 @@ pub(crate) async fn apply_in(
     let Some(name) = changes.get("name") else {
         return finish(tx, role, user, event, conflicts, row).await;
     };
-    let Some(name) = name.as_str().and_then(|name| checked_name(name).ok()) else {
+    let Some(name) = name
+        .as_str()
+        .and_then(|name| app_users::checked_name(name).ok())
+    else {
         return rejected(event, "invalid: a name is needed", Some(row));
     };
     let now = now();
@@ -282,7 +254,9 @@ pub(crate) async fn apply_in(
         updated.version += 1;
         updated.last_synced_at = Some(now);
     }
-    app_users::update(&mut *tx, AcceptedUser(&updated)).await?;
+    let updated = AcceptedUser::new(updated)?;
+    app_users::update(&mut *tx, &updated).await?;
+    let updated = updated.into_row();
     finish(tx, role, user, event, conflicts, updated).await
 }
 
@@ -328,13 +302,15 @@ pub(crate) async fn update_name_in(
     let user = get_live(tx, id).await?;
     let now = now();
     let updated = User {
-        name: checked_name(name)?,
+        name: name.to_string(),
         updated_at: now,
         version: user.version + 1,
         last_synced_at: Some(now),
         ..user
     };
-    app_users::update(&mut *tx, AcceptedUser(&updated)).await?;
+    let updated = AcceptedUser::new(updated)?;
+    app_users::update(&mut *tx, &updated).await?;
+    let updated = updated.into_row();
     Ok(updated)
 }
 
@@ -364,7 +340,9 @@ pub(crate) async fn update_avatar_url_in(
         last_synced_at: Some(now),
         ..user
     };
-    app_users::update(&mut *tx, AcceptedUser(&updated)).await?;
+    let updated = AcceptedUser::new(updated)?;
+    app_users::update(&mut *tx, &updated).await?;
+    let updated = updated.into_row();
     let answer = Answer::applied(
         event.id,
         updated.version,
@@ -410,7 +388,9 @@ pub(crate) async fn delete_in(tx: &mut Transaction, id: Uuid) -> Result<User, Us
         deleted_by_id: Some(id),
         ..user
     };
-    app_users::delete(&mut *tx, AcceptedUser(&deleted)).await?;
+    let deleted = AcceptedUser::new(deleted)?;
+    app_users::delete(&mut *tx, &deleted).await?;
+    let deleted = deleted.into_row();
     let answer = Answer::applied(
         event.id,
         deleted.version,
@@ -503,7 +483,7 @@ pub(crate) async fn apply_server_row(tx: &mut Transaction, row: &Value) -> Resul
 
 /// Writes the server's row, or inserts it.
 pub(crate) async fn upsert_in(tx: &mut Transaction, user: &User) -> Result<(), UserError> {
-    Ok(app_users::replication::upsert(&mut *tx, AcceptedUser(user)).await?)
+    Ok(app_users::replication::upsert(&mut *tx, user).await?)
 }
 
 /// A page of the rows the server wrote after the cursor that the user
@@ -558,21 +538,12 @@ pub(crate) async fn name_from_email_in(
             .chars()
             .take(MAX_NAME_LENGTH - suffix.len())
             .collect();
-        let name = checked_name(&format!("{start}{suffix}"))?;
+        let name = app_users::checked_name(&format!("{start}{suffix}"))?;
         if !app_users::exists_by_name(&mut *tx, &name, id).await? {
             return Ok(name);
         }
         number += 1;
     }
-}
-
-/// The name as it is kept: trimmed, not empty and not too long.
-pub(crate) fn checked_name(name: &str) -> Result<String, UserError> {
-    let name = name.trim();
-    if name.is_empty() || name.chars().count() > MAX_NAME_LENGTH {
-        return Err(UserError::InvalidName);
-    }
-    Ok(name.to_string())
 }
 
 #[cfg(test)]
@@ -744,7 +715,10 @@ pub(crate) mod tests {
                 let error = create(&deployment, "alice@example.com", name)
                     .await
                     .expect_err("invalid");
-                assert!(matches!(error, UserError::InvalidName), "{name}");
+                assert!(
+                    matches!(error, UserError::Validation(UserInvalid::Name)),
+                    "{name}"
+                );
             }
 
             create(&deployment, "alice@example.com", "Alice")

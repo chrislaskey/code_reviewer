@@ -1,10 +1,73 @@
-//! Transaction-scoped user records. Workflows own validation and commits.
+//! User records: the `User` schema, its baseline validation, and the
+//! reads and writes of `app_users`. Callers own and commit the
+//! transaction. Writes are crate-private: a user syncs, so each write
+//! goes with its event, see `app::users`.
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::app::sync::Cursor;
-use crate::app::users::{AcceptedUser, User};
 use crate::database::Transaction;
-use chrono::{DateTime, Utc};
 use uuid::Uuid;
+
+pub const TABLE: &str = "app_users";
+pub const MAX_NAME_LENGTH: usize = 80;
+
+/// A user as the pages show one, with the sync columns every synced row
+/// carries, see `docs/design/offline-sync.md`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct User {
+    pub id: Uuid,
+    /// What the pages show them by.
+    pub name: String,
+    pub inserted_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub version: i64,
+    pub last_synced_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<DateTime<Utc>>,
+    pub deleted_by_id: Option<Uuid>,
+    /// The public URL of their picture in object storage, see `avatars`.
+    #[serde(default)]
+    pub avatar_url: Option<String>,
+}
+
+/// Why a user may not be written.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum UserInvalid {
+    #[error("A name is needed, {MAX_NAME_LENGTH} characters at most")]
+    Name,
+}
+
+/// A user that passed validation, which every write requires.
+pub struct AcceptedUser(User);
+
+impl AcceptedUser {
+    /// Checks the user, with their name as it is kept.
+    pub fn new(user: User) -> Result<AcceptedUser, UserInvalid> {
+        let name = checked_name(&user.name)?;
+        Ok(AcceptedUser(User { name, ..user }))
+    }
+
+    /// The accepted user.
+    pub fn row(&self) -> &User {
+        &self.0
+    }
+
+    /// The accepted user, owned.
+    pub fn into_row(self) -> User {
+        self.0
+    }
+}
+
+/// The name as it is kept: trimmed, not empty and not too long.
+pub fn checked_name(name: &str) -> Result<String, UserInvalid> {
+    let name = name.trim();
+    if name.is_empty() || name.chars().count() > MAX_NAME_LENGTH {
+        return Err(UserInvalid::Name);
+    }
+    Ok(name.to_string())
+}
 
 #[cfg(feature = "postgres")]
 mod postgres;
@@ -21,31 +84,22 @@ macro_rules! query {
 }
 
 /// Gets a live profile by ID, preserving the application's existing lookup semantics.
-pub(crate) async fn get(tx: &mut Transaction, id: Uuid) -> Result<Option<User>, sqlx::Error> {
+pub async fn get(tx: &mut Transaction, id: Uuid) -> Result<Option<User>, sqlx::Error> {
     Ok(query!(tx, get(id))?.filter(|user| user.deleted_at.is_none()))
 }
 
 /// Persists a row accepted by the resource workflow.
-pub(crate) async fn update(
-    tx: &mut Transaction,
-    user: AcceptedUser<'_>,
-) -> Result<(), sqlx::Error> {
+pub(crate) async fn update(tx: &mut Transaction, user: &AcceptedUser) -> Result<(), sqlx::Error> {
     query!(tx, update(user.row()))
 }
 
 /// Persists a row accepted by the resource workflow.
-pub(crate) async fn delete(
-    tx: &mut Transaction,
-    user: AcceptedUser<'_>,
-) -> Result<(), sqlx::Error> {
+pub(crate) async fn delete(tx: &mut Transaction, user: &AcceptedUser) -> Result<(), sqlx::Error> {
     query!(tx, update_deleted(user.row()))
 }
 
 /// Persists a row accepted by the resource workflow.
-pub(crate) async fn create(
-    tx: &mut Transaction,
-    user: AcceptedUser<'_>,
-) -> Result<(), sqlx::Error> {
+pub(crate) async fn create(tx: &mut Transaction, user: &AcceptedUser) -> Result<(), sqlx::Error> {
     query!(tx, insert(user.row()))
 }
 
@@ -59,24 +113,21 @@ pub(crate) async fn exists_by_name(
 }
 
 /// Explicit replication access for internal resource workflows.
-pub(crate) mod replication {
+pub mod replication {
     use super::*;
 
     /// Reads protocol state, including tombstones, in the caller transaction.
-    pub(crate) async fn get(tx: &mut Transaction, id: Uuid) -> Result<Option<User>, sqlx::Error> {
+    pub async fn get(tx: &mut Transaction, id: Uuid) -> Result<Option<User>, sqlx::Error> {
         query!(tx, get(id))
     }
 
     /// Reads protocol state, including tombstones, in the caller transaction.
-    pub(crate) async fn list_by_ids(
-        tx: &mut Transaction,
-        ids: &[Uuid],
-    ) -> Result<Vec<User>, sqlx::Error> {
+    pub async fn list_by_ids(tx: &mut Transaction, ids: &[Uuid]) -> Result<Vec<User>, sqlx::Error> {
         query!(tx, list_by_ids(ids))
     }
 
     /// Reads protocol state, including tombstones, in the caller transaction.
-    pub(crate) async fn list_synced_after(
+    pub async fn list_synced_after(
         tx: &mut Transaction,
         user_id: Uuid,
         after: &Cursor,
@@ -86,11 +137,8 @@ pub(crate) mod replication {
     }
 
     /// Persists a row accepted by the resource workflow.
-    pub(crate) async fn upsert(
-        tx: &mut Transaction,
-        user: AcceptedUser<'_>,
-    ) -> Result<(), sqlx::Error> {
-        query!(tx, upsert(user.row()))
+    pub(crate) async fn upsert(tx: &mut Transaction, user: &User) -> Result<(), sqlx::Error> {
+        query!(tx, upsert(user))
     }
 }
 
@@ -100,7 +148,7 @@ pub(crate) mod maintenance {
 
     /// Lists referenced pictures, including deleted users, for byte cleanup.
     #[cfg_attr(not(feature = "object-storage"), allow(dead_code))]
-    pub(crate) async fn list_avatar_urls(tx: &mut Transaction) -> Result<Vec<String>, sqlx::Error> {
+    pub async fn list_avatar_urls(tx: &mut Transaction) -> Result<Vec<String>, sqlx::Error> {
         query!(tx, list_avatar_urls())
     }
 
@@ -118,7 +166,7 @@ pub(crate) mod authentication {
     use super::*;
 
     /// Resolves an unexpired token hash, retaining tombstones to distinguish deleted accounts.
-    pub(crate) async fn get_by_token_hash(
+    pub async fn get_by_token_hash(
         tx: &mut Transaction,
         token_hash: &str,
         api_made_after: DateTime<Utc>,
