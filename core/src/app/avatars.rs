@@ -19,11 +19,11 @@ use garde::Validate;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[cfg(feature = "sync-http")]
-use crate::app::sync::Http;
 use crate::app::sync::SyncError;
 use crate::app::users::UserError;
 use crate::helpers::field_errors::FieldErrors;
+#[cfg(feature = "sync-http")]
+use crate::services::web_server::Http;
 #[cfg(any(feature = "object-storage", feature = "sync-http"))]
 use crate::{app::users, data::app_users::User, deployment::Deployment};
 #[cfg(feature = "object-storage")]

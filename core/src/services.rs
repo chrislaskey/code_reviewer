@@ -8,3 +8,4 @@ pub mod mailer;
 pub mod storage;
 #[cfg(feature = "stripe")]
 pub mod stripe;
+pub mod web_server;

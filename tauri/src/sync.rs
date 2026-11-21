@@ -29,7 +29,8 @@ use tauri::{App, AppHandle, Emitter, Manager, State};
 use tokio::sync::{Mutex, MutexGuard};
 
 use app_core::accounts::online;
-use app_core::app::sync::{self, Http, Report, Status, SyncError};
+use app_core::app::sync::{self, Report, Status, SyncError};
+use app_core::services::web_server::Http;
 
 use crate::device_accounts::DeviceAccounts;
 use crate::server_urls;

@@ -308,10 +308,11 @@ mod tests {
     use super::*;
     use crate::accounts::tests::{code_sent_to, signed_up_for_a_device};
     use crate::accounts::{self, Session};
-    use crate::app::sync::{self, InProcess};
+    use crate::app::sync;
     use crate::app::users::tests::device_of;
     use crate::app::{purge, users};
     use crate::database::with_each_database;
+    use crate::services::web_server::InProcess;
 
     fn server(database: crate::database::Database) -> Deployment {
         Deployment::new(database, Role::Server)

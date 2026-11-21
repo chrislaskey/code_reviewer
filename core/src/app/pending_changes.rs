@@ -103,10 +103,11 @@ fn pending_change(stored: StoredEvent, about: Option<String>) -> PendingChange {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::sync::{self, InProcess};
+    use crate::app::sync;
     use crate::app::users;
     use crate::database::with_each_database;
     use crate::deployment::Role;
+    use crate::services::web_server::InProcess;
 
     #[tokio::test]
     async fn pending_changes_list_what_waits_and_nothing_once_synced() {

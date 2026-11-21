@@ -47,7 +47,7 @@ use crate::app::events::{
     self, Answer, AnswerStatus, Conflicts, Event, EventKind, EventStatus, Fields, StoredEvent,
 };
 use crate::app::files_communities::{self, FileCommunityError, FileCommunityNew};
-use crate::app::sync::{Cursor, SyncError, TableRow, Transport};
+use crate::app::sync::{Cursor, SyncError, TableRow};
 use crate::app::users;
 use crate::data::app_communities::Community;
 use crate::data::app_users::User;
@@ -58,6 +58,7 @@ use crate::helpers::field_errors::FieldErrors;
 #[cfg(feature = "object-storage")]
 use crate::helpers::{json, sha256};
 use crate::services::storage::{Storage, StorageError};
+use crate::services::web_server::Transport;
 
 /// Why a device refuses a waiting file itself: there is nothing to send.
 pub const BYTES_GONE: &str = "the file's bytes are no longer on this device";
@@ -1523,11 +1524,10 @@ pub(crate) mod tests {
     use crate::accounts::Session;
     use crate::app::conflicts::{self, ConflictError, Resolve};
     use crate::app::sync::tests::user_with_token;
-    use crate::app::sync::{
-        self, BackfillRequest, InProcess, Page, PullRequest, PushRequest, PushResponse,
-    };
+    use crate::app::sync::{self, BackfillRequest, Page, PullRequest, PushRequest, PushResponse};
     use crate::app::{pending_changes, posts, users};
     use crate::database::{Database, with_each_database};
+    use crate::services::web_server::InProcess;
 
     /// The user's own community on the deployment, made the first time.
     pub(crate) async fn personal(deployment: &Deployment, user: &User) -> Uuid {

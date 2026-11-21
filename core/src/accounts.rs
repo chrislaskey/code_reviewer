@@ -55,7 +55,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::app::communities::{self, CommunityError};
-use crate::app::sync::{SyncError, Transport};
+use crate::app::sync::SyncError;
 use crate::app::users::{SignedIn, UserError};
 use crate::data::accounts_credentials::{self, CredentialError};
 use crate::data::accounts_tokens::{self, Context};
@@ -66,6 +66,7 @@ use crate::deployment::{Deployment, Role, now};
 use crate::helpers::random;
 use crate::services::mailer::mails;
 use crate::services::mailer::{MailError, Mailer};
+use crate::services::web_server::Transport;
 
 use crate::data::accounts_users::{self, AccountUser, AccountUserError};
 
@@ -515,7 +516,7 @@ pub async fn password_update(
 #[cfg(feature = "sync-http")]
 pub async fn second_factors_on_device(
     deployment: &Deployment,
-    server: &crate::app::sync::Http,
+    server: &crate::services::web_server::Http,
 ) -> Result<Vec<SecondFactor>, AccountError> {
     let (_user, token) = crate::app::users::signed_in_with_token(deployment).await?;
     Ok(server.accounts_second_factors(&token).await?)
@@ -526,7 +527,7 @@ pub async fn second_factors_on_device(
 #[cfg(feature = "sync-http")]
 pub async fn password_update_on_device(
     deployment: &Deployment,
-    server: &crate::app::sync::Http,
+    server: &crate::services::web_server::Http,
     update: &PasswordUpdate,
 ) -> Result<(), AccountError> {
     let (_user, token) = crate::app::users::signed_in_with_token(deployment).await?;
@@ -951,9 +952,10 @@ async fn live_user_in(tx: &mut Transaction, id: Uuid) -> Result<Option<User>, Ac
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::app::sync::{self, InProcess};
+    use crate::app::sync;
     use crate::app::{posts, users};
     use crate::database::with_each_database;
+    use crate::services::web_server::InProcess;
 
     pub(crate) const PASSWORD: &str = "correct horse battery";
 

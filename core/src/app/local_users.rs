@@ -358,10 +358,11 @@ mod tests {
     use crate::app::files;
     use crate::app::files::tests::server;
     use crate::app::posts;
-    use crate::app::sync::{self, InProcess};
+    use crate::app::sync;
     use crate::database::with_each_database;
     use crate::deployment::FileStore;
     use crate::services::storage::Storage;
+    use crate::services::web_server::InProcess;
 
     /// A device where someone skipped signing in, with a folder for
     /// its files' bytes.

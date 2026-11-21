@@ -28,12 +28,13 @@ use uuid::fmt::Hyphenated;
 
 use app_core::accounts::{self, AccountError, Session};
 use app_core::app::local_users::{self, LocalUserError, Moved};
-use app_core::app::sync::{self, SyncError, Transport};
+use app_core::app::sync::{self, SyncError};
 use app_core::app::users::{self, UserError};
 use app_core::data::app_users::User;
 use app_core::data::device_settings::{self, DeviceSettingsError};
 use app_core::database::{Database, DatabaseError};
 use app_core::deployment::{Deployment, FileStore, Role, now};
+use app_core::services::web_server::Transport;
 
 use crate::sync::SyncServer;
 
@@ -772,9 +773,9 @@ pub async fn device_accounts_remove(
 mod tests {
     use super::*;
     use app_core::app::posts;
-    use app_core::app::sync::InProcess;
     use app_core::services::mailer::Mailer;
     use app_core::services::mailer::mails;
+    use app_core::services::web_server::InProcess;
 
     async fn server() -> Deployment {
         let database = Database::open_sqlite_in_memory()

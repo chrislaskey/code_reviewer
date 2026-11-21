@@ -170,7 +170,7 @@ pub async fn accounts_subscriptions_portal_create(
 /// kept as it was, for the next sync to try.
 pub async fn plan_refresh(
     deployment: &app_core::deployment::Deployment,
-    server: &app_core::app::sync::Http,
+    server: &app_core::services::web_server::Http,
 ) {
     if let Err(error) = online::plan_refresh(deployment, server).await {
         log::warn!("could not refresh the plan: {error}");

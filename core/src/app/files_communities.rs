@@ -607,10 +607,11 @@ mod tests {
     use crate::app::files::tests::{device_with_folder, new_file, server};
     use crate::app::files::{FileError, FileNew};
     use crate::app::sync::tests::user_with_token;
-    use crate::app::sync::{self, BackfillRequest, InProcess, PullRequest, SyncError};
+    use crate::app::sync::{self, BackfillRequest, PullRequest, SyncError};
     use crate::app::{communities, files, memberships, users};
     use crate::database::with_each_database;
     use crate::services::storage::Storage;
+    use crate::services::web_server::InProcess;
 
     /// A file the user created on the server in the communities, its
     /// bytes put in the bucket as an upload would have.
