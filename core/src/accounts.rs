@@ -205,37 +205,37 @@ enum Finish<'a> {
     Device { challenge: &'a str },
 }
 
-/// Registers the person on the server, unconfirmed, with their name,
-/// and mails them a code: their account, their user's row and a pending
-/// sign-in, in one transaction, then the email. An email that already
-/// has a confirmed account is answered the same way, and its owner is
-/// emailed that they have one; an unconfirmed one gets this name and a
-/// new code, so whoever reads the inbox gets the account.
+/// Registers the person on the server, unconfirmed, named from their
+/// email, `users::name_from_email_in`, and mails them a code: their
+/// account, their user's row and a pending sign-in, in one transaction,
+/// then the email. An email that already has a confirmed account is
+/// answered the same way, and its owner is emailed that they have one;
+/// an unconfirmed one gets a new code, so whoever reads the inbox gets
+/// the account.
 pub async fn sign_up(
     deployment: &Deployment,
     mailer: &Mailer,
     email: &str,
-    name: &str,
 ) -> Result<CodeSent, AccountError> {
     if deployment.role != Role::Server {
         return Err(AccountError::ServerOnly);
     }
-    crate::users::checked_name(name)?;
+    let email = users::checked_email(email)?;
     let mut tx = deployment.begin().await?;
-    let existing = users::get_by_email_in(&mut tx, email).await?;
+    let existing = users::get_by_email_in(&mut tx, &email).await?;
     let (mail, pending) = match existing {
         Some(account) if account.confirmed_at.is_some() => {
             let mail = mails::already_signed_up(&account.email);
             (mail, tokens::random_hex(32))
         }
         Some(account) => {
-            crate::users::update_name_in(&mut tx, account.id, name).await?;
             let (pending, code) = tokens::create_sign_in_code(&mut tx, account.id, None).await?;
             (mails::sign_in_code(&account.email, &code), pending)
         }
         None => {
-            let account = users::create_in(&mut tx, Uuid::now_v7(), email, false).await?;
-            crate::users::create_in(&mut tx, account.id, name).await?;
+            let account = users::create_in(&mut tx, Uuid::now_v7(), &email, false).await?;
+            let name = crate::users::name_from_email_in(&mut tx, &email, account.id).await?;
+            crate::users::create_in(&mut tx, account.id, &name).await?;
             let (pending, code) = tokens::create_sign_in_code(&mut tx, account.id, None).await?;
             (mails::sign_in_code(&account.email, &code), pending)
         }
@@ -277,8 +277,9 @@ pub async fn sign_in(
 /// A trial user signing up, on the server: a code is mailed to the
 /// address they gave, and when it matches, `sign_in_with_code`, their
 /// account takes that address and is a trial no longer; the user and
-/// everything they made stay as they are. Their name is kept at once.
-/// An address that already has a confirmed account is answered the
+/// everything they made stay as they are. Their made-up name gives way
+/// at once to one from the address, `users::name_from_email_in`. An
+/// address that already has a confirmed account is answered the
 /// same way, and its owner is emailed that they have one; the trial is
 /// unchanged.
 pub async fn sign_up_from_trial(
@@ -286,12 +287,10 @@ pub async fn sign_up_from_trial(
     mailer: &Mailer,
     trial: &User,
     email: &str,
-    name: &str,
 ) -> Result<CodeSent, AccountError> {
     if deployment.role != Role::Server {
         return Err(AccountError::ServerOnly);
     }
-    crate::users::checked_name(name)?;
     let email = users::checked_email(email)?;
     let mut tx = deployment.begin().await?;
     let account = live_account_in(&mut tx, trial.id).await?;
@@ -304,7 +303,8 @@ pub async fn sign_up_from_trial(
             (mail, tokens::random_hex(32))
         }
         _ => {
-            crate::users::update_name_in(&mut tx, trial.id, name).await?;
+            let name = crate::users::name_from_email_in(&mut tx, &email, trial.id).await?;
+            crate::users::update_name_in(&mut tx, trial.id, &name).await?;
             let (pending, code) =
                 tokens::create_sign_in_code(&mut tx, trial.id, Some(&email)).await?;
             (mails::sign_in_code(&email, &code), pending)
@@ -952,9 +952,7 @@ pub(crate) mod tests {
     /// A user signed up on the server with no password, their email
     /// confirmed: the browser's session.
     async fn signed_up(server: &Deployment, mailer: &Mailer, email: &str) -> Session {
-        let sent = sign_up(server, mailer, email, "Alice")
-            .await
-            .expect("signed up");
+        let sent = sign_up(server, mailer, email).await.expect("signed up");
         let code = code_sent_to(mailer, email);
         let step = sign_in_with_code(server, &sent.pending, &code)
             .await
@@ -993,7 +991,7 @@ pub(crate) mod tests {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let mailer = Mailer::memory();
-            let sent = sign_up(&server, &mailer, " Alice@Example.com ", "Alice")
+            let sent = sign_up(&server, &mailer, " Alice@Example.com ")
                 .await
                 .expect("signed up");
             assert_eq!(sent.pending.len(), 64);
@@ -1021,7 +1019,7 @@ pub(crate) mod tests {
                 .await
                 .expect("skipped making a password");
             assert_eq!(signed_up.email, "alice@example.com");
-            assert_eq!(signed_up.user.name, "Alice");
+            assert_eq!(signed_up.user.name, "alice", "named from the email");
             let account = super::users::get(&server, signed_up.user.id)
                 .await
                 .expect("their account");
@@ -1080,7 +1078,7 @@ pub(crate) mod tests {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let mailer = Mailer::memory();
-            let sent = sign_up(&server, &mailer, "alice@example.com", "Alice")
+            let sent = sign_up(&server, &mailer, "alice@example.com")
                 .await
                 .expect("signed up");
             let code = code_sent_to(&mailer, "alice@example.com");
@@ -1339,20 +1337,18 @@ pub(crate) mod tests {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let mailer = Mailer::memory();
-            let error = sign_up(&server, &mailer, "alice", "Alice")
-                .await
-                .expect_err("no @");
+            let error = sign_up(&server, &mailer, "alice").await.expect_err("no @");
             assert!(matches!(
                 error,
                 AccountError::AccountUser(AccountUserError::InvalidEmail)
             ));
             assert!(mailer.sent().is_empty());
 
-            let first = sign_up(&server, &mailer, "alice@example.com", "Alice")
+            let first = sign_up(&server, &mailer, "alice@example.com")
                 .await
                 .expect("signed up");
             let first_code = code_sent_to(&mailer, "alice@example.com");
-            let again = sign_up(&server, &mailer, "alice@example.com", "Alice Again")
+            let again = sign_up(&server, &mailer, "alice@example.com")
                 .await
                 .expect("signed up again before confirming");
             assert!(
@@ -1370,10 +1366,13 @@ pub(crate) mod tests {
             let session = sign_in_with_new_password(&server, &pending, None)
                 .await
                 .expect("skipped");
-            assert_eq!(session.user.name, "Alice Again", "with the second name");
+            assert_eq!(
+                session.user.name, "alice",
+                "named once, not again as alice1"
+            );
 
             let sent_before = mailer.sent().len();
-            let taken = sign_up(&server, &mailer, "alice@example.com", "Mallory")
+            let taken = sign_up(&server, &mailer, "alice@example.com")
                 .await
                 .expect("answered as a new one");
             assert_eq!(taken.pending.len(), 64);
@@ -1389,7 +1388,7 @@ pub(crate) mod tests {
                     .await
                     .expect("alice")
                     .name,
-                "Alice Again",
+                "alice",
                 "the name was not touched"
             );
         })
@@ -1426,7 +1425,7 @@ pub(crate) mod tests {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let mailer = Mailer::memory();
-            let sent = sign_up(&server, &mailer, "alice@example.com", "Alice")
+            let sent = sign_up(&server, &mailer, "alice@example.com")
                 .await
                 .expect("signed up");
             let code = code_sent_to(&mailer, "alice@example.com");
@@ -1461,7 +1460,7 @@ pub(crate) mod tests {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let mailer = Mailer::memory();
-            let sent = sign_up(&server, &mailer, "alice@example.com", "Alice")
+            let sent = sign_up(&server, &mailer, "alice@example.com")
                 .await
                 .expect("signed up");
             let first = code_sent_to(&mailer, "alice@example.com");
@@ -1508,7 +1507,7 @@ pub(crate) mod tests {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let mailer = Mailer::memory();
-            let sent = sign_up(&server, &mailer, "alice@example.com", "Alice")
+            let sent = sign_up(&server, &mailer, "alice@example.com")
                 .await
                 .expect("signed up");
             let code = code_sent_to(&mailer, "alice@example.com");
@@ -1551,7 +1550,7 @@ pub(crate) mod tests {
         let device = users::tests::device().await;
         let mailer = Mailer::memory();
         assert!(matches!(
-            sign_up(&device, &mailer, "alice@example.com", "Alice").await,
+            sign_up(&device, &mailer, "alice@example.com").await,
             Err(AccountError::ServerOnly)
         ));
         assert!(matches!(

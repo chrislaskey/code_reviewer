@@ -207,7 +207,7 @@ mod tests {
         with_each_database(|database| async move {
             let deployment = Deployment::new(database, Role::Server);
             let mailer = crate::mailer::Mailer::memory();
-            crate::accounts::sign_up(&deployment, &mailer, "bob@example.com", "Bob")
+            crate::accounts::sign_up(&deployment, &mailer, "bob@example.com")
                 .await
                 .expect("bob signed up and stopped there");
             let mut tx = deployment.begin().await.expect("a transaction");
@@ -253,7 +253,7 @@ mod tests {
             );
             tx.commit().await.expect("committed");
             assert!(
-                crate::accounts::sign_up(&deployment, &mailer, "bob@example.com", "Bob")
+                crate::accounts::sign_up(&deployment, &mailer, "bob@example.com")
                     .await
                     .is_ok(),
                 "and the email is free again"

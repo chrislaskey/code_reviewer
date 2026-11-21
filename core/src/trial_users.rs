@@ -423,7 +423,7 @@ mod tests {
     /// code.
     async fn signed_up(server: &Deployment, trial: &User, email: &str) -> SignInStep<Session> {
         let mailer = Mailer::memory();
-        let sent = accounts::sign_up_from_trial(server, &mailer, trial, email, "Alice")
+        let sent = accounts::sign_up_from_trial(server, &mailer, trial, email)
             .await
             .expect("a code sent");
         let sent_to = email.trim().to_lowercase();
@@ -465,7 +465,7 @@ mod tests {
                 .await
                 .expect("skipped");
             assert_eq!(signed_up.user.id, trial.id, "the same user");
-            assert_eq!(signed_up.user.name, "Alice");
+            assert_eq!(signed_up.user.name, "bob", "named from the address");
             assert_eq!(signed_up.email, "bob@example.com");
             let account = accounts_users::get(&server, trial.id)
                 .await
@@ -518,10 +518,9 @@ mod tests {
             full_user(&server, "alice@example.com").await;
             let trial = create(&server, 10).await.expect("a trial").user;
             let mailer = Mailer::memory();
-            let sent =
-                accounts::sign_up_from_trial(&server, &mailer, &trial, "alice@example.com", "Me")
-                    .await
-                    .expect("answered as any sign-up");
+            let sent = accounts::sign_up_from_trial(&server, &mailer, &trial, "alice@example.com")
+                .await
+                .expect("answered as any sign-up");
             assert_eq!(sent.pending.len(), 64);
             let mail = mailer.last_sent_to("alice@example.com").expect("mailed");
             assert_eq!(mail.subject, "You already have an account");
@@ -533,8 +532,7 @@ mod tests {
 
             let alice = full_user(&server, "carol@example.com").await;
             assert!(matches!(
-                accounts::sign_up_from_trial(&server, &mailer, &alice, "new@example.com", "Me")
-                    .await,
+                accounts::sign_up_from_trial(&server, &mailer, &alice, "new@example.com").await,
                 Err(AccountError::NotATrial)
             ));
         })
@@ -545,7 +543,7 @@ mod tests {
     async fn trial_users_sign_up_takes_an_email_a_sign_up_never_proved() {
         with_each_database(|database| async move {
             let server = server(database);
-            accounts::sign_up(&server, &Mailer::memory(), "bob@example.com", "Bob")
+            accounts::sign_up(&server, &Mailer::memory(), "bob@example.com")
                 .await
                 .expect("signed up and stopped there");
             let trial = create(&server, 10).await.expect("a trial").user;

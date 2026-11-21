@@ -3,7 +3,7 @@
 **Status: built, 2026-11-08, steps 1 to 6 of the build order; the
 later returns are not.** Since `multi-app.md` the email and
 `confirmed_at` are on `accounts_users`, a server-only row with the
-user's id, and a sign-up takes a name, the only thing of a person that
+user's id, and a sign-up's name, from the email since 2026-11-20, is the only thing of a person that
 `app_users` syncs besides their picture; read `app_users` below as
 that pair. The code is `core/src/accounts.rs`,
 `core/src/tokens.rs`, `core/src/mailer.rs` and `core/src/mails.rs`,
@@ -21,7 +21,9 @@ optional second factor asked for after it. This section is the flow as
 built; where "To decide" below speaks of a password checked before the
 code, or made at sign-up (items 4, 5 and 22), read it as moved here.
 
-- **Sign-up** takes a name and an email, no password. **Sign-in** takes
+- **Sign-up** takes an email, no password; the name is the email's
+  part before the @, numbered when taken (`hello`, `hello1`, ...),
+  changed on the profile (since 2026-11-20). **Sign-in** takes
   an email. Both mail a code and answer the pending token. A sign-in
   with an email that has no account answers the same way, and that
   address is mailed that it has none, as a sign-up with a taken email
@@ -444,7 +446,7 @@ email or password, rate limiting in front of the server, see
 
 ## The flows
 
-**Sign-up on the web.** The page posts the name and the email. The
+**Sign-up on the web.** The page posts the email. The
 server makes the account, unconfirmed, and the user's row, deletes any
 earlier pending sign-in of theirs, makes a `sign_in_code` row with a
 random pending token and the hash of a six-digit code, commits, mails
@@ -582,7 +584,7 @@ and over is the per-address limit, see "Rate limits".
 
 | route | body | answers |
 | --- | --- | --- |
-| `POST /api/accounts/sign-up` | `email`, `name` | 202 `{ pending }` whether the email is new or not, 422 bad email or name |
+| `POST /api/accounts/sign-up` | `email` | 202 `{ pending }` whether the email is new or not, 422 bad email |
 | `POST /api/accounts/sign-in` | `email` | 202 `{ pending }` whether the email has an account or not, 422 bad email |
 | `POST /api/accounts/code` | `pending`, `code`, `challenge?` | 200 session with the cookie, or with `challenge` 200 `{ code }` and no cookie; or 200 `{ next, pending }`, `next` being `password` or `new_password`; 401 wrong, expired, or too many |
 | `POST /api/accounts/sign-in/password` | `pending`, `password`, `challenge?` | 200 as a finished code; 422 wrong password; 401 expired or too many |

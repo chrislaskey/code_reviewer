@@ -49,6 +49,15 @@ pub(crate) async fn create(
     query!(tx, insert(user.row()))
 }
 
+/// Whether a live user other than the one with the id has the name, in any case.
+pub(crate) async fn exists_by_name(
+    tx: &mut Transaction,
+    name: &str,
+    except_id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    query!(tx, exists_by_name(name, except_id))
+}
+
 /// Explicit replication access for internal resource workflows.
 pub(crate) mod replication {
     use super::*;

@@ -2918,7 +2918,7 @@ pub(crate) mod tests {
                     .expect("the post")
                     .owner
                     .name,
-                "Alice"
+                "alice"
             );
             let listed = communities::list(&b, &bob).await.expect("the communities");
             assert!(listed[0].membership.is_some());
@@ -3524,7 +3524,7 @@ pub(crate) mod tests {
         email: &str,
     ) -> Session {
         let mailer = crate::mailer::Mailer::memory();
-        let sent = accounts::sign_up(servers_database, &mailer, email, "Alice")
+        let sent = accounts::sign_up(servers_database, &mailer, email)
             .await
             .expect("signed up");
         let sent = match crate::mails::code_in(&mailer.last_sent_to(email).expect("mailed")) {

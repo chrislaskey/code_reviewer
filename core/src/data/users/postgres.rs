@@ -55,6 +55,22 @@ pub async fn get(connection: &mut PgConnection, id: Uuid) -> Result<Option<User>
     Ok(row.map(User::from))
 }
 
+/// Whether a live user other than the one with the id has the name,
+/// in any case.
+pub async fn exists_by_name(
+    connection: &mut PgConnection,
+    name: &str,
+    except_id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM app_users WHERE lower(name) = lower($1) AND id != $2 AND deleted_at IS NULL)",
+    )
+    .bind(name)
+    .bind(except_id)
+    .fetch_one(connection)
+    .await
+}
+
 /// The user the token with the hash stands for, deleted or not: an app's token
 /// made after `api_made_after`, or the browser's made after
 /// `session_made_after`, which is when each would have expired.

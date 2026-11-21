@@ -296,7 +296,7 @@ mod tests {
 
     /// A user signed up on the server and finished with their code.
     async fn signed_up(deployment: &Deployment, mailer: &Mailer, email: &str) -> Session {
-        let sent = app_core::accounts::sign_up(deployment, mailer, email, "Alice")
+        let sent = app_core::accounts::sign_up(deployment, mailer, email)
             .await
             .expect("signed up");
         let code = code_sent_to(mailer, email);
@@ -389,7 +389,7 @@ mod tests {
         let (status, body) = get(&router, "/api/posts").await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body, json!([post]));
-        assert_eq!(post["owner"]["name"], json!("Alice"));
+        assert_eq!(post["owner"]["name"], json!("alice"));
         assert_eq!(
             post["owner"]["email"],
             Value::Null,
@@ -452,7 +452,7 @@ mod tests {
     #[tokio::test]
     async fn accounts_sign_up_then_the_code_sign_in_and_sign_out_over_the_cookie() {
         let (router, _) = test_router().await;
-        let bob = json!({ "email": "Bob@example.com", "name": "Bob" });
+        let bob = json!({ "email": "Bob@example.com" });
         let (status, body) = send_as(
             &router.router,
             None,
@@ -529,7 +529,7 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["email"], json!("bob@example.com"));
-        assert_eq!(body["user"]["name"], json!("Bob"));
+        assert_eq!(body["user"]["name"], json!("bob"));
         let set_cookie = headers[header::SET_COOKIE].to_str().expect("a cookie");
         assert!(set_cookie.starts_with(&format!("token={}", body["token"].as_str().unwrap())));
         assert!(set_cookie.contains("HttpOnly"));
@@ -705,7 +705,7 @@ mod tests {
             None,
             Method::POST,
             "/api/accounts/sign-up",
-            Some(json!({ "email": "bob@example.com", "name": "Bob" })),
+            Some(json!({ "email": "bob@example.com" })),
         )
         .await;
         assert_eq!(
@@ -786,7 +786,7 @@ mod tests {
             None,
             Method::POST,
             "/api/accounts/sign-up",
-            Some(json!({ "email": "bob@example.com", "name": "Bob" })),
+            Some(json!({ "email": "bob@example.com" })),
         )
         .await;
         let code = code_sent_to(&router.mailer, "bob@example.com");
@@ -954,7 +954,7 @@ mod tests {
             Some(&cookie),
             Method::POST,
             "/api/accounts/sign-up",
-            Some(json!({ "email": "dana@example.com", "name": "Dana" })),
+            Some(json!({ "email": "dana@example.com" })),
         )
         .await;
         assert_eq!(status, StatusCode::ACCEPTED);
@@ -996,7 +996,7 @@ mod tests {
         assert_eq!(me["kind"], json!("full"));
         assert_eq!(me["trial_expires_at"], Value::Null);
         assert_eq!(me["email"], json!("dana@example.com"));
-        assert_eq!(me["name"], json!("Dana"));
+        assert_eq!(me["name"], json!("dana"));
         let (status, _, _) = send_with(
             &router.router,
             None,
@@ -1585,7 +1585,7 @@ mod tests {
             None,
             Method::POST,
             "/api/accounts/sign-up",
-            Some(json!({ "email": "bob@example.com", "name": "Bob" })),
+            Some(json!({ "email": "bob@example.com" })),
         )
         .await;
         assert_eq!(status, StatusCode::ACCEPTED);
@@ -1957,7 +1957,7 @@ mod tests {
         let (router, _) = test_router().await;
         let (status, me) = get(&router, "/api/current-user").await;
         assert_eq!(status, StatusCode::OK);
-        assert_eq!(me["name"], json!("Alice"));
+        assert_eq!(me["name"], json!("alice"));
         assert_eq!(me["email"], json!("alice@example.com"));
         assert_eq!(me["is_staff"], json!(false));
     }

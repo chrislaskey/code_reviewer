@@ -786,7 +786,7 @@ mod tests {
     /// answered. Once the email has an account, a sign-in instead.
     async fn signed_up(server: &Deployment, email: &str) -> Session {
         let mailer = Mailer::memory();
-        let sent = accounts::sign_up(server, &mailer, email, "Alice")
+        let sent = accounts::sign_up(server, &mailer, email)
             .await
             .expect("signed up");
         let mail = mailer.last_sent_to(email).expect("mailed");

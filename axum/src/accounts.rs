@@ -87,8 +87,6 @@ pub struct DeviceCodeExchange {
 #[derive(Deserialize)]
 pub struct SignUp {
     pub email: String,
-    /// What the pages show the person by.
-    pub name: String,
 }
 
 /// A sign-up; from a trial user's browser, that trial user signing up,
@@ -103,10 +101,9 @@ pub async fn sign_up(
     limits.check_email(&sign_up.email)?;
     let sent = match trial_user_of(&deployment, &jar).await? {
         Some(trial) => {
-            let (email, name) = (&sign_up.email, &sign_up.name);
-            accounts::sign_up_from_trial(&deployment, &mailer, &trial, email, name).await?
+            accounts::sign_up_from_trial(&deployment, &mailer, &trial, &sign_up.email).await?
         }
-        None => accounts::sign_up(&deployment, &mailer, &sign_up.email, &sign_up.name).await?,
+        None => accounts::sign_up(&deployment, &mailer, &sign_up.email).await?,
     };
     Ok((StatusCode::ACCEPTED, Json(sent)))
 }

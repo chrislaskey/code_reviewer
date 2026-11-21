@@ -108,11 +108,10 @@ export function avatarsUpdate(key) {
 
 /**
  * @param {string} email
- * @param {string} name what the pages show the person by
  * @returns {Promise<{pending: string}>}
  */
-export function accountsSignUp(email, name) {
-  return send("POST", "/api/accounts/sign-up", { email, name });
+export function accountsSignUp(email) {
+  return send("POST", "/api/accounts/sign-up", { email });
 }
 
 /**

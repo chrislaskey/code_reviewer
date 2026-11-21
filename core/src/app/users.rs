@@ -319,7 +319,7 @@ fn rejected(
 }
 
 /// Sets the user's name, a server write the devices pull like any
-/// other, for a sign-up that is tried again before its code was entered.
+/// other, for a trial user signing up.
 pub(crate) async fn update_name_in(
     tx: &mut Transaction,
     id: Uuid,
@@ -538,6 +538,34 @@ async fn get_live(tx: &mut Transaction, id: Uuid) -> Result<User, UserError> {
     }
 }
 
+/// A sign-up's name, from its email before the @: `hello@world.com` is
+/// `hello`, or `hello1`, `hello2` and on when another user has it. The
+/// person changes it on their profile.
+pub(crate) async fn name_from_email_in(
+    tx: &mut Transaction,
+    email: &str,
+    id: Uuid,
+) -> Result<String, UserError> {
+    let before_at = email.split_once('@').map_or(email, |(before, _)| before);
+    let mut number = 0_u32;
+    loop {
+        let suffix = if number == 0 {
+            String::new()
+        } else {
+            number.to_string()
+        };
+        let start: String = before_at
+            .chars()
+            .take(MAX_NAME_LENGTH - suffix.len())
+            .collect();
+        let name = checked_name(&format!("{start}{suffix}"))?;
+        if !users_records::exists_by_name(&mut *tx, &name, id).await? {
+            return Ok(name);
+        }
+        number += 1;
+    }
+}
+
 /// The name as it is kept: trimmed, not empty and not too long.
 pub(crate) fn checked_name(name: &str) -> Result<String, UserError> {
     let name = name.trim();
@@ -729,6 +757,47 @@ pub(crate) mod tests {
                 error,
                 UserError::AccountUser(AccountUserError::EmailTaken)
             ));
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn users_name_from_email_numbers_a_taken_name_in_any_case_and_fits_the_length() {
+        with_each_database(|database| async move {
+            let deployment = server(database);
+            create(&deployment, "a@example.com", "Hello")
+                .await
+                .expect("a user");
+            let hello1 = create(&deployment, "b@example.com", "hello1")
+                .await
+                .expect("a user");
+            let gone = create(&deployment, "c@example.com", "hello2")
+                .await
+                .expect("a user");
+            create(&deployment, "d@example.com", &"x".repeat(MAX_NAME_LENGTH))
+                .await
+                .expect("a user");
+            let mut tx = deployment.begin().await.expect("a transaction");
+            delete_in(&mut tx, gone.id).await.expect("deleted");
+
+            let new_id = Uuid::now_v7();
+            let name = name_from_email_in(&mut tx, "hello@world.com", new_id)
+                .await
+                .expect("a name");
+            assert_eq!(
+                name, "hello2",
+                "Hello and hello1 are taken, a deleted hello2 is not"
+            );
+            let own = name_from_email_in(&mut tx, "hello1@world.com", hello1.id)
+                .await
+                .expect("a name");
+            assert_eq!(own, "hello1", "their own name is not taken from them");
+
+            let long = "x".repeat(MAX_NAME_LENGTH + 10);
+            let numbered = name_from_email_in(&mut tx, &format!("{long}@world.com"), new_id)
+                .await
+                .expect("a name");
+            assert_eq!(numbered, format!("{}1", "x".repeat(MAX_NAME_LENGTH - 1)));
         })
         .await;
     }

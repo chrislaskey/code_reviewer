@@ -1,6 +1,7 @@
-<!-- Signing up, at /accounts/sign-up, on the web: the name and the
-     email, then the code that was emailed, which proves the email, and a
-     password to make or skip, see AccountsSignInSteps. Opened by a
+<!-- Signing up, at /accounts/sign-up, on the web: the email, then the
+     code that was emailed, which proves the email, and a password to
+     make or skip, see AccountsSignInSteps. The name comes from the
+     email, changed later on the profile. Opened by a
      device with ?challenge=, it ends in a code for the device instead;
      the email is filled in from ?email=. -->
 <script>
@@ -18,7 +19,6 @@
   const appReturn = { appPort: query.get("app_port") ?? "", appScheme: query.get("app_scheme") ?? "" };
 
   let email = $state(query.get("email") ?? "");
-  let name = $state("");
   let keepSignedIn = $state(KEEP_SIGNED_IN_CHECKED);
   /** Whether to offer a trial: on the web, when the server has room for one. */
   let trialAvailable = $state(false);
@@ -31,7 +31,7 @@
     busy = true;
     error = "";
     try {
-      pending = (await accountsSignUp(email, name)).pending;
+      pending = (await accountsSignUp(email)).pending;
     } catch (problem) {
       error = problem instanceof Error ? problem.message : String(problem);
     } finally {
@@ -48,7 +48,7 @@
   {#if pending}
     <AccountsSignInSteps {email} {pending} {challenge} {appReturn} {keepSignedIn} onstartover={() => (pending = "")} />
   {:else}
-    <AccountsForm bind:email bind:name withName bind:keepSignedIn withKeepSignedIn={!challenge} submitText="Sign up" {error} {busy} onsubmit={signUp} />
+    <AccountsForm bind:email bind:keepSignedIn withKeepSignedIn={!challenge} submitText="Sign up" {error} {busy} onsubmit={signUp} />
     <Text tone="muted">By signing up you accept the <PublicPagesLinks />.</Text>
     <Text tone="muted">Already have an account? <Link href={accountsSignInUrl(email || undefined)}>Sign in</Link></Text>
     {#if trialAvailable}

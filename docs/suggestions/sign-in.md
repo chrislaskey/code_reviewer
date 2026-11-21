@@ -83,3 +83,14 @@ file as passkeys).
 
 A Custom Tab, as the iPhone's sheet, returning to the app's scheme;
 Android pastes the code until then. Whenever Android builds matter.
+
+## Later: choosing a name after signing up
+
+Since 2026-11-20 a sign-up's name is the email's part before the @,
+numbered when another user has it (`hello`, `hello1`, ...), and the
+person changes it on their profile. Still to plan:
+
+- A step right after the first sign-in that offers to change it, as
+  social sites do; it needs a way to tell a first sign-in apart.
+- Whether names should be unique everywhere: the profile's name edit
+  takes any name today, so two users can still pick the same one.
