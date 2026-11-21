@@ -10,15 +10,15 @@ use uuid::Uuid;
 
 use crate::data::app_sync_state::Cursor;
 use crate::database::Transaction;
+use crate::helpers::content_type::{content_type_or_unknown, is_content_type};
 use crate::helpers::field_errors::FieldErrors;
+use crate::helpers::sha256::is_sha256;
 
 pub const TABLE: &str = "app_files";
 /// The largest file, 25 MB.
 pub const MAX_BYTES: u64 = 25 * 1024 * 1024;
 /// The longest name, in characters.
 pub const MAX_NAME_LENGTH: usize = 255;
-/// What a file with no content type of its own is sent as.
-pub const UNKNOWN_CONTENT_TYPE: &str = "application/octet-stream";
 
 /// A file's row, with the sync columns every synced row carries, see
 /// `docs/design/offline-sync.md`. The rules on its fields are what
@@ -83,14 +83,6 @@ impl AcceptedFile {
     }
 }
 
-/// The content type a browser gave, or the unknown one when it gave none.
-pub fn content_type_or_unknown(content_type: &str) -> String {
-    match content_type.trim() {
-        "" => UNKNOWN_CONTENT_TYPE.to_string(),
-        content_type => content_type.to_lowercase(),
-    }
-}
-
 /// A name that is not blank and not too long.
 pub fn is_file_name(value: &str, _context: &()) -> garde::Result {
     if value.trim().is_empty() {
@@ -98,30 +90,6 @@ pub fn is_file_name(value: &str, _context: &()) -> garde::Result {
     }
     if value.chars().count() > MAX_NAME_LENGTH {
         return Err(garde::Error::new("is longer than 255 characters"));
-    }
-    Ok(())
-}
-
-/// A `type/subtype`, with parameters or not, in printable ASCII.
-pub fn is_content_type(value: &str, _context: &()) -> garde::Result {
-    let essence = value.split(';').next().unwrap_or_default().trim();
-    let well_formed = essence.split_once('/').is_some_and(|(kind, subtype)| {
-        !kind.is_empty() && !subtype.is_empty() && !subtype.contains('/')
-    });
-    let printable = value.chars().all(|c| c.is_ascii_graphic() || c == ' ');
-    if !well_formed || !printable || value.len() > MAX_NAME_LENGTH {
-        return Err(garde::Error::new("is not a content type"));
-    }
-    Ok(())
-}
-
-/// A SHA-256 as lowercase hex.
-pub fn is_sha256(value: &str, _context: &()) -> garde::Result {
-    let hex = value
-        .chars()
-        .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c));
-    if value.len() != 64 || !hex {
-        return Err(garde::Error::new("is not a SHA-256"));
     }
     Ok(())
 }

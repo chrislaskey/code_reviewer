@@ -13,6 +13,7 @@ use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role};
 use crate::sync::TableRow;
+use crate::sync::bytes::SyncedBytes;
 use crate::sync::events::Answer;
 
 /// The error of a table's own module, as the machinery passes it on.
@@ -151,6 +152,12 @@ pub trait SyncedTable: Send + Sync {
         _user: &User,
     ) -> Result<(), TableError> {
         Ok(app_sync_state::maintenance::delete_not_pending(tx, self.table()).await?)
+    }
+
+    /// What the rows carry beside their fields, a file's bytes say, see
+    /// `sync::bytes`; none for most tables.
+    fn bytes(&self) -> Option<&dyn SyncedBytes> {
+        None
     }
 
     /// Whether the rows count among a local user's things, in the

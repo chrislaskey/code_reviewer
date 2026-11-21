@@ -49,7 +49,7 @@ alternatives weighed and how it was settled.
 - **The bytes are sent inside the sync, after the pull** (5a): ask the
   server about waiting files, push with them held back, pull, backfill,
   prune, then send the bytes and push those files' events. One
-  function, `files::upload_waiting`, which an application with large
+  function, `bytes::upload_waiting`, which an application with large
   files can move to a task of its own. The PUT has a longer timeout
   than the sync's other requests.
 - **No device-only table** (3a). Whether a file's bytes are on this

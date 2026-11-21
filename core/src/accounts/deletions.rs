@@ -462,7 +462,7 @@ mod tests {
                 };
                 storage
                     .put(
-                        &files::storage_key(alice.user.id, new.id),
+                        &crate::sync::bytes::storage_key(&files::Synced, alice.user.id, new.id),
                         b"bytes".to_vec(),
                     )
                     .await
@@ -493,7 +493,11 @@ mod tests {
             for file in &created {
                 assert!(
                     storage
-                        .size(&files::storage_key(alice.user.id, file.id))
+                        .size(&crate::sync::bytes::storage_key(
+                            &files::Synced,
+                            alice.user.id,
+                            file.id
+                        ))
                         .await
                         .expect("looked")
                         .is_some(),

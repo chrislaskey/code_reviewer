@@ -13,13 +13,12 @@ use serde_json::Value;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::files::{self, FileError};
 use crate::app::synced_tables;
 use crate::data::app_events::{self, Event, EventKind, EventStatus, Fields, StoredEvent};
-use crate::data::app_files;
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
+use crate::sync::bytes::{self, BytesError};
 use crate::sync::events::AnswerStatus;
 use crate::sync::synced_table::TableError;
 
@@ -77,7 +76,7 @@ pub enum ConflictError {
     #[error(transparent)]
     Table(#[from] TableError),
     #[error(transparent)]
-    File(#[from] FileError),
+    Bytes(#[from] BytesError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -152,17 +151,14 @@ pub async fn try_again(deployment: &Deployment, id: Uuid) -> Result<(), Conflict
 pub async fn let_go(deployment: &Deployment, id: Uuid) -> Result<(), ConflictError> {
     let mut tx = deployment.begin().await?;
     let stored = get(&mut tx, id).await?;
-    let refused_file =
-        stored.event.table == app_files::TABLE && stored.event.kind == EventKind::Create;
-    if refused_file {
-        files::forget_in(&mut tx, stored.event.row_id).await?;
-    } else {
-        app_events::delete(&mut tx, id).await?;
+    let refused_with_bytes =
+        stored.event.kind == EventKind::Create && bytes::of_table(&stored.event.table).is_ok();
+    if refused_with_bytes {
+        tx.commit().await?;
+        return Ok(bytes::forget(deployment, &stored.event.table, stored.event.row_id).await?);
     }
+    app_events::delete(&mut tx, id).await?;
     tx.commit().await?;
-    if refused_file {
-        files::delete_local_copy(deployment, stored.event.row_id).await?;
-    }
     Ok(())
 }
 

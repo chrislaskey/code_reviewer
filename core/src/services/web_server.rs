@@ -6,12 +6,12 @@
 use crate::accounts::{self, AccountError, Session};
 #[cfg(feature = "sync-http")]
 use crate::app::avatars::{AvatarUpdate, AvatarUpload, AvatarUploadNew};
-#[cfg(feature = "object-storage")]
-use crate::app::files::{self, FileError};
-use crate::app::files::{FileUpload, FileUploadNew};
 use crate::app::users::{self, UserError};
 use crate::data::app_users::User;
 use crate::deployment::Deployment;
+#[cfg(feature = "object-storage")]
+use crate::sync::bytes::{self, BytesError};
+use crate::sync::bytes::{Upload, UploadNew};
 use crate::sync::{self, BackfillRequest, Page, PullRequest, PushRequest, PushResponse, SyncError};
 #[cfg(feature = "sync-http")]
 use serde::{Deserialize, Serialize};
@@ -48,26 +48,29 @@ pub trait Transport {
         verifier: &str,
     ) -> impl Future<Output = Result<Session, SyncError>> + Send;
     fn sign_out(&self, token: &str) -> impl Future<Output = Result<(), SyncError>> + Send;
-    /// Asks whether the bucket has a file's bytes, and where to send
-    /// them when it has not, see `files::create_upload`.
-    fn files_create_upload(
+    /// Asks whether the bucket has a row's bytes, and where to send
+    /// them when it has not, see `bytes::create_upload`.
+    fn bytes_create_upload(
         &self,
         token: Option<&str>,
-        request: FileUploadNew,
-    ) -> impl Future<Output = Result<FileUpload, SyncError>> + Send;
+        table: &str,
+        request: UploadNew,
+    ) -> impl Future<Output = Result<Upload, SyncError>> + Send;
     /// Sends the bytes at the path to where the upload says. The bucket
     /// refusing them is `Refused`; not reaching it, `Transport`.
-    fn files_upload(
+    fn bytes_upload(
         &self,
         token: Option<&str>,
-        upload: &FileUpload,
+        table: &str,
+        upload: &Upload,
         path: &Path,
     ) -> impl Future<Output = Result<(), SyncError>> + Send;
-    /// Fetches the bytes of a file of the user's from the bucket into
+    /// Fetches the bytes of a row the user sees from the bucket into
     /// the path.
-    fn files_download(
+    fn bytes_download(
         &self,
         token: Option<&str>,
+        table: &str,
         id: Uuid,
         path: &Path,
     ) -> impl Future<Output = Result<(), SyncError>> + Send;
@@ -132,80 +135,82 @@ impl Transport for InProcess<'_> {
     }
 
     #[cfg(feature = "object-storage")]
-    async fn files_create_upload(
+    async fn bytes_create_upload(
         &self,
         token: Option<&str>,
-        request: FileUploadNew,
-    ) -> Result<FileUpload, SyncError> {
+        table: &str,
+        request: UploadNew,
+    ) -> Result<Upload, SyncError> {
         let user = self.user(token).await?;
-        files::create_upload(self.server, &user, &request)
+        bytes::create_upload(self.server, &user, table, &request)
             .await
-            .map_err(refused_file)
+            .map_err(refused_bytes)
     }
 
     /// Puts the bytes where the device's PUT would have.
     #[cfg(feature = "object-storage")]
-    async fn files_upload(
+    async fn bytes_upload(
         &self,
         token: Option<&str>,
-        upload: &FileUpload,
+        table: &str,
+        upload: &Upload,
         path: &Path,
     ) -> Result<(), SyncError> {
         let user = self.user(token).await?;
-        let bytes = tokio::fs::read(path)
+        let of_table = bytes::of_table(table).map_err(refused_bytes)?;
+        let read = tokio::fs::read(path)
             .await
             .map_err(|error| SyncError::Refused(error.to_string()))?;
-        files::bucket(self.server)
-            .map_err(refused_file)?
-            .put(&files::storage_key(user.id, upload.id), bytes)
+        bytes::bucket(self.server)
+            .map_err(refused_bytes)?
+            .put(&bytes::storage_key(of_table, user.id, upload.id), read)
             .await
             .map_err(|error| SyncError::Transport(error.to_string()))
     }
 
     #[cfg(feature = "object-storage")]
-    async fn files_download(
+    async fn bytes_download(
         &self,
         token: Option<&str>,
+        table: &str,
         id: Uuid,
         path: &Path,
     ) -> Result<(), SyncError> {
         let user = self.user(token).await?;
-        let shown = files::get(self.server, &user, id)
+        let read = bytes::get_from_bucket(self.server, &user, table, id)
             .await
-            .map_err(refused_file)?;
-        let bytes = files::bucket(self.server)
-            .map_err(refused_file)?
-            .get(&files::storage_key(shown.file.created_by_id, id))
-            .await
-            .map_err(|error| SyncError::Transport(error.to_string()))?;
-        tokio::fs::write(path, bytes)
+            .map_err(refused_bytes)?;
+        tokio::fs::write(path, read)
             .await
             .map_err(|error| SyncError::Malformed(error.to_string()))
     }
 
     #[cfg(not(feature = "object-storage"))]
-    async fn files_create_upload(
+    async fn bytes_create_upload(
         &self,
         _token: Option<&str>,
-        _request: FileUploadNew,
-    ) -> Result<FileUpload, SyncError> {
+        _table: &str,
+        _request: UploadNew,
+    ) -> Result<Upload, SyncError> {
         Err(no_bucket())
     }
 
     #[cfg(not(feature = "object-storage"))]
-    async fn files_upload(
+    async fn bytes_upload(
         &self,
         _token: Option<&str>,
-        _upload: &FileUpload,
+        _table: &str,
+        _upload: &Upload,
         _path: &Path,
     ) -> Result<(), SyncError> {
         Err(no_bucket())
     }
 
     #[cfg(not(feature = "object-storage"))]
-    async fn files_download(
+    async fn bytes_download(
         &self,
         _token: Option<&str>,
+        _table: &str,
         _id: Uuid,
         _path: &Path,
     ) -> Result<(), SyncError> {
@@ -220,14 +225,14 @@ fn no_bucket() -> SyncError {
     SyncError::Transport("the server in this process has no bucket".to_string())
 }
 
-/// The server's answer about a file as the web server would send it:
+/// The server's answer about bytes as the web server would send it:
 /// what it will not take is refused in words, a missing or failing
 /// bucket is the server failing.
 #[cfg(feature = "object-storage")]
-fn refused_file(error: FileError) -> SyncError {
+fn refused_bytes(error: BytesError) -> SyncError {
     match error {
-        FileError::Database(error) => SyncError::Database(error),
-        FileError::NoFileStore | FileError::Storage(_) => SyncError::Transport(error.to_string()),
+        BytesError::Database(error) => SyncError::Database(error),
+        BytesError::NoFileStore | BytesError::Storage(_) => SyncError::Transport(error.to_string()),
         error => SyncError::Refused(error.to_string()),
     }
 }
@@ -471,20 +476,23 @@ impl Transport for Http {
         self.delete(token, "/api/accounts/sign-out").await
     }
 
-    async fn files_create_upload(
+    async fn bytes_create_upload(
         &self,
         token: Option<&str>,
-        request: FileUploadNew,
-    ) -> Result<FileUpload, SyncError> {
-        self.post(token, "/api/files/uploads", &request).await
+        table: &str,
+        request: UploadNew,
+    ) -> Result<Upload, SyncError> {
+        let path = format!("/api/sync/bytes/{table}/uploads");
+        self.post(token, &path, &request).await
     }
 
     /// PUTs the file to the signed URL, streamed from the disk, with the
     /// checksum the bucket checks the bytes against.
-    async fn files_upload(
+    async fn bytes_upload(
         &self,
         _token: Option<&str>,
-        upload: &FileUpload,
+        _table: &str,
+        upload: &Upload,
         path: &Path,
     ) -> Result<(), SyncError> {
         let url = upload
@@ -524,17 +532,18 @@ impl Transport for Http {
         Ok(())
     }
 
-    /// Asks the server where the file's bytes are, then reads them from
+    /// Asks the server where the row's bytes are, then reads them from
     /// the bucket into the path, a chunk at a time.
-    async fn files_download(
+    async fn bytes_download(
         &self,
         token: Option<&str>,
+        table: &str,
         id: Uuid,
         path: &Path,
     ) -> Result<(), SyncError> {
         use tokio::io::AsyncWriteExt;
 
-        let asked = format!("{}/api/files/{id}/content", self.base_url);
+        let asked = format!("{}/api/sync/bytes/{table}/{id}", self.base_url);
         let mut request = self.not_following_redirects.get(&asked);
         if let Some(token) = token {
             request = request.bearer_auth(token);

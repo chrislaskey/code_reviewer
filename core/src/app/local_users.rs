@@ -414,7 +414,11 @@ mod tests {
 
     async fn bucket_has(storage: &Storage, user: &User, id: Uuid) -> bool {
         storage
-            .size(&files::storage_key(user.id, id))
+            .size(&crate::sync::bytes::storage_key(
+                &files::Synced,
+                user.id,
+                id,
+            ))
             .await
             .expect("looked")
             .is_some()

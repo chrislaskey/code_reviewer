@@ -2,6 +2,8 @@
 //! what a device calls to converge with this server, as the user its
 //! token stands for, see `docs/design/offline-sync.md`.
 
+pub mod bytes;
+
 use axum::Json;
 use axum::extract::State;
 

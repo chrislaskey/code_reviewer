@@ -99,11 +99,11 @@ which the cleanup removes, and never a row without a file.
 
 | Step | Who | What |
 | --- | --- | --- |
-| 1 | device, `files::ask_about_waiting` | for each pending create on `app_files`, the oldest `files::FILES_PER_SYNC` (100), asks `POST /api/files/uploads` with `{id, content_type, size, sha256}` |
+| 1 | device, `bytes::ask_about_waiting` | for each pending create on `app_files`, the oldest `bytes::PER_SYNC` (100), asks `POST /api/sync/bytes/app_files/uploads` with `{id, content_type, size, sha256}` |
 | 2 | server | checks the size; looks at `files/<creator id>/<file id>`. There, of that size and with that checksum: `uploaded`. Otherwise a PUT URL signed for the content type and the checksum, good for 10 minutes |
-| 3 | device | pushes every pending event except those of a file not answered `uploaded`, `files::held_back`; a rename waits with its create |
+| 3 | device | pushes every pending event except those of a file not answered `uploaded`, `bytes::held_back`; a rename waits with its create |
 | 4 | device | pulls, backfills, prunes, as ever |
-| 5 | device, `files::upload_waiting` | sends each waiting file's bytes from disk to its URL, as a stream, with a longer timeout than the sync's requests |
+| 5 | device, `bytes::upload_waiting` | sends each waiting file's bytes from disk to its URL, as a stream, with a longer timeout than the sync's requests |
 | 6 | device | pushes the events of the files just sent |
 | 7 | server, `files::apply_event` | on create, looks in the bucket again: there, the row is written; not there, `file_not_uploaded`, and the event stays pending for the next sync |
 
@@ -119,7 +119,7 @@ which the cleanup removes, and never a row without a file.
 - A file that fails holds back only its own events.
 - The bytes go last, so a sync's posts and pulled rows never wait on
   them. The sync lock is held while they go; an application with large
-  files moves `files::upload_waiting` to a task of its own, which
+  files moves `bytes::upload_waiting` to a task of its own, which
   changes who calls it and no data.
 - One PUT per file, started over if cut off, carrying the checksum in
   `x-amz-checksum-sha256`, which the bucket checks the bytes against.
@@ -230,12 +230,12 @@ Downloads folder; absent on phones.
 A delete is the soft delete, synced like any edit.
 
 - **On a device**, a cleanup at the end of each sync, over the
-  account's folder, `files::delete_unreferenced_on_device`: a file
+  account's folder, `bytes::delete_unreferenced_on_device`: a file
   whose row is deleted is removed; a file with no row, or a fetch left
   half done, is removed once it is a day old. The day is for a file
   being added, whose bytes are on disk a moment before its row.
 - **In the bucket**, `files/` joins `avatars/` in the server's sweep,
-  `files::delete_unreferenced`: a file with no row, a day old, is
+  `bytes::delete_unreferenced`: a file with no row, a day old, is
   deleted. A deleted row keeps its file for the purge's 90 days.
   Deleting an account deletes no file's bytes at once, since its files
   may still be in other communities; the sweep takes those of the files
@@ -280,7 +280,7 @@ Each phase ends in a state that works, is tested and is worth keeping.
 | 1 | the migration `files_create`; `files` in core with its events and SQL; `app_files` in the push and the pull; signed download URLs; the routes; the web's pages, with `FileImage`, the animation choice and Download | on the web a file is added, shown, renamed, deleted and downloaded; a create without its file in the bucket is refused; another user neither lists it nor gets its content |
 | 2 | a folder per account: `accounts/<user_id>/app.db`, `bin/reset` | the account tests pass on the new layout; removing an account removes its folder |
 | 3 | adding a file on a device; the custom protocol serving the local copy; the commands; the desktop's Download | a file added offline is listed as waiting and shows with the network off; deleting it leaves nothing behind |
-| 4 | the exchange: the transport, `files::upload_waiting`, events held back, the second push | a file added offline reaches the bucket and the web; a failed upload holds back only its own events; a sync cut off finishes on the next; `file_not_uploaded` is tried again |
+| 4 | the exchange: the transport, `bytes::upload_waiting`, events held back, the second push | a file added offline reaches the bucket and the web; a failed upload holds back only its own events; a sync cut off finishes on the next; `file_not_uploaded` is tried again |
 | 5 | fetching on first use | a file added on one device shows on another, then with the network off |
 | 6 | the migration `events_add_attempts`; what counts; refused; the conflicts page and the pending changes for files | 30 rejections refuse an event and an outage counts nothing; Try again starts over; Let it go removes the bytes; a refused file is not lost; a name edited on two devices is a conflict |
 | 7 | the device's cleanup; `files/` in the server's sweep; `offline-sync.md` and `uploads.md` brought up to date; `docs/suggestions/files.md` | after a day no file is without a row on either side; a deleted row's bytes leave the device |

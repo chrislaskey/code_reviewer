@@ -34,6 +34,7 @@ use app_core::ops::staff::StaffError;
 use app_core::services::app_store::AppStoreError;
 use app_core::services::stripe::StripeError;
 use app_core::sync::SyncError;
+use app_core::sync::bytes::BytesError;
 use app_core::sync::events::RecordError;
 
 #[derive(Debug)]
@@ -268,11 +269,27 @@ impl From<FileError> for ApiError {
             FileError::NotUploaded | FileError::Rejected(_) | FileError::Malformed(_) => {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
-            FileError::NoFileStore => StatusCode::SERVICE_UNAVAILABLE,
-            FileError::Storage(_) => StatusCode::BAD_GATEWAY,
-            FileError::Sync(error) => return (*error).into(),
-            FileError::NotOnDevice => StatusCode::NOT_FOUND,
-            FileError::DeviceOnly | FileError::Io(_) | FileError::Database(_) => {
+            FileError::Bytes(error) => return error.into(),
+            FileError::DeviceOnly | FileError::Table(_) | FileError::Database(_) => {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        };
+        ApiError::new(status, error.to_string())
+    }
+}
+
+impl From<BytesError> for ApiError {
+    fn from(error: BytesError) -> Self {
+        let status = match error {
+            BytesError::Invalid(field_errors) => return ApiError::from_field_errors(field_errors),
+            BytesError::NotFound { .. } | BytesError::UnknownTable(_) | BytesError::NotOnDevice => {
+                StatusCode::NOT_FOUND
+            }
+            BytesError::Rejected(_) | BytesError::Malformed(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            BytesError::NoFileStore => StatusCode::SERVICE_UNAVAILABLE,
+            BytesError::Storage(_) => StatusCode::BAD_GATEWAY,
+            BytesError::User(error) => return error.into(),
+            BytesError::Io(_) | BytesError::Table(_) | BytesError::Database(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
         };
@@ -375,7 +392,7 @@ impl ApiError {
 impl From<SyncError> for ApiError {
     fn from(error: SyncError) -> Self {
         match error {
-            SyncError::File(error) => error.into(),
+            SyncError::Bytes(error) => error.into(),
             SyncError::Membership(error) => error.into(),
             SyncError::User(error) => error.into(),
             SyncError::Unauthorized => ApiError::new(StatusCode::UNAUTHORIZED, error.to_string()),

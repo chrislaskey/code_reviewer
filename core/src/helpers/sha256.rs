@@ -10,6 +10,17 @@ pub fn hex(bytes: &[u8]) -> String {
         .collect()
 }
 
+/// A SHA-256 as lowercase hex.
+pub fn is_sha256(value: &str, _context: &()) -> garde::Result {
+    let hex = value
+        .chars()
+        .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c));
+    if value.len() != 64 || !hex {
+        return Err(garde::Error::new("is not a SHA-256"));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

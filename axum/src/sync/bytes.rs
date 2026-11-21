@@ -1,0 +1,50 @@
+//! The bytes a device sends and fetches for a synced row, `app_core::sync::bytes`:
+//! where to PUT them, and where to read them, for the user its token stands for.
+
+use axum::Json;
+use axum::extract::{Path, State};
+use axum::http::StatusCode;
+use axum::http::header::{CACHE_CONTROL, LOCATION};
+use axum::response::{IntoResponse, Response};
+use uuid::Uuid;
+
+use app_core::deployment::Deployment;
+use app_core::sync::bytes::{self, Upload, UploadNew};
+
+use crate::api_error::ApiError;
+use crate::user_auth::CurrentUser;
+
+/// How long a device may reuse the redirect to a row's bytes: a little
+/// less than the signed URL it points at works.
+pub const CONTENT_REDIRECT_SECONDS: u64 = bytes::DOWNLOAD_URL_LIFETIME.as_secs() - 5 * 60;
+
+pub async fn create_upload(
+    State(deployment): State<Deployment>,
+    CurrentUser(user): CurrentUser,
+    Path(table): Path<String>,
+    Json(request): Json<UploadNew>,
+) -> Result<Json<Upload>, ApiError> {
+    Ok(Json(
+        bytes::create_upload(&deployment, &user, &table, &request).await?,
+    ))
+}
+
+/// A redirect to the bytes in the bucket, by a signed URL.
+pub async fn content(
+    State(deployment): State<Deployment>,
+    CurrentUser(user): CurrentUser,
+    Path((table, id)): Path<(String, Uuid)>,
+) -> Result<Response, ApiError> {
+    let url = bytes::download_url(&deployment, &user, &table, id, None).await?;
+    Ok((
+        StatusCode::FOUND,
+        [
+            (LOCATION, url),
+            (
+                CACHE_CONTROL,
+                format!("private, max-age={CONTENT_REDIRECT_SECONDS}"),
+            ),
+        ],
+    )
+        .into_response())
+}

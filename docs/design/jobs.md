@@ -16,7 +16,7 @@ how often, and the order: `Job::ALL`. Today they are the server's:
 | `purge` | `purge::run` | first, so the bytes of the rows it removes go the same day |
 | `trial_users_delete` | `trial_users::delete_expired`, hourly, the others daily | after the purge |
 | `avatars_delete_unreferenced` | `avatars::delete_unreferenced` | after the purge |
-| `files_delete_unreferenced` | `files::delete_unreferenced` | after the purge |
+| `files_delete_unreferenced` | `bytes::delete_unreferenced` | after the purge |
 
 Each is daily. A sweep is skipped on a server with no bucket for it.
 
@@ -39,7 +39,7 @@ how evenly an app wakes up does not matter.
   scheduler outside the server, and `app_web jobs run <name>` runs one
   job now.
 - **The desktop and phone apps** have no jobs yet. The device's file
-  cleanup, `files::delete_unreferenced_on_device`, stays at the end of
+  cleanup, `bytes::delete_unreferenced_on_device`, stays at the end of
   each sync, where a deleted file's bytes go as soon as the device
   learns of the delete. The first device job would be called where the
   sync is: at startup, when the app comes to the foreground, and in the

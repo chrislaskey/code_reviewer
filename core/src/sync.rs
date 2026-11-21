@@ -6,15 +6,18 @@
 //! stands for. A device does one sync with `run`: it pushes its pending
 //! events through a `Transport` with its token, applies the answers,
 //! pulls pages from its cursor, backfills each community it has just
-//! joined, and prunes the posts and files it can no longer see. A file
-//! created on the device is held back from the push until its bytes are in the
-//! server's bucket, which the sync sends last, see `files` and
+//! joined, and prunes the rows it can no longer see. Each synced table
+//! takes part through `synced_table::SyncedTable`, listed in
+//! `app::synced_tables`. A row with bytes, a file's say, created on the
+//! device is held back from the push until its bytes are in the
+//! server's bucket, which the sync sends last, see `bytes` and
 //! `docs/design/offline-files-decisions.md`. The transport is
 //! `services::web_server`: HTTP in the apps, and the server's own
 //! functions in this process in tests. A device that chose to work
 //! offline, `set_offline`, a device setting, makes no request at all
 //! until it chooses otherwise.
 
+pub mod bytes;
 pub mod conflicts;
 pub mod events;
 pub mod pending_changes;
@@ -31,18 +34,17 @@ use serde_json::Value;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::files::{self, FileError};
 use crate::app::memberships::{self, MembershipError};
 use crate::app::synced_tables;
 use crate::app::users::{self, UserError};
 use crate::data::app_events::{self, Event, EventKind, EventStatus, StoredEvent};
-use crate::data::app_files;
 use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::data::device_settings::{self, DeviceSettingsError, WORK_OFFLINE};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
 use crate::services::web_server::Transport;
+use bytes::BytesError;
 use events::{Answer, AnswerStatus};
 use purge::PurgeError;
 use synced_table::{SyncedTable, TableError};
@@ -145,7 +147,7 @@ pub enum SyncError {
     #[error(transparent)]
     Table(#[from] TableError),
     #[error(transparent)]
-    File(#[from] FileError),
+    Bytes(#[from] BytesError),
     #[error(transparent)]
     Membership(#[from] MembershipError),
     #[error(transparent)]
@@ -368,7 +370,7 @@ pub struct Report {
     pub rejected: usize,
     /// Files whose bytes this sync sent to the server's bucket.
     pub uploaded: usize,
-    /// Files waiting past the `files::FILES_PER_SYNC` this sync asked
+    /// Files waiting past the `bytes::PER_SYNC` this sync asked
     /// about, left for the next.
     #[serde(default)]
     pub files_left: usize,
@@ -456,9 +458,9 @@ pub async fn run<T: Transport>(
     }
     let (user, token) = users::signed_in_with_token(deployment).await?;
     let token = Some(token.as_str());
-    let mut waiting = files::ask_about_waiting(deployment, transport, token).await?;
-    report.files_left = waiting.len().saturating_sub(files::FILES_PER_SYNC);
-    let held_back = files::held_back(deployment, &waiting).await?;
+    let mut waiting = bytes::ask_about_waiting(deployment, transport, token).await?;
+    report.files_left = waiting.len().saturating_sub(bytes::PER_SYNC);
+    let held_back = bytes::held_back(deployment, &waiting).await?;
     if let Err(error) =
         push_pending(deployment, transport, token, &user, &held_back, &mut report).await
     {
@@ -467,16 +469,16 @@ pub async fn run<T: Transport>(
     pull_pages(deployment, transport, token, &user, &mut report).await?;
     backfill_pending(deployment, transport, token, &user, &mut report).await?;
     prune(deployment, &user, &mut report).await?;
-    report.uploaded = files::upload_waiting(deployment, transport, token, &mut waiting).await?;
+    report.uploaded = bytes::upload_waiting(deployment, transport, token, &mut waiting).await?;
     if report.uploaded > 0 {
-        let held_back = files::held_back(deployment, &waiting).await?;
+        let held_back = bytes::held_back(deployment, &waiting).await?;
         if let Err(error) =
             push_pending(deployment, transport, token, &user, &held_back, &mut report).await
         {
             report.push_error = Some(error.to_string());
         }
     }
-    report.cleaned += files::delete_unreferenced_on_device(deployment, now()).await?;
+    report.cleaned += bytes::delete_unreferenced_on_device(deployment, now()).await?;
     report.pending = status(deployment).await?.pending;
     Ok(report)
 }
@@ -601,11 +603,11 @@ async fn push_batch<T: Transport>(
                 match (event.kind, server.is_some()) {
                     // The server's row wins
                     (_, true) => app_events::delete(&mut tx, event.id).await?,
-                    // A file is the only copy of its bytes, so it is never
+                    // A row's bytes may be their only copy, so it is never
                     // dropped: it waits while the server only lacks the
                     // bytes, and is kept for the person otherwise
-                    (EventKind::Create, false) if event.table == app_files::TABLE => {
-                        let refused = if reason == files::FILE_NOT_UPLOADED {
+                    (EventKind::Create, false) if bytes::of_table(&event.table).is_ok() => {
+                        let refused = if reason == bytes::NOT_UPLOADED {
                             app_events::count_attempt(&mut tx, event.id, &reason).await?
                         } else {
                             app_events::refuse(&mut tx, event.id, &reason).await?;
@@ -791,19 +793,10 @@ async fn prune(deployment: &Deployment, user: &User, report: &mut Report) -> Res
     for synced in synced_tables::list() {
         pruned += synced.prune(&mut tx, user).await?;
     }
-    let files_pruned = files::prune(&mut tx, user).await?;
     tx.commit().await?;
-    report.pruned = pruned + files_pruned.len() as u64;
-    for id in files_pruned {
-        // A deployment with no folder has no bytes to remove
-        let Ok(path) = files::local_path(deployment, id) else {
-            break;
-        };
-        if tokio::fs::try_exists(&path).await.unwrap_or(false) {
-            files::delete_local_copy(deployment, id).await?;
-            report.cleaned += 1;
-        }
-    }
+    let (pruned_with_bytes, cleaned) = bytes::prune(deployment, user).await?;
+    report.pruned = pruned + pruned_with_bytes;
+    report.cleaned += cleaned;
     Ok(())
 }
 
@@ -830,7 +823,8 @@ pub(crate) mod tests {
     use super::*;
     use crate::accounts::{self, Session};
     use crate::app::communities::CommunityError;
-    use crate::app::files::{FileUpload, FileUploadNew};
+    #[cfg(feature = "object-storage")]
+    use crate::app::files;
     use crate::app::posts::PostError;
     pub(crate) use crate::app::users::tests::device_of;
     use crate::app::{communities, memberships, posts, posts_communities};
@@ -842,6 +836,7 @@ pub(crate) mod tests {
     #[cfg(feature = "sync-http")]
     use crate::services::web_server::Http;
     use crate::services::web_server::InProcess;
+    use crate::sync::bytes::{Upload, UploadNew};
     use crate::sync::{conflicts, purge};
 
     /// A user signed up on the server, with a token for their devices,
@@ -1291,30 +1286,33 @@ pub(crate) mod tests {
             self.server.sign_out(token).await
         }
 
-        async fn files_create_upload(
+        async fn bytes_create_upload(
             &self,
             token: Option<&str>,
-            request: FileUploadNew,
-        ) -> Result<FileUpload, SyncError> {
-            self.server.files_create_upload(token, request).await
+            table: &str,
+            request: UploadNew,
+        ) -> Result<Upload, SyncError> {
+            self.server.bytes_create_upload(token, table, request).await
         }
 
-        async fn files_upload(
+        async fn bytes_upload(
             &self,
             token: Option<&str>,
-            upload: &FileUpload,
+            table: &str,
+            upload: &Upload,
             path: &Path,
         ) -> Result<(), SyncError> {
-            self.server.files_upload(token, upload, path).await
+            self.server.bytes_upload(token, table, upload, path).await
         }
 
-        async fn files_download(
+        async fn bytes_download(
             &self,
             token: Option<&str>,
+            table: &str,
             id: Uuid,
             path: &Path,
         ) -> Result<(), SyncError> {
-            self.server.files_download(token, id, path).await
+            self.server.bytes_download(token, table, id, path).await
         }
     }
 
@@ -1372,30 +1370,33 @@ pub(crate) mod tests {
             self.server.sign_out(token).await
         }
 
-        async fn files_create_upload(
+        async fn bytes_create_upload(
             &self,
             token: Option<&str>,
-            request: FileUploadNew,
-        ) -> Result<FileUpload, SyncError> {
-            self.server.files_create_upload(token, request).await
+            table: &str,
+            request: UploadNew,
+        ) -> Result<Upload, SyncError> {
+            self.server.bytes_create_upload(token, table, request).await
         }
 
-        async fn files_upload(
+        async fn bytes_upload(
             &self,
             token: Option<&str>,
-            upload: &FileUpload,
+            table: &str,
+            upload: &Upload,
             path: &Path,
         ) -> Result<(), SyncError> {
-            self.server.files_upload(token, upload, path).await
+            self.server.bytes_upload(token, table, upload, path).await
         }
 
-        async fn files_download(
+        async fn bytes_download(
             &self,
             token: Option<&str>,
+            table: &str,
             id: Uuid,
             path: &Path,
         ) -> Result<(), SyncError> {
-            self.server.files_download(token, id, path).await
+            self.server.bytes_download(token, table, id, path).await
         }
     }
 
@@ -1674,30 +1675,33 @@ pub(crate) mod tests {
             self.server.sign_out(token).await
         }
 
-        async fn files_create_upload(
+        async fn bytes_create_upload(
             &self,
             token: Option<&str>,
-            request: FileUploadNew,
-        ) -> Result<FileUpload, SyncError> {
-            self.server.files_create_upload(token, request).await
+            table: &str,
+            request: UploadNew,
+        ) -> Result<Upload, SyncError> {
+            self.server.bytes_create_upload(token, table, request).await
         }
 
-        async fn files_upload(
+        async fn bytes_upload(
             &self,
             token: Option<&str>,
-            upload: &FileUpload,
+            table: &str,
+            upload: &Upload,
             path: &Path,
         ) -> Result<(), SyncError> {
-            self.server.files_upload(token, upload, path).await
+            self.server.bytes_upload(token, table, upload, path).await
         }
 
-        async fn files_download(
+        async fn bytes_download(
             &self,
             token: Option<&str>,
+            table: &str,
             id: Uuid,
             path: &Path,
         ) -> Result<(), SyncError> {
-            self.server.files_download(token, id, path).await
+            self.server.bytes_download(token, table, id, path).await
         }
     }
 
@@ -1929,26 +1933,29 @@ pub(crate) mod tests {
             panic!("the device is working offline and must not sign out")
         }
 
-        async fn files_create_upload(
+        async fn bytes_create_upload(
             &self,
             _token: Option<&str>,
-            _request: FileUploadNew,
-        ) -> Result<FileUpload, SyncError> {
+            _table: &str,
+            _request: UploadNew,
+        ) -> Result<Upload, SyncError> {
             panic!("the device is working offline and must not ask about a file")
         }
 
-        async fn files_upload(
+        async fn bytes_upload(
             &self,
             _token: Option<&str>,
-            _upload: &FileUpload,
+            _table: &str,
+            _upload: &Upload,
             _path: &Path,
         ) -> Result<(), SyncError> {
             panic!("the device is working offline and must not send a file")
         }
 
-        async fn files_download(
+        async fn bytes_download(
             &self,
             _token: Option<&str>,
+            _table: &str,
             _id: Uuid,
             _path: &Path,
         ) -> Result<(), SyncError> {
@@ -2901,7 +2908,7 @@ pub(crate) mod tests {
 
     /// Many files added on a device, `FILES` of them, 1,000 unless set,
     /// reach a running web server's bucket a sync of
-    /// `files::FILES_PER_SYNC` at a time, each sync starting the next as
+    /// `crate::sync::bytes::PER_SYNC` at a time, each sync starting the next as
     /// the app does; prints how long each took. Run as
     /// `sync_a_file_over_http` is:
     ///

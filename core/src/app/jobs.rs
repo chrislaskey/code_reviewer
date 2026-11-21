@@ -14,8 +14,8 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::app::avatars::AvatarError;
-use crate::app::files::FileError;
 use crate::deployment::{Deployment, Role};
+use crate::sync::bytes::BytesError;
 use crate::sync::purge::{self, PurgeError};
 
 impl Job {
@@ -92,7 +92,7 @@ pub enum JobError {
     #[error(transparent)]
     Avatar(#[from] AvatarError),
     #[error(transparent)]
-    File(#[from] FileError),
+    Bytes(#[from] BytesError),
     #[cfg(feature = "stripe")]
     #[error(transparent)]
     StripeReconcile(#[from] crate::accounts::stripe_reconcile::StripeReconcileError),
@@ -164,7 +164,7 @@ async fn perform(deployment: &Deployment, job: Job, now: DateTime<Utc>) -> Resul
         )?),
         #[cfg(feature = "object-storage")]
         Job::FilesDeleteUnreferenced => Ok(serde_json::to_value(
-            crate::app::files::delete_unreferenced(deployment, now).await?,
+            crate::sync::bytes::delete_unreferenced(deployment, now).await?,
         )?),
         #[cfg(not(feature = "object-storage"))]
         Job::AvatarsDeleteUnreferenced | Job::FilesDeleteUnreferenced => {

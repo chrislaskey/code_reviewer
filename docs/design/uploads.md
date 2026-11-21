@@ -103,7 +103,7 @@ first, and files after, by reconciliation rather than bookkeeping:
 - **Each table with files says which column and which prefix**, so the
   sweep reads every table's references; `avatar_url` and `avatars/` are
   the first, `avatars::delete_unreferenced`. `app_files` and `files/`
-  are the second, `files::delete_unreferenced`, where a file's key is
+  are the second, `bytes::delete_unreferenced`, where a file's key is
   worked out from its row.
 - **Deleting an account** deletes its prefixes at once, without waiting
   for the sweep, since erasure is owed promptly.

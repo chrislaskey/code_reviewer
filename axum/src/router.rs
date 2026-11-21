@@ -87,6 +87,11 @@ fn app_api() -> Router<AppState> {
             post(sync::push).layer(DefaultBodyLimit::max(app_core::sync::MAX_PUSH_BYTES)),
         )
         .route("/api/sync/pull", post(sync::pull))
+        .route(
+            "/api/sync/bytes/{table}/uploads",
+            post(sync::bytes::create_upload),
+        )
+        .route("/api/sync/bytes/{table}/{id}", get(sync::bytes::content))
         .route("/api/sync/backfill", post(sync::backfill))
 }
 

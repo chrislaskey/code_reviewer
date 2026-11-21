@@ -48,10 +48,11 @@ mod tests {
     /// of `list` would never sync, be purged or move with a local user.
     #[tokio::test]
     async fn synced_tables_list_every_table_with_sync_columns() {
-        let Database::Sqlite(pool) = Database::open_sqlite_in_memory()
+        let database = Database::open_sqlite_in_memory()
             .await
-            .expect("an in-memory SQLite database")
-        else {
+            .expect("an in-memory SQLite database");
+        #[allow(irrefutable_let_patterns)]
+        let Database::Sqlite(pool) = database else {
             unreachable!("an in-memory database is SQLite");
         };
         let mut with_sync_columns: Vec<String> = sqlx::query_scalar(

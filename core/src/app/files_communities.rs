@@ -739,7 +739,10 @@ mod tests {
             ..new_file(name, b"bytes", Uuid::nil())
         };
         storage
-            .put(&files::storage_key(user.id, new.id), b"bytes".to_vec())
+            .put(
+                &crate::sync::bytes::storage_key(&files::Synced, user.id, new.id),
+                b"bytes".to_vec(),
+            )
             .await
             .expect("the upload");
         files::create(deployment, user, &new).await.expect("a file")
@@ -863,7 +866,10 @@ mod tests {
                     ..new_file("x.txt", b"x", garden)
                 };
                 storage
-                    .put(&files::storage_key(alice.id, new.id), b"x".to_vec())
+                    .put(
+                        &crate::sync::bytes::storage_key(&files::Synced, alice.id, new.id),
+                        b"x".to_vec(),
+                    )
                     .await
                     .expect("the upload");
                 let error = files::create(&server, &alice, &new)

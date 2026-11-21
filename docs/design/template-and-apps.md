@@ -1,6 +1,6 @@
 # Template and apps
 
-Status: planned 2026-11-21; steps 1 to 3 built the same day.
+Status: planned 2026-11-21; steps 1 to 4 built the same day.
 
 ## Request
 
@@ -204,9 +204,15 @@ wait through `parents`, not through a check that names
   and its own rules for who reads.
 - **Avatars are not part of this.** They are online only, in a public
   bucket, and never synced.
-- **Built after the registry works**, as its own step, since
-  `files.rs` is 3,000 lines. Until then, files keep their hooks under
-  their own names.
+- **As built**: a table opts in through `SyncedTable::bytes`. Keys in
+  the bucket stay `<prefix>/<creator id>/<row id>`, the prefix the
+  table's (`files` for files), and a device keeps bytes under the row's
+  id in the account's folder. A device's sync asks
+  `POST /api/sync/bytes/{table}/uploads` and fetches through
+  `GET /api/sync/bytes/{table}/{id}`; the web's Files pages keep
+  `/api/files/uploads` and `/api/files/{id}/content`, which call the
+  same functions. The checks of a content type and a SHA-256 are in
+  `helpers/`, each table's largest size in `SyncedBytes::max_bytes`.
 
 ### Sync moves to `core/src/sync/`
 

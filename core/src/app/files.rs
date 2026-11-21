@@ -26,14 +26,11 @@
 //! `delete_unreferenced_on_device` in the account's folder, at the end
 //! of each sync.
 
-use crate::data::app_files::{
-    self, AcceptedFile, File, TABLE, content_type_or_unknown, is_content_type, is_file_name,
-    is_file_size, is_sha256,
-};
+use crate::data::app_files::{self, AcceptedFile, File, TABLE, is_file_name, is_file_size};
 use crate::data::app_files_communities;
 use crate::data::app_users_communities;
 use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -52,23 +49,18 @@ use crate::data::app_events::{
 };
 use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
-use crate::data::device_settings::{self, WORK_OFFLINE};
 use crate::database::Transaction;
-use crate::deployment::{Deployment, FileStore, Role, now};
+use crate::deployment::{Deployment, Role, now};
+use crate::helpers::content_type::{content_type_or_unknown, is_content_type};
 use crate::helpers::field_errors::FieldErrors;
+use crate::helpers::sha256::is_sha256;
 use crate::helpers::{json, sha256};
-#[cfg(feature = "object-storage")]
-use crate::services::storage::{Storage, StorageError};
 use crate::services::web_server::Transport;
+use crate::sync::TableRow;
+use crate::sync::bytes::{self, BytesError, BytesRow, Readable, SyncedBytes};
 use crate::sync::events::{self, Answer, AnswerStatus};
 use crate::sync::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
-use crate::sync::{SyncError, TableRow};
 
-/// Why a device refuses a waiting file itself: there is nothing to send.
-pub const BYTES_GONE: &str = "the file's bytes are no longer on this device";
-/// Why the server leaves a create pending: the bytes are not in its
-/// bucket yet, so the device sends them and pushes again.
-pub const FILE_NOT_UPLOADED: &str = "file_not_uploaded";
 /// The fields an event may set when it creates a file: `communities` is
 /// the rows of its first communities, written with it.
 const CREATE_FIELDS: &[&str] = &["name", "content_type", "size", "sha256", "communities"];
@@ -77,24 +69,10 @@ const CREATE_FIELDS: &[&str] = &["name", "content_type", "size", "sha256", "comm
 const UPDATE_FIELDS: &[&str] = &["name"];
 /// Where files go in the bucket: `files/<creator id>/<file id>`.
 const KEY_PREFIX: &str = "files";
-/// Bytes no row points at are removed once they are older than this,
-/// in the bucket and on a device: an upload whose row never came, bytes
-/// written a moment before their row.
-pub const UNREFERENCED_DAYS: i64 = 1;
 /// The most checksums `list_duplicates` takes in one call.
 pub const MAX_DUPLICATES_CHECKED: usize = 500;
 /// The most files `search` answers in one call.
 pub const MAX_SEARCH_LIMIT: u32 = 500;
-/// The waiting files one sync asks about and sends, oldest first; the
-/// rest wait for the next, so a URL is used well within its lifetime
-/// and the sync lock is not held for thousands of files.
-pub const FILES_PER_SYNC: usize = 100;
-/// How long a signed upload URL works.
-#[cfg(feature = "object-storage")]
-const UPLOAD_URL_LIFETIME: std::time::Duration = std::time::Duration::from_secs(10 * 60);
-/// How long a signed download URL works.
-#[cfg(feature = "object-storage")]
-pub const DOWNLOAD_URL_LIFETIME: std::time::Duration = std::time::Duration::from_secs(60 * 60);
 
 /// Where a file stands between a device and the server.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -205,34 +183,6 @@ pub struct FileNew {
     pub community_ids: Vec<Uuid>,
 }
 
-/// A file whose bytes are about to be sent to the bucket. A device
-/// names the id it made; the web names none and the server makes one.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Validate)]
-pub struct FileUploadNew {
-    #[garde(skip)]
-    #[serde(default)]
-    pub id: Option<Uuid>,
-    #[garde(custom(is_content_type))]
-    pub content_type: String,
-    #[garde(custom(is_file_size))]
-    pub size: u64,
-    #[garde(custom(is_sha256))]
-    pub sha256: String,
-}
-
-/// The server's answer to `FileUploadNew`: the bytes are already in the
-/// bucket, or where to PUT them, with the `Content-Type` and the
-/// `x-amz-checksum-sha256` headers the URL was signed for.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FileUpload {
-    pub id: Uuid,
-    pub uploaded: bool,
-    pub upload_url: Option<String>,
-    pub content_type: String,
-    /// The bytes' SHA-256 in base64, as the header carries it.
-    pub checksum_sha256: String,
-}
-
 #[derive(Debug, Error)]
 pub enum FileError {
     #[error("file {id} not found")]
@@ -243,32 +193,33 @@ pub enum FileError {
     NotUploaded,
     #[error("the change was refused: {0}")]
     Rejected(String),
-    #[error("files are not set up on this deployment")]
-    NoFileStore,
     #[error("only a device keeps a file's bytes itself")]
     DeviceOnly,
     #[error("{0}")]
     Malformed(String),
-    #[error("could not read or write the file on this device: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("the file is not on this device")]
-    NotOnDevice,
     #[error(transparent)]
     Community(#[from] FileCommunityError),
     #[error(transparent)]
-    Sync(Box<SyncError>),
-    #[cfg(feature = "object-storage")]
+    Bytes(BytesError),
+    /// A synced table's own module failed.
     #[error(transparent)]
-    Storage(#[from] StorageError),
+    Table(#[from] TableError),
     #[error(transparent)]
     Record(#[from] crate::sync::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
 
-impl From<SyncError> for FileError {
-    fn from(error: SyncError) -> FileError {
-        FileError::Sync(Box::new(error))
+/// The bytes' errors a file answers as its own, the rest as they are.
+impl From<BytesError> for FileError {
+    fn from(error: BytesError) -> FileError {
+        match error {
+            BytesError::NotFound { id } => FileError::NotFound { id },
+            BytesError::Invalid(errors) => FileError::Invalid(errors),
+            BytesError::Rejected(reason) => FileError::Rejected(reason),
+            BytesError::Malformed(message) => FileError::Malformed(message),
+            error => FileError::Bytes(error),
+        }
     }
 }
 
@@ -433,12 +384,12 @@ pub async fn create_with_bytes(
         community_ids: community_ids.to_vec(),
     }
     .checked()?;
-    let path = local_path(deployment, new.id)?;
-    write_whole(&path, bytes).await?;
+    let path = bytes::local_path(deployment, new.id)?;
+    bytes::write_whole(&path, bytes).await?;
     match create(deployment, user, &new).await {
         Ok(file) => Ok(file),
         Err(error) => {
-            delete_local(&path).await?;
+            bytes::delete_local(&path).await?;
             Err(error)
         }
     }
@@ -488,7 +439,7 @@ pub async fn delete(deployment: &Deployment, user: &User, id: Uuid) -> Result<()
     if deployment.role == Role::Device && create_of(&mut tx, id).await?.is_some() {
         forget_in(&mut tx, id).await?;
         tx.commit().await?;
-        return delete_local_copy(deployment, id).await;
+        return Ok(bytes::delete_local_copy(deployment, id).await?);
     }
     for row in files_communities::list_visible_of_files(&mut tx, user, &[id]).await? {
         files_communities::delete_in(&mut tx, deployment.role, user, id, row.community_id).await?;
@@ -509,54 +460,14 @@ pub async fn apply_event(
 }
 
 /// Answers where to PUT a file's bytes, or that the bucket already has
-/// them: on the server, which holds the bucket's keys. The file has no
-/// row yet, so what holds an upload to its creator is the key's prefix:
-/// nobody else writes or claims a file before its row exists.
+/// them, see `bytes::create_upload`.
 #[cfg(feature = "object-storage")]
 pub async fn create_upload(
     deployment: &Deployment,
     user: &User,
-    request: &FileUploadNew,
-) -> Result<FileUpload, FileError> {
-    if crate::accounts::trial_users::is_trial(deployment, user).await? {
-        return Err(FileError::Rejected(
-            "a trial has no files; sign up first".to_string(),
-        ));
-    }
-    let storage = bucket(deployment)?;
-    let content_type = content_type_or_unknown(&request.content_type);
-    let request = FileUploadNew {
-        content_type: content_type.clone(),
-        ..request.clone()
-    };
-    FieldErrors::check(&request).map_err(FileError::Invalid)?;
-    let id = request.id.unwrap_or_else(Uuid::now_v7);
-    let key = storage_key(user.id, id);
-    let checksum_sha256 = base64_of_hex(&request.sha256)?;
-    if bucket_has(storage, &key, request.size, &checksum_sha256).await? {
-        return Ok(FileUpload {
-            id,
-            uploaded: true,
-            upload_url: None,
-            content_type,
-            checksum_sha256,
-        });
-    }
-    let upload_url = storage
-        .upload_url(
-            &key,
-            &content_type,
-            Some(&checksum_sha256),
-            UPLOAD_URL_LIFETIME,
-        )
-        .await?;
-    Ok(FileUpload {
-        id,
-        uploaded: false,
-        upload_url: Some(upload_url),
-        content_type,
-        checksum_sha256,
-    })
+    request: &bytes::UploadNew,
+) -> Result<bytes::Upload, FileError> {
+    Ok(bytes::create_upload(deployment, user, TABLE, request).await?)
 }
 
 /// A URL a file the user sees is read from for the next hour, signed by
@@ -569,269 +480,27 @@ pub async fn content_url(
     id: Uuid,
     as_attachment: bool,
 ) -> Result<String, FileError> {
-    let storage = bucket(deployment)?;
-    let mut tx = deployment.begin().await?;
-    let file = get_visible(&mut tx, user, id).await?;
-    tx.commit().await?;
-    let content_disposition = as_attachment.then(|| attachment_named(&file.name));
-    Ok(storage
-        .download_url(
-            &storage_key(file.created_by_id, file.id),
-            DOWNLOAD_URL_LIFETIME,
-            content_disposition.as_deref(),
-        )
-        .await?)
-}
-
-/// A file waiting on a device, with what the server said when asked
-/// about its bytes: nothing when it could not be asked or would not
-/// say, that it has them, or where to send them.
-#[derive(Clone, Debug)]
-pub struct WaitingFile {
-    pub id: Uuid,
-    /// The file's create, pending in the queue.
-    pub create_id: Uuid,
-    pub upload: Option<FileUpload>,
-}
-
-/// The first step of a sync on a device: asks the server about the
-/// bytes of the first `FILES_PER_SYNC` files whose create is pending,
-/// and answers every one, those not asked with nothing. What the device
-/// knows of an upload is only this answer, asked again by every sync
-/// and kept nowhere. Once the server cannot be reached the rest are not
-/// asked, so a device offline waits for one request, not one per file.
-pub async fn ask_about_waiting<T: Transport>(
-    deployment: &Deployment,
-    transport: &T,
-    token: Option<&str>,
-) -> Result<Vec<WaitingFile>, SyncError> {
-    let mut tx = deployment.begin().await?;
-    let creates: Vec<StoredEvent> = app_events::pending(&mut tx)
-        .await?
-        .into_iter()
-        .filter(|stored| stored.event.table == TABLE && stored.event.kind == EventKind::Create)
-        .collect();
-    tx.commit().await?;
-
-    let mut waiting = Vec::with_capacity(creates.len());
-    let mut reachable = true;
-    for (index, stored) in creates.into_iter().enumerate() {
-        let event = &stored.event;
-        let mut file = WaitingFile {
-            id: event.row_id,
-            create_id: event.id,
-            upload: None,
-        };
-        let request = FileUploadNew {
-            id: Some(event.row_id),
-            content_type: event.changes["content_type"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string(),
-            size: event.changes["size"].as_u64().unwrap_or_default(),
-            sha256: event.changes["sha256"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string(),
-        };
-        if reachable && index < FILES_PER_SYNC {
-            match transport.files_create_upload(token, request).await {
-                Ok(upload) => file.upload = Some(upload),
-                // The server will not take this file, whatever is sent
-                Err(SyncError::Refused(reason)) => refuse(deployment, event.id, &reason).await?,
-                Err(error @ SyncError::Transport(_)) => {
-                    reachable = false;
-                    note_error(deployment, event.id, &error.to_string()).await?;
-                }
-                Err(error) => return Err(error),
-            }
-        }
-        waiting.push(file);
-    }
-    Ok(waiting)
-}
-
-/// The rows whose events are held back from the push: the files waiting
-/// whose bytes the server does not have, and those it refused, whose
-/// later events, a rename say, it would answer by a row it never had,
-/// and their rows in communities.
-pub async fn held_back(
-    deployment: &Deployment,
-    waiting: &[WaitingFile],
-) -> Result<BTreeSet<Uuid>, SyncError> {
-    let mut held_back: BTreeSet<Uuid> = waiting
-        .iter()
-        .filter(|file| !file.upload.as_ref().is_some_and(|upload| upload.uploaded))
-        .map(|file| file.id)
-        .collect();
-    let mut tx = deployment.begin().await?;
-    let refused = app_events::conflicts(&mut tx)
-        .await?
-        .into_iter()
-        .filter(|stored| stored.event.table == TABLE && stored.event.kind == EventKind::Create)
-        .map(|stored| stored.event.row_id);
-    held_back.extend(refused);
-    let mut rows = BTreeSet::new();
-    for stored in app_events::pending(&mut tx).await? {
-        if stored.event.table != app_files_communities::TABLE {
-            continue;
-        }
-        let row = files_communities::get_in(&mut tx, stored.event.row_id)
-            .await
-            .map_err(FileError::from)?;
-        if row.is_some_and(|row| held_back.contains(&row.file_id)) {
-            rows.insert(stored.event.row_id);
-        }
-    }
-    held_back.extend(rows);
-    tx.commit().await?;
-    Ok(held_back)
-}
-
-/// The last step of a sync on a device before the files' events are
-/// pushed: sends the bytes of each waiting file the server gave a URL
-/// for, from the account's folder, and marks it uploaded. How many
-/// went. A file whose bytes are gone from the device is refused; one
-/// the bucket says no to counts a try and waits for the next sync; once
-/// the bucket cannot be reached the rest wait too, and nothing counts.
-///
-/// This runs inside the sync, which holds the sync lock while bytes go.
-/// An application with large files calls it from a task of its own
-/// instead, followed by a sync.
-pub async fn upload_waiting<T: Transport>(
-    deployment: &Deployment,
-    transport: &T,
-    token: Option<&str>,
-    waiting: &mut [WaitingFile],
-) -> Result<usize, SyncError> {
-    let mut uploaded = 0;
-    for file in waiting {
-        let Some(upload) = file.upload.as_mut().filter(|upload| !upload.uploaded) else {
-            continue;
-        };
-        let path = local_path(deployment, file.id)?;
-        if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
-            refuse(deployment, file.create_id, BYTES_GONE).await?;
-            continue;
-        }
-        match transport.files_upload(token, upload, &path).await {
-            Ok(()) => {
-                upload.uploaded = true;
-                uploaded += 1;
-            }
-            Err(SyncError::Refused(reason)) => {
-                let mut tx = deployment.begin().await?;
-                app_events::count_attempt(&mut tx, file.create_id, &reason).await?;
-                tx.commit().await?;
-            }
-            Err(error @ SyncError::Transport(_)) => {
-                note_error(deployment, file.create_id, &error.to_string()).await?;
-                break;
-            }
-            Err(error) => return Err(error),
-        }
-    }
-    Ok(uploaded)
-}
-
-/// Stops trying a waiting file, with why: kept for the person.
-async fn refuse(deployment: &Deployment, create_id: Uuid, reason: &str) -> Result<(), SyncError> {
-    let mut tx = deployment.begin().await?;
-    app_events::refuse(&mut tx, create_id, reason).await?;
-    tx.commit().await?;
-    Ok(())
-}
-
-/// Keeps why a waiting file's bytes did not go, without counting a try.
-async fn note_error(
-    deployment: &Deployment,
-    create_id: Uuid,
-    reason: &str,
-) -> Result<(), SyncError> {
-    let mut tx = deployment.begin().await?;
-    app_events::mark_error(&mut tx, create_id, reason).await?;
-    tx.commit().await?;
-    Ok(())
-}
-
-/// Deletes from the bucket every file's bytes that no row points at,
-/// deleted rows included, once they are older than `UNREFERENCED_DAYS`:
-/// an upload whose push never came, a refused file let go, a row the
-/// purge removed. A deleted row keeps its bytes until the purge takes
-/// it. On the server, daily after `purge::run` and
-/// `avatars::delete_unreferenced`, see `jobs`.
-///
-/// A device that comes back in the moment between this reading the rows
-/// and deleting a file can have its row written just before the bytes
-/// go; rare enough to accept, see "A gap accepted" in
-/// `docs/design/offline-files-decisions.md`.
-#[cfg(feature = "object-storage")]
-pub async fn delete_unreferenced(
-    deployment: &Deployment,
-    now: DateTime<Utc>,
-) -> Result<crate::app::avatars::DeleteUnreferencedReport, FileError> {
-    let storage = bucket(deployment)?;
-    let mut tx = deployment.begin().await?;
-    let referenced: BTreeSet<String> = app_files::maintenance::list_ids(&mut tx)
-        .await?
-        .into_iter()
-        .map(|(id, created_by_id, _deleted)| storage_key(created_by_id, id))
-        .collect();
-    tx.commit().await?;
-
-    let cutoff = now - chrono::Duration::days(UNREFERENCED_DAYS);
-    let mut report = crate::app::avatars::DeleteUnreferencedReport::default();
-    for file in storage.list(KEY_PREFIX).await? {
-        if referenced.contains(&file.key) || file.last_modified > cutoff {
-            report.kept += 1;
-            continue;
-        }
-        storage.delete(&file.key).await?;
-        report.deleted += 1;
-    }
-    Ok(report)
-}
-
-/// Removes from the account's folder the bytes no live row points at:
-/// those of a deleted row at once, and those of no row, or a fetch left
-/// half done, once they are older than `UNREFERENCED_DAYS`, since a
-/// file being created has its bytes there a moment before its row. That
-/// covers a delete, a resync that dropped the rows, and a crash between
-/// the bytes and the row. How many went. A deployment with no folder
-/// has nothing to remove.
-pub async fn delete_unreferenced_on_device(
-    deployment: &Deployment,
-    now: DateTime<Utc>,
-) -> Result<usize, FileError> {
-    let FileStore::Folder(folder) = &deployment.file_store else {
-        return Ok(0);
+    let content_disposition = if as_attachment {
+        let mut tx = deployment.begin().await?;
+        let file = get_visible(&mut tx, user, id).await?;
+        tx.commit().await?;
+        Some(attachment_named(&file.name))
+    } else {
+        None
     };
-    let mut tx = deployment.begin().await?;
-    let rows = app_files::maintenance::list_ids(&mut tx).await?;
-    tx.commit().await?;
+    Ok(bytes::download_url(deployment, user, TABLE, id, content_disposition.as_deref()).await?)
+}
 
-    let cutoff = now - chrono::Duration::days(UNREFERENCED_DAYS);
-    let mut removed = 0;
-    let mut entries = tokio::fs::read_dir(folder).await?;
-    while let Some(entry) = entries.next_entry().await? {
-        let row = entry
-            .file_name()
-            .to_str()
-            .and_then(|name| Uuid::parse_str(name).ok())
-            .and_then(|id| rows.iter().find(|(row_id, _, _)| *row_id == id));
-        let remove = match row {
-            Some((_, _, deleted)) => *deleted,
-            None => {
-                let modified: DateTime<Utc> = entry.metadata().await?.modified()?.into();
-                modified < cutoff
-            }
-        };
-        if remove {
-            delete_local(&entry.path()).await?;
-            removed += 1;
-        }
-    }
-    Ok(removed)
+/// Where the bytes of a file the user sees are on this device, fetched
+/// from the server first when they are not there, see
+/// `bytes::local_copy`.
+pub async fn local_copy<T: Transport>(
+    deployment: &Deployment,
+    transport: &T,
+    user: &User,
+    id: Uuid,
+) -> Result<PathBuf, FileError> {
+    Ok(bytes::local_copy(deployment, transport, user, TABLE, id).await?)
 }
 
 /// The copies on this device of the synced files the user sees.
@@ -850,7 +519,7 @@ pub async fn cache_get(deployment: &Deployment, user: &User) -> Result<FilesCach
 pub async fn cache_delete(deployment: &Deployment, user: &User) -> Result<FilesCache, FileError> {
     let mut removed = FilesCache::default();
     for (path, size) in cached(deployment, user).await? {
-        delete_local(&path).await?;
+        bytes::delete_local(&path).await?;
         removed.count += 1;
         removed.bytes += size;
     }
@@ -865,11 +534,11 @@ async fn cached(deployment: &Deployment, user: &User) -> Result<Vec<(PathBuf, u6
         if shown.state != FileState::Synced {
             continue;
         }
-        let path = local_path(deployment, shown.file.id)?;
+        let path = bytes::local_path(deployment, shown.file.id)?;
         match tokio::fs::metadata(&path).await {
             Ok(metadata) => cached.push((path, metadata.len())),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error.into()),
+            Err(error) => return Err(BytesError::from(error).into()),
         }
     }
     Ok(cached)
@@ -881,11 +550,6 @@ pub fn table_row(file: &File) -> Result<TableRow, FileError> {
         table: TABLE.to_string(),
         row: serde_json::to_value(file)?,
     })
-}
-
-/// Where a file's bytes are in the bucket, under its creator.
-pub fn storage_key(created_by_id: Uuid, id: Uuid) -> String {
-    format!("{KEY_PREFIX}/{created_by_id}/{id}")
 }
 
 /// Writes the server's row over the device's, unless an event of the
@@ -920,60 +584,9 @@ pub(crate) async fn get_in(tx: &mut Transaction, id: Uuid) -> Result<Option<File
     Ok(app_files::replication::get(tx, id).await?)
 }
 
-/// Where the bytes of a file the user sees are on this device, fetched
-/// from the server first when they are not there: the first time a
-/// device that did not create the file shows it. Fetched under a temporary name
-/// and renamed once whole, so a file at its path is never half there.
-/// Working offline, or with the server out of reach, a file not here
-/// is `NotOnDevice`.
-pub async fn local_copy<T: Transport>(
-    deployment: &Deployment,
-    transport: &T,
-    user: &User,
-    id: Uuid,
-) -> Result<PathBuf, FileError> {
-    let mut tx = deployment.begin().await?;
-    let file = get_visible(&mut tx, user, id).await?;
-    let offline: bool = device_settings::get(&mut tx, WORK_OFFLINE)
-        .await
-        .map_err(|error| FileError::Malformed(error.to_string()))?;
-    tx.commit().await?;
-    let path = local_path(deployment, id)?;
-    if tokio::fs::try_exists(&path).await? {
-        return Ok(path);
-    }
-    if offline {
-        return Err(FileError::NotOnDevice);
-    }
-    let (_user, token) = users::signed_in_with_token(deployment)
-        .await
-        .map_err(|error| FileError::Malformed(error.to_string()))?;
-    // A name of its own, since two pages may ask for one file at once
-    let partial = path.with_extension(format!("{}.part", Uuid::now_v7().simple()));
-    let fetched = match transport.files_download(Some(&token), id, &partial).await {
-        Ok(()) => tokio::fs::metadata(&partial)
-            .await
-            .map(|fetched| fetched.len()),
-        Err(SyncError::Transport(_)) => {
-            delete_local(&partial).await?;
-            return Err(FileError::NotOnDevice);
-        }
-        Err(error) => {
-            delete_local(&partial).await?;
-            return Err(error.into());
-        }
-    };
-    if fetched.as_ref().ok() != Some(&file.size) {
-        delete_local(&partial).await?;
-        return Err(FileError::NotOnDevice);
-    }
-    tokio::fs::rename(&partial, &path).await?;
-    Ok(path)
-}
-
 /// Removes the row and every event of a file that never reached the
 /// server, on a device, its rows in communities with it; its bytes go
-/// once this is committed, see `delete_local_copy`.
+/// once this is committed, see `bytes::delete_local_copy`.
 pub(crate) async fn forget_in(tx: &mut Transaction, id: Uuid) -> Result<(), FileError> {
     app_events::delete_of_row(tx, TABLE, id).await?;
     for row in files_communities_of(tx, id).await? {
@@ -1000,7 +613,7 @@ async fn files_communities_of(tx: &mut Transaction, id: Uuid) -> Result<Vec<Uuid
 /// community left, a file taken out of theirs or deleted. A file whose
 /// create has not reached the server stays: its bytes are nowhere else.
 /// Answers the ids that went, whose bytes go once this is committed, see
-/// `delete_local_copy`.
+/// `bytes::prune`.
 pub(crate) async fn prune(tx: &mut Transaction, user: &User) -> Result<Vec<Uuid>, FileError> {
     let mut pruned = Vec::new();
     for id in app_files::maintenance::list_invisible_ids(tx, user.id).await? {
@@ -1039,41 +652,6 @@ pub(crate) async fn delete_with_last_community(
     let file = AcceptedFile::new(file)?;
     app_files::update(&mut *tx, &file).await?;
     Ok(())
-}
-
-/// Removes a file's bytes from this device, if they are there.
-pub(crate) async fn delete_local_copy(deployment: &Deployment, id: Uuid) -> Result<(), FileError> {
-    delete_local(&local_path(deployment, id)?).await
-}
-
-/// Where a file's bytes are on this device, there or not.
-pub fn local_path(deployment: &Deployment, id: Uuid) -> Result<PathBuf, FileError> {
-    match &deployment.file_store {
-        FileStore::Folder(folder) => Ok(folder.join(id.hyphenated().to_string())),
-        _ => Err(FileError::NoFileStore),
-    }
-}
-
-/// Writes the bytes under a temporary name beside the path, then
-/// renames, so a file at its path is always whole.
-async fn write_whole(path: &Path, bytes: &[u8]) -> Result<(), FileError> {
-    let partial = partial_path(path);
-    tokio::fs::write(&partial, bytes).await?;
-    tokio::fs::rename(&partial, path).await?;
-    Ok(())
-}
-
-/// The name a file is written under until it is whole.
-pub(crate) fn partial_path(path: &Path) -> PathBuf {
-    path.with_extension("part")
-}
-
-/// Removes the bytes at the path, if any are there.
-async fn delete_local(path: &Path) -> Result<(), FileError> {
-    match tokio::fs::remove_file(path).await {
-        Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error.into()),
-        _ => Ok(()),
-    }
 }
 
 /// The create of a file that has not reached the server, on a device:
@@ -1189,7 +767,7 @@ impl Applied {
         match (self.answer.status, self.file) {
             (AnswerStatus::Rejected, _) => {
                 let reason = self.answer.reason.unwrap_or_else(|| "rejected".to_string());
-                Err(if reason == FILE_NOT_UPLOADED {
+                Err(if reason == bytes::NOT_UPLOADED {
                     FileError::NotUploaded
                 } else {
                     FileError::Rejected(reason)
@@ -1206,88 +784,15 @@ impl Applied {
 /// transaction, since the bucket is another machine.
 async fn apply(deployment: &Deployment, user: &User, event: &Event) -> Result<Applied, FileError> {
     let uploaded = match (deployment.role, event.kind) {
-        (Role::Server, EventKind::Create) => is_uploaded(deployment, user, event).await?,
+        (Role::Server, EventKind::Create) => {
+            bytes::is_uploaded(deployment, user, &Synced, event).await?
+        }
         _ => true,
     };
     let mut tx = deployment.begin().await?;
     let applied = apply_in(&mut tx, deployment.role, user, event, uploaded).await?;
     tx.commit().await?;
     Ok(applied)
-}
-
-/// Whether the bucket holds the bytes of the file the event creates, at
-/// the size and with the checksum the event says.
-async fn is_uploaded(
-    deployment: &Deployment,
-    user: &User,
-    event: &Event,
-) -> Result<bool, FileError> {
-    let Some(size) = event.changes.get("size").and_then(Value::as_u64) else {
-        return Ok(false);
-    };
-    let Some(sha256) = event.changes.get("sha256").and_then(Value::as_str) else {
-        return Ok(false);
-    };
-    let key = storage_key(user.id, event.row_id);
-    bucket_has_bytes(deployment, &key, size, sha256).await
-}
-
-#[cfg(feature = "object-storage")]
-async fn bucket_has_bytes(
-    deployment: &Deployment,
-    key: &str,
-    size: u64,
-    sha256: &str,
-) -> Result<bool, FileError> {
-    let Ok(checksum_sha256) = base64_of_hex(sha256) else {
-        return Ok(false);
-    };
-    bucket_has(bucket(deployment)?, key, size, &checksum_sha256).await
-}
-
-/// Without the bucket's code compiled in, as in the apps, there is none.
-#[cfg(not(feature = "object-storage"))]
-async fn bucket_has_bytes(
-    _deployment: &Deployment,
-    _key: &str,
-    _size: u64,
-    _sha256: &str,
-) -> Result<bool, FileError> {
-    Err(FileError::NoFileStore)
-}
-
-/// Whether the bucket holds bytes at the key of the size, whose checksum
-/// it checked is this base64 SHA-256.
-#[cfg(feature = "object-storage")]
-async fn bucket_has(
-    storage: &Storage,
-    key: &str,
-    size: u64,
-    checksum_sha256: &str,
-) -> Result<bool, FileError> {
-    if storage.size(key).await? != Some(size) {
-        return Ok(false);
-    }
-    Ok(storage.checksum_sha256(key).await?.as_deref() == Some(checksum_sha256))
-}
-
-/// The checksum as the bucket's header carries it, base64, from the
-/// row's hex.
-#[cfg(feature = "object-storage")]
-fn base64_of_hex(sha256: &str) -> Result<String, FileError> {
-    use base64::Engine;
-
-    let bytes = (0..sha256.len())
-        .step_by(2)
-        .map(|at| {
-            sha256
-                .get(at..at + 2)
-                .and_then(|pair| u8::from_str_radix(pair, 16).ok())
-        })
-        .collect::<Option<Vec<u8>>>()
-        .filter(|_| is_sha256(sha256, &()).is_ok())
-        .ok_or_else(|| FileError::Malformed(format!("{sha256} is not a SHA-256")))?;
-    Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
 /// Applies the event in the transaction: checks the fields it changes
@@ -1369,7 +874,7 @@ pub(crate) async fn apply_in(
                 return rejected(event, reason, None);
             }
             if !uploaded {
-                return rejected(event, FILE_NOT_UPLOADED, None);
+                return rejected(event, bytes::NOT_UPLOADED, None);
             }
             app_files::create(&mut *tx, &file).await?;
             let file = file.into_row();
@@ -1478,15 +983,6 @@ impl FileNew {
     }
 }
 
-/// The server's bucket, where there is one.
-#[cfg(feature = "object-storage")]
-pub(crate) fn bucket(deployment: &Deployment) -> Result<&Storage, FileError> {
-    match &deployment.file_store {
-        FileStore::Bucket(storage) => Ok(storage),
-        _ => Err(FileError::NoFileStore),
-    }
-}
-
 /// The name as it is kept: trimmed, not blank, not too long.
 fn checked_name(name: &str) -> Result<String, FileError> {
     let name = name.trim();
@@ -1529,6 +1025,10 @@ pub struct Synced;
 impl SyncedTable for Synced {
     fn table(&self) -> &'static str {
         TABLE
+    }
+
+    fn bytes(&self) -> Option<&dyn SyncedBytes> {
+        Some(self)
     }
 
     fn owner_column(&self) -> Option<&'static str> {
@@ -1678,17 +1178,87 @@ impl SyncedTable for Synced {
     }
 }
 
+#[async_trait]
+impl SyncedBytes for Synced {
+    fn key_prefix(&self) -> &'static str {
+        KEY_PREFIX
+    }
+
+    fn max_bytes(&self) -> u64 {
+        app_files::MAX_BYTES
+    }
+
+    async fn readable(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        id: Uuid,
+    ) -> Result<Option<Readable>, TableError> {
+        let file = app_files::get(tx, user.id, id).await?;
+        Ok(file.map(|file| Readable {
+            created_by_id: file.created_by_id,
+            size: file.size,
+        }))
+    }
+
+    async fn list_rows(&self, tx: &mut Transaction) -> Result<Vec<BytesRow>, TableError> {
+        let rows = app_files::maintenance::list_ids(tx).await?;
+        Ok(rows
+            .into_iter()
+            .map(|(id, created_by_id, deleted)| BytesRow {
+                id,
+                created_by_id,
+                deleted,
+            })
+            .collect())
+    }
+
+    async fn forget(&self, tx: &mut Transaction, id: Uuid) -> Result<(), TableError> {
+        Ok(forget_in(tx, id).await?)
+    }
+
+    /// A file's rows in communities, whose events the server would
+    /// answer by a file it never had.
+    async fn rows_waiting_with(
+        &self,
+        tx: &mut Transaction,
+        held_back: &BTreeSet<Uuid>,
+    ) -> Result<Vec<Uuid>, TableError> {
+        let mut rows = Vec::new();
+        for stored in app_events::pending(tx).await? {
+            if stored.event.table != app_files_communities::TABLE {
+                continue;
+            }
+            let row = files_communities::get_in(tx, stored.event.row_id).await?;
+            if row.is_some_and(|row| held_back.contains(&row.file_id)) {
+                rows.push(stored.event.row_id);
+            }
+        }
+        Ok(rows)
+    }
+
+    async fn prune(&self, tx: &mut Transaction, user: &User) -> Result<Vec<Uuid>, TableError> {
+        Ok(prune(tx, user).await?)
+    }
+}
+
 #[cfg(all(test, feature = "object-storage"))]
 pub(crate) mod tests {
     use super::*;
     use crate::accounts::Session;
     use crate::app::{posts, users};
     use crate::database::{Database, with_each_database};
+    use crate::deployment::FileStore;
+    use crate::helpers::content_type;
+    use crate::services::storage::Storage;
     use crate::services::web_server::InProcess;
+    use crate::sync::SyncError;
+    use crate::sync::bytes::{Upload, UploadNew};
     use crate::sync::conflicts::{self, ConflictError, Resolve};
     use crate::sync::pending_changes;
     use crate::sync::tests::user_with_token;
     use crate::sync::{self, BackfillRequest, Page, PullRequest, PushRequest, PushResponse};
+    use std::path::Path;
 
     /// The user's own community on the deployment, made the first time.
     pub(crate) async fn personal(deployment: &Deployment, user: &User) -> Uuid {
@@ -1769,7 +1339,10 @@ pub(crate) mod tests {
     ) -> File {
         let new = new_file(name, bytes, personal(deployment, user).await);
         storage
-            .put(&storage_key(user.id, new.id), bytes.to_vec())
+            .put(
+                &bytes::storage_key(&Synced, user.id, new.id),
+                bytes.to_vec(),
+            )
             .await
             .expect("the upload");
         create(deployment, user, &new).await.expect("a file")
@@ -1902,7 +1475,7 @@ pub(crate) mod tests {
         assert_eq!(file.name, "notes.txt");
         assert_eq!(file.size, 10);
         assert_eq!(file.version, 0);
-        let path = local_path(&device, file.id).expect("a path");
+        let path = bytes::local_path(&device, file.id).expect("a path");
         assert_eq!(std::fs::read(&path).expect("the bytes"), b"some notes");
         let listed = list(&device, &alice).await.expect("the files");
         assert_eq!(listed[0].file, file);
@@ -2017,40 +1590,46 @@ pub(crate) mod tests {
             self.server.sign_out(token).await
         }
 
-        async fn files_create_upload(
+        async fn bytes_create_upload(
             &self,
             token: Option<&str>,
-            request: FileUploadNew,
-        ) -> Result<FileUpload, SyncError> {
+            table: &str,
+            request: UploadNew,
+        ) -> Result<Upload, SyncError> {
             if self.down_for_files {
                 return Err(SyncError::Transport("502 from the server".to_string()));
             }
             if let Some(reason) = self.refuses_files {
                 return Err(SyncError::Refused(reason.to_string()));
             }
-            let upload = self.server.files_create_upload(token, request).await?;
-            Ok(FileUpload {
+            let upload = self
+                .server
+                .bytes_create_upload(token, table, request)
+                .await?;
+            Ok(Upload {
                 uploaded: upload.uploaded || self.says_uploaded,
                 ..upload
             })
         }
 
-        async fn files_upload(
+        async fn bytes_upload(
             &self,
             token: Option<&str>,
-            upload: &FileUpload,
+            table: &str,
+            upload: &Upload,
             path: &Path,
         ) -> Result<(), SyncError> {
-            self.server.files_upload(token, upload, path).await
+            self.server.bytes_upload(token, table, upload, path).await
         }
 
-        async fn files_download(
+        async fn bytes_download(
             &self,
             token: Option<&str>,
+            table: &str,
             id: Uuid,
             path: &Path,
         ) -> Result<(), SyncError> {
-            self.server.files_download(token, id, path).await
+            self.server.bytes_download(token, table, id, path).await
         }
     }
 
@@ -2065,7 +1644,7 @@ pub(crate) mod tests {
 
     async fn in_bucket(storage: &Storage, user: &User, id: Uuid) -> Option<u64> {
         storage
-            .size(&storage_key(user.id, id))
+            .size(&bytes::storage_key(&Synced, user.id, id))
             .await
             .expect("looked")
     }
@@ -2103,7 +1682,7 @@ pub(crate) mod tests {
             assert_eq!(on_a.state, FileState::Synced);
             assert_eq!(on_a.file, on_server.file, "the server's row came back");
             assert!(
-                local_path(&a, file.id).expect("a path").exists(),
+                bytes::local_path(&a, file.id).expect("a path").exists(),
                 "the device that added it keeps its copy"
             );
 
@@ -2132,7 +1711,7 @@ pub(crate) mod tests {
                 .expect("a file");
             sync::run(&a, &transport).await.expect("a sync");
             sync::run(&b, &transport).await.expect("a sync");
-            assert!(!local_path(&b, file.id).expect("a path").exists());
+            assert!(!bytes::local_path(&b, file.id).expect("a path").exists());
 
             let path = local_copy(&b, &transport, &alice, file.id)
                 .await
@@ -2147,7 +1726,7 @@ pub(crate) mod tests {
             );
 
             storage
-                .delete(&storage_key(alice.id, file.id))
+                .delete(&bytes::storage_key(&Synced, alice.id, file.id))
                 .await
                 .expect("the bucket out of reach, in effect");
             let again = local_copy(&b, &transport, &alice, file.id)
@@ -2182,9 +1761,15 @@ pub(crate) mod tests {
             assert_eq!(cache, FilesCache { count: 1, bytes: 5 });
             let removed = cache_delete(&device, &alice).await.expect("removed");
             assert_eq!(removed, cache);
-            assert!(!local_path(&device, synced.id).expect("a path").exists());
             assert!(
-                local_path(&device, waiting.id).expect("a path").exists(),
+                !bytes::local_path(&device, synced.id)
+                    .expect("a path")
+                    .exists()
+            );
+            assert!(
+                bytes::local_path(&device, waiting.id)
+                    .expect("a path")
+                    .exists(),
                 "a waiting file is the only copy"
             );
             assert_eq!(
@@ -2218,7 +1803,7 @@ pub(crate) mod tests {
             let error = local_copy(&b, &transport, &alice, file.id)
                 .await
                 .expect_err("not fetched");
-            assert!(matches!(error, FileError::NotOnDevice));
+            assert!(matches!(error, FileError::Bytes(BytesError::NotOnDevice)));
             assert_eq!(
                 std::fs::read_dir(b_folder.path())
                     .expect("the folder")
@@ -2251,7 +1836,8 @@ pub(crate) mod tests {
             posts::create(&a, &alice, "a post", &[])
                 .await
                 .expect("a post");
-            std::fs::remove_file(local_path(&a, lost.id).expect("a path")).expect("its bytes gone");
+            std::fs::remove_file(bytes::local_path(&a, lost.id).expect("a path"))
+                .expect("its bytes gone");
 
             let report = sync::run(&a, &InProcess { server: &server })
                 .await
@@ -2273,7 +1859,7 @@ pub(crate) mod tests {
             assert_eq!(on_server, ["kept.txt"]);
             let (state, error) = state_of(&a, &alice, lost.id).await;
             assert_eq!(state, FileState::Refused, "there is nothing to send");
-            assert_eq!(error.as_deref(), Some(BYTES_GONE));
+            assert_eq!(error.as_deref(), Some(bytes::BYTES_GONE));
             assert_eq!(state_of(&a, &alice, kept.id).await.0, FileState::Synced);
 
             let report = sync::run(&a, &InProcess { server: &server })
@@ -2298,7 +1884,7 @@ pub(crate) mod tests {
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let (a, _folder) = device_with_folder(&alice, &token).await;
             let mut created = Vec::new();
-            for number in 0..=FILES_PER_SYNC {
+            for number in 0..=bytes::PER_SYNC {
                 let name = format!("{number}.txt");
                 let file = with_bytes(&a, &alice, &name, "text/plain", name.as_bytes())
                     .await
@@ -2310,7 +1896,7 @@ pub(crate) mod tests {
             let report = sync::run(&a, &InProcess { server: &server })
                 .await
                 .expect("a sync");
-            assert_eq!(report.uploaded, FILES_PER_SYNC);
+            assert_eq!(report.uploaded, bytes::PER_SYNC);
             assert_eq!(report.files_left, 1);
             assert!(report.more_files_to_send());
             assert_eq!(report.pending, 1);
@@ -2373,7 +1959,7 @@ pub(crate) mod tests {
             *transport.file_pushes_lost.lock().expect("the lock") = 1;
             sync::run(&a, &transport).await.expect("a sync cut off");
             storage
-                .delete(&storage_key(alice.id, file.id))
+                .delete(&bytes::storage_key(&Synced, alice.id, file.id))
                 .await
                 .expect("swept, as a file no row points at is after a day");
 
@@ -2404,7 +1990,7 @@ pub(crate) mod tests {
             assert_eq!(report.pending, 1);
             let (state, error) = state_of(&a, &alice, file.id).await;
             assert_eq!(state, FileState::Waiting, "the file is not dropped");
-            assert_eq!(error.as_deref(), Some(FILE_NOT_UPLOADED));
+            assert_eq!(error.as_deref(), Some(bytes::NOT_UPLOADED));
             assert!(get(&server, &alice, file.id).await.is_err());
 
             sync::run(&a, &InProcess { server: &server })
@@ -2441,7 +2027,7 @@ pub(crate) mod tests {
             assert_eq!(state, FileState::Refused);
             assert_eq!(error.as_deref(), Some("tried 30 times: file_not_uploaded"));
             assert!(
-                local_path(&a, file.id).expect("a path").exists(),
+                bytes::local_path(&a, file.id).expect("a path").exists(),
                 "not lost"
             );
 
@@ -2648,20 +2234,25 @@ pub(crate) mod tests {
             delete(&server, &alice, deleted.id).await.expect("deleted");
             let never_pushed = Uuid::now_v7();
             storage
-                .put(&storage_key(alice.id, never_pushed), b"orphan".to_vec())
+                .put(
+                    &bytes::storage_key(&Synced, alice.id, never_pushed),
+                    b"orphan".to_vec(),
+                )
                 .await
                 .expect("an upload whose row never came");
             let now = now();
 
-            let report = delete_unreferenced(&server, now).await.expect("a sweep");
+            let report = bytes::delete_unreferenced(&server, now)
+                .await
+                .expect("a sweep");
             assert_eq!(
                 (report.kept, report.deleted),
                 (3, 0),
                 "nothing is a day old"
             );
 
-            let tomorrow = now + chrono::Duration::days(UNREFERENCED_DAYS + 1);
-            let report = delete_unreferenced(&server, tomorrow)
+            let tomorrow = now + chrono::Duration::days(bytes::UNREFERENCED_DAYS + 1);
+            let report = bytes::delete_unreferenced(&server, tomorrow)
                 .await
                 .expect("a sweep");
             assert_eq!((report.kept, report.deleted), (2, 1));
@@ -2677,7 +2268,7 @@ pub(crate) mod tests {
             crate::sync::purge::run(&server, after_the_window)
                 .await
                 .expect("purged");
-            let report = delete_unreferenced(&server, after_the_window)
+            let report = bytes::delete_unreferenced(&server, after_the_window)
                 .await
                 .expect("a sweep");
             assert_eq!((report.kept, report.deleted), (1, 1));
@@ -2737,20 +2328,22 @@ pub(crate) mod tests {
         let half_fetched = folder.path().join("0192f7c0.part");
         std::fs::write(&half_fetched, b"half").expect("bytes");
 
-        let removed = delete_unreferenced_on_device(&device, now())
+        let removed = bytes::delete_unreferenced_on_device(&device, now())
             .await
             .expect("cleaned");
         assert_eq!(removed, 0, "nothing without a row is a day old");
 
-        let tomorrow = now() + chrono::Duration::days(UNREFERENCED_DAYS + 1);
-        let removed = delete_unreferenced_on_device(&device, tomorrow)
+        let tomorrow = now() + chrono::Duration::days(bytes::UNREFERENCED_DAYS + 1);
+        let removed = bytes::delete_unreferenced_on_device(&device, tomorrow)
             .await
             .expect("cleaned");
         assert_eq!(removed, 2);
         assert!(!without_a_row.exists());
         assert!(!half_fetched.exists());
         assert!(
-            local_path(&device, waiting.id).expect("a path").exists(),
+            bytes::local_path(&device, waiting.id)
+                .expect("a path")
+                .exists(),
             "a waiting file is the only copy, however old"
         );
     }
@@ -2780,7 +2373,10 @@ pub(crate) mod tests {
             );
 
             storage
-                .put(&storage_key(alice.id, new.id), b"other".to_vec())
+                .put(
+                    &bytes::storage_key(&Synced, alice.id, new.id),
+                    b"other".to_vec(),
+                )
                 .await
                 .expect("an upload of another size");
             let error = create(&deployment, &alice, &new)
@@ -2789,7 +2385,10 @@ pub(crate) mod tests {
             assert!(matches!(error, FileError::NotUploaded));
 
             storage
-                .put(&storage_key(alice.id, new.id), b"some other".to_vec())
+                .put(
+                    &bytes::storage_key(&Synced, alice.id, new.id),
+                    b"some other".to_vec(),
+                )
                 .await
                 .expect("an upload of the size, other bytes");
             let error = create(&deployment, &alice, &new)
@@ -2798,7 +2397,10 @@ pub(crate) mod tests {
             assert!(matches!(error, FileError::NotUploaded));
 
             storage
-                .put(&storage_key(alice.id, new.id), b"some notes".to_vec())
+                .put(
+                    &bytes::storage_key(&Synced, alice.id, new.id),
+                    b"some notes".to_vec(),
+                )
                 .await
                 .expect("the upload");
             let file = create(&deployment, &alice, &new).await.expect("a file");
@@ -2852,13 +2454,16 @@ pub(crate) mod tests {
                 ..new_file("data", b"x", personal(&deployment, &alice).await)
             };
             storage
-                .put(&storage_key(alice.id, untyped.id), b"x".to_vec())
+                .put(
+                    &bytes::storage_key(&Synced, alice.id, untyped.id),
+                    b"x".to_vec(),
+                )
                 .await
                 .expect("the upload");
             let file = create(&deployment, &alice, &untyped)
                 .await
                 .expect("a file of no known type");
-            assert_eq!(file.content_type, app_files::UNKNOWN_CONTENT_TYPE);
+            assert_eq!(file.content_type, content_type::UNKNOWN);
         })
         .await;
     }
@@ -2972,7 +2577,10 @@ pub(crate) mod tests {
                     ..new_file(name, bytes, community_id)
                 };
                 storage
-                    .put(&storage_key(alice.id, new.id), bytes.to_vec())
+                    .put(
+                        &bytes::storage_key(&Synced, alice.id, new.id),
+                        bytes.to_vec(),
+                    )
                     .await
                     .expect("the upload");
                 create(&deployment, &alice, &new).await.expect("a file");
@@ -3120,7 +2728,7 @@ pub(crate) mod tests {
             assert_eq!(row.deleted_by_id, Some(alice.id));
             assert_eq!(
                 storage
-                    .size(&storage_key(alice.id, file.id))
+                    .size(&bytes::storage_key(&Synced, alice.id, file.id))
                     .await
                     .expect("looked"),
                 Some(1),
@@ -3137,7 +2745,7 @@ pub(crate) mod tests {
             let alice = users::create(&deployment, "alice@example.com", "Alice")
                 .await
                 .expect("a user");
-            let request = FileUploadNew {
+            let request = UploadNew {
                 id: None,
                 content_type: "IMAGE/GIF".to_string(),
                 size: 3,
@@ -3153,14 +2761,14 @@ pub(crate) mod tests {
                 upload.checksum_sha256,
                 "dsZk7xUuBlki/tRycxXQZbj7Gu1hAVza73vP6jxY1as="
             );
-            let key = storage_key(alice.id, upload.id);
+            let key = bytes::storage_key(&Synced, alice.id, upload.id);
             assert_eq!(upload.upload_url, Some(format!("memory:///{key}")));
 
             storage
                 .put(&key, b"GIF".to_vec())
                 .await
                 .expect("the upload");
-            let again = FileUploadNew {
+            let again = UploadNew {
                 id: Some(upload.id),
                 ..request.clone()
             };
@@ -3170,7 +2778,7 @@ pub(crate) mod tests {
             assert!(upload.uploaded);
             assert_eq!(upload.upload_url, None);
 
-            let too_large = FileUploadNew {
+            let too_large = UploadNew {
                 size: app_files::MAX_BYTES + 1,
                 ..request
             };
@@ -3193,7 +2801,13 @@ pub(crate) mod tests {
             let url = content_url(&deployment, &alice, file.id, false)
                 .await
                 .expect("a url");
-            assert_eq!(url, format!("memory:///{}", storage_key(alice.id, file.id)));
+            assert_eq!(
+                url,
+                format!(
+                    "memory:///{}",
+                    bytes::storage_key(&Synced, alice.id, file.id)
+                )
+            );
             assert_eq!(
                 attachment_named("my notes \"v2\".txt"),
                 "attachment; filename*=UTF-8''my%20notes%20%22v2%22.txt"
@@ -3217,6 +2831,6 @@ pub(crate) mod tests {
         )
         .await
         .expect_err("no bucket");
-        assert!(matches!(error, FileError::NoFileStore));
+        assert!(matches!(error, FileError::Bytes(BytesError::NoFileStore)));
     }
 }

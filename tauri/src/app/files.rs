@@ -17,7 +17,8 @@ use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 
 use app_core::app::files::{self, FileSearch, FileSearchResults, FileWithState, FilesCache};
-use app_core::data::app_files::{self, File};
+use app_core::data::app_files::File;
+use app_core::helpers::content_type;
 
 use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
@@ -339,7 +340,7 @@ pub async fn content_response(app: &AppHandle, uri: &Uri) -> Response<Vec<u8>> {
         Some((content_type, bytes)) => {
             let mut response = Response::new(bytes);
             let content_type = HeaderValue::from_str(&content_type)
-                .unwrap_or(HeaderValue::from_static(app_files::UNKNOWN_CONTENT_TYPE));
+                .unwrap_or(HeaderValue::from_static(content_type::UNKNOWN));
             response.headers_mut().insert(CONTENT_TYPE, content_type);
             response
                 .headers_mut()

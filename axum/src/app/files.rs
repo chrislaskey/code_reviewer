@@ -13,18 +13,17 @@ use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use app_core::app::files::{
-    self, FileNew, FileSearch, FileSearchResults, FileUpload, FileUploadNew, FileWithState,
-};
+use app_core::app::files::{self, FileNew, FileSearch, FileSearchResults, FileWithState};
 use app_core::data::app_files::File;
 use app_core::deployment::Deployment;
+use app_core::sync::bytes::{self, Upload, UploadNew};
 
 use crate::api_error::ApiError;
 use crate::user_auth::CurrentUser;
 
 /// How long a browser may reuse the redirect to a file's bytes: a
 /// little less than the signed URL it points at works.
-const CONTENT_REDIRECT_SECONDS: u64 = files::DOWNLOAD_URL_LIFETIME.as_secs() - 5 * 60;
+const CONTENT_REDIRECT_SECONDS: u64 = bytes::DOWNLOAD_URL_LIFETIME.as_secs() - 5 * 60;
 
 #[derive(Deserialize)]
 pub struct FileFields {
@@ -77,8 +76,8 @@ pub async fn get(
 pub async fn create_upload(
     State(deployment): State<Deployment>,
     CurrentUser(user): CurrentUser,
-    Json(request): Json<FileUploadNew>,
-) -> Result<Json<FileUpload>, ApiError> {
+    Json(request): Json<UploadNew>,
+) -> Result<Json<Upload>, ApiError> {
     Ok(Json(
         files::create_upload(&deployment, &user, &request).await?,
     ))
