@@ -130,6 +130,12 @@ pub mod replication {
 pub(crate) mod maintenance {
     use super::*;
 
+    /// Drops the rows for a resync, but the pending and those of a
+    /// pending or refused file.
+    pub(crate) async fn delete_for_resync(tx: &mut Transaction) -> Result<(), sqlx::Error> {
+        query!(tx, delete_for_resync())
+    }
+
     /// Physically removes a device's row the server holds under another id.
     pub(crate) async fn delete(tx: &mut Transaction, id: Uuid) -> Result<(), sqlx::Error> {
         query!(tx, delete_row(id))

@@ -260,3 +260,18 @@ pub async fn delete_row(connection: &mut SqliteConnection, id: Uuid) -> Result<(
         .await?;
     Ok(())
 }
+
+/// Drops the rows for a resync from nothing, but those an event still
+/// pending is about, and those of a file whose create is pending or was
+/// refused, which came with that create.
+pub async fn delete_for_resync(connection: &mut SqliteConnection) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "DELETE FROM app_files_communities WHERE id NOT IN
+           (SELECT row_id FROM app_events WHERE status = 'pending' AND table_name = 'app_files_communities')
+           AND file_id NOT IN (SELECT row_id FROM app_events WHERE table_name = 'app_files'
+            AND type = 'create' AND status IN ('pending', 'conflict'))",
+    )
+    .execute(connection)
+    .await?;
+    Ok(())
+}

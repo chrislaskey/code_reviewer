@@ -11,6 +11,7 @@
 //! back.
 
 use crate::data::app_posts_communities::{self, PostCommunity, TABLE};
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 use thiserror::Error;
@@ -19,7 +20,10 @@ use uuid::Uuid;
 use crate::app::events::{self, Answer, AnswerStatus};
 use crate::app::memberships::{self, id_field};
 use crate::app::sync::TableRow;
+use crate::app::synced_table::{LocalCreate, SyncedTable, TableError};
+use crate::app::{communities, posts};
 use crate::data::app_events::{self, Conflicts, Event, EventKind};
+use crate::data::app_posts;
 use crate::data::app_posts::Post;
 use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
@@ -551,6 +555,116 @@ fn invalid(error: memberships::MembershipError) -> PostCommunityError {
     match error {
         memberships::MembershipError::Database(error) => PostCommunityError::Database(error),
         other => PostCommunityError::Invalid(other.to_string()),
+    }
+}
+
+/// Posts' community rows as a synced table, see `synced_tables`.
+pub struct Synced;
+
+#[async_trait]
+impl SyncedTable for Synced {
+    fn table(&self) -> &'static str {
+        TABLE
+    }
+
+    fn owner_column(&self) -> Option<&'static str> {
+        None
+    }
+
+    async fn apply_in(
+        &self,
+        tx: &mut Transaction,
+        role: Role,
+        user: &User,
+        event: &Event,
+    ) -> Result<Answer, TableError> {
+        Ok(apply_in(tx, role, user, event).await?.answer)
+    }
+
+    async fn list_synced_after(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        after: &Cursor,
+        limit: usize,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let rows = list_synced_after(tx, user, after, limit).await?;
+        Ok(rows.iter().map(table_row).collect::<Result<_, _>>()?)
+    }
+
+    /// A live row brings its post along; a row taken out of a community
+    /// brings none, since the user may never have seen the post.
+    async fn parents(
+        &self,
+        tx: &mut Transaction,
+        row: &TableRow,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let row: PostCommunity = serde_json::from_value(row.row.clone())?;
+        let mut parents = Vec::new();
+        if row.deleted_at.is_none()
+            && let Some(post) = app_posts::replication::get(tx, row.post_id).await?
+        {
+            parents.push(posts::table_row(&post)?);
+        }
+        if let Some(community) = communities::get_in(tx, row.community_id).await? {
+            parents.push(communities::table_row(&community)?);
+        }
+        if let Some(membership) = memberships::get_in(tx, row.users_communities_id).await? {
+            parents.push(memberships::table_row(&membership)?);
+        }
+        Ok(parents)
+    }
+
+    async fn apply_server_row(
+        &self,
+        tx: &mut Transaction,
+        _user: &User,
+        row: &TableRow,
+    ) -> Result<bool, TableError> {
+        Ok(apply_server_row(tx, &row.row).await?)
+    }
+
+    async fn delete_row(&self, tx: &mut Transaction, id: Uuid) -> Result<(), TableError> {
+        Ok(delete_row(tx, id).await?)
+    }
+
+    async fn local_user_creates(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+    ) -> Result<Vec<LocalCreate>, TableError> {
+        let posts = app_posts::list(tx, app_posts::Filter::VisibleTo(user.id)).await?;
+        let post_ids: Vec<Uuid> = posts.iter().map(|post| post.id).collect();
+        if post_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let rows =
+            app_posts_communities::list(&mut *tx, app_posts_communities::Filter::Posts(&post_ids))
+                .await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| LocalCreate {
+                id: row.id,
+                inserted_at: row.inserted_at,
+                parents: vec![row.post_id, row.community_id, row.users_communities_id],
+                changes: json::object_fields(json!({
+                    "post_id": row.post_id,
+                    "community_id": row.community_id,
+                    "users_communities_id": row.users_communities_id,
+                })),
+            })
+            .collect())
+    }
+
+    async fn list_live_in_community_after(
+        &self,
+        tx: &mut Transaction,
+        community_id: Uuid,
+        after: &Cursor,
+        limit: usize,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let rows = list_live_of_community_after(tx, community_id, after, limit).await?;
+        Ok(rows.iter().map(table_row).collect::<Result<_, _>>()?)
     }
 }
 

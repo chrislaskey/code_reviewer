@@ -1,23 +1,29 @@
 //! What a local user's move to an account does to the device's rows,
 //! see `crate::app::local_users`.
 
-use sqlx::SqliteConnection;
+use sqlx::{AssertSqlSafe, SqliteConnection};
 use uuid::Uuid;
 
-/// Gives every row of one user to another, who must have their row.
+use crate::database::identifier;
+
+/// Gives every row of one user to another, who must have their row:
+/// the column naming its maker in each table, and the events.
 pub async fn give_rows_to_user(
     connection: &mut SqliteConnection,
+    owner_columns: &[(&str, &str)],
     from: Uuid,
     to: Uuid,
 ) -> Result<(), sqlx::Error> {
-    for statement in [
-        "UPDATE app_users_communities SET user_id = $2 WHERE user_id = $1",
-        "UPDATE app_posts SET user_id = $2 WHERE user_id = $1",
-        "UPDATE app_files SET created_by_id = $2 WHERE created_by_id = $1",
-        "UPDATE app_files_communities SET created_by_id = $2 WHERE created_by_id = $1",
-        "UPDATE app_events SET user_id = $2 WHERE user_id = $1",
-    ] {
-        sqlx::query(statement)
+    let mut statements = Vec::new();
+    for (table, column) in owner_columns {
+        let (table, column) = (identifier(table)?, identifier(column)?);
+        statements.push(format!(
+            "UPDATE {table} SET {column} = $2 WHERE {column} = $1"
+        ));
+    }
+    statements.push("UPDATE app_events SET user_id = $2 WHERE user_id = $1".to_string());
+    for statement in statements {
+        sqlx::query(AssertSqlSafe(statement))
             .bind(from.hyphenated())
             .bind(to.hyphenated())
             .execute(&mut *connection)
@@ -26,18 +32,19 @@ pub async fn give_rows_to_user(
     Ok(())
 }
 
-/// Removes every soft-deleted row, children first: nobody else ever
-/// saw a local user's rows, so there is nobody to tell.
-pub async fn delete_deleted_rows(connection: &mut SqliteConnection) -> Result<(), sqlx::Error> {
-    for statement in [
-        "DELETE FROM app_posts_communities WHERE deleted_at IS NOT NULL",
-        "DELETE FROM app_posts WHERE deleted_at IS NOT NULL",
-        "DELETE FROM app_files_communities WHERE deleted_at IS NOT NULL",
-        "DELETE FROM app_files WHERE deleted_at IS NOT NULL",
-        "DELETE FROM app_users_communities WHERE deleted_at IS NOT NULL",
-        "DELETE FROM app_communities WHERE deleted_at IS NOT NULL",
-    ] {
-        sqlx::query(statement).execute(&mut *connection).await?;
+/// Removes every soft-deleted row of the tables, in the order given:
+/// nobody else ever saw a local user's rows, so there is nobody to tell.
+pub async fn delete_deleted_rows(
+    connection: &mut SqliteConnection,
+    tables: &[&str],
+) -> Result<(), sqlx::Error> {
+    for table in tables {
+        let table = identifier(table)?;
+        sqlx::query(AssertSqlSafe(format!(
+            "DELETE FROM {table} WHERE deleted_at IS NOT NULL"
+        )))
+        .execute(&mut *connection)
+        .await?;
     }
     Ok(())
 }
@@ -50,17 +57,23 @@ pub async fn delete_user(connection: &mut SqliteConnection, id: Uuid) -> Result<
     Ok(())
 }
 
-/// How many posts and files the user has, not deleted.
+/// How many live rows the user made in the tables, each named with the
+/// column naming its maker.
 pub async fn count_items(
     connection: &mut SqliteConnection,
+    owner_columns: &[(&str, &str)],
     user_id: Uuid,
 ) -> Result<i64, sqlx::Error> {
-    let (count,): (i64,) = sqlx::query_as(
-        "SELECT (SELECT COUNT(*) FROM app_posts WHERE user_id = $1 AND deleted_at IS NULL)
-              + (SELECT COUNT(*) FROM app_files WHERE created_by_id = $1 AND deleted_at IS NULL)",
-    )
-    .bind(user_id.hyphenated())
-    .fetch_one(connection)
-    .await?;
+    let mut count = 0;
+    for (table, column) in owner_columns {
+        let (table, column) = (identifier(table)?, identifier(column)?);
+        let (rows,): (i64,) = sqlx::query_as(AssertSqlSafe(format!(
+            "SELECT COUNT(*) FROM {table} WHERE {column} = $1 AND deleted_at IS NULL"
+        )))
+        .bind(user_id.hyphenated())
+        .fetch_one(&mut *connection)
+        .await?;
+        count += rows;
+    }
     Ok(count)
 }

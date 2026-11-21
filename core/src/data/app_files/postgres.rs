@@ -301,3 +301,17 @@ pub async fn delete_row(connection: &mut PgConnection, id: Uuid) -> Result<(), s
         .await?;
     Ok(())
 }
+
+/// Drops the files for a resync from nothing, but those an event still
+/// pending is about, and those whose create the server refused: a
+/// refused file is the only copy of its bytes.
+pub async fn delete_for_resync(connection: &mut PgConnection) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "DELETE FROM app_files WHERE id NOT IN
+           (SELECT row_id FROM app_events WHERE table_name = 'app_files'
+            AND (status = 'pending' OR (status = 'conflict' AND type = 'create')))",
+    )
+    .execute(connection)
+    .await?;
+    Ok(())
+}

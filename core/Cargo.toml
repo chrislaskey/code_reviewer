@@ -37,6 +37,8 @@ app-store = ["stripe", "dep:app-store-server-library"]
 # Checked 2026-11-12, see docs/design/purchasing-phones.md
 app-store-server-library = { version = "=6.0.2", features = ["ring", "api-client-reqwest"], optional = true }
 argon2 = "0.6"
+# A synced table is a `dyn SyncedTable`, whose async methods need boxed futures
+async-trait = "0.1"
 # A release candidate, pinned exactly: the 1.0 line is the maintained one, see docs/design/purchasing.md
 async-stripe = { version = "=1.0.0-rc.10", default-features = false, features = ["rustls-tls-webpki-roots", "rustls-ring"], optional = true }
 async-stripe-billing = { version = "=1.0.0-rc.10", features = ["deserialize", "subscription", "subscription_schedule", "billing_portal_session"], optional = true }

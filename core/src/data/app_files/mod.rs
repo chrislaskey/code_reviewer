@@ -231,6 +231,11 @@ pub mod replication {
 pub(crate) mod maintenance {
     use super::*;
 
+    /// Drops the files for a resync, but the pending and the refused.
+    pub(crate) async fn delete_for_resync(tx: &mut Transaction) -> Result<(), sqlx::Error> {
+        query!(tx, delete_for_resync())
+    }
+
     /// Lists row IDs, creators and deletion state for byte cleanup.
     pub async fn list_ids(tx: &mut Transaction) -> Result<Vec<(Uuid, Uuid, bool)>, sqlx::Error> {
         query!(tx, list_ids())

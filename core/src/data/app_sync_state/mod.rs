@@ -53,8 +53,14 @@ pub async fn upsert(tx: &mut Transaction, cursor: &Cursor) -> Result<(), sqlx::E
 pub mod maintenance {
     use super::*;
 
-    /// Resets device sync rows while preserving the existing pending/conflicted-row rules.
-    pub async fn reset(tx: &mut Transaction, user_id: Uuid) -> Result<(), sqlx::Error> {
-        query!(tx, reset(user_id))
+    /// Drops a synced table's rows for a resync, but those a pending
+    /// event is about.
+    pub async fn delete_not_pending(tx: &mut Transaction, table: &str) -> Result<(), sqlx::Error> {
+        query!(tx, delete_not_pending(table))
+    }
+
+    /// Drops the cursor and the backfills to do, for a resync.
+    pub async fn delete_cursor_and_backfills(tx: &mut Transaction) -> Result<(), sqlx::Error> {
+        query!(tx, delete_cursor_and_backfills())
     }
 }

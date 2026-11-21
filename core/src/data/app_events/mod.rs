@@ -308,8 +308,11 @@ pub async fn try_again(tx: &mut Transaction, id: Uuid) -> Result<(), sqlx::Error
 pub(crate) mod maintenance {
     use super::*;
 
-    /// Removes events for business rows that no longer exist.
-    pub(crate) async fn delete_of_missing_rows(tx: &mut Transaction) -> Result<u64, sqlx::Error> {
-        query!(tx, delete_of_missing_rows())
+    /// Removes the events of a synced table's rows that no longer exist.
+    pub(crate) async fn delete_of_missing_rows(
+        tx: &mut Transaction,
+        table: &str,
+    ) -> Result<u64, sqlx::Error> {
+        query!(tx, delete_of_missing_rows(table))
     }
 }

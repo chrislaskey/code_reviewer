@@ -147,6 +147,11 @@ pub mod replication {
 pub(crate) mod maintenance {
     use super::*;
 
+    /// Deletes every user but the one kept, for a resync from nothing.
+    pub(crate) async fn delete_others(tx: &mut Transaction, keep: Uuid) -> Result<(), sqlx::Error> {
+        query!(tx, delete_others(keep))
+    }
+
     /// Lists referenced pictures, including deleted users, for byte cleanup.
     #[cfg_attr(not(feature = "object-storage"), allow(dead_code))]
     pub async fn list_avatar_urls(tx: &mut Transaction) -> Result<Vec<String>, sqlx::Error> {

@@ -16,4 +16,6 @@ pub mod posts;
 pub mod posts_communities;
 pub mod purge;
 pub mod sync;
+pub mod synced_table;
+pub mod synced_tables;
 pub mod users;

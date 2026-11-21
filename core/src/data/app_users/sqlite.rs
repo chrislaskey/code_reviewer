@@ -256,3 +256,15 @@ pub async fn upsert(connection: &mut SqliteConnection, user: &User) -> Result<()
     .await?;
     Ok(())
 }
+
+/// Deletes every user but the one kept, for a resync from nothing.
+pub async fn delete_others(
+    connection: &mut SqliteConnection,
+    keep: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM app_users WHERE id != $1")
+        .bind(keep.hyphenated())
+        .execute(connection)
+        .await?;
+    Ok(())
+}

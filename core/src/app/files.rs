@@ -35,6 +35,7 @@ use crate::data::app_users_communities;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use garde::Validate;
 use serde::{Deserialize, Serialize};
@@ -46,6 +47,7 @@ use crate::app::communities;
 use crate::app::events::{self, Answer, AnswerStatus};
 use crate::app::files_communities::{self, FileCommunityError, FileCommunityNew};
 use crate::app::sync::{SyncError, TableRow};
+use crate::app::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
 use crate::app::users;
 use crate::data::app_communities::Community;
 use crate::data::app_events::{
@@ -1518,6 +1520,162 @@ fn attachment_named(name: &str) -> String {
         }
     }
     format!("attachment; filename*=UTF-8''{encoded}")
+}
+
+/// Files as a synced table, see `synced_tables`.
+pub struct Synced;
+
+#[async_trait]
+impl SyncedTable for Synced {
+    fn table(&self) -> &'static str {
+        TABLE
+    }
+
+    fn owner_column(&self) -> Option<&'static str> {
+        Some("created_by_id")
+    }
+
+    /// A reapplied change, whose file is already on the server.
+    async fn apply_in(
+        &self,
+        tx: &mut Transaction,
+        role: Role,
+        user: &User,
+        event: &Event,
+    ) -> Result<Answer, TableError> {
+        Ok(apply_in(tx, role, user, event, true).await?.answer)
+    }
+
+    /// The server looks in its bucket first when the event creates a file.
+    async fn apply_event(
+        &self,
+        deployment: &Deployment,
+        user: &User,
+        event: &Event,
+    ) -> Result<Answer, TableError> {
+        Ok(apply_event(deployment, user, event).await?)
+    }
+
+    async fn list_synced_after(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        after: &Cursor,
+        limit: usize,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let files = list_synced_after(tx, user, after, limit).await?;
+        Ok(files.iter().map(table_row).collect::<Result<_, _>>()?)
+    }
+
+    async fn parents(
+        &self,
+        _tx: &mut Transaction,
+        _row: &TableRow,
+    ) -> Result<Vec<TableRow>, TableError> {
+        Ok(Vec::new())
+    }
+
+    async fn apply_server_row(
+        &self,
+        tx: &mut Transaction,
+        _user: &User,
+        row: &TableRow,
+    ) -> Result<bool, TableError> {
+        Ok(apply_server_row(tx, &row.row).await?)
+    }
+
+    async fn delete_row(&self, tx: &mut Transaction, id: Uuid) -> Result<(), TableError> {
+        Ok(delete_row(tx, id).await?)
+    }
+
+    /// A file's create carries its communities, and comes after them and
+    /// the user's memberships there.
+    async fn local_user_creates(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+    ) -> Result<Vec<LocalCreate>, TableError> {
+        let memberships =
+            app_users_communities::list(&mut *tx, app_users_communities::Filter::User(user.id))
+                .await?;
+        let files = app_files::list(&mut *tx, user.id).await?;
+        let file_ids: Vec<Uuid> = files.iter().map(|file| file.id).collect();
+        let files_communities =
+            files_communities::list_visible_of_files(tx, user, &file_ids).await?;
+        Ok(files
+            .into_iter()
+            .map(|file| {
+                let rows: Vec<_> = files_communities
+                    .iter()
+                    .filter(|row| row.file_id == file.id)
+                    .collect();
+                let parents: Vec<Uuid> = rows
+                    .iter()
+                    .flat_map(|row| {
+                        let membership = memberships
+                            .iter()
+                            .find(|membership| membership.community_id == row.community_id)
+                            .map(|membership| membership.id);
+                        [Some(row.community_id), membership].into_iter().flatten()
+                    })
+                    .collect();
+                let communities: Vec<FileCommunityNew> = rows
+                    .iter()
+                    .map(|row| FileCommunityNew {
+                        id: row.id,
+                        community_id: row.community_id,
+                    })
+                    .collect();
+                LocalCreate {
+                    id: file.id,
+                    inserted_at: file.inserted_at,
+                    parents,
+                    changes: json::object_fields(json!({
+                        "name": file.name,
+                        "content_type": file.content_type,
+                        "size": file.size,
+                        "sha256": file.sha256,
+                        "communities": communities,
+                    })),
+                }
+            })
+            .collect())
+    }
+
+    /// A file whose create the server refused stays: its bytes are
+    /// nowhere else.
+    async fn delete_for_resync(
+        &self,
+        tx: &mut Transaction,
+        _user: &User,
+    ) -> Result<(), TableError> {
+        Ok(app_files::maintenance::delete_for_resync(tx).await?)
+    }
+
+    async fn label(&self, tx: &mut Transaction, id: Uuid) -> Result<Option<String>, TableError> {
+        Ok(get_in(tx, id).await?.map(|file| file.name))
+    }
+
+    async fn current_fields(
+        &self,
+        tx: &mut Transaction,
+        id: Uuid,
+    ) -> Result<Option<CurrentFields>, TableError> {
+        let Some(file) = get_in(tx, id).await? else {
+            return Ok(None);
+        };
+        if file.deleted_at.is_some() {
+            return Ok(None);
+        }
+        Ok(Some(CurrentFields {
+            version: file.version,
+            fields: file.fields(&["name", "deleted_at"])?,
+        }))
+    }
+
+    fn counted_before_a_move(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(all(test, feature = "object-storage"))]

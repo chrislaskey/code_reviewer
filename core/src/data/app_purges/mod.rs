@@ -29,33 +29,6 @@ macro_rules! query {
     };
 }
 
-/// Business tables whose tombstones may be purged, children first at the call site.
-#[derive(Clone, Copy)]
-pub(crate) enum Table {
-    PostsCommunities,
-    Posts,
-    FilesCommunities,
-    Files,
-    Memberships,
-    Communities,
-    Users,
-}
-
-impl Table {
-    /// Returns the fixed table name; callers cannot supply SQL identifiers.
-    pub(crate) fn name(self) -> &'static str {
-        match self {
-            Self::PostsCommunities => crate::data::app_posts_communities::TABLE,
-            Self::Posts => crate::data::app_posts::TABLE,
-            Self::FilesCommunities => crate::data::app_files_communities::TABLE,
-            Self::Files => crate::data::app_files::TABLE,
-            Self::Memberships => crate::data::app_users_communities::TABLE,
-            Self::Communities => crate::data::app_communities::TABLE,
-            Self::Users => crate::data::app_users::TABLE,
-        }
-    }
-}
-
 /// Persists the record accepted by its workflow.
 pub async fn create(tx: &mut Transaction, purge: &Purge) -> Result<(), sqlx::Error> {
     query!(tx, insert(purge))
@@ -70,12 +43,12 @@ pub async fn get(tx: &mut Transaction) -> Result<Option<DateTime<Utc>>, sqlx::Er
 pub(crate) mod maintenance {
     use super::*;
 
-    /// Physically removes retained tombstones from an allowed table.
+    /// Physically removes a synced table's tombstones older than the horizon.
     pub(crate) async fn delete_deleted_before(
         tx: &mut Transaction,
-        table: Table,
+        table: &str,
         horizon: DateTime<Utc>,
     ) -> Result<u64, sqlx::Error> {
-        query!(tx, delete_deleted_before(table.name(), horizon))
+        query!(tx, delete_deleted_before(table, horizon))
     }
 }

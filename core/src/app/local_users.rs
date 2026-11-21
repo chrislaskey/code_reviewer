@@ -15,30 +15,27 @@
 //! nothing to merge.
 
 use crate::data::app_communities;
-use crate::data::app_files;
-use crate::data::app_posts;
-use crate::data::app_posts_communities;
-use crate::data::app_users_communities;
 use crate::data::local_users;
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::accounts::Session;
 use crate::app::communities::{self, CommunityError};
 use crate::app::events;
-use crate::app::files_communities::{self, FileCommunityNew};
+use crate::app::synced_table::TableError;
+use crate::app::synced_tables;
 use crate::app::users::{self, SignedIn, UserError};
 use crate::data::app_events::Event;
 use crate::data::app_users::{self, User};
 use crate::data::device_settings::{self, DeviceSettingsError, LOCAL_USER_MOVED, SIGNED_IN};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
-use crate::helpers::{json, random};
+use crate::helpers::random;
 
 /// Whether a device offers to skip signing in. The app's choice, to
 /// change in a fork.
@@ -73,8 +70,9 @@ pub enum LocalUserError {
     Community(#[from] CommunityError),
     #[error(transparent)]
     DeviceSettings(#[from] DeviceSettingsError),
+    /// A synced table's own module failed.
     #[error(transparent)]
-    FileCommunity(#[from] files_communities::FileCommunityError),
+    Table(#[from] TableError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -152,12 +150,18 @@ pub(crate) async fn is_signed_in_in(tx: &mut Transaction) -> Result<bool, sqlx::
     }))
 }
 
-/// How many posts and files the local user has, for the question asked
-/// before a move.
+/// How many things the local user made, posts and files say, in the
+/// tables that count them, for the question asked before a move.
 pub async fn count_items(deployment: &Deployment) -> Result<i64, LocalUserError> {
     let mut tx = deployment.begin().await?;
     let local = local_user_in(&mut tx).await?;
-    let count = local_users::count_items(&mut tx, local).await?;
+    let counted: Vec<_> = owner_columns()
+        .into_iter()
+        .filter(|(table, _)| {
+            synced_tables::get(table).is_some_and(|synced| synced.counted_before_a_move())
+        })
+        .collect();
+    let count = local_users::count_items(&mut tx, &counted, local).await?;
     tx.commit().await?;
     Ok(count)
 }
@@ -179,8 +183,15 @@ pub async fn move_to_account(
     let mut tx = deployment.begin().await?;
     let local = local_user_in(&mut tx).await?;
     users::upsert_in(&mut tx, &account).await?;
-    local_users::maintenance::give_rows_to_user(&mut tx, local, account.id).await?;
-    local_users::maintenance::delete_deleted_rows(&mut tx).await?;
+    local_users::maintenance::give_rows_to_user(&mut tx, &owner_columns(), local, account.id)
+        .await?;
+    let children_first: Vec<&str> = synced_tables::list()
+        .iter()
+        .rev()
+        .map(|synced| synced.table())
+        .filter(|table| *table != app_users::TABLE)
+        .collect();
+    local_users::maintenance::delete_deleted_rows(&mut tx, &children_first).await?;
     local_users::maintenance::delete_user(&mut tx, local).await?;
     let signed_in = SignedIn {
         user_id: account.id,
@@ -226,126 +237,40 @@ async fn local_user_in(tx: &mut Transaction) -> Result<Uuid, LocalUserError> {
     }
 }
 
-/// Queues a create for every row the device holds, parents first: the
-/// communities, the user's memberships, their posts, the posts'
-/// community rows, their files. The queue is pushed in the order the
-/// events were made, so each is made at the time its row was, and
+/// Each synced table whose rows name their maker, with that column.
+fn owner_columns() -> Vec<(&'static str, &'static str)> {
+    synced_tables::list()
+        .iter()
+        .filter_map(|synced| Some((synced.table(), synced.owner_column()?)))
+        .collect()
+}
+
+/// Queues a create for every row the device holds, table by table,
+/// parents first, see `synced_tables`. The queue is pushed in the order
+/// the events were made, so each is made at the time its row was, and
 /// after the rows it points at.
 async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), LocalUserError> {
     let mut made_at_of: BTreeMap<Uuid, DateTime<Utc>> = BTreeMap::new();
     let mut queue = Vec::new();
-    let mut add =
-        |table: &str, id: Uuid, inserted_at: DateTime<Utc>, parents: &[Uuid], changes: Value| {
-            let after_parents = parents
+    for synced in synced_tables::list() {
+        for create in synced.local_user_creates(tx, user).await? {
+            let after_parents = create
+                .parents
                 .iter()
                 .filter_map(|parent| made_at_of.get(parent))
                 .max()
                 .map(|parent| *parent + Duration::microseconds(1));
-            let made_at = after_parents.map_or(inserted_at, |after| after.max(inserted_at));
-            made_at_of.insert(id, made_at);
+            let made_at =
+                after_parents.map_or(create.inserted_at, |after| after.max(create.inserted_at));
+            made_at_of.insert(create.id, made_at);
             queue.push(Event::create(
-                table,
-                id,
-                json::object_fields(changes),
+                synced.table(),
+                create.id,
+                create.changes,
                 made_at,
             ));
-        };
-
-    for community in app_communities::list(&mut *tx, user.id).await? {
-        add(
-            app_communities::TABLE,
-            community.id,
-            community.inserted_at,
-            &[],
-            json!({ "name": community.name }),
-        );
-    }
-    for membership in
-        app_users_communities::list(&mut *tx, app_users_communities::Filter::User(user.id)).await?
-    {
-        add(
-            app_users_communities::TABLE,
-            membership.id,
-            membership.inserted_at,
-            &[membership.community_id],
-            json!({
-                "user_id": user.id,
-                "community_id": membership.community_id,
-                "role": membership.role,
-            }),
-        );
-    }
-    let posts = app_posts::list(tx, app_posts::Filter::VisibleTo(user.id)).await?;
-    let post_ids: Vec<Uuid> = posts.iter().map(|post| post.id).collect();
-    for post in posts {
-        add(
-            app_posts::TABLE,
-            post.id,
-            post.inserted_at,
-            &[],
-            json!({ "body": post.body }),
-        );
-    }
-    if !post_ids.is_empty() {
-        for row in
-            app_posts_communities::list(&mut *tx, app_posts_communities::Filter::Posts(&post_ids))
-                .await?
-        {
-            add(
-                app_posts_communities::TABLE,
-                row.id,
-                row.inserted_at,
-                &[row.post_id, row.community_id, row.users_communities_id],
-                json!({
-                    "post_id": row.post_id,
-                    "community_id": row.community_id,
-                    "users_communities_id": row.users_communities_id,
-                }),
-            );
         }
     }
-    let memberships =
-        app_users_communities::list(&mut *tx, app_users_communities::Filter::User(user.id)).await?;
-    let files = app_files::list(&mut *tx, user.id).await?;
-    let file_ids: Vec<Uuid> = files.iter().map(|file| file.id).collect();
-    let files_communities = files_communities::list_visible_of_files(tx, user, &file_ids).await?;
-    for file in files {
-        let rows: Vec<_> = files_communities
-            .iter()
-            .filter(|row| row.file_id == file.id)
-            .collect();
-        let parents: Vec<Uuid> = rows
-            .iter()
-            .flat_map(|row| {
-                let membership = memberships
-                    .iter()
-                    .find(|membership| membership.community_id == row.community_id)
-                    .map(|membership| membership.id);
-                [Some(row.community_id), membership].into_iter().flatten()
-            })
-            .collect();
-        let communities: Vec<FileCommunityNew> = rows
-            .iter()
-            .map(|row| FileCommunityNew {
-                id: row.id,
-                community_id: row.community_id,
-            })
-            .collect();
-        add(
-            app_files::TABLE,
-            file.id,
-            file.inserted_at,
-            &parents,
-            json!({
-                "name": file.name,
-                "content_type": file.content_type,
-                "size": file.size,
-                "sha256": file.sha256,
-                "communities": communities,
-            }),
-        );
-    }
-
     for event in &queue {
         events::queue(tx, user.id, event).await?;
     }
@@ -360,6 +285,7 @@ mod tests {
     use crate::app::files::tests::server;
     use crate::app::posts;
     use crate::app::sync;
+    use crate::data::{app_files, app_posts};
     use crate::database::with_each_database;
     use crate::deployment::FileStore;
     use crate::services::storage::Storage;

@@ -9,6 +9,7 @@
 //! setting, `signed_in`. Nobody acts until someone signs in.
 
 use crate::data::app_users::{self, AcceptedUser, MAX_NAME_LENGTH, TABLE, User, UserInvalid};
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -17,6 +18,7 @@ use uuid::Uuid;
 
 use crate::app::events::{self, Answer, AnswerStatus};
 use crate::app::sync::TableRow;
+use crate::app::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
 use crate::data::accounts_tokens;
 use crate::data::accounts_users::{self, AccountUserError};
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
@@ -488,17 +490,6 @@ pub(crate) async fn upsert_in(tx: &mut Transaction, user: &User) -> Result<(), U
     Ok(app_users::replication::upsert(&mut *tx, user).await?)
 }
 
-/// A page of the rows the server wrote after the cursor that the user
-/// sees, deleted or not.
-pub(crate) async fn list_synced_after(
-    tx: &mut Transaction,
-    user: &User,
-    after: &Cursor,
-    limit: usize,
-) -> Result<Vec<User>, UserError> {
-    Ok(app_users::replication::list_synced_after(tx, user.id, after, limit).await?)
-}
-
 pub(crate) async fn get_in(tx: &mut Transaction, id: Uuid) -> Result<Option<User>, UserError> {
     Ok(app_users::replication::get(tx, id).await?)
 }
@@ -545,6 +536,99 @@ pub(crate) async fn name_from_email_in(
             return Ok(name);
         }
         number += 1;
+    }
+}
+
+/// Users as a synced table, see `synced_tables`.
+pub struct Synced;
+
+#[async_trait]
+impl SyncedTable for Synced {
+    fn table(&self) -> &'static str {
+        TABLE
+    }
+
+    fn owner_column(&self) -> Option<&'static str> {
+        None
+    }
+
+    async fn apply_in(
+        &self,
+        tx: &mut Transaction,
+        role: Role,
+        user: &User,
+        event: &Event,
+    ) -> Result<Answer, TableError> {
+        Ok(apply_in(tx, role, user, event).await?.answer)
+    }
+
+    async fn list_synced_after(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        after: &Cursor,
+        limit: usize,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let users = app_users::replication::list_synced_after(tx, user.id, after, limit).await?;
+        Ok(users.iter().map(table_row).collect::<Result<_, _>>()?)
+    }
+
+    async fn parents(
+        &self,
+        _tx: &mut Transaction,
+        _row: &TableRow,
+    ) -> Result<Vec<TableRow>, TableError> {
+        Ok(Vec::new())
+    }
+
+    async fn apply_server_row(
+        &self,
+        tx: &mut Transaction,
+        _user: &User,
+        row: &TableRow,
+    ) -> Result<bool, TableError> {
+        Ok(apply_server_row(tx, &row.row).await?)
+    }
+
+    /// Only the server makes a user, so a device never holds a user the
+    /// server refused.
+    async fn delete_row(&self, _tx: &mut Transaction, id: Uuid) -> Result<(), TableError> {
+        Err(format!("user {id} is never removed from a device by a refusal").into())
+    }
+
+    /// The account's row is written by the move itself.
+    async fn local_user_creates(
+        &self,
+        _tx: &mut Transaction,
+        _user: &User,
+    ) -> Result<Vec<LocalCreate>, TableError> {
+        Ok(Vec::new())
+    }
+
+    /// The signed-in user's own row stays, since their rows point at it.
+    async fn delete_for_resync(&self, tx: &mut Transaction, user: &User) -> Result<(), TableError> {
+        Ok(app_users::maintenance::delete_others(tx, user.id).await?)
+    }
+
+    async fn label(&self, tx: &mut Transaction, id: Uuid) -> Result<Option<String>, TableError> {
+        Ok(get_in(tx, id).await?.map(|user| user.name))
+    }
+
+    async fn current_fields(
+        &self,
+        tx: &mut Transaction,
+        id: Uuid,
+    ) -> Result<Option<CurrentFields>, TableError> {
+        let Some(user) = get_in(tx, id).await? else {
+            return Ok(None);
+        };
+        if user.deleted_at.is_some() {
+            return Ok(None);
+        }
+        Ok(Some(CurrentFields {
+            version: user.version,
+            fields: Fields::from_iter([("name".to_string(), Value::String(user.name))]),
+        }))
     }
 }
 

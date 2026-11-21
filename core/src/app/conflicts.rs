@@ -13,16 +13,13 @@ use serde_json::Value;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::communities::{self, CommunityError};
 use crate::app::events::AnswerStatus;
 use crate::app::files::{self, FileError};
-use crate::app::posts::{self, PostError};
-use crate::app::users::{self, UserError};
-use crate::data::app_communities;
+use crate::app::synced_table::TableError;
+use crate::app::synced_tables;
 use crate::data::app_events::{self, Event, EventKind, EventStatus, Fields, StoredEvent};
 use crate::data::app_files;
-use crate::data::app_posts;
-use crate::data::app_users::{self, User};
+use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
 
@@ -76,14 +73,11 @@ pub enum ConflictError {
     NotTriedAgain,
     #[error("the change was refused: {0}")]
     Rejected(String),
+    /// A synced table's own module failed.
     #[error(transparent)]
-    Post(#[from] PostError),
+    Table(#[from] TableError),
     #[error(transparent)]
     File(#[from] FileError),
-    #[error(transparent)]
-    Community(#[from] CommunityError),
-    #[error(transparent)]
-    User(#[from] UserError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -126,28 +120,10 @@ pub async fn reapply(deployment: &Deployment, user: &User, id: Uuid) -> Result<(
         changes,
         now(),
     );
-    let answer = match stored.event.table.as_str() {
-        app_files::TABLE => {
-            files::apply_in(&mut tx, deployment.role, user, &event, true)
-                .await?
-                .answer
-        }
-        app_communities::TABLE => {
-            communities::apply_in(&mut tx, deployment.role, user, &event)
-                .await?
-                .answer
-        }
-        app_users::TABLE => {
-            users::apply_in(&mut tx, deployment.role, user, &event)
-                .await?
-                .answer
-        }
-        _ => {
-            posts::apply_in(&mut tx, deployment.role, user, &event)
-                .await?
-                .answer
-        }
-    };
+    let synced = synced_tables::get(&stored.event.table).ok_or(ConflictError::Gone)?;
+    let answer = synced
+        .apply_in(&mut tx, deployment.role, user, &event)
+        .await?;
     if answer.status == AnswerStatus::Rejected {
         return Err(ConflictError::Rejected(answer.reason.unwrap_or_default()));
     }
@@ -210,50 +186,18 @@ struct Row {
 /// The live row the event is about, of a table whose conflicts are
 /// shown; none when it is gone or deleted.
 async fn row_of(tx: &mut Transaction, event: &Event) -> Result<Option<Row>, ConflictError> {
-    Ok(match event.table.as_str() {
-        app_posts::TABLE => posts::get_in(tx, event.row_id)
-            .await?
-            .filter(|post| post.deleted_at.is_none())
-            .map(|post| {
-                Ok::<Row, PostError>(Row {
-                    about: post.body.lines().next().unwrap_or_default().to_string(),
-                    version: post.version,
-                    fields: post.fields(&["body", "deleted_at"])?,
-                })
-            })
-            .transpose()?,
-        app_files::TABLE => files::get_in(tx, event.row_id)
-            .await?
-            .filter(|file| file.deleted_at.is_none())
-            .map(|file| {
-                Ok::<Row, FileError>(Row {
-                    about: file.name.clone(),
-                    version: file.version,
-                    fields: file.fields(&["name", "deleted_at"])?,
-                })
-            })
-            .transpose()?,
-        app_communities::TABLE => communities::get_in(tx, event.row_id)
-            .await?
-            .filter(|community| community.deleted_at.is_none())
-            .map(|community| {
-                Ok::<Row, CommunityError>(Row {
-                    about: community.name.clone(),
-                    version: community.version,
-                    fields: community.fields(communities::UPDATE_FIELDS)?,
-                })
-            })
-            .transpose()?,
-        app_users::TABLE => users::get_in(tx, event.row_id)
-            .await?
-            .filter(|user| user.deleted_at.is_none())
-            .map(|user| Row {
-                about: user.name.clone(),
-                version: user.version,
-                fields: Fields::from_iter([("name".to_string(), Value::String(user.name))]),
-            }),
-        _ => None,
-    })
+    let Some(synced) = synced_tables::get(&event.table) else {
+        return Ok(None);
+    };
+    let Some(current) = synced.current_fields(tx, event.row_id).await? else {
+        return Ok(None);
+    };
+    let about = synced.label(tx, event.row_id).await?.unwrap_or_default();
+    Ok(Some(Row {
+        about,
+        version: current.version,
+        fields: current.fields,
+    }))
 }
 
 fn conflict(stored: StoredEvent, row: Option<Row>) -> Conflict {

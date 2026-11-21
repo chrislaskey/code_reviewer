@@ -8,17 +8,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::communities::{self, CommunityError};
-use crate::app::files::{self, FileError};
-use crate::app::files_communities;
-use crate::app::posts::{self, PostError};
-use crate::app::users::{self, UserError};
-use crate::data::app_communities;
+use crate::app::synced_table::TableError;
+use crate::app::synced_tables;
 use crate::data::app_events::{self, EventKind, Fields, StoredEvent};
-use crate::data::app_files;
-use crate::data::app_files_communities;
-use crate::data::app_posts;
-use crate::data::app_users;
 use crate::deployment::Deployment;
 
 /// A change waiting to reach the server, as the page shows it.
@@ -39,14 +31,9 @@ pub struct PendingChange {
 
 #[derive(Debug, Error)]
 pub enum PendingChangeError {
+    /// A synced table's own module failed.
     #[error(transparent)]
-    Post(#[from] PostError),
-    #[error(transparent)]
-    File(#[from] FileError),
-    #[error(transparent)]
-    Community(#[from] CommunityError),
-    #[error(transparent)]
-    User(#[from] UserError),
+    Table(#[from] TableError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -56,31 +43,9 @@ pub async fn list(deployment: &Deployment) -> Result<Vec<PendingChange>, Pending
     let mut tx = deployment.begin().await?;
     let mut changes = Vec::new();
     for stored in app_events::pending(&mut tx).await? {
-        let about = match stored.event.table.as_str() {
-            app_posts::TABLE => posts::get_in(&mut tx, stored.event.row_id)
-                .await?
-                .map(|post| post.body.lines().next().unwrap_or_default().to_string()),
-            app_files::TABLE => files::get_in(&mut tx, stored.event.row_id)
-                .await?
-                .map(|file| file.name),
-            app_files_communities::TABLE => {
-                match files_communities::get_in(&mut tx, stored.event.row_id)
-                    .await
-                    .map_err(FileError::from)?
-                {
-                    Some(row) => files::get_in(&mut tx, row.file_id)
-                        .await?
-                        .map(|file| file.name),
-                    None => None,
-                }
-            }
-            app_communities::TABLE => communities::get_in(&mut tx, stored.event.row_id)
-                .await?
-                .map(|community| community.name),
-            app_users::TABLE => users::get_in(&mut tx, stored.event.row_id)
-                .await?
-                .map(|user| user.name),
-            _ => None,
+        let about = match synced_tables::get(&stored.event.table) {
+            Some(synced) => synced.label(&mut tx, stored.event.row_id).await?,
+            None => None,
         };
         changes.push(pending_change(stored, about));
     }
@@ -103,6 +68,7 @@ fn pending_change(stored: StoredEvent, about: Option<String>) -> PendingChange {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::posts;
     use crate::app::sync;
     use crate::app::users;
     use crate::database::with_each_database;

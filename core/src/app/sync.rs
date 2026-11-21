@@ -25,24 +25,17 @@ use serde_json::Value;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::communities::{self, CommunityError};
 use crate::app::events::{Answer, AnswerStatus};
 use crate::app::files::{self, FileError};
-use crate::app::files_communities::{self, FileCommunityError};
 use crate::app::memberships::{self, MembershipError};
-use crate::app::posts::{self, PostError};
-use crate::app::posts_communities::{self, PostCommunityError};
 use crate::app::purge::{self, PurgeError};
+use crate::app::synced_table::{SyncedTable, TableError};
+use crate::app::synced_tables;
 use crate::app::users::{self, UserError};
-use crate::data::app_communities::{self, Community};
 use crate::data::app_events::{self, Event, EventKind, EventStatus, StoredEvent};
-use crate::data::app_files::{self, File};
-use crate::data::app_files_communities::{self, FileCommunity};
-use crate::data::app_posts::{self, Post};
-use crate::data::app_posts_communities::{self, PostCommunity};
+use crate::data::app_files;
 use crate::data::app_sync_state::Cursor;
-use crate::data::app_users::{self, User};
-use crate::data::app_users_communities::{self, Membership};
+use crate::data::app_users::User;
 use crate::data::device_settings::{self, DeviceSettingsError, WORK_OFFLINE};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
@@ -142,16 +135,11 @@ pub struct Page {
 pub enum SyncError {
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
+    /// A synced table's own module failed.
     #[error(transparent)]
-    Post(#[from] PostError),
-    #[error(transparent)]
-    PostCommunity(#[from] PostCommunityError),
+    Table(#[from] TableError),
     #[error(transparent)]
     File(#[from] FileError),
-    #[error(transparent)]
-    FileCommunity(#[from] FileCommunityError),
-    #[error(transparent)]
-    Community(#[from] CommunityError),
     #[error(transparent)]
     Membership(#[from] MembershipError),
     #[error(transparent)]
@@ -191,21 +179,9 @@ pub async fn push(
 ) -> Result<PushResponse, SyncError> {
     let mut answers = Vec::with_capacity(request.events.len());
     for event in &request.events {
-        let answer = match event.table.as_str() {
-            app_users::TABLE => users::apply_event(deployment, user, event).await?,
-            app_communities::TABLE => communities::apply_event(deployment, user, event).await?,
-            app_users_communities::TABLE => {
-                memberships::apply_event(deployment, user, event).await?
-            }
-            app_posts::TABLE => posts::apply_event(deployment, user, event).await?,
-            app_files::TABLE => files::apply_event(deployment, user, event).await?,
-            app_files_communities::TABLE => {
-                files_communities::apply_event(deployment, user, event).await?
-            }
-            app_posts_communities::TABLE => {
-                posts_communities::apply_event(deployment, user, event).await?
-            }
-            _ => Answer::rejected(event.id, "unknown_table", None),
+        let answer = match synced_tables::get(&event.table) {
+            Some(synced) => synced.apply_event(deployment, user, event).await?,
+            None => Answer::rejected(event.id, "unknown_table", None),
         };
         answers.push(answer);
     }
@@ -243,49 +219,14 @@ pub async fn pull(
     };
 
     let mut tx = deployment.begin().await?;
-    let mut rows: Vec<SyncedRow> = Vec::new();
-    rows.extend(
-        users::list_synced_after(&mut tx, user, &after, limit)
-            .await?
-            .into_iter()
-            .map(SyncedRow::User),
-    );
-    rows.extend(
-        communities::list_synced_after(&mut tx, user, &after, limit)
-            .await?
-            .into_iter()
-            .map(SyncedRow::Community),
-    );
-    rows.extend(
-        memberships::list_synced_after(&mut tx, user, &after, limit)
-            .await?
-            .into_iter()
-            .map(SyncedRow::Membership),
-    );
-    rows.extend(
-        posts::list_synced_after(&mut tx, user, &after, limit)
-            .await?
-            .into_iter()
-            .map(SyncedRow::Post),
-    );
-    rows.extend(
-        posts_communities::list_synced_after(&mut tx, user, &after, limit)
-            .await?
-            .into_iter()
-            .map(SyncedRow::PostCommunity),
-    );
-    rows.extend(
-        files::list_synced_after(&mut tx, user, &after, limit)
-            .await?
-            .into_iter()
-            .map(SyncedRow::File),
-    );
-    rows.extend(
-        files_communities::list_synced_after(&mut tx, user, &after, limit)
-            .await?
-            .into_iter()
-            .map(SyncedRow::FileCommunity),
-    );
+    let mut rows: Vec<TableRow> = Vec::new();
+    for synced in synced_tables::list() {
+        rows.extend(
+            synced
+                .list_synced_after(&mut tx, user, &after, limit)
+                .await?,
+        );
+    }
     let mut page = page_of(&mut tx, rows, limit).await?;
     tx.commit().await?;
     page.purge_horizon = purge_horizon;
@@ -319,86 +260,51 @@ pub async fn backfill(
             community_id: request.community_id,
         });
     }
-    let mut rows: Vec<SyncedRow> = posts_communities::list_live_of_community_after(
-        &mut tx,
-        request.community_id,
-        &after,
-        limit,
-    )
-    .await?
-    .into_iter()
-    .map(SyncedRow::PostCommunity)
-    .collect();
-    rows.extend(
-        files_communities::list_live_of_community_after(
-            &mut tx,
-            request.community_id,
-            &after,
-            limit,
-        )
-        .await?
-        .into_iter()
-        .map(SyncedRow::FileCommunity),
-    );
+    let mut rows: Vec<TableRow> = Vec::new();
+    for synced in synced_tables::list() {
+        rows.extend(
+            synced
+                .list_live_in_community_after(&mut tx, request.community_id, &after, limit)
+                .await?,
+        );
+    }
     let page = page_of(&mut tx, rows, limit).await?;
     tx.commit().await?;
     Ok(page)
 }
 
-/// A row of a synced table before it goes on the wire.
-enum SyncedRow {
-    User(User),
-    Community(Community),
-    Membership(Membership),
-    Post(Post),
-    PostCommunity(PostCommunity),
-    File(File),
-    FileCommunity(FileCommunity),
-}
-
-impl SyncedRow {
-    fn key(&self) -> Cursor {
-        let (last_synced_at, id) = match self {
-            SyncedRow::User(row) => (row.last_synced_at, row.id),
-            SyncedRow::Community(row) => (row.last_synced_at, row.id),
-            SyncedRow::Membership(row) => (row.last_synced_at, row.id),
-            SyncedRow::Post(row) => (row.last_synced_at, row.id),
-            SyncedRow::PostCommunity(row) => (row.last_synced_at, row.id),
-            SyncedRow::File(row) => (row.last_synced_at, row.id),
-            SyncedRow::FileCommunity(row) => (row.last_synced_at, row.id),
-        };
-        Cursor {
-            last_synced_at: last_synced_at.unwrap_or(DateTime::<Utc>::UNIX_EPOCH),
-            id,
-        }
-    }
-
-    fn table_row(&self) -> Result<TableRow, SyncError> {
-        Ok(match self {
-            SyncedRow::User(row) => users::table_row(row)?,
-            SyncedRow::Community(row) => communities::table_row(row)?,
-            SyncedRow::Membership(row) => memberships::table_row(row)?,
-            SyncedRow::Post(row) => posts::table_row(row)?,
-            SyncedRow::PostCommunity(row) => posts_communities::table_row(row)?,
-            SyncedRow::File(row) => files::table_row(row)?,
-            SyncedRow::FileCommunity(row) => files_communities::table_row(row)?,
-        })
-    }
+/// A row's place in the pull order.
+fn place_of(row: &TableRow) -> Result<Cursor, SyncError> {
+    let id = row
+        .id()
+        .ok_or_else(|| SyncError::Malformed(format!("a row of {} without an id", row.table)))?;
+    let last_synced_at =
+        Cursor::of_row(row).map_or(DateTime::<Utc>::UNIX_EPOCH, |cursor| cursor.last_synced_at);
+    Ok(Cursor { last_synced_at, id })
 }
 
 /// The first `limit` rows in cursor order, each after the rows it points
 /// at, with where the next page starts when there are more.
 async fn page_of(
     tx: &mut Transaction,
-    mut rows: Vec<SyncedRow>,
+    rows: Vec<TableRow>,
     limit: usize,
 ) -> Result<Page, SyncError> {
-    rows.sort_by_key(SyncedRow::key);
-    let more = rows.len() > limit;
-    rows.truncate(limit);
-    let cursor = rows.last().map(SyncedRow::key);
+    let mut placed = rows
+        .into_iter()
+        .map(|row| Ok((place_of(&row)?, row)))
+        .collect::<Result<Vec<_>, SyncError>>()?;
+    placed.sort_by_key(|(place, _)| *place);
+    let more = placed.len() > limit;
+    placed.truncate(limit);
+    let cursor = placed.last().map(|(place, _)| *place);
+    let mut out = Vec::with_capacity(placed.len());
+    let mut sent = BTreeSet::new();
+    for (_, row) in placed {
+        send_with_parents(tx, &mut out, &mut sent, row).await?;
+    }
     Ok(Page {
-        rows: with_parents(tx, rows).await?,
+        rows: out,
         next: if more { cursor } else { None },
         cursor,
         purge_horizon: None,
@@ -406,145 +312,35 @@ async fn page_of(
     })
 }
 
-/// The rows on the wire, each after the rows it points at, so a device
-/// with foreign keys can write them in order: a membership after its
-/// user and community, a post after its owner, a post's community row
-/// after the post, the community and the membership it was added under,
-/// a file's live community row after the file and the community. A row
-/// taken out of a community brings no post or file along: the user may
-/// not see it, or never have, and a device without it skips the row. A
-/// row brought along for another is sent once.
-async fn with_parents(
-    tx: &mut Transaction,
-    rows: Vec<SyncedRow>,
-) -> Result<Vec<TableRow>, SyncError> {
-    let mut out = Vec::with_capacity(rows.len());
-    let mut sent: BTreeSet<(&'static str, Uuid)> = BTreeSet::new();
-    for row in rows {
-        match &row {
-            SyncedRow::Membership(membership) => {
-                send_user(tx, &mut out, &mut sent, membership.user_id).await?;
-                send_community(tx, &mut out, &mut sent, membership.community_id).await?;
-            }
-            SyncedRow::Post(post) => {
-                send_user(tx, &mut out, &mut sent, post.user_id).await?;
-            }
-            SyncedRow::FileCommunity(row) => {
-                if row.deleted_at.is_none()
-                    && let Some(file) = files::get_in(tx, row.file_id).await?
-                {
-                    send(
-                        &mut out,
-                        &mut sent,
-                        app_files::TABLE,
-                        file.id,
-                        SyncedRow::File(file),
-                    )?;
-                }
-                send_community(tx, &mut out, &mut sent, row.community_id).await?;
-            }
-            SyncedRow::PostCommunity(row) => {
-                if row.deleted_at.is_none()
-                    && let Some(post) = posts::get_in(tx, row.post_id).await?
-                {
-                    send_user(tx, &mut out, &mut sent, post.user_id).await?;
-                    send(
-                        &mut out,
-                        &mut sent,
-                        app_posts::TABLE,
-                        post.id,
-                        SyncedRow::Post(post),
-                    )?;
-                }
-                send_community(tx, &mut out, &mut sent, row.community_id).await?;
-                if let Some(membership) = memberships::get_in(tx, row.users_communities_id).await? {
-                    send_user(tx, &mut out, &mut sent, membership.user_id).await?;
-                    send(
-                        &mut out,
-                        &mut sent,
-                        app_users_communities::TABLE,
-                        membership.id,
-                        SyncedRow::Membership(membership),
-                    )?;
-                }
-            }
-            SyncedRow::User(_) | SyncedRow::Community(_) | SyncedRow::File(_) => {}
-        }
-        let (table, id) = match &row {
-            SyncedRow::User(user) => (app_users::TABLE, user.id),
-            SyncedRow::Community(community) => (app_communities::TABLE, community.id),
-            SyncedRow::Membership(membership) => (app_users_communities::TABLE, membership.id),
-            SyncedRow::Post(post) => (app_posts::TABLE, post.id),
-            SyncedRow::PostCommunity(row) => (app_posts_communities::TABLE, row.id),
-            SyncedRow::File(file) => (app_files::TABLE, file.id),
-            SyncedRow::FileCommunity(row) => (app_files_communities::TABLE, row.id),
-        };
-        send(&mut out, &mut sent, table, id, row)?;
-    }
-    Ok(out)
-}
-
-async fn send_user(
+/// Puts the row on the wire after the rows it points at, and theirs in
+/// turn, so a device with foreign keys can write them in order: a
+/// membership after its user and community, a post after its owner, a
+/// post's community row after the post, the community and the membership
+/// it was added under. Each table says which, see
+/// `SyncedTable::parents`. A row brought along for another is sent once.
+async fn send_with_parents(
     tx: &mut Transaction,
     out: &mut Vec<TableRow>,
-    sent: &mut BTreeSet<(&'static str, Uuid)>,
-    id: Uuid,
+    sent: &mut BTreeSet<(String, Uuid)>,
+    row: TableRow,
 ) -> Result<(), SyncError> {
-    if sent.contains(&(app_users::TABLE, id)) {
+    let key = (row.table.clone(), place_of(&row)?.id);
+    if sent.contains(&key) {
         return Ok(());
     }
-    if let Some(user) = users::get_in(tx, id).await? {
-        send(out, sent, app_users::TABLE, id, SyncedRow::User(user))?;
+    let synced = synced_table_of(&row.table)?;
+    for parent in synced.parents(tx, &row).await? {
+        Box::pin(send_with_parents(tx, out, sent, parent)).await?;
     }
+    sent.insert(key);
+    out.push(row);
     Ok(())
 }
 
-async fn send_community(
-    tx: &mut Transaction,
-    out: &mut Vec<TableRow>,
-    sent: &mut BTreeSet<(&'static str, Uuid)>,
-    id: Uuid,
-) -> Result<(), SyncError> {
-    if sent.contains(&(app_communities::TABLE, id)) {
-        return Ok(());
-    }
-    if let Some(community) = communities::get_in(tx, id).await? {
-        send(
-            out,
-            sent,
-            app_communities::TABLE,
-            id,
-            SyncedRow::Community(community),
-        )?;
-    }
-    Ok(())
-}
-
-fn send(
-    out: &mut Vec<TableRow>,
-    sent: &mut BTreeSet<(&'static str, Uuid)>,
-    table: &'static str,
-    id: Uuid,
-    row: SyncedRow,
-) -> Result<(), SyncError> {
-    if sent.insert((table, id)) {
-        out.push(row.table_row()?);
-    }
-    Ok(())
-}
-
-/// The order rows are written in on a device, parents first.
-fn table_rank(table: &str) -> usize {
-    match table {
-        app_users::TABLE => 0,
-        app_communities::TABLE => 1,
-        app_users_communities::TABLE => 2,
-        app_posts::TABLE => 3,
-        app_posts_communities::TABLE => 4,
-        app_files::TABLE => 5,
-        app_files_communities::TABLE => 6,
-        _ => 7,
-    }
+/// The synced table of the name a row or an event gives.
+fn synced_table_of(table: &str) -> Result<&'static dyn SyncedTable, SyncError> {
+    synced_tables::get(table)
+        .ok_or_else(|| SyncError::Malformed(format!("a row of an unknown table '{table}'")))
 }
 
 /// What one sync did.
@@ -864,7 +660,7 @@ async fn push_batch<T: Transport>(
                 app_events::delete_pending_of_row(&mut tx, &event.table, event.row_id).await?;
                 delete_row(&mut tx, &event.table, event.row_id).await?;
             }
-            answered.insert((table_rank(&server.table), server_id), server);
+            answered.insert((synced_tables::position(&server.table), server_id), server);
         }
     }
     for row in answered.into_values() {
@@ -928,7 +724,10 @@ async fn pull_pages<T: Transport>(
 /// posts point at it.
 async fn reset(deployment: &Deployment, user: &User) -> Result<(), SyncError> {
     let mut tx = deployment.begin().await?;
-    app_sync_state::maintenance::reset(&mut tx, user.id).await?;
+    for synced in synced_tables::list().iter().rev() {
+        synced.delete_for_resync(&mut tx, user).await?;
+    }
+    app_sync_state::maintenance::delete_cursor_and_backfills(&mut tx).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -977,15 +776,18 @@ async fn backfill_pending<T: Transport>(
     Ok(())
 }
 
-/// Removes the posts and files the user no longer sees: a community
-/// left, a post or file taken out of one, the rows brought along for a
-/// removal.
+/// Removes the rows the user no longer sees, each table its own, see
+/// `SyncedTable::prune`: a community left, a post or file taken out of
+/// one, the rows brought along for a removal.
 async fn prune(deployment: &Deployment, user: &User, report: &mut Report) -> Result<(), SyncError> {
     let mut tx = deployment.begin().await?;
-    let posts_pruned = posts::prune(&mut tx, user).await?;
+    let mut pruned = 0;
+    for synced in synced_tables::list() {
+        pruned += synced.prune(&mut tx, user).await?;
+    }
     let files_pruned = files::prune(&mut tx, user).await?;
     tx.commit().await?;
-    report.pruned = posts_pruned + files_pruned.len() as u64;
+    report.pruned = pruned + files_pruned.len() as u64;
     for id in files_pruned {
         // A deployment with no folder has no bytes to remove
         let Ok(path) = files::local_path(deployment, id) else {
@@ -1004,49 +806,13 @@ async fn prune(deployment: &Deployment, user: &User, report: &mut Report) -> Res
 /// membership of the device's user that the device did not have, or
 /// had left, records the community to backfill.
 async fn apply_row(tx: &mut Transaction, user: &User, row: &TableRow) -> Result<bool, SyncError> {
-    match row.table.as_str() {
-        app_users::TABLE => Ok(users::apply_server_row(tx, &row.row).await?),
-        app_communities::TABLE => Ok(communities::apply_server_row(tx, &row.row).await?),
-        app_users_communities::TABLE => {
-            let incoming: Membership = serde_json::from_value(row.row.clone())
-                .map_err(|error| SyncError::Malformed(error.to_string()))?;
-            let joined = incoming.user_id == user.id
-                && incoming.deleted_at.is_none()
-                && memberships::get_in(tx, incoming.id)
-                    .await?
-                    .is_none_or(|had| had.deleted_at.is_some() || had.last_synced_at.is_none());
-            let written = memberships::apply_server_row(tx, &row.row).await?;
-            if written && joined {
-                app_sync_backfills::create(&mut *tx, incoming.community_id).await?;
-            }
-            Ok(written)
-        }
-        app_posts::TABLE => Ok(posts::apply_server_row(tx, &row.row).await?),
-        app_posts_communities::TABLE => {
-            Ok(posts_communities::apply_server_row(tx, &row.row).await?)
-        }
-        app_files::TABLE => Ok(files::apply_server_row(tx, &row.row).await?),
-        app_files_communities::TABLE => {
-            Ok(files_communities::apply_server_row(tx, &row.row).await?)
-        }
-        other => Err(SyncError::Malformed(format!(
-            "a row of an unknown table '{other}'"
-        ))),
-    }
+    let synced = synced_table_of(&row.table)?;
+    Ok(synced.apply_server_row(tx, user, row).await?)
 }
 
 async fn delete_row(tx: &mut Transaction, table: &str, id: Uuid) -> Result<(), SyncError> {
-    match table {
-        app_communities::TABLE => Ok(communities::delete_row(tx, id).await?),
-        app_users_communities::TABLE => Ok(memberships::delete_row(tx, id).await?),
-        app_posts::TABLE => Ok(posts::delete_row(tx, id).await?),
-        app_posts_communities::TABLE => Ok(posts_communities::delete_row(tx, id).await?),
-        app_files::TABLE => Ok(files::delete_row(tx, id).await?),
-        app_files_communities::TABLE => Ok(files_communities::delete_row(tx, id).await?),
-        other => Err(SyncError::Malformed(format!(
-            "a row of an unknown table '{other}'"
-        ))),
-    }
+    let synced = synced_table_of(table)?;
+    Ok(synced.delete_row(tx, id).await?)
 }
 
 #[cfg(test)]
@@ -1057,9 +823,14 @@ pub(crate) mod tests {
 
     use super::*;
     use crate::accounts::{self, Session};
+    use crate::app::communities::CommunityError;
     use crate::app::files::{FileUpload, FileUploadNew};
+    use crate::app::posts::PostError;
     pub(crate) use crate::app::users::tests::device_of;
     use crate::app::{communities, conflicts, memberships, posts, posts_communities, purge};
+    use crate::data::{
+        app_communities, app_posts, app_posts_communities, app_users, app_users_communities,
+    };
     use crate::database::with_each_database;
     use crate::deployment::{Role, now};
     #[cfg(feature = "sync-http")]
@@ -1867,7 +1638,8 @@ pub(crate) mod tests {
                 "edited during the push",
                 &[],
             )
-            .await?;
+            .await
+            .map_err(|error| SyncError::Table(error.into()))?;
             Ok(response)
         }
 

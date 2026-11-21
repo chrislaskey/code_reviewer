@@ -13,6 +13,7 @@
 use crate::data::app_communities;
 use crate::data::app_users_communities::{self, Membership, ROLE_MEMBER, TABLE};
 use crate::data::trial_users;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 use thiserror::Error;
@@ -21,8 +22,11 @@ use uuid::Uuid;
 use crate::app::events::{self, Answer, AnswerStatus};
 use crate::app::posts_communities;
 use crate::app::sync::TableRow;
+use crate::app::synced_table::{LocalCreate, SyncedTable, TableError};
+use crate::app::{communities, users};
 use crate::data::app_communities::Community;
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
+use crate::data::app_sync_backfills;
 use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::database::Transaction;
@@ -449,6 +453,108 @@ pub(crate) fn id_field(fields: &Fields, name: &str) -> Option<Uuid> {
         .get(name)
         .and_then(Value::as_str)
         .and_then(|id| Uuid::parse_str(id).ok())
+}
+
+/// Memberships as a synced table, see `synced_tables`.
+pub struct Synced;
+
+#[async_trait]
+impl SyncedTable for Synced {
+    fn table(&self) -> &'static str {
+        TABLE
+    }
+
+    fn owner_column(&self) -> Option<&'static str> {
+        Some("user_id")
+    }
+
+    async fn apply_in(
+        &self,
+        tx: &mut Transaction,
+        role: Role,
+        user: &User,
+        event: &Event,
+    ) -> Result<Answer, TableError> {
+        Ok(apply_in(tx, role, user, event).await?.answer)
+    }
+
+    async fn list_synced_after(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        after: &Cursor,
+        limit: usize,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let memberships = list_synced_after(tx, user, after, limit).await?;
+        Ok(memberships
+            .iter()
+            .map(table_row)
+            .collect::<Result<_, _>>()?)
+    }
+
+    async fn parents(
+        &self,
+        tx: &mut Transaction,
+        row: &TableRow,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let membership: Membership = serde_json::from_value(row.row.clone())?;
+        let mut parents = Vec::new();
+        if let Some(user) = users::get_in(tx, membership.user_id).await? {
+            parents.push(users::table_row(&user)?);
+        }
+        if let Some(community) = communities::get_in(tx, membership.community_id).await? {
+            parents.push(communities::table_row(&community)?);
+        }
+        Ok(parents)
+    }
+
+    /// A live membership of the device's user that the device did not
+    /// have, or had left, records the community to backfill.
+    async fn apply_server_row(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        row: &TableRow,
+    ) -> Result<bool, TableError> {
+        let incoming: Membership = serde_json::from_value(row.row.clone())?;
+        let joined = incoming.user_id == user.id
+            && incoming.deleted_at.is_none()
+            && get_in(tx, incoming.id)
+                .await?
+                .is_none_or(|had| had.deleted_at.is_some() || had.last_synced_at.is_none());
+        let written = apply_server_row(tx, &row.row).await?;
+        if written && joined {
+            app_sync_backfills::create(&mut *tx, incoming.community_id).await?;
+        }
+        Ok(written)
+    }
+
+    async fn delete_row(&self, tx: &mut Transaction, id: Uuid) -> Result<(), TableError> {
+        Ok(delete_row(tx, id).await?)
+    }
+
+    async fn local_user_creates(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+    ) -> Result<Vec<LocalCreate>, TableError> {
+        let memberships =
+            app_users_communities::list(&mut *tx, app_users_communities::Filter::User(user.id))
+                .await?;
+        Ok(memberships
+            .into_iter()
+            .map(|membership| LocalCreate {
+                id: membership.id,
+                inserted_at: membership.inserted_at,
+                parents: vec![membership.community_id],
+                changes: json::object_fields(json!({
+                    "user_id": user.id,
+                    "community_id": membership.community_id,
+                    "role": membership.role,
+                })),
+            })
+            .collect())
+    }
 }
 
 #[cfg(test)]

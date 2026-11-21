@@ -375,11 +375,7 @@ impl ApiError {
 impl From<SyncError> for ApiError {
     fn from(error: SyncError) -> Self {
         match error {
-            SyncError::Post(error) => error.into(),
-            SyncError::PostCommunity(error) => error.into(),
             SyncError::File(error) => error.into(),
-            SyncError::FileCommunity(error) => error.into(),
-            SyncError::Community(error) => error.into(),
             SyncError::Membership(error) => error.into(),
             SyncError::User(error) => error.into(),
             SyncError::Unauthorized => ApiError::new(StatusCode::UNAUTHORIZED, error.to_string()),
@@ -388,7 +384,10 @@ impl From<SyncError> for ApiError {
             SyncError::Transport(_) | SyncError::Refused(_) | SyncError::Malformed(_) => {
                 ApiError::new(StatusCode::BAD_REQUEST, error.to_string())
             }
-            SyncError::Database(_) | SyncError::DeviceSettings(_) | SyncError::Purge(_) => {
+            SyncError::Database(_)
+            | SyncError::Table(_)
+            | SyncError::DeviceSettings(_)
+            | SyncError::Purge(_) => {
                 ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
             }
         }

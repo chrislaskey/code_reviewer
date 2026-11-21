@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::app::synced_tables;
 use crate::app::users;
 use crate::data::accounts_tokens;
 use crate::data::accounts_users;
@@ -31,17 +32,6 @@ use crate::deployment::{Deployment, Role};
 pub const RETENTION_DAYS: i64 = 90;
 /// How long a sign-up has to enter its code before the user goes.
 pub const UNCONFIRMED_DAYS: i64 = 1;
-
-/// The tables purged, children first.
-const TABLES: &[app_purges::Table] = &[
-    app_purges::Table::PostsCommunities,
-    app_purges::Table::Posts,
-    app_purges::Table::FilesCommunities,
-    app_purges::Table::Files,
-    app_purges::Table::Memberships,
-    app_purges::Table::Communities,
-    app_purges::Table::Users,
-];
 
 /// What a run removed.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -73,12 +63,16 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
     let horizon = now - Duration::days(RETENTION_DAYS);
     let mut tx = deployment.begin().await?;
     let mut removed = BTreeMap::new();
-    for table in TABLES {
-        let count =
-            app_purges::maintenance::delete_deleted_before(&mut tx, *table, horizon).await?;
-        removed.insert(table.name().to_string(), count);
+    // Children first, so a purged parent's rows have already gone
+    for synced in synced_tables::list().iter().rev() {
+        let table = synced.table();
+        let count = app_purges::maintenance::delete_deleted_before(&mut tx, table, horizon).await?;
+        removed.insert(table.to_string(), count);
     }
-    let events = app_events::maintenance::delete_of_missing_rows(&mut tx).await?;
+    let mut events = 0;
+    for synced in synced_tables::list() {
+        events += app_events::maintenance::delete_of_missing_rows(&mut tx, synced.table()).await?;
+    }
     removed.insert("app_events".to_string(), events);
     let expired_tokens = accounts_tokens::delete_expired(&mut tx, now).await?;
     removed.insert("accounts_tokens".to_string(), expired_tokens);

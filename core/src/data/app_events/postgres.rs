@@ -3,10 +3,11 @@
 
 use chrono::{DateTime, Utc};
 use sqlx::types::Json;
-use sqlx::{FromRow, PgConnection};
+use sqlx::{AssertSqlSafe, FromRow, PgConnection};
 use uuid::Uuid;
 
 use super::{Conflicts, Event, EventKind, EventStatus, Fields, StoredEvent};
+use crate::database::identifier;
 
 #[derive(FromRow)]
 struct EventRow {
@@ -264,18 +265,16 @@ pub async fn mark_error(
     Ok(())
 }
 
-/// Removes the events of rows that are gone, after a purge.
-pub async fn delete_of_missing_rows(connection: &mut PgConnection) -> Result<u64, sqlx::Error> {
-    let result = sqlx::query(
-        "DELETE FROM app_events WHERE
-           (table_name = 'app_posts' AND row_id NOT IN (SELECT id FROM app_posts))
-           OR (table_name = 'app_files' AND row_id NOT IN (SELECT id FROM app_files))
-           OR (table_name = 'app_files_communities' AND row_id NOT IN (SELECT id FROM app_files_communities))
-           OR (table_name = 'app_posts_communities' AND row_id NOT IN (SELECT id FROM app_posts_communities))
-           OR (table_name = 'app_users_communities' AND row_id NOT IN (SELECT id FROM app_users_communities))
-           OR (table_name = 'app_communities' AND row_id NOT IN (SELECT id FROM app_communities))
-           OR (table_name = 'app_users' AND row_id NOT IN (SELECT id FROM app_users))",
-    )
+/// Removes the events of a table's rows that are gone, after a purge.
+pub async fn delete_of_missing_rows(
+    connection: &mut PgConnection,
+    table: &str,
+) -> Result<u64, sqlx::Error> {
+    let table = identifier(table)?;
+    let result = sqlx::query(AssertSqlSafe(format!(
+        "DELETE FROM app_events WHERE table_name = $1 AND row_id NOT IN (SELECT id FROM {table})"
+    )))
+    .bind(table)
     .execute(connection)
     .await?;
     Ok(result.rows_affected())

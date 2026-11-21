@@ -141,6 +141,23 @@ impl Database {
     }
 }
 
+/// A table or column name for SQL that runs over every synced table,
+/// which cannot be bound as a value: only lowercase letters and
+/// underscores pass, so a name is never more than a name.
+pub(crate) fn identifier(name: &str) -> Result<&str, sqlx::Error> {
+    let plain = !name.is_empty()
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte == b'_');
+    if plain {
+        Ok(name)
+    } else {
+        Err(sqlx::Error::Protocol(format!(
+            "not a table or column name: {name}"
+        )))
+    }
+}
+
 /// Runs a test against every database the tests can reach: SQLite in
 /// memory always, and PostgreSQL when `TEST_POSTGRES_URL` names a database
 /// to use, each test in a schema of its own that is dropped afterwards.

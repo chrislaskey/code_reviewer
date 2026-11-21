@@ -11,6 +11,7 @@
 //! and is recorded as `deleted_by_id` on what they delete, which takes
 //! the post's community rows with it.
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use thiserror::Error;
@@ -20,6 +21,7 @@ use crate::app::communities;
 use crate::app::events::{self, Answer, AnswerStatus};
 use crate::app::posts_communities::{self, PostCommunityError};
 use crate::app::sync::TableRow;
+use crate::app::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
 use crate::app::users;
 use crate::data::app_communities::Community;
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
@@ -191,28 +193,6 @@ pub fn table_row(post: &Post) -> Result<TableRow, PostError> {
     })
 }
 
-/// Writes the server's row over the device's, unless an event of the
-/// device's for it is still pending; true when it was written.
-pub(crate) async fn apply_server_row(tx: &mut Transaction, row: &Value) -> Result<bool, PostError> {
-    let post: Post = serde_json::from_value(row.clone())?;
-    if app_events::has_pending(tx, TABLE, post.id).await? {
-        return Ok(false);
-    }
-    app_posts::replication::upsert(tx, &post).await?;
-    Ok(true)
-}
-
-/// Removes a device's post whose create the server refused.
-pub(crate) async fn delete_row(tx: &mut Transaction, id: Uuid) -> Result<(), PostError> {
-    Ok(app_posts::maintenance::delete(tx, id).await?)
-}
-
-/// Removes every post the user no longer sees from a device, after a
-/// pull: not theirs, and in no community they are in. How many went.
-pub(crate) async fn prune(tx: &mut Transaction, user: &User) -> Result<u64, PostError> {
-    Ok(app_posts::maintenance::prune(tx, user.id).await?)
-}
-
 /// The posts with their owners and live communities, in the order given.
 async fn with_owners_and_communities(
     tx: &mut Transaction,
@@ -254,17 +234,6 @@ async fn with_owners_and_communities(
             })
         })
         .collect()
-}
-
-/// A page of the rows the server wrote after the cursor that the user
-/// sees, deleted or not.
-pub(crate) async fn list_synced_after(
-    tx: &mut Transaction,
-    user: &User,
-    after: &Cursor,
-    limit: usize,
-) -> Result<Vec<Post>, PostError> {
-    Ok(app_posts::replication::list(tx, user.id, after, limit).await?)
 }
 
 /// The row by its id, deleted or not, whoever sees it.
@@ -461,6 +430,119 @@ impl Post {
             all.insert(name.clone(), value.clone());
         }
         Ok(serde_json::from_value(Value::Object(all))?)
+    }
+}
+
+/// Posts as a synced table, see `synced_tables`.
+pub struct Synced;
+
+#[async_trait]
+impl SyncedTable for Synced {
+    fn table(&self) -> &'static str {
+        TABLE
+    }
+
+    fn owner_column(&self) -> Option<&'static str> {
+        Some("user_id")
+    }
+
+    async fn apply_in(
+        &self,
+        tx: &mut Transaction,
+        role: Role,
+        user: &User,
+        event: &Event,
+    ) -> Result<Answer, TableError> {
+        Ok(apply_in(tx, role, user, event).await?.answer)
+    }
+
+    async fn list_synced_after(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        after: &Cursor,
+        limit: usize,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let posts = app_posts::replication::list(tx, user.id, after, limit).await?;
+        Ok(posts.iter().map(table_row).collect::<Result<_, _>>()?)
+    }
+
+    async fn parents(
+        &self,
+        tx: &mut Transaction,
+        row: &TableRow,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let post: Post = serde_json::from_value(row.row.clone())?;
+        let owner = users::get_in(tx, post.user_id).await?;
+        Ok(owner
+            .iter()
+            .map(users::table_row)
+            .collect::<Result<_, _>>()?)
+    }
+
+    async fn apply_server_row(
+        &self,
+        tx: &mut Transaction,
+        _user: &User,
+        row: &TableRow,
+    ) -> Result<bool, TableError> {
+        let post: Post = serde_json::from_value(row.row.clone())?;
+        if app_events::has_pending(tx, TABLE, post.id).await? {
+            return Ok(false);
+        }
+        app_posts::replication::upsert(tx, &post).await?;
+        Ok(true)
+    }
+
+    async fn delete_row(&self, tx: &mut Transaction, id: Uuid) -> Result<(), TableError> {
+        Ok(app_posts::maintenance::delete(tx, id).await?)
+    }
+
+    async fn local_user_creates(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+    ) -> Result<Vec<LocalCreate>, TableError> {
+        let posts = app_posts::list(tx, app_posts::Filter::VisibleTo(user.id)).await?;
+        Ok(posts
+            .into_iter()
+            .map(|post| LocalCreate {
+                id: post.id,
+                inserted_at: post.inserted_at,
+                parents: Vec::new(),
+                changes: json::object_fields(json!({ "body": post.body })),
+            })
+            .collect())
+    }
+
+    async fn label(&self, tx: &mut Transaction, id: Uuid) -> Result<Option<String>, TableError> {
+        let post = get_in(tx, id).await?;
+        Ok(post.map(|post| post.body.lines().next().unwrap_or_default().to_string()))
+    }
+
+    async fn current_fields(
+        &self,
+        tx: &mut Transaction,
+        id: Uuid,
+    ) -> Result<Option<CurrentFields>, TableError> {
+        let Some(post) = get_in(tx, id).await? else {
+            return Ok(None);
+        };
+        if post.deleted_at.is_some() {
+            return Ok(None);
+        }
+        Ok(Some(CurrentFields {
+            version: post.version,
+            fields: post.fields(UPDATE_FIELDS)?,
+        }))
+    }
+
+    async fn prune(&self, tx: &mut Transaction, user: &User) -> Result<u64, TableError> {
+        Ok(app_posts::maintenance::prune(tx, user.id).await?)
+    }
+
+    fn counted_before_a_move(&self) -> bool {
+        true
     }
 }
 

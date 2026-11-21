@@ -244,3 +244,12 @@ pub async fn upsert(connection: &mut PgConnection, user: &User) -> Result<(), sq
     .await?;
     Ok(())
 }
+
+/// Deletes every user but the one kept, for a resync from nothing.
+pub async fn delete_others(connection: &mut PgConnection, keep: Uuid) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM app_users WHERE id != $1")
+        .bind(keep)
+        .execute(connection)
+        .await?;
+    Ok(())
+}
