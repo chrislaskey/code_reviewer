@@ -8,10 +8,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::synced_table::TableError;
 use crate::app::synced_tables;
 use crate::data::app_events::{self, EventKind, Fields, StoredEvent};
 use crate::deployment::Deployment;
+use crate::sync::synced_table::TableError;
 
 /// A change waiting to reach the server, as the page shows it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -69,11 +69,11 @@ fn pending_change(stored: StoredEvent, about: Option<String>) -> PendingChange {
 mod tests {
     use super::*;
     use crate::app::posts;
-    use crate::app::sync;
     use crate::app::users;
     use crate::database::with_each_database;
     use crate::deployment::Role;
     use crate::services::web_server::InProcess;
+    use crate::sync;
 
     #[tokio::test]
     async fn pending_changes_list_what_waits_and_nothing_once_synced() {

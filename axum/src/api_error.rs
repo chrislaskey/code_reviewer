@@ -21,13 +21,11 @@ use app_core::accounts::subscriptions::SubscriptionError;
 use app_core::app::avatars::AvatarError;
 use app_core::app::communities::CommunityError;
 use app_core::app::current_community::CurrentCommunityError;
-use app_core::app::events::RecordError;
 use app_core::app::files::FileError;
 use app_core::app::files_communities::FileCommunityError;
 use app_core::app::memberships::MembershipError;
 use app_core::app::posts::PostError;
 use app_core::app::posts_communities::PostCommunityError;
-use app_core::app::sync::SyncError;
 use app_core::app::users::UserError;
 use app_core::data::accounts_credentials::CredentialError;
 use app_core::data::accounts_users::AccountUserError;
@@ -35,6 +33,8 @@ use app_core::helpers::field_errors::FieldErrors;
 use app_core::ops::staff::StaffError;
 use app_core::services::app_store::AppStoreError;
 use app_core::services::stripe::StripeError;
+use app_core::sync::SyncError;
+use app_core::sync::events::RecordError;
 
 #[derive(Debug)]
 pub struct ApiError {

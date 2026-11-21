@@ -47,7 +47,7 @@ core/src/
 
 - A module that already was a table's low-level context moved into `data` whole, its functions becoming the context's: `accounts::users` (only the deployment's `get` stays there), `tokens`, `credentials`, `device_settings`. Their `create` and `get` check and normalize their input themselves, as an Ecto context does.
 - An enum that names a column's values moves with its schema (`Job`, `CheckoutStatus`, `Store`, `SubscriptionStatus`, `PriceInterval`); methods on it that translate a service's types or decide policy stay in the app's module as a second `impl` (`CheckoutStatus::of`, `Job::interval`).
-- `Cursor` is the schema of `app_sync_state`; `Event`, `StoredEvent` and the queue's reads and writes are `data/app_events`. Merging and answering an event stay in `app::events`. `data` imports nothing from the apps or services.
+- `Cursor` is the schema of `app_sync_state`; `Event`, `StoredEvent` and the queue's reads and writes are `data/app_events`. Merging and answering an event stay in `sync::events`. `data` imports nothing from the apps or services.
 - `services/web_server` holds the `Transport` a sync and a sign-in go through: `Http` for the apps, `InProcess` for tests.
 
 ## Open

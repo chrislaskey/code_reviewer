@@ -12,16 +12,16 @@ use app_core::accounts::AccountError;
 use app_core::accounts::online::OnlineError;
 use app_core::app::avatars::AvatarError;
 use app_core::app::communities::CommunityError;
-use app_core::app::conflicts::ConflictError;
 use app_core::app::current_community::CurrentCommunityError;
 use app_core::app::files::FileError;
 use app_core::app::local_users::LocalUserError;
 use app_core::app::memberships::MembershipError;
-use app_core::app::pending_changes::PendingChangeError;
 use app_core::app::posts::PostError;
-use app_core::app::sync::SyncError;
 use app_core::app::users::UserError;
 use app_core::helpers::field_errors::FieldErrors;
+use app_core::sync::SyncError;
+use app_core::sync::conflicts::ConflictError;
+use app_core::sync::pending_changes::PendingChangeError;
 
 use crate::device_accounts::DeviceAccountsError;
 

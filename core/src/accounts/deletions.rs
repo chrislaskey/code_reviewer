@@ -29,7 +29,6 @@ use uuid::Uuid;
 use crate::accounts::trial_users;
 use crate::accounts::{AccountError, MAX_CODE_ATTEMPTS};
 use crate::app::communities::{self, CommunityError};
-use crate::app::events::{Answer, AnswerStatus};
 use crate::app::memberships::{self, MembershipError};
 use crate::app::posts::{self, PostError};
 use crate::app::users::{self, UserError};
@@ -41,6 +40,7 @@ use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::services::mailer::mails;
 use crate::services::mailer::{MailError, Mailer};
+use crate::sync::events::{Answer, AnswerStatus};
 
 #[derive(Debug, Error)]
 pub enum DeletionError {
@@ -308,11 +308,12 @@ mod tests {
     use super::*;
     use crate::accounts::tests::{code_sent_to, signed_up_for_a_device};
     use crate::accounts::{self, Session};
-    use crate::app::sync;
+    use crate::app::users;
     use crate::app::users::tests::device_of;
-    use crate::app::{purge, users};
     use crate::database::with_each_database;
     use crate::services::web_server::InProcess;
+    use crate::sync;
+    use crate::sync::purge;
 
     fn server(database: crate::database::Database) -> Deployment {
         Deployment::new(database, Role::Server)

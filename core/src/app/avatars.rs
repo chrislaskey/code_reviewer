@@ -19,11 +19,11 @@ use garde::Validate;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::app::sync::SyncError;
 use crate::app::users::UserError;
 use crate::helpers::field_errors::FieldErrors;
 #[cfg(feature = "sync-http")]
 use crate::services::web_server::Http;
+use crate::sync::SyncError;
 #[cfg(any(feature = "object-storage", feature = "sync-http"))]
 use crate::{app::users, data::app_users::User, deployment::Deployment};
 #[cfg(feature = "object-storage")]
@@ -642,8 +642,8 @@ mod tests {
             assert_eq!(report.deleted, 0, "a soft-deleted row still points at it");
 
             let after_the_window =
-                now + chrono::Duration::days(crate::app::purge::RETENTION_DAYS + 1);
-            crate::app::purge::run(&deployment, after_the_window)
+                now + chrono::Duration::days(crate::sync::purge::RETENTION_DAYS + 1);
+            crate::sync::purge::run(&deployment, after_the_window)
                 .await
                 .expect("the purge");
             let report = delete_unreferenced(&deployment, after_the_window)

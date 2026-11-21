@@ -44,10 +44,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::app::communities;
-use crate::app::events::{self, Answer, AnswerStatus};
 use crate::app::files_communities::{self, FileCommunityError, FileCommunityNew};
-use crate::app::sync::{SyncError, TableRow};
-use crate::app::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
 use crate::app::users;
 use crate::data::app_communities::Community;
 use crate::data::app_events::{
@@ -63,6 +60,9 @@ use crate::helpers::{json, sha256};
 #[cfg(feature = "object-storage")]
 use crate::services::storage::{Storage, StorageError};
 use crate::services::web_server::Transport;
+use crate::sync::events::{self, Answer, AnswerStatus};
+use crate::sync::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
+use crate::sync::{SyncError, TableRow};
 
 /// Why a device refuses a waiting file itself: there is nothing to send.
 pub const BYTES_GONE: &str = "the file's bytes are no longer on this device";
@@ -261,7 +261,7 @@ pub enum FileError {
     #[error(transparent)]
     Storage(#[from] StorageError),
     #[error(transparent)]
-    Record(#[from] crate::app::events::RecordError),
+    Record(#[from] crate::sync::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -1682,12 +1682,13 @@ impl SyncedTable for Synced {
 pub(crate) mod tests {
     use super::*;
     use crate::accounts::Session;
-    use crate::app::conflicts::{self, ConflictError, Resolve};
-    use crate::app::sync::tests::user_with_token;
-    use crate::app::sync::{self, BackfillRequest, Page, PullRequest, PushRequest, PushResponse};
-    use crate::app::{pending_changes, posts, users};
+    use crate::app::{posts, users};
     use crate::database::{Database, with_each_database};
     use crate::services::web_server::InProcess;
+    use crate::sync::conflicts::{self, ConflictError, Resolve};
+    use crate::sync::pending_changes;
+    use crate::sync::tests::user_with_token;
+    use crate::sync::{self, BackfillRequest, Page, PullRequest, PushRequest, PushResponse};
 
     /// The user's own community on the deployment, made the first time.
     pub(crate) async fn personal(deployment: &Deployment, user: &User) -> Uuid {
@@ -2672,8 +2673,8 @@ pub(crate) mod tests {
             );
 
             let after_the_window =
-                now + chrono::Duration::days(crate::app::purge::RETENTION_DAYS + 1);
-            crate::app::purge::run(&server, after_the_window)
+                now + chrono::Duration::days(crate::sync::purge::RETENTION_DAYS + 1);
+            crate::sync::purge::run(&server, after_the_window)
                 .await
                 .expect("purged");
             let report = delete_unreferenced(&server, after_the_window)

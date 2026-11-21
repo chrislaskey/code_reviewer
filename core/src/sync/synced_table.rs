@@ -7,13 +7,13 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::app::events::Answer;
-use crate::app::sync::TableRow;
 use crate::data::app_events::{Event, Fields};
 use crate::data::app_sync_state::{self, Cursor};
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role};
+use crate::sync::TableRow;
+use crate::sync::events::Answer;
 
 /// The error of a table's own module, as the machinery passes it on.
 pub type TableError = Box<dyn std::error::Error + Send + Sync>;

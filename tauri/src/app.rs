@@ -4,11 +4,9 @@
 
 pub mod avatars;
 pub mod communities;
-pub mod conflicts;
 pub mod current_community;
 pub mod current_user;
 pub mod files;
 pub mod local_users;
 pub mod memberships;
-pub mod pending_changes;
 pub mod posts;

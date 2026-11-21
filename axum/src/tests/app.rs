@@ -554,7 +554,7 @@ async fn sync_push_takes_a_request_up_to_the_most_a_device_sends_and_no_larger()
     assert_eq!(status, StatusCode::OK, "over the 2 MB of the other routes");
     assert_eq!(body["events"].as_array().expect("answers").len(), 400);
 
-    let over = "a".repeat(app_core::app::sync::MAX_PUSH_BYTES);
+    let over = "a".repeat(app_core::sync::MAX_PUSH_BYTES);
     let (status, _) = send(
         &router,
         Method::POST,

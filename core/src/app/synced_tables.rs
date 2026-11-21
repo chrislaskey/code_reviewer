@@ -1,11 +1,11 @@
 //! The app's synced tables, which sync, conflicts, pending changes,
 //! purge and a local user's move run over: a table the app adds is
-//! listed here, see `app::synced_table`.
+//! listed here, see `sync::synced_table`.
 
-use crate::app::synced_table::SyncedTable;
 use crate::app::{
     communities, files, files_communities, memberships, posts, posts_communities, users,
 };
+use crate::sync::synced_table::SyncedTable;
 
 /// Every synced table, parents before the rows that point at them: the
 /// order a device writes a page in, and, reversed, the order purge

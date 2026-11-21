@@ -16,11 +16,8 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::events::{self, Answer, AnswerStatus};
 use crate::app::files_communities;
 use crate::app::memberships::{self, MembershipError};
-use crate::app::sync::TableRow;
-use crate::app::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
 use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
@@ -29,6 +26,9 @@ use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::field_errors::FieldErrors;
 use crate::helpers::json;
+use crate::sync::TableRow;
+use crate::sync::events::{self, Answer, AnswerStatus};
+use crate::sync::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
 
 const CREATE_FIELDS: &[&str] = &["name"];
 pub(crate) const UPDATE_FIELDS: &[&str] = &["name", "deleted_at"];
@@ -56,7 +56,7 @@ pub enum CommunityError {
     #[error(transparent)]
     Membership(#[from] MembershipError),
     #[error(transparent)]
-    Record(#[from] crate::app::events::RecordError),
+    Record(#[from] crate::sync::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }

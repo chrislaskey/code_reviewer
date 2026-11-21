@@ -9,12 +9,10 @@ use crate::app::avatars::{AvatarUpdate, AvatarUpload, AvatarUploadNew};
 #[cfg(feature = "object-storage")]
 use crate::app::files::{self, FileError};
 use crate::app::files::{FileUpload, FileUploadNew};
-use crate::app::sync::{
-    self, BackfillRequest, Page, PullRequest, PushRequest, PushResponse, SyncError,
-};
 use crate::app::users::{self, UserError};
 use crate::data::app_users::User;
 use crate::deployment::Deployment;
+use crate::sync::{self, BackfillRequest, Page, PullRequest, PushRequest, PushResponse, SyncError};
 #[cfg(feature = "sync-http")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "sync-http")]

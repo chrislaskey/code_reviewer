@@ -26,8 +26,6 @@ use uuid::Uuid;
 
 use crate::accounts::Session;
 use crate::app::communities::{self, CommunityError};
-use crate::app::events;
-use crate::app::synced_table::TableError;
 use crate::app::synced_tables;
 use crate::app::users::{self, SignedIn, UserError};
 use crate::data::app_events::Event;
@@ -36,6 +34,8 @@ use crate::data::device_settings::{self, DeviceSettingsError, LOCAL_USER_MOVED, 
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::random;
+use crate::sync::events;
+use crate::sync::synced_table::TableError;
 
 /// Whether a device offers to skip signing in. The app's choice, to
 /// change in a fork.
@@ -284,12 +284,12 @@ mod tests {
     use crate::app::files;
     use crate::app::files::tests::server;
     use crate::app::posts;
-    use crate::app::sync;
     use crate::data::{app_files, app_posts};
     use crate::database::with_each_database;
     use crate::deployment::FileStore;
     use crate::services::storage::Storage;
     use crate::services::web_server::InProcess;
+    use crate::sync;
 
     /// A device where someone skipped signing in, with a folder for
     /// its files' bytes.

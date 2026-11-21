@@ -268,7 +268,7 @@ now.
 ### The sync lock and a switch
 
 How a sync runs today: `SyncServer` holds a `tokio::sync::Mutex`, one
-sync at a time; `sync::run` takes it, then `app_core::app::sync::run` pushes
+sync at a time; `sync::run` takes it, then `app_core::sync::run` pushes
 the pending events in one request and applies the answers in one
 transaction, pulls page by page with the cursor advanced in each page's
 transaction, backfills communities just joined the same way, and prunes.

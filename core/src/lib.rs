@@ -25,3 +25,4 @@ pub mod deployment;
 pub mod helpers;
 pub mod ops;
 pub mod services;
+pub mod sync;

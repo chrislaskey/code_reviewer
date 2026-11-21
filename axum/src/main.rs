@@ -34,6 +34,7 @@ mod public_pages;
 mod rate_limits;
 mod router;
 mod state;
+mod sync;
 #[cfg(test)]
 mod tests;
 mod user_auth;

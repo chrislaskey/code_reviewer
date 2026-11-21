@@ -15,8 +15,8 @@ use thiserror::Error;
 
 use crate::app::avatars::AvatarError;
 use crate::app::files::FileError;
-use crate::app::purge::{self, PurgeError};
 use crate::deployment::{Deployment, Role};
+use crate::sync::purge::{self, PurgeError};
 
 impl Job {
     /// The role of the deployments it runs on.

@@ -1,5 +1,5 @@
 //! Syncing the active account's database with the web server, see
-//! `docs/design/offline-sync.md`: `app_core::app::sync::run` over HTTP to the
+//! `docs/design/offline-sync.md`: `app_core::sync::run` over HTTP to the
 //! server at the URL `server_urls` resolves when the app starts. One
 //! sync runs at a time: when the app starts, when it comes
 //! to the foreground, after every write, from the Sync now button, and
@@ -20,6 +20,9 @@
 //! since the waiting one sees it. A sync that left files for the next
 //! starts the next.
 
+pub mod conflicts;
+pub mod pending_changes;
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex as SyncMutex, PoisonError};
 use std::time::{Duration, Instant};
@@ -29,8 +32,8 @@ use tauri::{App, AppHandle, Emitter, Manager, State};
 use tokio::sync::{Mutex, MutexGuard};
 
 use app_core::accounts::online;
-use app_core::app::sync::{self, Report, Status, SyncError};
 use app_core::services::web_server::Http;
+use app_core::sync::{self, Report, Status, SyncError};
 
 use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;

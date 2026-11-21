@@ -1,9 +1,9 @@
-//! The pending changes command: `app_core::app::pending_changes` as the
+//! The pending changes command: `app_core::sync::pending_changes` as the
 //! page listing the changes not on the server calls it.
 
 use tauri::State;
 
-use app_core::app::pending_changes::{self, PendingChange};
+use app_core::sync::pending_changes::{self, PendingChange};
 
 use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;

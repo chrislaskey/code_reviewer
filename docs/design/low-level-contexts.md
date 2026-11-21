@@ -33,7 +33,7 @@ Current evidence:
 - [users.rs](../../core/src/app/users.rs): profile changes, account-related helpers, token lookup, anonymization and replication coexist.
 - [accounts/products.rs](../../core/src/accounts/products.rs): catalog persistence, sale projections and Stripe synchronization coexist.
 - [accounts/deletions.rs](../../core/src/accounts/deletions.rs): orchestrates several resources and directly calls adapters for posts, files, memberships, staff and account data. [accounts/stripe_reconcile.rs](../../core/src/accounts/stripe_reconcile.rs) also directly queries adapters.
-- [local_users.rs](../../core/src/app/local_users.rs): ownership transfer and cleanup include bulk SQL; [purge.rs](../../core/src/app/purge.rs) uses cross-table maintenance operations. These need explicit treatment, not a claim that ordinary CRUD already covers every write.
+- [local_users.rs](../../core/src/app/local_users.rs): ownership transfer and cleanup include bulk SQL; [purge.rs](../../core/src/sync/purge.rs) uses cross-table maintenance operations. These need explicit treatment, not a claim that ordinary CRUD already covers every write.
 - [lib.rs](../../core/src/lib.rs) keeps backend modules private to the crate, but sibling core modules can still use them. Privacy currently prevents external access, not internal bypasses.
 
 Design constraints: [offline sync](offline-sync.md) and [multi-app](multi-app.md). Synced business rows use events; accounts writes do not universally use those events. Infrastructure tables with an `app_` prefix are not ordinary replicated business rows. Preserve these distinctions.

@@ -348,12 +348,12 @@ design, carried over from the Phoenix version, is
 `docs/design/offline-sync.md`. In short:
 
 * Every write, on every deployment, is an **event**
-  (`core/src/app/events.rs`): the fields the person changed, from the row's
+  (`core/src/sync/events.rs`): the fields the person changed, from the row's
   version they started at, and who made it. The server applies it at
   once, increments the row's `version` and records the event in
   `app_events`; a device applies it at once too and queues it there for
   the next push.
-* A **sync** on a device (`core/src/app/sync.rs`, `sync::run`) pushes the
+* A **sync** on a device (`core/src/sync.rs`, `sync::run`) pushes the
   pending events to `POST /api/sync/push` with the device's token, where
   the server applies each as that user with the same function, refusing
   a change to someone else's post, and answers it; then pulls the rows
@@ -367,13 +367,13 @@ design, carried over from the Phoenix version, is
   server runs those due every 15 minutes; `cargo run -p app_web -- jobs
   run` does the same once, for a scheduler outside it, and `jobs run
   purge` runs one job now. Each run is recorded in `app_jobs`.
-* The **purge** (`core/src/app/purge.rs`, a daily job, see below)
+* The **purge** (`core/src/sync/purge.rs`, a daily job, see below)
   hard-deletes what was deleted more than 90 days
   ago and records the horizon; a device away longer than that is told to
   start over on its next pull, and does, keeping its pending changes.
 * Conflicts are decided by versions, never clocks, field by field. A
   field someone else changed first keeps their value, and the device's
-  value is kept as a **conflict** (`core/src/app/conflicts.rs`) the person
+  value is kept as a **conflict** (`core/src/sync/conflicts.rs`) the person
   reapplies or lets go on the `/conflicts` page, which the sync status in
   the nav links to. Deletes are soft, `deleted_at`, so they sync like any
   edit.

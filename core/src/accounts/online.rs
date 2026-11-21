@@ -18,10 +18,10 @@ use serde_json::Value;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::sync::SyncError;
 use crate::app::users::UserError;
 use crate::data::device_settings::{self, DeviceSettingsError, PLAN};
 use crate::deployment::{Deployment, now};
+use crate::sync::SyncError;
 
 /// Where Stripe's pages come back to: the web page that asked, or, for
 /// the app, a page saying to go back to it, as the browser that paid is

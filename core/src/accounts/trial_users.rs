@@ -184,13 +184,13 @@ pub(crate) async fn show_communities_in(
 mod tests {
     use super::*;
     use crate::accounts::{self, NextStep, SignInStep};
-    use crate::app::sync::{self, PullRequest};
     use crate::app::{memberships, posts};
     use crate::data::app_communities;
     use crate::data::app_posts;
     use crate::database::with_each_database;
     use crate::services::mailer::Mailer;
     use crate::services::mailer::mails;
+    use crate::sync::{self, PullRequest};
 
     fn server(database: crate::database::Database) -> Deployment {
         Deployment::new(database, Role::Server)
@@ -377,7 +377,7 @@ mod tests {
                 .expect_err("refused");
             assert!(matches!(
                 error,
-                posts::PostError::Record(crate::app::events::RecordError::TrialWritesFull)
+                posts::PostError::Record(crate::sync::events::RecordError::TrialWritesFull)
             ));
             assert_eq!(
                 error.to_string(),
@@ -636,7 +636,7 @@ mod tests {
             let server = server(database);
             let trial = create(&server, 10).await.expect("a trial").user;
             let a_day_and_a_half = now() + Duration::hours(36);
-            crate::app::purge::run(&server, a_day_and_a_half)
+            crate::sync::purge::run(&server, a_day_and_a_half)
                 .await
                 .expect("purged");
             assert!(

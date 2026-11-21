@@ -17,10 +17,7 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::events::{self, Answer, AnswerStatus};
 use crate::app::memberships::{self, id_field};
-use crate::app::sync::TableRow;
-use crate::app::synced_table::{LocalCreate, SyncedTable, TableError};
 use crate::app::{communities, posts};
 use crate::data::app_events::{self, Conflicts, Event, EventKind};
 use crate::data::app_posts;
@@ -31,6 +28,9 @@ use crate::data::app_users_communities::Membership;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;
+use crate::sync::TableRow;
+use crate::sync::events::{self, Answer, AnswerStatus};
+use crate::sync::synced_table::{LocalCreate, SyncedTable, TableError};
 
 const CREATE_FIELDS: &[&str] = &["post_id", "community_id", "users_communities_id"];
 const UPDATE_FIELDS: &[&str] = &["deleted_at"];
@@ -50,7 +50,7 @@ pub enum PostCommunityError {
     #[error("the change was refused: {0}")]
     Rejected(String),
     #[error(transparent)]
-    Record(#[from] crate::app::events::RecordError),
+    Record(#[from] crate::sync::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }

@@ -18,10 +18,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::app::communities;
-use crate::app::events::{self, Answer, AnswerStatus};
 use crate::app::posts_communities::{self, PostCommunityError};
-use crate::app::sync::TableRow;
-use crate::app::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
 use crate::app::users;
 use crate::data::app_communities::Community;
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
@@ -31,6 +28,9 @@ use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;
+use crate::sync::TableRow;
+use crate::sync::events::{self, Answer, AnswerStatus};
+use crate::sync::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
 
 /// The fields an event may set when it creates a post.
 const CREATE_FIELDS: &[&str] = &["body"];
@@ -60,7 +60,7 @@ pub enum PostError {
     #[error(transparent)]
     Community(#[from] PostCommunityError),
     #[error(transparent)]
-    Record(#[from] crate::app::events::RecordError),
+    Record(#[from] crate::sync::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }

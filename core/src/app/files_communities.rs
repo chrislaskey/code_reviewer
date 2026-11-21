@@ -20,11 +20,8 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::app::communities;
-use crate::app::events::{self, Answer, AnswerStatus};
 use crate::app::files;
 use crate::app::memberships::{self, id_field};
-use crate::app::sync::TableRow;
-use crate::app::synced_table::{LocalCreate, SyncedTable, TableError};
 use crate::data::app_communities::Community;
 use crate::data::app_events::{self, Conflicts, Event, EventKind};
 use crate::data::app_files::File;
@@ -33,6 +30,9 @@ use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;
+use crate::sync::TableRow;
+use crate::sync::events::{self, Answer, AnswerStatus};
+use crate::sync::synced_table::{LocalCreate, SyncedTable, TableError};
 
 const CREATE_FIELDS: &[&str] = &["file_id", "community_id"];
 const UPDATE_FIELDS: &[&str] = &["deleted_at"];
@@ -58,7 +58,7 @@ pub enum FileCommunityError {
     #[error("the change was refused: {0}")]
     Rejected(String),
     #[error(transparent)]
-    Record(#[from] crate::app::events::RecordError),
+    Record(#[from] crate::sync::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -718,12 +718,12 @@ mod tests {
     use super::*;
     use crate::app::files::tests::{device_with_folder, new_file, server};
     use crate::app::files::{FileError, FileNew};
-    use crate::app::sync::tests::user_with_token;
-    use crate::app::sync::{self, BackfillRequest, PullRequest, SyncError};
     use crate::app::{communities, files, memberships, users};
     use crate::database::with_each_database;
     use crate::services::storage::Storage;
     use crate::services::web_server::InProcess;
+    use crate::sync::tests::user_with_token;
+    use crate::sync::{self, BackfillRequest, PullRequest, SyncError};
 
     /// A file the user created on the server in the communities, its
     /// bytes put in the bucket as an upload would have.

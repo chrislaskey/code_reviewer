@@ -13,15 +13,15 @@ use serde_json::Value;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::events::AnswerStatus;
 use crate::app::files::{self, FileError};
-use crate::app::synced_table::TableError;
 use crate::app::synced_tables;
 use crate::data::app_events::{self, Event, EventKind, EventStatus, Fields, StoredEvent};
 use crate::data::app_files;
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
+use crate::sync::events::AnswerStatus;
+use crate::sync::synced_table::TableError;
 
 /// A conflicted change as the page shows it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

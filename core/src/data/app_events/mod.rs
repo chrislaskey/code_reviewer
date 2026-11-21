@@ -1,7 +1,7 @@
 //! Event records: the `Event` a person made to a synced row, as
 //! `app_events` keeps it, `StoredEvent`, and the reads and writes of the
 //! server's log and a device's queue. How an event is applied, merged and
-//! answered is `app::events` and each resource's `apply_event`.
+//! answered is `sync::events` and each resource's `apply_event`.
 
 use std::collections::BTreeMap;
 

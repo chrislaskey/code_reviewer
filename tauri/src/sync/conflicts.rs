@@ -1,10 +1,10 @@
-//! The conflicts commands: `app_core::app::conflicts` as the conflicts page
+//! The conflicts commands: `app_core::sync::conflicts` as the conflicts page
 //! calls it. A change reapplied or tried again starts a sync, see `sync`.
 
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 
-use app_core::app::conflicts::{self, Conflict};
+use app_core::sync::conflicts::{self, Conflict};
 
 use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;

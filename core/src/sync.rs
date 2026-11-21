@@ -15,6 +15,12 @@
 //! offline, `set_offline`, a device setting, makes no request at all
 //! until it chooses otherwise.
 
+pub mod conflicts;
+pub mod events;
+pub mod pending_changes;
+pub mod purge;
+pub mod synced_table;
+
 use crate::data::app_sync_backfills;
 use crate::data::app_sync_state;
 use std::collections::{BTreeMap, BTreeSet};
@@ -25,11 +31,8 @@ use serde_json::Value;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::events::{Answer, AnswerStatus};
 use crate::app::files::{self, FileError};
 use crate::app::memberships::{self, MembershipError};
-use crate::app::purge::{self, PurgeError};
-use crate::app::synced_table::{SyncedTable, TableError};
 use crate::app::synced_tables;
 use crate::app::users::{self, UserError};
 use crate::data::app_events::{self, Event, EventKind, EventStatus, StoredEvent};
@@ -40,6 +43,9 @@ use crate::data::device_settings::{self, DeviceSettingsError, WORK_OFFLINE};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
 use crate::services::web_server::Transport;
+use events::{Answer, AnswerStatus};
+use purge::PurgeError;
+use synced_table::{SyncedTable, TableError};
 
 /// How far back from its cursor's time a pull starts, so a row written
 /// in a transaction that committed after a later one is not missed.
@@ -827,7 +833,7 @@ pub(crate) mod tests {
     use crate::app::files::{FileUpload, FileUploadNew};
     use crate::app::posts::PostError;
     pub(crate) use crate::app::users::tests::device_of;
-    use crate::app::{communities, conflicts, memberships, posts, posts_communities, purge};
+    use crate::app::{communities, memberships, posts, posts_communities};
     use crate::data::{
         app_communities, app_posts, app_posts_communities, app_users, app_users_communities,
     };
@@ -836,6 +842,7 @@ pub(crate) mod tests {
     #[cfg(feature = "sync-http")]
     use crate::services::web_server::Http;
     use crate::services::web_server::InProcess;
+    use crate::sync::{conflicts, purge};
 
     /// A user signed up on the server, with a token for their devices,
     /// and without the community a sign-up starts with, so a test
@@ -2049,7 +2056,7 @@ pub(crate) mod tests {
                     .expect("deleted");
                 let mut broken = stored.event.clone();
                 broken.changes = fields(json!({ "body": "x", "version": 5 }));
-                crate::app::events::queue(&mut tx, alice.id, &broken)
+                crate::sync::events::queue(&mut tx, alice.id, &broken)
                     .await
                     .expect("queued");
                 tx.commit().await.expect("committed");

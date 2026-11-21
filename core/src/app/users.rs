@@ -16,9 +16,6 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::events::{self, Answer, AnswerStatus};
-use crate::app::sync::TableRow;
-use crate::app::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
 use crate::data::accounts_tokens;
 use crate::data::accounts_users::{self, AccountUserError};
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
@@ -26,6 +23,9 @@ use crate::data::app_sync_state::Cursor;
 use crate::data::device_settings::{self, DeviceSettingsError, SIGNED_IN};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
+use crate::sync::TableRow;
+use crate::sync::events::{self, Answer, AnswerStatus};
+use crate::sync::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
 
 /// What a person changes of their own row; the rest is the server's.
 pub(crate) const UPDATE_FIELDS: &[&str] = &["name"];
@@ -82,7 +82,7 @@ pub enum UserError {
     #[error(transparent)]
     DeviceSettings(#[from] DeviceSettingsError),
     #[error(transparent)]
-    Record(#[from] crate::app::events::RecordError),
+    Record(#[from] crate::sync::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }

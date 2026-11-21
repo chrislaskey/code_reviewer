@@ -20,9 +20,10 @@ use crate::accounts::{
 };
 use crate::api_error::ApiError;
 use crate::app::{
-    avatars, communities, current_community, current_user, files, memberships, posts, sync,
+    avatars, communities, current_community, current_user, files, memberships, posts,
 };
 use crate::state::AppState;
+use crate::sync;
 use crate::{accounts, ops, public_pages, rate_limits};
 
 pub fn router(svelte_dist: &Path, ops_dist: &Path, state: AppState) -> Router {
@@ -83,7 +84,7 @@ fn app_api() -> Router<AppState> {
         )
         .route(
             "/api/sync/push",
-            post(sync::push).layer(DefaultBodyLimit::max(app_core::app::sync::MAX_PUSH_BYTES)),
+            post(sync::push).layer(DefaultBodyLimit::max(app_core::sync::MAX_PUSH_BYTES)),
         )
         .route("/api/sync/pull", post(sync::pull))
         .route("/api/sync/backfill", post(sync::backfill))

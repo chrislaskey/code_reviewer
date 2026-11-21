@@ -8,4 +8,3 @@ pub mod current_user;
 pub mod files;
 pub mod memberships;
 pub mod posts;
-pub mod sync;

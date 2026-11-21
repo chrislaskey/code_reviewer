@@ -55,7 +55,6 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::app::communities::{self, CommunityError};
-use crate::app::sync::SyncError;
 use crate::app::users::{SignedIn, UserError};
 use crate::data::accounts_credentials::{self, CredentialError};
 use crate::data::accounts_tokens::{self, Context};
@@ -67,6 +66,7 @@ use crate::helpers::random;
 use crate::services::mailer::mails;
 use crate::services::mailer::{MailError, Mailer};
 use crate::services::web_server::Transport;
+use crate::sync::SyncError;
 
 use crate::data::accounts_users::{self, AccountUser, AccountUserError};
 
@@ -952,10 +952,10 @@ async fn live_user_in(tx: &mut Transaction, id: Uuid) -> Result<Option<User>, Ac
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::app::sync;
     use crate::app::{posts, users};
     use crate::database::with_each_database;
     use crate::services::web_server::InProcess;
+    use crate::sync;
 
     pub(crate) const PASSWORD: &str = "correct horse battery";
 
