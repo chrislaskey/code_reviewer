@@ -301,7 +301,7 @@ a push cannot stop halfway.
   of every file, the switch, the file naming, with tests on temporary
   directories. `app_tauri` has no tests today; this would be the first
   module with them.
-- `tauri/migrations/device/`: the one migration for `device.db`, run
+- `tauri/migrations/device/`: the migrations for `device.db`, run
   through its own `sqlx::migrate!` path, separate from the account
   files' migrations in `core/migrations/sqlite/`.
 - The managed `Deployment` goes. The device section's state is managed
