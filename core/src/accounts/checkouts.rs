@@ -8,7 +8,7 @@
 //! webhook, which applies the same session, `apply_session_in`. See
 //! `docs/design/purchasing.md`, P2 and P3.
 
-use crate::data::accounts_checkouts;
+use crate::data::accounts_checkouts::{self, Checkout, CheckoutStatus};
 use crate::data::accounts_products;
 use crate::data::accounts_purchases;
 use crate::data::accounts_users;
@@ -20,8 +20,9 @@ use uuid::Uuid;
 use crate::accounts::online::ReturnTo;
 use crate::accounts::prices;
 use crate::accounts::products::{self, ProductError, ProductKind};
-use crate::accounts::purchases::{self, Purchase, Store};
+use crate::accounts::purchases;
 use crate::accounts::{plans, subscriptions};
+use crate::data::accounts_purchases::{Purchase, Store};
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
@@ -30,96 +31,9 @@ use crate::services::stripe::{
     StripeCheckoutSessionStatus, StripeError, StripePaymentStatus, StripeSubscription,
 };
 
-/// A checkout status accepted by provider-session processing.
-pub(crate) struct AcceptedStatus(CheckoutStatus);
-
-impl AcceptedStatus {
-    /// Returns the accepted provider status.
-    pub(crate) fn value(&self) -> CheckoutStatus {
-        self.0
-    }
-}
-
-/// A record accepted by the checkouts workflow.
-pub(crate) struct AcceptedCheckout<'a>(&'a Checkout);
-
-impl AcceptedCheckout<'_> {
-    /// Borrows the accepted record for persistence.
-    pub(crate) fn row(&self) -> &Checkout {
-        self.0
-    }
-}
-
-pub const TABLE: &str = "accounts_checkouts";
-
 /// The page Stripe comes back to for the app: open to anyone, as the
 /// browser that paid is not signed in, saying to go back to the app.
 pub const BACK_TO_APP_PATH: &str = "/accounts/back-to-app";
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CheckoutStatus {
-    /// On Stripe's page, not paid yet.
-    Open,
-    /// Paid with a method that settles later.
-    Processing,
-    Paid,
-    /// Left unpaid until Stripe closed it.
-    Expired,
-    /// A payment that settles later and did not.
-    Failed,
-}
-
-impl CheckoutStatus {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            CheckoutStatus::Open => "open",
-            CheckoutStatus::Processing => "processing",
-            CheckoutStatus::Paid => "paid",
-            CheckoutStatus::Expired => "expired",
-            CheckoutStatus::Failed => "failed",
-        }
-    }
-
-    pub fn from_name(name: &str) -> Option<CheckoutStatus> {
-        match name {
-            "open" => Some(CheckoutStatus::Open),
-            "processing" => Some(CheckoutStatus::Processing),
-            "paid" => Some(CheckoutStatus::Paid),
-            "expired" => Some(CheckoutStatus::Expired),
-            "failed" => Some(CheckoutStatus::Failed),
-            _ => None,
-        }
-    }
-
-    /// Whether Stripe may still change it.
-    fn is_pending(self) -> bool {
-        matches!(self, CheckoutStatus::Open | CheckoutStatus::Processing)
-    }
-
-    fn of(session: &StripeCheckoutSession) -> CheckoutStatus {
-        match (session.status, session.payment_status) {
-            (_, StripePaymentStatus::Paid) => CheckoutStatus::Paid,
-            (_, StripePaymentStatus::Failed) => CheckoutStatus::Failed,
-            (_, StripePaymentStatus::Processing) => CheckoutStatus::Processing,
-            (StripeCheckoutSessionStatus::Expired, _) => CheckoutStatus::Expired,
-            (StripeCheckoutSessionStatus::Complete, _) => CheckoutStatus::Processing,
-            (StripeCheckoutSessionStatus::Open, _) => CheckoutStatus::Open,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Checkout {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub price_id: Uuid,
-    /// `cs_...`
-    pub stripe_session_id: String,
-    pub status: CheckoutStatus,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
 
 /// A checkout just made, and Stripe's page to send the person to.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -138,6 +52,24 @@ pub struct CheckoutShown {
     pub product_name: String,
     pub kind: ProductKind,
     pub purchase_id: Option<Uuid>,
+}
+
+impl CheckoutStatus {
+    /// Whether Stripe may still change it.
+    fn is_pending(self) -> bool {
+        matches!(self, CheckoutStatus::Open | CheckoutStatus::Processing)
+    }
+
+    fn of(session: &StripeCheckoutSession) -> CheckoutStatus {
+        match (session.status, session.payment_status) {
+            (_, StripePaymentStatus::Paid) => CheckoutStatus::Paid,
+            (_, StripePaymentStatus::Failed) => CheckoutStatus::Failed,
+            (_, StripePaymentStatus::Processing) => CheckoutStatus::Processing,
+            (StripeCheckoutSessionStatus::Expired, _) => CheckoutStatus::Expired,
+            (StripeCheckoutSessionStatus::Complete, _) => CheckoutStatus::Processing,
+            (StripeCheckoutSessionStatus::Open, _) => CheckoutStatus::Open,
+        }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -260,7 +192,7 @@ pub async fn create(
         updated_at: now,
     };
     let mut tx = deployment.begin().await?;
-    accounts_checkouts::create(&mut tx, AcceptedCheckout(&checkout)).await?;
+    accounts_checkouts::create(&mut tx, &checkout).await?;
     tx.commit().await?;
     Ok(CheckoutCreated { checkout, url })
 }
@@ -330,7 +262,7 @@ pub(crate) async fn apply_session_in(
     };
     let status = CheckoutStatus::of(session);
     if status != checkout.status {
-        accounts_checkouts::update(&mut *tx, checkout.id, AcceptedStatus(status), now).await?;
+        accounts_checkouts::update(&mut *tx, checkout.id, status, now).await?;
     }
     if let Some(subscription) = subscription {
         subscriptions::upsert_from_stripe_in(tx, subscription, now).await?;

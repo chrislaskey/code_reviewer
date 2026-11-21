@@ -16,8 +16,9 @@ use axum::routing::get;
 use axum::{Extension, Json, Router};
 use tower_http::services::{ServeDir, ServeFile};
 
+use app_core::data::ops_staff::Staff;
 use app_core::deployment::Deployment;
-use app_core::ops::staff::{self, Staff, StaffError};
+use app_core::ops::staff::{self, StaffError};
 
 use crate::api_error::ApiError;
 use crate::current_user::CurrentUser;

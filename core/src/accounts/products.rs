@@ -5,30 +5,19 @@
 //! for and whether it can be bought twice are the grant's. See
 //! `docs/design/purchasing.md`.
 
-use crate::data::accounts_products;
+use crate::data::accounts_products::{self, Product};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::accounts::prices::{self, Price};
+use crate::accounts::prices;
 use crate::accounts::purchases;
+use crate::data::accounts_prices::Price;
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::services::stripe::{Stripe, StripeError, StripeProduct};
-
-/// A record accepted by the products workflow.
-pub(crate) struct AcceptedProduct<'a>(&'a Product);
-
-impl AcceptedProduct<'_> {
-    /// Borrows the accepted record for persistence.
-    pub(crate) fn row(&self) -> &Product {
-        self.0
-    }
-}
-
-pub const TABLE: &str = "accounts_products";
 
 /// What a price gives the user who pays it, by its lookup key. No
 /// feature needs one yet: these are placeholders, for a fork to rename.
@@ -78,19 +67,6 @@ impl Grant {
     pub fn free_days(self) -> Option<u32> {
         None
     }
-}
-
-/// A product as Stripe has it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Product {
-    pub id: Uuid,
-    /// `prod_...`
-    pub stripe_id: String,
-    pub name: String,
-    pub description: Option<String>,
-    pub active: bool,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
 }
 
 /// A product the catalog sells, with the prices it sells it at: plans
@@ -233,7 +209,7 @@ pub(crate) async fn upsert_in(
         inserted_at: now,
         updated_at: now,
     };
-    accounts_products::upsert(&mut *tx, AcceptedProduct(&product)).await?;
+    accounts_products::upsert(&mut *tx, &product).await?;
     let upserted = accounts_products::get_by_stripe_id(&mut *tx, &stripe_product.id).await?;
     upserted
         .map(|product| product.id)
@@ -290,7 +266,7 @@ fn for_sale(product: Product, prices: &[Price]) -> Option<ProductForSale> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::accounts::prices::PriceInterval;
+    use crate::data::accounts_prices::PriceInterval;
     use crate::database::with_each_database;
     use crate::services::stripe::StripePrice;
 

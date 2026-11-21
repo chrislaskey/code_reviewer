@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::accounts::products::{self, ProductError};
-use crate::accounts::purchases::Store;
 use crate::accounts::{checkouts, subscriptions};
+use crate::data::accounts_purchases::Store;
 use crate::deployment::{Deployment, Role, now};
 use crate::services::stripe::{Stripe, StripeError};
 

@@ -12,6 +12,7 @@ use crate::database::Transaction;
 use crate::helpers::field_errors::FieldErrors;
 
 pub const TABLE: &str = "app_communities";
+/// The longest name, in characters.
 pub const MAX_NAME_LENGTH: usize = 80;
 
 /// A community as the pages show it, with the sync columns every synced

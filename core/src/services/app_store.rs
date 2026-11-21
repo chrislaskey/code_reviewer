@@ -29,9 +29,9 @@ use secrecy::{ExposeSecret, SecretString};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::accounts::purchases::Store;
 use crate::accounts::store_transactions::{StoreTransaction, StoreTransactionDetails};
-use crate::accounts::subscriptions::SubscriptionStatus;
+use crate::data::accounts_purchases::Store;
+use crate::data::accounts_subscriptions::SubscriptionStatus;
 
 /// Apple's root certificates, public, see `certificates/apple/README.md`.
 const ROOT_CERTIFICATES: [&[u8]; 2] = [

@@ -248,8 +248,8 @@ struct StripeLeft {
 
 #[cfg(feature = "stripe")]
 async fn stripe_left_in(tx: &mut Transaction, user_id: Uuid) -> Result<StripeLeft, DeletionError> {
-    use crate::accounts::purchases::Store;
-    use crate::accounts::subscriptions::SubscriptionStatus;
+    use crate::data::accounts_purchases::Store;
+    use crate::data::accounts_subscriptions::SubscriptionStatus;
 
     let subscription_ids = accounts_subscriptions::list(&mut *tx, user_id)
         .await?

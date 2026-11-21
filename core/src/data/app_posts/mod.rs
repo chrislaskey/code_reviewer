@@ -12,6 +12,7 @@ use uuid::Uuid;
 use crate::database::Transaction;
 
 pub const TABLE: &str = "app_posts";
+/// The longest body, in characters.
 pub const MAX_BODY_LENGTH: usize = 10_000;
 
 /// A post as the pages show it, with the sync columns every synced row

@@ -6,7 +6,7 @@ use sqlx::{FromRow, SqliteConnection};
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
-use crate::ops::staff::Staff;
+use super::Staff;
 
 #[derive(FromRow)]
 struct StaffRow {

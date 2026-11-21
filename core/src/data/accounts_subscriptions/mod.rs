@@ -1,9 +1,104 @@
-//! Transaction-scoped subscriptions records. Workflows own policy and commits.
+//! Subscription records: the `Subscription` schema, its
+//! `SubscriptionStatus`, and the reads and writes of
+//! `accounts_subscriptions`. Callers own and commit the transaction.
 
-use crate::accounts::purchases::Store;
-use crate::accounts::subscriptions::{AcceptedSubscription, Subscription};
-use crate::database::Transaction;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use crate::data::accounts_purchases::Store;
+use crate::database::Transaction;
+
+pub const TABLE: &str = "accounts_subscriptions";
+
+/// Stripe's statuses.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SubscriptionStatus {
+    Active,
+    /// In its free days.
+    Trialing,
+    /// A renewal's payment failed, and Stripe is retrying it.
+    PastDue,
+    /// Stripe stopped retrying.
+    Unpaid,
+    /// The first payment is not made yet.
+    Incomplete,
+    IncompleteExpired,
+    Paused,
+    Canceled,
+}
+
+impl SubscriptionStatus {
+    /// Its name in `accounts_subscriptions`.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SubscriptionStatus::Active => "active",
+            SubscriptionStatus::Trialing => "trialing",
+            SubscriptionStatus::PastDue => "past_due",
+            SubscriptionStatus::Unpaid => "unpaid",
+            SubscriptionStatus::Incomplete => "incomplete",
+            SubscriptionStatus::IncompleteExpired => "incomplete_expired",
+            SubscriptionStatus::Paused => "paused",
+            SubscriptionStatus::Canceled => "canceled",
+        }
+    }
+
+    /// The status with this name, if there is one.
+    pub fn from_name(name: &str) -> Option<SubscriptionStatus> {
+        match name {
+            "active" => Some(SubscriptionStatus::Active),
+            "trialing" => Some(SubscriptionStatus::Trialing),
+            "past_due" => Some(SubscriptionStatus::PastDue),
+            "unpaid" => Some(SubscriptionStatus::Unpaid),
+            "incomplete" => Some(SubscriptionStatus::Incomplete),
+            "incomplete_expired" => Some(SubscriptionStatus::IncompleteExpired),
+            "paused" => Some(SubscriptionStatus::Paused),
+            "canceled" => Some(SubscriptionStatus::Canceled),
+            _ => None,
+        }
+    }
+
+    /// Whether it gives its plan: paid, or in its free days. A plan not
+    /// paid is no plan.
+    pub fn gives_plan(self) -> bool {
+        matches!(
+            self,
+            SubscriptionStatus::Active | SubscriptionStatus::Trialing
+        )
+    }
+
+    /// Whether a payment failed and the person can fix it with another card.
+    pub fn is_payment_failed(self) -> bool {
+        matches!(
+            self,
+            SubscriptionStatus::PastDue | SubscriptionStatus::Unpaid
+        )
+    }
+}
+
+/// A subscription of the account's, from either store.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Subscription {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub product_id: Uuid,
+    pub price_id: Uuid,
+    pub store: Store,
+    /// The store's id, `sub_...` for Stripe.
+    pub store_id: String,
+    pub status: SubscriptionStatus,
+    /// When the period paid for ends: the next renewal, or the end.
+    pub current_period_end: Option<DateTime<Utc>>,
+    pub cancel_at_period_end: bool,
+    pub ended_at: Option<DateTime<Utc>>,
+    /// The price a change waiting for the end of the period moves to.
+    pub scheduled_price_id: Option<Uuid>,
+    /// When it does.
+    pub scheduled_at: Option<DateTime<Utc>>,
+    pub inserted_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
 
 #[cfg(feature = "postgres")]
 mod postgres;
@@ -20,7 +115,7 @@ macro_rules! query {
 }
 
 /// Gets a record owned by the acting account; another account's is absent.
-pub(crate) async fn get(
+pub async fn get(
     tx: &mut Transaction,
     user_id: Uuid,
     id: Uuid,
@@ -29,7 +124,7 @@ pub(crate) async fn get(
 }
 
 /// Lists one account's records in their existing order.
-pub(crate) async fn list(
+pub async fn list(
     tx: &mut Transaction,
     user_id: Uuid,
 ) -> Result<Vec<(Subscription, String)>, sqlx::Error> {
@@ -37,19 +132,16 @@ pub(crate) async fn list(
 }
 
 /// Persists a record accepted by the resource workflow.
-pub(crate) async fn upsert(
-    tx: &mut Transaction,
-    subscription: AcceptedSubscription<'_>,
-) -> Result<(), sqlx::Error> {
-    query!(tx, upsert(subscription.row()))
+pub async fn upsert(tx: &mut Transaction, subscription: &Subscription) -> Result<(), sqlx::Error> {
+    query!(tx, upsert(subscription))
 }
 
 /// Explicit processing access for trusted payment workflows.
-pub(crate) mod processing {
+pub mod processing {
     use super::*;
 
     /// Gets one stored record by ID.
-    pub(crate) async fn get(
+    pub async fn get(
         tx: &mut Transaction,
         id: Uuid,
     ) -> Result<Option<(Subscription, String)>, sqlx::Error> {
@@ -57,7 +149,7 @@ pub(crate) mod processing {
     }
 
     /// Lists provider subscriptions that still need cancellation after account deletion.
-    pub(crate) async fn list_live_store_ids_of_deleted_accounts(
+    pub async fn list_live_store_ids_of_deleted_accounts(
         tx: &mut Transaction,
         store: Store,
     ) -> Result<Vec<String>, sqlx::Error> {
@@ -65,7 +157,7 @@ pub(crate) mod processing {
     }
 
     /// Lists live provider subscriptions for reconciliation.
-    pub(crate) async fn list_live_store_ids(
+    pub async fn list_live_store_ids(
         tx: &mut Transaction,
         store: Store,
     ) -> Result<Vec<String>, sqlx::Error> {
@@ -73,7 +165,7 @@ pub(crate) mod processing {
     }
 
     /// Gets the record and owner IDs associated with one store payment.
-    pub(crate) async fn get_ids_by_store_id(
+    pub async fn get_ids_by_store_id(
         tx: &mut Transaction,
         store: Store,
         store_id: &str,

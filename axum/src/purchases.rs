@@ -5,7 +5,8 @@ use axum::Json;
 use axum::extract::{Path, State};
 use uuid::Uuid;
 
-use app_core::accounts::purchases::{self, PurchaseShown};
+use app_core::accounts::purchases;
+use app_core::data::accounts_purchases::PurchaseShown;
 use app_core::deployment::Deployment;
 
 use crate::api_error::ApiError;

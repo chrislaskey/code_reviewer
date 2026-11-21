@@ -7,42 +7,22 @@
 //! fetched from Stripe and copied as it is now, so events out of order
 //! never leave an older state. See `docs/design/purchasing.md`.
 
-use crate::data::accounts_stripe_events;
+use crate::data::accounts_stripe_events::{self, StripeEvent};
 use chrono::{DateTime, Utc};
 use secrecy::{ExposeSecret, SecretString};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use stripe_webhook::{Webhook, WebhookError};
 use thiserror::Error;
 
-use crate::accounts::purchases::{self, Store};
+use crate::accounts::purchases;
 use crate::accounts::{checkouts, prices, products, subscriptions};
+use crate::data::accounts_purchases::Store;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::services::stripe::{
     Stripe, StripeCharge, StripeCheckoutSession, StripeError, StripePrice, StripeProduct,
     StripeSubscription,
 };
-
-/// A record accepted by the stripe events workflow.
-pub(crate) struct AcceptedStripeEvent<'a>(&'a StripeEvent);
-
-impl AcceptedStripeEvent<'_> {
-    /// Borrows the accepted record for persistence.
-    pub(crate) fn row(&self) -> &StripeEvent {
-        self.0
-    }
-}
-
-pub const TABLE: &str = "accounts_stripe_events";
-
-/// An event handled, by Stripe's id, `evt_...`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct StripeEvent {
-    pub id: String,
-    /// Stripe's name for it, `checkout.session.completed`.
-    pub event_type: String,
-    pub handled_at: DateTime<Utc>,
-}
 
 /// What an event's body is read for.
 #[derive(Deserialize)]
@@ -139,11 +119,11 @@ pub async fn create(
     let mut tx = deployment.begin().await?;
     let inserted = accounts_stripe_events::create(
         &mut tx,
-        AcceptedStripeEvent(&StripeEvent {
+        &StripeEvent {
             id: id.to_string(),
             event_type: event_type.to_string(),
             handled_at: now,
-        }),
+        },
     )
     .await?;
     if inserted > 0 {
@@ -309,7 +289,7 @@ mod tests {
                 handled_at: now(),
             };
             assert_eq!(
-                accounts_stripe_events::create(&mut tx, AcceptedStripeEvent(&receipt))
+                accounts_stripe_events::create(&mut tx, &receipt)
                     .await
                     .expect("receipt"),
                 1

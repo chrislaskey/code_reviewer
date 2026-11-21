@@ -12,8 +12,9 @@ use uuid::Uuid;
 
 use crate::accounts::prices;
 use crate::accounts::products::Grant;
-use crate::accounts::purchases::Store;
-use crate::accounts::subscriptions::{self, SubscriptionStatus};
+use crate::accounts::subscriptions;
+use crate::data::accounts_purchases::Store;
+use crate::data::accounts_subscriptions::SubscriptionStatus;
 use crate::data::app_users::User;
 use crate::deployment::{Deployment, Role};
 
@@ -103,9 +104,10 @@ pub async fn payment_failed(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::accounts::checkouts::{self, CheckoutError, CheckoutStatus};
+    use crate::accounts::checkouts::{self, CheckoutError};
     use crate::accounts::{products, stripe_events};
     use crate::app::users;
+    use crate::data::accounts_checkouts::CheckoutStatus;
     use crate::database::with_each_database;
     use crate::deployment::now;
     use crate::services::stripe::{

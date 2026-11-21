@@ -62,6 +62,7 @@ pub enum Context {
 }
 
 impl Context {
+    /// Every context.
     pub const ALL: [Context; 6] = [
         Context::Api,
         Context::Session,
@@ -83,6 +84,7 @@ impl Context {
         }
     }
 
+    /// The context with this name, if there is one.
     pub fn parse(context: &str) -> Option<Context> {
         Context::ALL
             .into_iter()
@@ -247,6 +249,7 @@ pub async fn count_attempt(tx: &mut Transaction, id: Uuid) -> Result<i64, sqlx::
     query!(tx, increment_attempts(id))
 }
 
+/// Deletes one token by its id.
 pub async fn delete_by_id(tx: &mut Transaction, id: Uuid) -> Result<(), sqlx::Error> {
     query!(tx, delete_by_id(id))
 }

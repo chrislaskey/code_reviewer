@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgConnection};
 use uuid::Uuid;
 
-use crate::accounts::products::Product;
+use super::Product;
 
 const COLUMNS: &str = "id, stripe_id, name, description, active, inserted_at, updated_at";
 

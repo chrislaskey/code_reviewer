@@ -5,7 +5,7 @@ use sqlx::{FromRow, PgConnection};
 
 use uuid::Uuid;
 
-use crate::accounts::prices::{Price, PriceInterval};
+use super::{Price, PriceInterval};
 
 const COLUMNS: &str = "id, product_id, stripe_id, lookup_key, amount, currency, interval, active, inserted_at, updated_at";
 

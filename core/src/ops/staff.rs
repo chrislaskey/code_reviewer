@@ -2,33 +2,12 @@
 //! each. Server only. Someone becomes staff from the server's command
 //! line, by their email, never from a page.
 
-use crate::data::ops_staff;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use crate::data::ops_staff::{self, Staff};
 use thiserror::Error;
-use uuid::Uuid;
 
 use crate::data::accounts_users::{self, AccountUserError};
 use crate::data::app_users::User;
 use crate::deployment::{Deployment, Role, now};
-
-/// A record accepted by this resource's workflow.
-pub(crate) struct AcceptedStaff<'a>(&'a Staff);
-
-impl AcceptedStaff<'_> {
-    /// Borrows the accepted record for persistence.
-    pub(crate) fn row(&self) -> &Staff {
-        self.0
-    }
-}
-
-pub const TABLE: &str = "ops_staff";
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Staff {
-    pub user_id: Uuid,
-    pub inserted_at: DateTime<Utc>,
-}
 
 #[derive(Debug, Error)]
 pub enum StaffError {
@@ -64,10 +43,10 @@ pub async fn create(deployment: &Deployment, email: &str) -> Result<Staff, Staff
     let account = account_with_email(&mut tx, email).await?;
     ops_staff::create(
         &mut tx,
-        AcceptedStaff(&Staff {
+        &Staff {
             user_id: account.id,
             inserted_at: now(),
-        }),
+        },
     )
     .await?;
     let staff = ops_staff::get(&mut tx, account.id).await?;

@@ -7,8 +7,8 @@ use crate::data::accounts_subscriptions;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::accounts::purchases::Store;
 use crate::accounts::store_transactions::{self, StoreTransactionError};
+use crate::data::accounts_purchases::Store;
 use crate::deployment::{Deployment, Role};
 use crate::services::app_store::{self, AppStore, AppStoreError};
 

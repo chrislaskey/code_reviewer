@@ -15,6 +15,7 @@ use crate::helpers::field_errors::FieldErrors;
 pub const TABLE: &str = "app_files";
 /// The largest file, 25 MB.
 pub const MAX_BYTES: u64 = 25 * 1024 * 1024;
+/// The longest name, in characters.
 pub const MAX_NAME_LENGTH: usize = 255;
 /// What a file with no content type of its own is sent as.
 pub const UNKNOWN_CONTENT_TYPE: &str = "application/octet-stream";
@@ -90,6 +91,7 @@ pub fn content_type_or_unknown(content_type: &str) -> String {
     }
 }
 
+/// A name that is not blank and not too long.
 pub fn is_file_name(value: &str, _context: &()) -> garde::Result {
     if value.trim().is_empty() {
         return Err(garde::Error::new("is blank"));
@@ -124,6 +126,7 @@ pub fn is_sha256(value: &str, _context: &()) -> garde::Result {
     Ok(())
 }
 
+/// A size that is not empty and not too large.
 pub fn is_file_size(value: &u64, _context: &()) -> garde::Result {
     if *value == 0 {
         return Err(garde::Error::new("is empty"));

@@ -4,20 +4,20 @@
 //! documented in `docs/design/low-level-contexts.md`.
 
 #[cfg(feature = "app-store")]
-pub(crate) mod accounts_app_store_notifications;
+pub mod accounts_app_store_notifications;
 #[cfg(feature = "stripe")]
-pub(crate) mod accounts_checkouts;
+pub mod accounts_checkouts;
 pub mod accounts_credentials;
 #[cfg(feature = "stripe")]
-pub(crate) mod accounts_prices;
+pub mod accounts_prices;
 #[cfg(feature = "stripe")]
-pub(crate) mod accounts_products;
+pub mod accounts_products;
 #[cfg(feature = "stripe")]
-pub(crate) mod accounts_purchases;
+pub mod accounts_purchases;
 #[cfg(feature = "stripe")]
-pub(crate) mod accounts_stripe_events;
+pub mod accounts_stripe_events;
 #[cfg(feature = "stripe")]
-pub(crate) mod accounts_subscriptions;
+pub mod accounts_subscriptions;
 pub mod accounts_tokens;
 pub mod accounts_users;
 pub mod app_communities;
@@ -34,5 +34,5 @@ pub mod app_users;
 pub mod app_users_communities;
 pub mod device_settings;
 pub(crate) mod local_users;
-pub(crate) mod ops_staff;
+pub mod ops_staff;
 pub(crate) mod trial_users;

@@ -4,7 +4,7 @@
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgConnection};
 
-use crate::accounts::app_store_notifications::AppStoreNotification;
+use super::AppStoreNotification;
 
 #[derive(FromRow)]
 struct AppStoreNotificationRow {

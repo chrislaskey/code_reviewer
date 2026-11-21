@@ -8,7 +8,7 @@
 //! Stripe's Customer Portal, `portal_create`.
 
 use crate::data::accounts_prices;
-use crate::data::accounts_subscriptions;
+use crate::data::accounts_subscriptions::{self, Subscription, SubscriptionStatus};
 use crate::data::accounts_users;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -17,111 +17,14 @@ use uuid::Uuid;
 
 use crate::accounts::checkouts::BACK_TO_APP_PATH;
 use crate::accounts::online::ReturnTo;
-use crate::accounts::prices::{self, Price, PriceInterval};
+use crate::accounts::prices;
 use crate::accounts::products::{self, ProductError, ProductKind};
-use crate::accounts::purchases::Store;
+use crate::data::accounts_prices::{Price, PriceInterval};
+use crate::data::accounts_purchases::Store;
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::services::stripe::{Stripe, StripeError, StripeSubscription};
-
-/// A record accepted by the subscriptions workflow.
-pub(crate) struct AcceptedSubscription<'a>(&'a Subscription);
-
-impl AcceptedSubscription<'_> {
-    /// Borrows the accepted record for persistence.
-    pub(crate) fn row(&self) -> &Subscription {
-        self.0
-    }
-}
-
-pub const TABLE: &str = "accounts_subscriptions";
-
-/// Stripe's statuses.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SubscriptionStatus {
-    Active,
-    /// In its free days.
-    Trialing,
-    /// A renewal's payment failed, and Stripe is retrying it.
-    PastDue,
-    /// Stripe stopped retrying.
-    Unpaid,
-    /// The first payment is not made yet.
-    Incomplete,
-    IncompleteExpired,
-    Paused,
-    Canceled,
-}
-
-impl SubscriptionStatus {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            SubscriptionStatus::Active => "active",
-            SubscriptionStatus::Trialing => "trialing",
-            SubscriptionStatus::PastDue => "past_due",
-            SubscriptionStatus::Unpaid => "unpaid",
-            SubscriptionStatus::Incomplete => "incomplete",
-            SubscriptionStatus::IncompleteExpired => "incomplete_expired",
-            SubscriptionStatus::Paused => "paused",
-            SubscriptionStatus::Canceled => "canceled",
-        }
-    }
-
-    pub fn from_name(name: &str) -> Option<SubscriptionStatus> {
-        match name {
-            "active" => Some(SubscriptionStatus::Active),
-            "trialing" => Some(SubscriptionStatus::Trialing),
-            "past_due" => Some(SubscriptionStatus::PastDue),
-            "unpaid" => Some(SubscriptionStatus::Unpaid),
-            "incomplete" => Some(SubscriptionStatus::Incomplete),
-            "incomplete_expired" => Some(SubscriptionStatus::IncompleteExpired),
-            "paused" => Some(SubscriptionStatus::Paused),
-            "canceled" => Some(SubscriptionStatus::Canceled),
-            _ => None,
-        }
-    }
-
-    /// Whether it gives its plan: paid, or in its free days. A plan not
-    /// paid is no plan.
-    pub fn gives_plan(self) -> bool {
-        matches!(
-            self,
-            SubscriptionStatus::Active | SubscriptionStatus::Trialing
-        )
-    }
-
-    /// Whether a payment failed and the person can fix it with another card.
-    pub fn is_payment_failed(self) -> bool {
-        matches!(
-            self,
-            SubscriptionStatus::PastDue | SubscriptionStatus::Unpaid
-        )
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Subscription {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub product_id: Uuid,
-    pub price_id: Uuid,
-    pub store: Store,
-    /// The store's id, `sub_...` for Stripe.
-    pub store_id: String,
-    pub status: SubscriptionStatus,
-    /// When the period paid for ends: the next renewal, or the end.
-    pub current_period_end: Option<DateTime<Utc>>,
-    pub cancel_at_period_end: bool,
-    pub ended_at: Option<DateTime<Utc>>,
-    /// The price a change waiting for the end of the period moves to.
-    pub scheduled_price_id: Option<Uuid>,
-    /// When it does.
-    pub scheduled_at: Option<DateTime<Utc>>,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
 
 /// A subscription as its pages show it, with its plan and price.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -354,7 +257,7 @@ pub(crate) async fn upsert_in(
     tx: &mut Transaction,
     subscription: &Subscription,
 ) -> Result<(), sqlx::Error> {
-    accounts_subscriptions::upsert(tx, AcceptedSubscription(subscription)).await
+    accounts_subscriptions::upsert(tx, subscription).await
 }
 
 /// The subscription as Stripe has it now: made, or updated in place by
@@ -414,7 +317,7 @@ pub(crate) async fn upsert_from_stripe_in(
         inserted_at: now,
         updated_at: now,
     };
-    accounts_subscriptions::upsert(&mut *tx, AcceptedSubscription(&subscription)).await
+    accounts_subscriptions::upsert(&mut *tx, &subscription).await
 }
 
 async fn shown_in(

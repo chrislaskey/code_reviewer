@@ -5,8 +5,8 @@ use sqlx::{FromRow, SqliteConnection};
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
-use crate::accounts::purchases::Store;
-use crate::accounts::subscriptions::{Subscription, SubscriptionStatus};
+use super::{Subscription, SubscriptionStatus};
+use crate::data::accounts_purchases::Store;
 
 const SELECT: &str = "SELECT accounts_subscriptions.id, user_id, product_id, price_id, store, store_id, status, \
      current_period_end, cancel_at_period_end, ended_at, scheduled_price_id, scheduled_at, \

@@ -28,6 +28,7 @@ macro_rules! query {
 
 /// Phoenix's rule: long enough to be worth hashing, and bounded.
 pub const MIN_PASSWORD_LENGTH: usize = 12;
+/// The longest password, by the same rule.
 pub const MAX_PASSWORD_LENGTH: usize = 72;
 
 /// The hash of a password nobody has: checked against when the user

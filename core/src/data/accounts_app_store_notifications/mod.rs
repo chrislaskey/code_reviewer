@@ -1,9 +1,22 @@
-//! Transaction-scoped app store notifications records. Workflows own policy and commits.
+//! App Store notification receipts: the `AppStoreNotification` schema and
+//! the reads and writes of `accounts_app_store_notifications`. Callers own
+//! and commit the transaction.
 
-use crate::accounts::app_store_notifications::{
-    AcceptedAppStoreNotification, AppStoreNotification,
-};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+
 use crate::database::Transaction;
+
+pub const TABLE: &str = "accounts_app_store_notifications";
+
+/// A notification handled, by Apple's `notificationUUID`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AppStoreNotification {
+    pub id: String,
+    /// Apple's `notificationType`.
+    pub notification_type: String,
+    pub handled_at: DateTime<Utc>,
+}
 
 #[cfg(feature = "postgres")]
 mod postgres;
@@ -20,7 +33,7 @@ macro_rules! query {
 }
 
 /// Gets one stored record by ID.
-pub(crate) async fn get(
+pub async fn get(
     tx: &mut Transaction,
     id: &str,
 ) -> Result<Option<AppStoreNotification>, sqlx::Error> {
@@ -28,16 +41,12 @@ pub(crate) async fn get(
 }
 
 /// Records a store payment or delivery only when its unique key is new.
-pub(crate) async fn create(
+pub async fn create(
     tx: &mut Transaction,
-    receipt: AcceptedAppStoreNotification<'_>,
+    receipt: &AppStoreNotification,
 ) -> Result<u64, sqlx::Error> {
     query!(
         tx,
-        insert_if_missing(
-            &receipt.row().id,
-            &receipt.row().notification_type,
-            receipt.row().handled_at
-        )
+        insert_if_missing(&receipt.id, &receipt.notification_type, receipt.handled_at)
     )
 }

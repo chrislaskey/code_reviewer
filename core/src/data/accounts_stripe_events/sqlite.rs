@@ -4,7 +4,7 @@
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, SqliteConnection};
 
-use crate::accounts::stripe_events::StripeEvent;
+use super::StripeEvent;
 
 #[derive(FromRow)]
 struct StripeEventRow {

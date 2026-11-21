@@ -1,8 +1,20 @@
-//! Transaction-scoped staff records. Workflows own commits.
+//! Staff records: the `Staff` schema and the reads and writes of
+//! `ops_staff`. Callers own and commit the transaction.
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::database::Transaction;
-use crate::ops::staff::{AcceptedStaff, Staff};
-use uuid::Uuid;
+
+pub const TABLE: &str = "ops_staff";
+
+/// A staff member: an account that may use the ops app.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Staff {
+    pub user_id: Uuid,
+    pub inserted_at: DateTime<Utc>,
+}
 
 #[cfg(feature = "postgres")]
 mod postgres;
@@ -19,22 +31,16 @@ macro_rules! query {
 }
 
 /// Gets the staff assignment for one account.
-pub(crate) async fn get(tx: &mut Transaction, user_id: Uuid) -> Result<Option<Staff>, sqlx::Error> {
+pub async fn get(tx: &mut Transaction, user_id: Uuid) -> Result<Option<Staff>, sqlx::Error> {
     query!(tx, get(user_id))
 }
 
 /// Creates a validated staff assignment idempotently.
-pub(crate) async fn create(
-    tx: &mut Transaction,
-    staff: AcceptedStaff<'_>,
-) -> Result<(), sqlx::Error> {
-    query!(
-        tx,
-        insert_if_missing(staff.row().user_id, staff.row().inserted_at)
-    )
+pub async fn create(tx: &mut Transaction, staff: &Staff) -> Result<(), sqlx::Error> {
+    query!(tx, insert_if_missing(staff.user_id, staff.inserted_at))
 }
 
 /// Removes a staff assignment, returning the number removed.
-pub(crate) async fn delete(tx: &mut Transaction, user_id: Uuid) -> Result<u64, sqlx::Error> {
+pub async fn delete(tx: &mut Transaction, user_id: Uuid) -> Result<u64, sqlx::Error> {
     query!(tx, delete(user_id))
 }

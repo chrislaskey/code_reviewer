@@ -12,6 +12,7 @@ use crate::database::Transaction;
 use uuid::Uuid;
 
 pub const TABLE: &str = "app_users";
+/// The longest name, in characters.
 pub const MAX_NAME_LENGTH: usize = 80;
 
 /// A user as the pages show one, with the sync columns every synced row

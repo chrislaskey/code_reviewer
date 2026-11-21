@@ -4,82 +4,14 @@
 //! store's id for it, which is how a repeat of the same payment is
 //! recognized. A refunded purchase gives nothing.
 
-use crate::data::accounts_purchases;
+use crate::data::accounts_purchases::{self, Purchase, PurchaseShown, Store};
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role};
-
-/// A record accepted by the purchases workflow.
-pub(crate) struct AcceptedPurchase<'a>(&'a Purchase);
-
-impl AcceptedPurchase<'_> {
-    /// Borrows the accepted record for persistence.
-    pub(crate) fn row(&self) -> &Purchase {
-        self.0
-    }
-}
-
-pub const TABLE: &str = "accounts_purchases";
-
-/// Who sold it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Store {
-    Stripe,
-    AppStore,
-    PlayStore,
-}
-
-impl Store {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Store::Stripe => "stripe",
-            Store::AppStore => "app_store",
-            Store::PlayStore => "play_store",
-        }
-    }
-
-    pub fn from_name(name: &str) -> Option<Store> {
-        match name {
-            "stripe" => Some(Store::Stripe),
-            "app_store" => Some(Store::AppStore),
-            "play_store" => Some(Store::PlayStore),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Purchase {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub product_id: Uuid,
-    pub price_id: Uuid,
-    /// The checkout that paid it; none for a phone store's.
-    pub checkout_id: Option<Uuid>,
-    pub store: Store,
-    /// The store's id for the payment, `pi_...` for Stripe.
-    pub store_id: String,
-    /// What was paid, in the currency's smallest unit, tax included.
-    pub amount: i64,
-    pub currency: String,
-    pub refunded_at: Option<DateTime<Utc>>,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-/// A purchase as its pages show it, with what was bought.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PurchaseShown {
-    #[serde(flatten)]
-    pub purchase: Purchase,
-    pub product_name: String,
-}
 
 #[derive(Debug, Error)]
 pub enum PurchaseError {
@@ -125,7 +57,7 @@ pub(crate) async fn insert_if_missing_in(
     tx: &mut Transaction,
     purchase: &Purchase,
 ) -> Result<(), sqlx::Error> {
-    accounts_purchases::create(&mut *tx, AcceptedPurchase(purchase)).await
+    accounts_purchases::create(&mut *tx, purchase).await
 }
 
 /// Whether the user has the product, bought and not refunded.

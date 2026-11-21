@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgConnection};
 use uuid::Uuid;
 
-use crate::accounts::purchases::{Purchase, PurchaseShown, Store};
+use super::{Purchase, PurchaseShown, Store};
 
 const SELECT: &str = "SELECT accounts_purchases.id, user_id, product_id, price_id, checkout_id, store, store_id, \
      amount, currency, refunded_at, accounts_purchases.inserted_at, accounts_purchases.updated_at, \

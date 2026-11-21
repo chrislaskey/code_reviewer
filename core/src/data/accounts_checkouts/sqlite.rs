@@ -5,7 +5,7 @@ use sqlx::{FromRow, SqliteConnection};
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
-use crate::accounts::checkouts::{Checkout, CheckoutStatus};
+use super::{Checkout, CheckoutStatus};
 
 const COLUMNS: &str = "id, user_id, price_id, stripe_session_id, status, inserted_at, updated_at";
 

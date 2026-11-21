@@ -11,6 +11,7 @@ use crate::app::sync::Cursor;
 use crate::database::Transaction;
 
 pub const TABLE: &str = "app_users_communities";
+/// The one role yet.
 pub const ROLE_MEMBER: &str = "member";
 
 /// A user's membership in a community, with the sync columns every

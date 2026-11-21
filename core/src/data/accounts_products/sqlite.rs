@@ -5,7 +5,7 @@ use sqlx::{FromRow, SqliteConnection};
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
-use crate::accounts::products::Product;
+use super::Product;
 
 const COLUMNS: &str = "id, stripe_id, name, description, active, inserted_at, updated_at";
 

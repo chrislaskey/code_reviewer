@@ -10,35 +10,12 @@
 //! the purchase's revocation, which `store_transactions` marks through
 //! `purchases::refund_in`.
 
-use crate::data::accounts_app_store_notifications;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use crate::data::accounts_app_store_notifications::{self, AppStoreNotification};
 use thiserror::Error;
 
 use crate::accounts::store_transactions::{self, StoreTransactionError};
 use crate::deployment::{Deployment, Role, now};
 use crate::services::app_store::{AppStore, AppStoreError};
-
-/// A record accepted by the app store notifications workflow.
-pub(crate) struct AcceptedAppStoreNotification<'a>(&'a AppStoreNotification);
-
-impl AcceptedAppStoreNotification<'_> {
-    /// Borrows the accepted record for persistence.
-    pub(crate) fn row(&self) -> &AppStoreNotification {
-        self.0
-    }
-}
-
-pub const TABLE: &str = "accounts_app_store_notifications";
-
-/// A notification handled, by Apple's `notificationUUID`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AppStoreNotification {
-    pub id: String,
-    /// Apple's `notificationType`.
-    pub notification_type: String,
-    pub handled_at: DateTime<Utc>,
-}
 
 /// What `create` did with a delivery.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -85,11 +62,11 @@ pub async fn create(
     let mut tx = deployment.begin().await?;
     let inserted = accounts_app_store_notifications::create(
         &mut tx,
-        AcceptedAppStoreNotification(&AppStoreNotification {
+        &AppStoreNotification {
             id: id.to_string(),
             notification_type: notification_type.to_string(),
             handled_at: now,
-        }),
+        },
     )
     .await?;
     if inserted > 0
@@ -131,9 +108,9 @@ mod tests {
     use super::*;
     use crate::accounts::store_transactions::tests::catalog;
     use crate::accounts::store_transactions::{StoreProof, StoreRow};
-    use crate::accounts::subscriptions::SubscriptionStatus;
     use crate::accounts::{app_store_reconcile, plans, purchases, subscriptions};
     use crate::app::users;
+    use crate::data::accounts_subscriptions::SubscriptionStatus;
     use crate::data::app_users::User;
     use crate::database::with_each_database;
     use crate::services::app_store::{
@@ -269,7 +246,7 @@ mod tests {
                 .await
                 .expect("read")
                 .expect("a plan");
-            assert_eq!(plan.store, crate::accounts::purchases::Store::AppStore);
+            assert_eq!(plan.store, crate::data::accounts_purchases::Store::AppStore);
 
             let renewed = AppStoreTransaction {
                 transaction_id: "101".to_string(),
