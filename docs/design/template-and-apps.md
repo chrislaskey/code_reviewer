@@ -1,6 +1,6 @@
 # Template and apps
 
-Status: planned 2026-11-21; steps 1 to 6 built the same day.
+Status: planned 2026-11-21; steps 1 to 7 built the same day.
 
 ## Request
 

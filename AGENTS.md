@@ -17,6 +17,12 @@ AI Agents MUST run these commands to test, lint, and verify code before declarin
 * **Test Suite:** `cargo test --workspace --all-targets`
 * **Security Audit:** `cargo audit`
 
+## 2a. Template and App Code
+This repository is a template; apps are copies of it that merge its updates and send changes back. `framework.toml` sorts the files: **framework** (the template's machinery), **seams** (files every app edits to add a feature: the lists of synced tables, jobs, routes, commands and nav) and **examples** (posts and files, the app's to replace). The design is `docs/design/template-and-apps.md`.
+* **Before editing a framework file**, prefer extending it from the app's own files: a synced table implements `SyncedTable` and is listed in `core/src/app/synced_tables.rs`; a table with bytes implements `SyncedBytes`; a job implements `RecurringJob` and is listed in `core/src/app/jobs.rs`. A Claude Code hook (`.claude/settings.json`) notes each edit of a framework file.
+* **When a framework file must change** in an app, declare it in `framework.toml` as a `[[divergence]]` with the reason, and say so in the summary; a change that would serve every app belongs in the template instead. `cargo test --workspace` fails on a framework file that differs from `framework.lock` without one.
+* **In the template itself**, run `cargo run -p framework_check -- lock` after changing a framework file, and put generic changes in their own commits.
+
 ## 3. Strict Architectural Rules
 * **Naming** Always use concrete naming instead of jargon. Better to have an explicit name that tells what happens when it is called instead of a shorter name with jargon and ambiguity. Prefer concrete terms like list/get/create/update/upsert/delete on Backend and index/show/new/edit/delete for UI/UX.
 * **Resource first, then the action**, in every layer, so names sort and read by resource. In Rust the resource is the module and the action the function, called through the module as the standard library does (`posts::list`, never `list_posts`, and never a bare `list` imported on its own). Where one namespace spans every resource the two join as `posts_list`: Tauri command names (`pub async fn posts_list`, which is its name on the wire too), test names (`posts_get_missing`), migration names (`posts_create`). In JavaScript they join as `postsList`, `postsShowUrl`; Svelte pages are `PostsShowPage`. HTTP routes are resource first by their paths (`/api/posts/:id`).

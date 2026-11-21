@@ -111,6 +111,46 @@ pub enum CheckError {
     Lock { line: usize },
 }
 
+/// Whether the path, from the root, is a framework file that no
+/// divergence declares: what an edit to it should stop and think about.
+pub fn is_undeclared_framework_file(manifest: &Manifest, path: &str) -> Result<bool, CheckError> {
+    let framework = patterns(&manifest.framework)?;
+    let exceptions = patterns(manifest.seams.iter().chain(&manifest.examples))?;
+    let declared = manifest
+        .divergence
+        .iter()
+        .any(|divergence| divergence.path == path);
+    Ok(matches_any(&framework, path) && !matches_any(&exceptions, path) && !declared)
+}
+
+/// What a Claude Code `PreToolUse` hook answers for an edit of the file,
+/// given the absolute path the tool names: a note for the model and the
+/// person when it is a framework file, nothing otherwise. Never blocks.
+pub fn hook_answer(root: &Path, file_path: &Path) -> Result<Option<String>, CheckError> {
+    let Some(path) = relative_path(root, file_path) else {
+        return Ok(None);
+    };
+    if !is_undeclared_framework_file(&manifest(root)?, &path)? {
+        return Ok(None);
+    }
+    let context = format!(
+        "{path} is template code (framework.toml), checked against framework.lock. \
+         Before changing it, prefer extending it from the app's own files, or changing \
+         it in the template and merging the template here. If it must change in this \
+         app, declare it in framework.toml as a [[divergence]] with the reason, and say \
+         so in the summary. In the template itself, run \
+         `cargo run -p framework_check -- lock` after changing it."
+    );
+    let answer = serde_json::json!({
+        "systemMessage": format!("Editing template code: {path}"),
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": context,
+        },
+    });
+    Ok(Some(answer.to_string()))
+}
+
 /// Reads `framework.toml` at the root.
 pub fn manifest(root: &Path) -> Result<Manifest, CheckError> {
     let path = root.join(MANIFEST);
@@ -348,6 +388,25 @@ mod tests {
             problems(&diverged("a.rs", "tuned for us"), &locked, &locked),
             [Problem::DivergenceNotNeeded("a.rs".to_string())]
         );
+    }
+
+    #[test]
+    fn framework_check_is_undeclared_framework_file_skips_seams_examples_and_divergences() {
+        let manifest = Manifest {
+            framework: vec!["core/src/**".to_string()],
+            seams: vec!["core/src/app.rs".to_string()],
+            examples: vec!["core/src/app/posts.rs".to_string()],
+            divergence: vec![Divergence {
+                path: "core/src/sync.rs".to_string(),
+                reason: "tuned for us".to_string(),
+            }],
+        };
+        let undeclared = |path| is_undeclared_framework_file(&manifest, path).expect("the globs");
+        assert!(undeclared("core/src/jobs.rs"));
+        assert!(!undeclared("core/src/app.rs"));
+        assert!(!undeclared("core/src/app/posts.rs"));
+        assert!(!undeclared("core/src/sync.rs"));
+        assert!(!undeclared("svelte/src/home/HomePage.svelte"));
     }
 
     #[test]
