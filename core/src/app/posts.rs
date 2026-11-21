@@ -21,7 +21,7 @@ use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind
 use crate::app::posts_communities::{self, PostCommunityError};
 use crate::app::sync::{Cursor, TableRow};
 use crate::app::users::{self, User};
-use crate::data::app_posts::{self, AcceptedPost, MAX_BODY_LENGTH, Post, PostInvalid, TABLE};
+use crate::data::app_posts::{self, AcceptedPost, Post, PostInvalid, TABLE};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;
@@ -43,10 +43,8 @@ pub struct PostWithOwnerAndCommunities {
 pub enum PostError {
     #[error("post {id} not found")]
     NotFound { id: Uuid },
-    #[error("a post needs some text")]
-    BlankBody,
-    #[error("a post has {MAX_BODY_LENGTH} characters at most")]
-    BodyTooLong,
+    #[error(transparent)]
+    Validation(#[from] PostInvalid),
     #[error("only the owner can change a post")]
     NotOwner,
     #[error("{0}")]
@@ -59,15 +57,6 @@ pub enum PostError {
     Record(#[from] crate::app::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
-}
-
-impl From<PostInvalid> for PostError {
-    fn from(invalid: PostInvalid) -> PostError {
-        match invalid {
-            PostInvalid::BlankBody => PostError::BlankBody,
-            PostInvalid::BodyTooLong => PostError::BodyTooLong,
-        }
-    }
 }
 
 impl From<serde_json::Error> for PostError {
@@ -633,7 +622,10 @@ mod tests {
             let error = create(&deployment, &alice, " \n ", &[])
                 .await
                 .expect_err("blank");
-            assert!(matches!(error, PostError::BlankBody));
+            assert!(matches!(
+                error,
+                PostError::Validation(PostInvalid::BlankBody)
+            ));
             assert_eq!(list(&deployment, &alice).await.expect("the posts").len(), 1);
         })
         .await;
@@ -644,7 +636,7 @@ mod tests {
         with_each_database(|database| async move {
             let deployment = server(database);
             let alice = user(&deployment, "alice@example.com").await;
-            let longest = "é".repeat(MAX_BODY_LENGTH);
+            let longest = "é".repeat(app_posts::MAX_BODY_LENGTH);
             let post = create(&deployment, &alice, &longest, &[])
                 .await
                 .expect("the maximum, counted in characters");
@@ -652,11 +644,17 @@ mod tests {
             let error = create(&deployment, &alice, &too_long, &[])
                 .await
                 .expect_err("one more");
-            assert!(matches!(error, PostError::BodyTooLong));
+            assert!(matches!(
+                error,
+                PostError::Validation(PostInvalid::BodyTooLong)
+            ));
             let error = update(&deployment, &alice, post.id, &too_long, &[])
                 .await
                 .expect_err("one more");
-            assert!(matches!(error, PostError::BodyTooLong));
+            assert!(matches!(
+                error,
+                PostError::Validation(PostInvalid::BodyTooLong)
+            ));
 
             let pushed = Event::create(
                 TABLE,
@@ -749,7 +747,10 @@ mod tests {
             let error = update(&deployment, &alice, written.id, "", &[])
                 .await
                 .expect_err("blank");
-            assert!(matches!(error, PostError::BlankBody));
+            assert!(matches!(
+                error,
+                PostError::Validation(PostInvalid::BlankBody)
+            ));
             let error = update(&deployment, &alice, Uuid::now_v7(), "x", &[])
                 .await
                 .expect_err("missing");

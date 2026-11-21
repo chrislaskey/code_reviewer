@@ -78,10 +78,9 @@ impl From<PostError> for ApiError {
         let status = match &error {
             PostError::NotFound { .. } => StatusCode::NOT_FOUND,
             PostError::NotOwner => StatusCode::FORBIDDEN,
-            PostError::BlankBody
-            | PostError::BodyTooLong
-            | PostError::Invalid(_)
-            | PostError::Rejected(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            PostError::Validation(_) | PostError::Invalid(_) | PostError::Rejected(_) => {
+                StatusCode::UNPROCESSABLE_ENTITY
+            }
             PostError::Community(error) => return ApiError::from_post_community(error),
             PostError::Record(error) => return ApiError::from_record(error),
             PostError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
