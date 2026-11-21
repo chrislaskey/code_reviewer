@@ -1,12 +1,12 @@
-//! The sync API: `app_core::sync`'s push, pull and backfill as JSON,
+//! The sync API: `app_core::app::sync`'s push, pull and backfill as JSON,
 //! what a device calls to converge with this server, as the user its
 //! token stands for, see `docs/design/offline-sync.md`.
 
 use axum::Json;
 use axum::extract::State;
 
+use app_core::app::sync::{self, BackfillRequest, Page, PullRequest, PushRequest, PushResponse};
 use app_core::deployment::Deployment;
-use app_core::sync::{self, BackfillRequest, Page, PullRequest, PushRequest, PushResponse};
 
 use crate::api_error::ApiError;
 use crate::current_user::CurrentUser;

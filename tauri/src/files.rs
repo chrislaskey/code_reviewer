@@ -1,4 +1,4 @@
-//! The files commands: `app_core::files` as the pages call it with
+//! The files commands: `app_core::app::files` as the pages call it with
 //! `invoke`, for the user signed in on this device, see
 //! `docs/design/offline-files-decisions.md`. A form's error is
 //! `{error, errors}`, the web's 422 body. A write starts a sync in the
@@ -16,7 +16,7 @@ use tauri::ipc::{InvokeBody, Request};
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 
-use app_core::files::{
+use app_core::app::files::{
     self, File, FileError, FileSearch, FileSearchResults, FileWithState, FilesCache,
 };
 

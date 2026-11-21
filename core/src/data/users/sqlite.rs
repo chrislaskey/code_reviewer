@@ -7,8 +7,8 @@ use sqlx::{FromRow, SqliteConnection};
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
-use crate::sync::Cursor;
-use crate::users::User;
+use crate::app::sync::Cursor;
+use crate::app::users::User;
 
 #[derive(FromRow)]
 struct UserRow {

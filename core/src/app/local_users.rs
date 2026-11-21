@@ -29,14 +29,15 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::accounts::Session;
-use crate::communities::{self, CommunityError};
+use crate::app::communities::{self, CommunityError};
+use crate::app::events::{self, Event};
+use crate::app::files_communities::{self, FileCommunityNew};
+use crate::app::users::{self, SignedIn, User, UserError};
+use crate::app::{files, memberships, posts, posts_communities};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::device_settings::{self, DeviceSettingsError, LOCAL_USER_MOVED, SIGNED_IN};
-use crate::events::{self, Event, Fields};
-use crate::files_communities::{self, FileCommunityNew};
-use crate::users::{self, SignedIn, User, UserError};
-use crate::{files, memberships, posts, posts_communities, tokens};
+use crate::helpers::{json, random};
 
 /// Whether a device offers to skip signing in. The app's choice, to
 /// change in a fork.
@@ -79,7 +80,7 @@ pub enum LocalUserError {
 
 /// A name for a new local user, `local_85a3ycZae3b`.
 pub fn new_name() -> String {
-    format!("{NAME_PREFIX}{}", tokens::random_letters_and_digits(11))
+    format!("{NAME_PREFIX}{}", random::letters_and_digits(11))
 }
 
 /// The email a device lists a local user by. Nothing is ever sent to
@@ -241,7 +242,12 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
                 .map(|parent| *parent + Duration::microseconds(1));
             let made_at = after_parents.map_or(inserted_at, |after| after.max(inserted_at));
             made_at_of.insert(id, made_at);
-            queue.push(Event::create(table, id, fields(changes), made_at));
+            queue.push(Event::create(
+                table,
+                id,
+                json::object_fields(changes),
+                made_at,
+            ));
         };
 
     for community in communities_records::list(&mut *tx, user.id).await? {
@@ -348,22 +354,15 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
     Ok(())
 }
 
-fn fields(value: Value) -> Fields {
-    match value {
-        Value::Object(fields) => fields,
-        _ => Fields::new(),
-    }
-}
-
 #[cfg(all(test, feature = "object-storage"))]
 mod tests {
     use super::*;
     use crate::accounts;
+    use crate::app::files::tests::server;
+    use crate::app::sync::{self, InProcess};
     use crate::database::with_each_database;
     use crate::deployment::FileStore;
-    use crate::files::tests::server;
-    use crate::storage::Storage;
-    use crate::sync::{self, InProcess};
+    use crate::services::storage::Storage;
 
     /// A device where someone skipped signing in, with a folder for
     /// its files' bytes.

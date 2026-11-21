@@ -3,14 +3,14 @@
 //! Stripe, sells nothing, and its webhook is a 404. `STRIPE_TAX` says who
 //! sells: `managed_payments`, the default, Stripe as the merchant of
 //! record, or `stripe_tax`, the business itself. See
-//! `app_core::accounts::stripe` and `docs/design/purchasing.md`.
+//! `app_core::services::stripe` and `docs/design/purchasing.md`.
 
 use std::env;
 
 use axum::extract::FromRef;
 use secrecy::SecretString;
 
-use app_core::accounts::stripe::{Stripe, StripeTax};
+use app_core::services::stripe::{Stripe, StripeTax};
 
 use crate::router::AppState;
 

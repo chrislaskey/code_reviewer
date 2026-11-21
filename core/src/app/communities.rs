@@ -16,14 +16,15 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
+use crate::app::files_communities;
+use crate::app::memberships::{self, Membership, MembershipError};
+use crate::app::sync::{Cursor, TableRow};
+use crate::app::users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
-use crate::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
-use crate::field_errors::FieldErrors;
-use crate::files_communities;
-use crate::memberships::{self, Membership, MembershipError};
-use crate::sync::{Cursor, TableRow};
-use crate::users::User;
+use crate::helpers::field_errors::FieldErrors;
+use crate::helpers::json;
 
 /// A row accepted by this resource's event or replication workflow.
 /// Only this module can construct an accepted write.
@@ -78,7 +79,7 @@ pub enum CommunityError {
     #[error(transparent)]
     Membership(#[from] MembershipError),
     #[error(transparent)]
-    Record(#[from] crate::events::RecordError),
+    Record(#[from] crate::app::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -156,7 +157,7 @@ pub(crate) async fn create_in(
     let event = Event::create(
         TABLE,
         Uuid::now_v7(),
-        fields(json!({ "name": name })),
+        json::object_fields(json!({ "name": name })),
         now(),
     );
     let community = apply_in(tx, role, user, &event).await?.community()?;
@@ -181,8 +182,8 @@ pub async fn update(
         TABLE,
         id,
         community.version,
-        fields(json!({ "name": community.name })),
-        fields(json!({ "name": name })),
+        json::object_fields(json!({ "name": community.name })),
+        json::object_fields(json!({ "name": name })),
         now(),
     );
     let community = apply_in(&mut tx, deployment.role, user, &event)
@@ -201,8 +202,8 @@ pub async fn delete(deployment: &Deployment, user: &User, id: Uuid) -> Result<()
         TABLE,
         id,
         community.version,
-        fields(json!({ "deleted_at": null })),
-        fields(json!({ "deleted_at": now() })),
+        json::object_fields(json!({ "deleted_at": null })),
+        json::object_fields(json!({ "deleted_at": now() })),
         now(),
     );
     apply_in(&mut tx, deployment.role, user, &event)
@@ -457,14 +458,14 @@ fn rejected(
 impl Community {
     /// The named fields as they travel on the wire.
     pub(crate) fn fields(&self, names: &[&str]) -> Result<Fields, CommunityError> {
-        let mut all = fields(serde_json::to_value(self)?);
+        let mut all = json::object_fields(serde_json::to_value(self)?);
         all.retain(|name, _| names.contains(&name.as_str()));
         Ok(all)
     }
 
     /// The community with the fields written over it, checked.
     fn with_fields(&self, changes: &Fields) -> Result<Community, CommunityError> {
-        let mut all = fields(serde_json::to_value(self)?);
+        let mut all = json::object_fields(serde_json::to_value(self)?);
         for (name, value) in changes {
             all.insert(name.clone(), value.clone());
         }
@@ -473,13 +474,6 @@ impl Community {
             name: checked_name(&community.name)?,
             ..community
         })
-    }
-}
-
-fn fields(value: Value) -> Fields {
-    match value {
-        Value::Object(fields) => fields,
-        _ => Fields::new(),
     }
 }
 
@@ -503,9 +497,9 @@ fn checked_name(name: &str) -> Result<String, CommunityError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::{posts, users};
     use crate::data::posts_communities as posts_communities_records;
     use crate::database::{Database, with_each_database};
-    use crate::{posts, users};
 
     fn server(database: Database) -> Deployment {
         Deployment::new(database, Role::Server)
@@ -749,8 +743,8 @@ mod tests {
                 TABLE,
                 gardening.id,
                 1,
-                fields(json!({ "name": "Gardening" })),
-                fields(json!({ "name": "Weeding" })),
+                json::object_fields(json!({ "name": "Gardening" })),
+                json::object_fields(json!({ "name": "Weeding" })),
                 now(),
             );
 

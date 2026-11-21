@@ -1,4 +1,4 @@
-//! The local user's commands, see `app_core::local_users` and
+//! The local user's commands, see `app_core::app::local_users` and
 //! `docs/design/accounts-local-and-trial-users.md`: Skip on the accounts
 //! page makes a user that is only on this device and opens the app as
 //! them, with no request made; when they later sign up or sign in, the
@@ -7,7 +7,7 @@
 
 use tauri::{AppHandle, State};
 
-use app_core::users::User;
+use app_core::app::users::User;
 
 use crate::device_accounts::DeviceAccounts;
 use crate::sync::{self, SyncServer};

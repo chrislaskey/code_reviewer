@@ -29,19 +29,19 @@ use uuid::Uuid;
 
 use crate::accounts::{self, AccountError, Session};
 #[cfg(feature = "sync-http")]
-use crate::avatars::{AvatarUpdate, AvatarUpload, AvatarUploadNew};
-use crate::communities::{self, Community, CommunityError};
+use crate::app::avatars::{AvatarUpdate, AvatarUpload, AvatarUploadNew};
+use crate::app::communities::{self, Community, CommunityError};
+use crate::app::events::{self, Answer, AnswerStatus, Event, EventKind, EventStatus, StoredEvent};
+use crate::app::files::{self, File, FileError, FileUpload, FileUploadNew};
+use crate::app::files_communities::{self, FileCommunity, FileCommunityError};
+use crate::app::memberships::{self, Membership, MembershipError};
+use crate::app::posts::{self, Post, PostError};
+use crate::app::posts_communities::{self, PostCommunity, PostCommunityError};
+use crate::app::purge::{self, PurgeError};
+use crate::app::users::{self, User, UserError};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
 use crate::device_settings::{self, DeviceSettingsError, WORK_OFFLINE};
-use crate::events::{self, Answer, AnswerStatus, Event, EventKind, EventStatus, StoredEvent};
-use crate::files::{self, File, FileError, FileUpload, FileUploadNew};
-use crate::files_communities::{self, FileCommunity, FileCommunityError};
-use crate::memberships::{self, Membership, MembershipError};
-use crate::posts::{self, Post, PostError};
-use crate::posts_communities::{self, PostCommunity, PostCommunityError};
-use crate::purge::{self, PurgeError};
-use crate::users::{self, User, UserError};
 
 /// How far back from its cursor's time a pull starts, so a row written
 /// in a transaction that committed after a later one is not missed.
@@ -953,7 +953,7 @@ impl Http {
 struct ErrorAnswer {
     error: String,
     #[serde(default)]
-    errors: Option<crate::field_errors::FieldErrors>,
+    errors: Option<crate::helpers::field_errors::FieldErrors>,
 }
 
 #[cfg(feature = "sync-http")]
@@ -1641,10 +1641,10 @@ pub(crate) mod tests {
     use serde_json::json;
 
     use super::*;
+    pub(crate) use crate::app::users::tests::device_of;
+    use crate::app::{communities, conflicts, memberships, posts, posts_communities, purge};
     use crate::database::with_each_database;
     use crate::deployment::{Role, now};
-    pub(crate) use crate::users::tests::device_of;
-    use crate::{communities, conflicts, memberships, posts, posts_communities, purge};
 
     /// A user signed up on the server, with a token for their devices,
     /// and without the community a sign-up starts with, so a test
@@ -3020,8 +3020,8 @@ pub(crate) mod tests {
                 users::TABLE,
                 alice.id,
                 on_server.version,
-                crate::events::Fields::from_iter([("name".to_string(), json!("Alice B"))]),
-                crate::events::Fields::from_iter([("name".to_string(), json!("Mallory"))]),
+                crate::app::events::Fields::from_iter([("name".to_string(), json!("Alice B"))]),
+                crate::app::events::Fields::from_iter([("name".to_string(), json!("Mallory"))]),
                 now(),
             );
             let answer = users::apply_event(&server, &bob, &event)
@@ -3523,11 +3523,13 @@ pub(crate) mod tests {
         servers_database: &Deployment,
         email: &str,
     ) -> Session {
-        let mailer = crate::mailer::Mailer::memory();
+        let mailer = crate::services::mailer::Mailer::memory();
         let sent = accounts::sign_up(servers_database, &mailer, email)
             .await
             .expect("signed up");
-        let sent = match crate::mails::code_in(&mailer.last_sent_to(email).expect("mailed")) {
+        let sent = match crate::services::mailer::mails::code_in(
+            &mailer.last_sent_to(email).expect("mailed"),
+        ) {
             Some(_) => sent,
             None => accounts::sign_in(servers_database, &mailer, email)
                 .await
@@ -3619,8 +3621,8 @@ pub(crate) mod tests {
     #[tokio::test]
     #[ignore]
     async fn sync_a_file_over_http() {
+        use crate::app::files::FileState;
         use crate::deployment::FileStore;
-        use crate::files::FileState;
 
         let url = std::env::var("SYNC_SERVER_URL").expect("SYNC_SERVER_URL");
         let server = Http::new(&url).expect("a transport");
@@ -3697,8 +3699,8 @@ pub(crate) mod tests {
     #[tokio::test]
     #[ignore]
     async fn sync_many_files_over_http() {
+        use crate::app::files::FileState;
         use crate::deployment::FileStore;
-        use crate::files::FileState;
 
         let url = std::env::var("SYNC_SERVER_URL").expect("SYNC_SERVER_URL");
         let count: usize = std::env::var("FILES")

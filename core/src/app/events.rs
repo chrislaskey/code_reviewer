@@ -23,8 +23,8 @@ use serde_json::{Map, Value};
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::app::sync::TableRow;
 use crate::database::Transaction;
-use crate::sync::TableRow;
 
 /// A record assembled by this resource's workflow.
 pub(crate) struct AcceptedEvent<'a>(&'a StoredEvent);
@@ -339,7 +339,7 @@ pub async fn record(
     event: &Event,
     answer: &Answer,
 ) -> Result<(), RecordError> {
-    if crate::trial_users::writes_are_full_in(tx, user_id).await? {
+    if crate::accounts::trial_users::writes_are_full_in(tx, user_id).await? {
         return Err(RecordError::TrialWritesFull);
     }
     let status = match answer.status {
@@ -363,7 +363,7 @@ pub async fn record(
 /// is not queued: they have no server to push to, and their rows are
 /// queued as creates if they ever move to an account, see `local_users`.
 pub async fn queue(tx: &mut Transaction, user_id: Uuid, event: &Event) -> Result<(), sqlx::Error> {
-    if crate::local_users::is_signed_in_in(tx).await? {
+    if crate::app::local_users::is_signed_in_in(tx).await? {
         return Ok(());
     }
     let stored = StoredEvent {
@@ -514,11 +514,11 @@ mod tests {
         crate::database::with_each_database(|database| async move {
             let deployment =
                 crate::deployment::Deployment::new(database, crate::deployment::Role::Server);
-            let user = crate::users::create(&deployment, "alice@example.com", "Alice")
+            let user = crate::app::users::create(&deployment, "alice@example.com", "Alice")
                 .await
                 .expect("user");
             let event = Event::create(
-                crate::posts::TABLE,
+                crate::app::posts::TABLE,
                 Uuid::now_v7(),
                 fields(json!({"body": "pending"})),
                 crate::deployment::now(),

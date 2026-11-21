@@ -13,10 +13,10 @@ use chrono::{DateTime, Duration, Utc};
 use serde_json::Value;
 use thiserror::Error;
 
-use crate::avatars::AvatarError;
+use crate::app::avatars::AvatarError;
+use crate::app::files::FileError;
+use crate::app::purge::{self, PurgeError};
 use crate::deployment::{Deployment, Role};
-use crate::files::FileError;
-use crate::purge::{self, PurgeError};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Job {
@@ -145,7 +145,7 @@ pub enum JobError {
     #[error(transparent)]
     Purge(#[from] PurgeError),
     #[error(transparent)]
-    TrialUser(#[from] crate::trial_users::TrialUserError),
+    TrialUser(#[from] crate::accounts::trial_users::TrialUserError),
     #[error(transparent)]
     Avatar(#[from] AvatarError),
     #[error(transparent)]
@@ -213,15 +213,15 @@ async fn perform(deployment: &Deployment, job: Job, now: DateTime<Utc>) -> Resul
     match job {
         Job::Purge => Ok(serde_json::to_value(purge::run(deployment, now).await?)?),
         Job::TrialUsersDelete => Ok(serde_json::to_value(
-            crate::trial_users::delete_expired(deployment, now).await?,
+            crate::accounts::trial_users::delete_expired(deployment, now).await?,
         )?),
         #[cfg(feature = "object-storage")]
         Job::AvatarsDeleteUnreferenced => Ok(serde_json::to_value(
-            crate::avatars::delete_unreferenced(deployment, now).await?,
+            crate::app::avatars::delete_unreferenced(deployment, now).await?,
         )?),
         #[cfg(feature = "object-storage")]
         Job::FilesDeleteUnreferenced => Ok(serde_json::to_value(
-            crate::files::delete_unreferenced(deployment, now).await?,
+            crate::app::files::delete_unreferenced(deployment, now).await?,
         )?),
         #[cfg(not(feature = "object-storage"))]
         Job::AvatarsDeleteUnreferenced | Job::FilesDeleteUnreferenced => {
@@ -393,7 +393,7 @@ mod tests {
 
     #[tokio::test]
     async fn jobs_run_refuses_a_job_of_another_role_or_without_its_bucket() {
-        let device = crate::users::tests::device().await;
+        let device = crate::app::users::tests::device().await;
         let error = run(&device, Job::Purge, crate::deployment::now())
             .await
             .expect_err("a device");
@@ -429,7 +429,7 @@ mod tests {
     mod with_buckets {
         use super::*;
         use crate::deployment::FileStore;
-        use crate::storage::Storage;
+        use crate::services::storage::Storage;
 
         /// A server with everything its jobs work on: buckets, and
         /// Stripe when it sells.
@@ -438,10 +438,10 @@ mod tests {
                 .with_avatar_bucket(Storage::memory())
                 .with_file_store(FileStore::Bucket(Storage::memory()));
             #[cfg(feature = "stripe")]
-            let deployment = deployment.with_stripe(crate::accounts::stripe::Stripe::memory());
+            let deployment = deployment.with_stripe(crate::services::stripe::Stripe::memory());
             #[cfg(feature = "app-store")]
             let deployment =
-                deployment.with_app_store(crate::accounts::app_store::AppStore::memory());
+                deployment.with_app_store(crate::services::app_store::AppStore::memory());
             deployment
         }
 

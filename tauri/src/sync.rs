@@ -1,5 +1,5 @@
 //! Syncing the active account's database with the web server, see
-//! `docs/design/offline-sync.md`: `app_core::sync::run` over HTTP to the
+//! `docs/design/offline-sync.md`: `app_core::app::sync::run` over HTTP to the
 //! server at the URL `server_urls` resolves when the app starts. One
 //! sync runs at a time: when the app starts, when it comes
 //! to the foreground, after every write, from the Sync now button, and
@@ -29,7 +29,7 @@ use tauri::{App, AppHandle, Emitter, Manager, State};
 use tokio::sync::{Mutex, MutexGuard};
 
 use app_core::accounts::online;
-use app_core::sync::{self, Http, Report, Status, SyncError};
+use app_core::app::sync::{self, Http, Report, Status, SyncError};
 
 use crate::device_accounts::DeviceAccounts;
 use crate::server_urls;

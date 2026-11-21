@@ -16,7 +16,7 @@ mod popup;
 #[path = "unavailable.rs"]
 mod popup;
 
-use app_core::files::{FileSearch, FileSearchResults};
+use app_core::app::files::{FileSearch, FileSearchResults};
 use tauri::AppHandle;
 use uuid::Uuid;
 

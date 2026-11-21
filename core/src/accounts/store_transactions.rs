@@ -19,9 +19,9 @@ use crate::accounts::products::{Grant, ProductKind};
 use crate::accounts::purchases::{self, Purchase, Store};
 use crate::accounts::subscriptions::{self, Subscription, SubscriptionStatus};
 use crate::accounts::users as accounts_users;
+use crate::app::users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
-use crate::users::User;
 
 /// The proof of a purchase the app sends, by store.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -94,7 +94,7 @@ pub enum StoreTransactionError {
     StoreNotSetUp,
     #[cfg(feature = "app-store")]
     #[error(transparent)]
-    AppStore(#[from] crate::accounts::app_store::AppStoreError),
+    AppStore(#[from] crate::services::app_store::AppStoreError),
     #[error("This was bought while signed in as someone else")]
     SomeoneElses,
     #[error("This purchase is for no account here")]
@@ -395,10 +395,10 @@ pub(crate) mod tests {
     use chrono::Duration;
 
     use super::*;
-    use crate::accounts::stripe::{Stripe, StripePrice, StripeProduct};
     use crate::accounts::{plans, products};
+    use crate::app::users;
     use crate::database::with_each_database;
-    use crate::users;
+    use crate::services::stripe::{Stripe, StripePrice, StripeProduct};
 
     /// The catalog's placeholders, copied from a Stripe fake.
     pub(crate) async fn catalog(server: &Deployment) {
@@ -661,7 +661,7 @@ pub(crate) mod tests {
             .expect_err("a plan is not bought once");
             assert!(matches!(error, StoreTransactionError::PriceNotForSale));
 
-            let trial = crate::trial_users::create(&server, 10)
+            let trial = crate::accounts::trial_users::create(&server, 10)
                 .await
                 .expect("a trial");
             let error = apply(

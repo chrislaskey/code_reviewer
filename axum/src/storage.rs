@@ -11,7 +11,7 @@
 
 use std::env;
 
-use app_core::storage::{S3Settings, Storage};
+use app_core::services::storage::{S3Settings, Storage};
 use secrecy::SecretString;
 
 /// The bucket anyone reads, for pictures.

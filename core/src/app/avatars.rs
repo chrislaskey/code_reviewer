@@ -19,20 +19,20 @@ use garde::Validate;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::field_errors::FieldErrors;
 #[cfg(feature = "sync-http")]
-use crate::sync::Http;
-use crate::sync::SyncError;
-use crate::users::UserError;
+use crate::app::sync::Http;
+use crate::app::sync::SyncError;
+use crate::app::users::UserError;
+use crate::helpers::field_errors::FieldErrors;
 #[cfg(any(feature = "object-storage", feature = "sync-http"))]
 use crate::{
+    app::users::{self, User},
     deployment::Deployment,
-    users::{self, User},
 };
 #[cfg(feature = "object-storage")]
 use crate::{
     deployment::Role,
-    storage::{Storage, StorageError},
+    services::storage::{Storage, StorageError},
 };
 
 /// The largest picture, 5 MB.
@@ -149,7 +149,7 @@ pub async fn create_upload(
     request: &AvatarUploadNew,
 ) -> Result<AvatarUpload, AvatarError> {
     FieldErrors::check(request).map_err(AvatarError::Invalid)?;
-    if crate::trial_users::is_trial(deployment, user).await? {
+    if crate::accounts::trial_users::is_trial(deployment, user).await? {
         return Err(AvatarError::TrialUser);
     }
     let storage = bucket(deployment)?;
@@ -366,8 +366,8 @@ fn is_avatar_size(size: &u64, _context: &()) -> garde::Result {
 #[cfg(all(test, feature = "object-storage"))]
 mod tests {
     use super::*;
+    use crate::app::events::{self, EventStatus};
     use crate::database::{Database, with_each_database};
-    use crate::events::{self, EventStatus};
 
     const PNG: &[u8] = b"\x89PNG\r\n\x1a\nthe rest of a picture";
 
@@ -644,8 +644,9 @@ mod tests {
                 .expect("a sweep");
             assert_eq!(report.deleted, 0, "a soft-deleted row still points at it");
 
-            let after_the_window = now + chrono::Duration::days(crate::purge::RETENTION_DAYS + 1);
-            crate::purge::run(&deployment, after_the_window)
+            let after_the_window =
+                now + chrono::Duration::days(crate::app::purge::RETENTION_DAYS + 1);
+            crate::app::purge::run(&deployment, after_the_window)
                 .await
                 .expect("the purge");
             let report = delete_unreferenced(&deployment, after_the_window)

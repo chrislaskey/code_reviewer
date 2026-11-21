@@ -11,11 +11,11 @@ use crate::data::memberships as memberships_records;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::communities::{self, Community, CommunityError};
+use crate::app::communities::{self, Community, CommunityError};
+use crate::app::users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role};
 use crate::device_settings::{self, CURRENT_COMMUNITY, DeviceSettingsError};
-use crate::users::User;
 
 #[derive(Debug, Error)]
 pub enum CurrentCommunityError {
@@ -142,8 +142,8 @@ async fn list_mine(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::{memberships, users};
     use crate::database::{Database, with_each_database};
-    use crate::{memberships, users};
 
     #[tokio::test]
     async fn current_community_get_is_the_choice_while_a_member_else_the_first_by_name() {

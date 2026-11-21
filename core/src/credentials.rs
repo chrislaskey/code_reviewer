@@ -122,9 +122,9 @@ async fn off_the_runtime<T: Send + 'static>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::users;
     use crate::database::with_each_database;
     use crate::deployment::{Deployment, Role};
-    use crate::users;
 
     #[tokio::test]
     async fn credentials_set_and_verify_and_set_again() {

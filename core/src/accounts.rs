@@ -2,7 +2,7 @@
 //! the work, and the emailed code is what proves who someone is, see
 //! `docs/design/accounts-sign-in.md`. A sign-up writes the person's
 //! account, `users`, unconfirmed, and their user's row with their name,
-//! `crate::users`; a sign-in finds the account by its email; both then
+//! `crate::app::users`; a sign-in finds the account by its email; both then
 //! make a pending sign-in, `tokens`, and mail its six-digit code,
 //! `mails`, answering the pending token the page holds. The code,
 //! `sign_in_with_code`, confirms the email the first time, then asks
@@ -24,8 +24,6 @@
 //! business, see `docs/design/device-accounts.md`.
 
 #[cfg(feature = "app-store")]
-pub mod app_store;
-#[cfg(feature = "app-store")]
 pub mod app_store_notifications;
 #[cfg(feature = "app-store")]
 pub mod app_store_reconcile;
@@ -44,29 +42,29 @@ pub mod purchases;
 #[cfg(feature = "stripe")]
 pub mod store_transactions;
 #[cfg(feature = "stripe")]
-pub mod stripe;
-#[cfg(feature = "stripe")]
 pub mod stripe_events;
 #[cfg(feature = "stripe")]
 pub mod stripe_reconcile;
 #[cfg(feature = "stripe")]
 pub mod subscriptions;
+pub mod trial_users;
 pub mod users;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::communities::{self, CommunityError};
+use crate::app::communities::{self, CommunityError};
+use crate::app::sync::{SyncError, Transport};
+use crate::app::users::{SignedIn, User, UserError};
 use crate::credentials::{self, CredentialError};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::device_settings::{self, DeviceSettingsError, SIGNED_IN};
-use crate::mailer::{MailError, Mailer};
-use crate::mails;
-use crate::sync::{SyncError, Transport};
+use crate::helpers::random;
+use crate::services::mailer::mails;
+use crate::services::mailer::{MailError, Mailer};
 use crate::tokens::{self, Context};
-use crate::users::{SignedIn, User, UserError};
 
 use self::users::{AccountUser, AccountUserError};
 
@@ -226,7 +224,7 @@ pub async fn sign_up(
     let (mail, pending) = match existing {
         Some(account) if account.confirmed_at.is_some() => {
             let mail = mails::already_signed_up(&account.email);
-            (mail, tokens::random_hex(32))
+            (mail, random::hex(32))
         }
         Some(account) => {
             let (pending, code) = tokens::create_sign_in_code(&mut tx, account.id, None).await?;
@@ -234,8 +232,8 @@ pub async fn sign_up(
         }
         None => {
             let account = users::create_in(&mut tx, Uuid::now_v7(), &email, false).await?;
-            let name = crate::users::name_from_email_in(&mut tx, &email, account.id).await?;
-            crate::users::create_in(&mut tx, account.id, &name).await?;
+            let name = crate::app::users::name_from_email_in(&mut tx, &email, account.id).await?;
+            crate::app::users::create_in(&mut tx, account.id, &name).await?;
             let (pending, code) = tokens::create_sign_in_code(&mut tx, account.id, None).await?;
             (mails::sign_in_code(&account.email, &code), pending)
         }
@@ -260,12 +258,12 @@ pub async fn sign_in(
     let mut tx = deployment.begin().await?;
     let (mail, pending) = match users::get_by_email_in(&mut tx, &email).await? {
         // A trial user's address is made up: nothing to send, nobody to tell
-        Some(account) if account.trial_expires_at.is_some() => (None, tokens::random_hex(32)),
+        Some(account) if account.trial_expires_at.is_some() => (None, random::hex(32)),
         Some(account) => {
             let (pending, code) = tokens::create_sign_in_code(&mut tx, account.id, None).await?;
             (Some(mails::sign_in_code(&account.email, &code)), pending)
         }
-        None => (Some(mails::no_account(&email)), tokens::random_hex(32)),
+        None => (Some(mails::no_account(&email)), random::hex(32)),
     };
     tx.commit().await?;
     if let Some(mail) = mail {
@@ -300,11 +298,11 @@ pub async fn sign_up_from_trial(
     let (mail, pending) = match users::get_by_email_in(&mut tx, &email).await? {
         Some(taken) if taken.confirmed_at.is_some() => {
             let mail = mails::already_signed_up(&taken.email);
-            (mail, tokens::random_hex(32))
+            (mail, random::hex(32))
         }
         _ => {
-            let name = crate::users::name_from_email_in(&mut tx, &email, trial.id).await?;
-            crate::users::update_name_in(&mut tx, trial.id, &name).await?;
+            let name = crate::app::users::name_from_email_in(&mut tx, &email, trial.id).await?;
+            crate::app::users::update_name_in(&mut tx, trial.id, &name).await?;
             let (pending, code) =
                 tokens::create_sign_in_code(&mut tx, trial.id, Some(&email)).await?;
             (mails::sign_in_code(&email, &code), pending)
@@ -503,9 +501,9 @@ pub async fn password_update(
 #[cfg(feature = "sync-http")]
 pub async fn second_factors_on_device(
     deployment: &Deployment,
-    server: &crate::sync::Http,
+    server: &crate::app::sync::Http,
 ) -> Result<Vec<SecondFactor>, AccountError> {
-    let (_user, token) = crate::users::signed_in_with_token(deployment).await?;
+    let (_user, token) = crate::app::users::signed_in_with_token(deployment).await?;
     Ok(server.accounts_second_factors(&token).await?)
 }
 
@@ -514,10 +512,10 @@ pub async fn second_factors_on_device(
 #[cfg(feature = "sync-http")]
 pub async fn password_update_on_device(
     deployment: &Deployment,
-    server: &crate::sync::Http,
+    server: &crate::app::sync::Http,
     update: &PasswordUpdate,
 ) -> Result<(), AccountError> {
-    let (_user, token) = crate::users::signed_in_with_token(deployment).await?;
+    let (_user, token) = crate::app::users::signed_in_with_token(deployment).await?;
     Ok(server.accounts_password_update(&token, update).await?)
 }
 
@@ -570,7 +568,7 @@ pub async fn sign_out(deployment: &Deployment, token: &str) -> Result<(), Accoun
 /// keeps to itself, and the challenge it puts in the sign-in URL, the
 /// verifier's hash.
 pub fn verifier_and_challenge() -> (String, String) {
-    let verifier = tokens::random_hex(32);
+    let verifier = random::hex(32);
     let challenge = challenge_of(&verifier);
     (verifier, challenge)
 }
@@ -605,7 +603,7 @@ pub async fn keep_signed_in(
         return Err(AccountError::DeviceOnly);
     }
     let mut tx = deployment.begin().await?;
-    crate::users::upsert_in(&mut tx, &session.user).await?;
+    crate::app::users::upsert_in(&mut tx, &session.user).await?;
     let signed_in = SignedIn {
         user_id: session.user.id,
         token: Some(session.token),
@@ -626,7 +624,7 @@ pub async fn sign_out_on_device<T: Transport>(
     if deployment.role != Role::Device {
         return Err(AccountError::DeviceOnly);
     }
-    let (_user, token) = crate::users::signed_in_with_token(deployment).await?;
+    let (_user, token) = crate::app::users::signed_in_with_token(deployment).await?;
     match transport.sign_out(&token).await {
         Ok(()) | Err(SyncError::Unauthorized) | Err(SyncError::AccountDeleted) => {}
         Err(error) => return Err(error.into()),
@@ -803,7 +801,7 @@ async fn sign_up_trial_in(
         users::delete_unconfirmed_in(tx, other.id).await?;
     }
     users::sign_up_trial_in(tx, account.id, email).await?;
-    crate::trial_users::show_communities_in(tx, account.id).await?;
+    crate::accounts::trial_users::show_communities_in(tx, account.id).await?;
     tokens::delete_of_user(tx, account.id, Context::Session).await?;
     live_account_in(tx, account.id).await
 }
@@ -910,16 +908,16 @@ async fn live_account_in(tx: &mut Transaction, id: Uuid) -> Result<AccountUser, 
 }
 
 async fn live_user_in(tx: &mut Transaction, id: Uuid) -> Result<Option<User>, AccountError> {
-    let user = crate::users::get_in(tx, id).await?;
+    let user = crate::app::users::get_in(tx, id).await?;
     Ok(user.filter(|user| user.deleted_at.is_none()))
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::app::sync::{self, InProcess};
+    use crate::app::{posts, users};
     use crate::database::with_each_database;
-    use crate::sync::{self, InProcess};
-    use crate::{posts, users};
 
     pub(crate) const PASSWORD: &str = "correct horse battery";
 

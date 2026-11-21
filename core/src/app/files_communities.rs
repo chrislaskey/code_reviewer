@@ -18,14 +18,15 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::communities::Community;
+use crate::app::communities::Community;
+use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind};
+use crate::app::files::{self, File};
+use crate::app::memberships::{self, id_field};
+use crate::app::sync::{Cursor, TableRow};
+use crate::app::users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
-use crate::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
-use crate::files::{self, File};
-use crate::memberships::{self, id_field};
-use crate::sync::{Cursor, TableRow};
-use crate::users::User;
+use crate::helpers::json;
 
 /// A row accepted by this resource's event or replication workflow.
 /// Only this module can construct an accepted write.
@@ -78,7 +79,7 @@ pub enum FileCommunityError {
     #[error("the change was refused: {0}")]
     Rejected(String),
     #[error(transparent)]
-    Record(#[from] crate::events::RecordError),
+    Record(#[from] crate::app::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -154,7 +155,7 @@ pub(crate) async fn create_in(
         None => Event::create(
             TABLE,
             Uuid::now_v7(),
-            fields(json!({ "file_id": file.id, "community_id": community_id })),
+            json::object_fields(json!({ "file_id": file.id, "community_id": community_id })),
             now(),
         ),
         Some(row) if row.deleted_at.is_none() => return Ok(row),
@@ -162,8 +163,8 @@ pub(crate) async fn create_in(
             TABLE,
             removed.id,
             removed.version,
-            fields(json!({ "deleted_at": removed.deleted_at })),
-            fields(json!({ "deleted_at": null })),
+            json::object_fields(json!({ "deleted_at": removed.deleted_at })),
+            json::object_fields(json!({ "deleted_at": null })),
             now(),
         ),
     };
@@ -193,8 +194,8 @@ pub(crate) async fn delete_in(
         TABLE,
         row.id,
         row.version,
-        fields(json!({ "deleted_at": null })),
-        fields(json!({ "deleted_at": now() })),
+        json::object_fields(json!({ "deleted_at": null })),
+        json::object_fields(json!({ "deleted_at": now() })),
         now(),
     );
     apply_in(tx, role, user, &event).await?.row()
@@ -630,23 +631,16 @@ fn invalid(error: memberships::MembershipError) -> FileCommunityError {
     }
 }
 
-fn fields(value: Value) -> Fields {
-    match value {
-        Value::Object(fields) => fields,
-        _ => Fields::new(),
-    }
-}
-
 #[cfg(all(test, feature = "object-storage"))]
 mod tests {
     use super::*;
+    use crate::app::files::tests::{device_with_folder, new_file, server};
+    use crate::app::files::{FileError, FileNew};
+    use crate::app::sync::tests::user_with_token;
+    use crate::app::sync::{self, BackfillRequest, InProcess, PullRequest, SyncError};
+    use crate::app::{communities, files, memberships, users};
     use crate::database::with_each_database;
-    use crate::files::tests::{device_with_folder, new_file, server};
-    use crate::files::{FileError, FileNew};
-    use crate::storage::Storage;
-    use crate::sync::tests::user_with_token;
-    use crate::sync::{self, BackfillRequest, InProcess, PullRequest, SyncError};
-    use crate::{communities, files, memberships, users};
+    use crate::services::storage::Storage;
 
     /// A file the user created on the server in the communities, its
     /// bytes put in the bucket as an upload would have.
@@ -752,8 +746,8 @@ mod tests {
                 files::TABLE,
                 file.id,
                 file.version,
-                fields(json!({ "name": file.name })),
-                fields(json!({ "name": "hers.txt" })),
+                json::object_fields(json!({ "name": file.name })),
+                json::object_fields(json!({ "name": "hers.txt" })),
                 now(),
             );
             let answer = files::apply_event(&server, &carol, &rename)
@@ -1145,7 +1139,7 @@ mod tests {
             let alices = file_in(&server, &storage, &alice, "roses.jpg", &[garden]).await;
             let bobs = file_in(&server, &storage, &bob, "the same.jpg", &[woodwork]).await;
             assert_eq!(alices.sha256, bobs.sha256, "the same bytes");
-            let other = files::sha256_hex(b"other bytes");
+            let other = crate::helpers::sha256::hex(b"other bytes");
 
             let found = files::list_duplicates(&server, &alice, &[other.clone(), alices.sha256])
                 .await

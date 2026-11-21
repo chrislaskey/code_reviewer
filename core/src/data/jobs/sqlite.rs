@@ -5,7 +5,7 @@ use serde_json::Value;
 use sqlx::SqliteConnection;
 use sqlx::types::Json;
 
-use crate::jobs::{Job, JobRecord};
+use crate::app::jobs::{Job, JobRecord};
 
 /// Starts the job's run at `now` unless one started after `due_after`;
 /// whether it did, so of two servers asking at once only one runs it.

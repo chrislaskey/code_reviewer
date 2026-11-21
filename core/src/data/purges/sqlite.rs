@@ -5,7 +5,7 @@
 use chrono::{DateTime, Utc};
 use sqlx::SqliteConnection;
 
-use crate::purge::Purge;
+use crate::app::purge::Purge;
 
 pub async fn delete_deleted_before(
     connection: &mut SqliteConnection,

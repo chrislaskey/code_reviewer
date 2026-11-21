@@ -1,8 +1,8 @@
 //! Transaction-scoped file-community association records. Workflows own commits.
 
+use crate::app::files_communities::{AcceptedFileCommunity, FileCommunity};
+use crate::app::sync::Cursor;
 use crate::database::Transaction;
-use crate::files_communities::{AcceptedFileCommunity, FileCommunity};
-use crate::sync::Cursor;
 use uuid::Uuid;
 
 #[cfg(feature = "postgres")]

@@ -35,23 +35,23 @@ use chrono::{DateTime, Utc};
 use garde::Validate;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::communities::{self, Community};
+use crate::app::communities::{self, Community};
+use crate::app::events::{
+    self, Answer, AnswerStatus, Conflicts, Event, EventKind, EventStatus, Fields, StoredEvent,
+};
+use crate::app::files_communities::{self, FileCommunityError, FileCommunityNew};
+use crate::app::sync::{Cursor, SyncError, TableRow, Transport};
+use crate::app::users::{self, User};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, FileStore, Role, now};
 use crate::device_settings::{self, WORK_OFFLINE};
-use crate::events::{
-    self, Answer, AnswerStatus, Conflicts, Event, EventKind, EventStatus, Fields, StoredEvent,
-};
-use crate::field_errors::FieldErrors;
-use crate::files_communities::{self, FileCommunityError, FileCommunityNew};
+use crate::helpers::field_errors::FieldErrors;
 #[cfg(feature = "object-storage")]
-use crate::storage::{Storage, StorageError};
-use crate::sync::{Cursor, SyncError, TableRow, Transport};
-use crate::users::{self, User};
+use crate::helpers::{json, sha256};
+use crate::services::storage::{Storage, StorageError};
 
 /// A row accepted by this resource's event, lifecycle or replication workflow.
 /// Only this module can construct an accepted write.
@@ -290,7 +290,7 @@ pub enum FileError {
     #[error(transparent)]
     Storage(#[from] StorageError),
     #[error(transparent)]
-    Record(#[from] crate::events::RecordError),
+    Record(#[from] crate::app::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -415,7 +415,7 @@ pub async fn create(
     let event = Event::create(
         TABLE,
         new.id,
-        fields(json!({
+        json::object_fields(json!({
             "name": new.name,
             "content_type": new.content_type,
             "size": new.size,
@@ -444,7 +444,7 @@ pub async fn create_with_bytes(
         return Err(FileError::DeviceOnly);
     }
     let owned = bytes.to_vec();
-    let sha256 = tokio::task::spawn_blocking(move || sha256_hex(&owned))
+    let sha256 = tokio::task::spawn_blocking(move || sha256::hex(&owned))
         .await
         .map_err(|error| FileError::Malformed(error.to_string()))?;
     let new = FileNew {
@@ -486,8 +486,8 @@ pub async fn update(
             TABLE,
             id,
             file.version,
-            fields(json!({ "name": file.name })),
-            fields(json!({ "name": name })),
+            json::object_fields(json!({ "name": file.name })),
+            json::object_fields(json!({ "name": name })),
             now(),
         );
         file = apply_in(&mut tx, deployment.role, user, &event, true)
@@ -541,7 +541,7 @@ pub async fn create_upload(
     user: &User,
     request: &FileUploadNew,
 ) -> Result<FileUpload, FileError> {
-    if crate::trial_users::is_trial(deployment, user).await? {
+    if crate::accounts::trial_users::is_trial(deployment, user).await? {
         return Err(FileError::Rejected(
             "a trial has no files; sign up first".to_string(),
         ));
@@ -792,7 +792,7 @@ async fn note_error(
 pub async fn delete_unreferenced(
     deployment: &Deployment,
     now: DateTime<Utc>,
-) -> Result<crate::avatars::DeleteUnreferencedReport, FileError> {
+) -> Result<crate::app::avatars::DeleteUnreferencedReport, FileError> {
     let storage = bucket(deployment)?;
     let mut tx = deployment.begin().await?;
     let referenced: BTreeSet<String> = files_records::maintenance::list_ids(&mut tx)
@@ -803,7 +803,7 @@ pub async fn delete_unreferenced(
     tx.commit().await?;
 
     let cutoff = now - chrono::Duration::days(UNREFERENCED_DAYS);
-    let mut report = crate::avatars::DeleteUnreferencedReport::default();
+    let mut report = crate::app::avatars::DeleteUnreferencedReport::default();
     for file in storage.list(KEY_PREFIX).await? {
         if referenced.contains(&file.key) || file.last_modified > cutoff {
             report.kept += 1;
@@ -1293,14 +1293,6 @@ async fn bucket_has(
     Ok(storage.checksum_sha256(key).await?.as_deref() == Some(checksum_sha256))
 }
 
-/// The SHA-256 of the bytes, lowercase hex, as a file's row holds it.
-pub fn sha256_hex(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
-}
-
 /// The checksum as the bucket's header carries it, base64, from the
 /// row's hex.
 #[cfg(feature = "object-storage")]
@@ -1468,14 +1460,14 @@ fn rejected(
 impl File {
     /// The named fields as they travel on the wire.
     pub(crate) fn fields(&self, names: &[&str]) -> Result<Fields, FileError> {
-        let mut all = fields(serde_json::to_value(self)?);
+        let mut all = json::object_fields(serde_json::to_value(self)?);
         all.retain(|name, _| names.contains(&name.as_str()));
         Ok(all)
     }
 
     /// The file with the fields written over it, checked.
     fn with_fields(&self, changes: &Fields) -> Result<File, FileError> {
-        let mut all = fields(serde_json::to_value(self)?);
+        let mut all = json::object_fields(serde_json::to_value(self)?);
         for (name, value) in changes {
             all.insert(name.clone(), value.clone());
         }
@@ -1520,14 +1512,6 @@ pub(crate) fn bucket(deployment: &Deployment) -> Result<&Storage, FileError> {
     match &deployment.file_store {
         FileStore::Bucket(storage) => Ok(storage),
         _ => Err(FileError::NoFileStore),
-    }
-}
-
-/// The fields of a JSON object, or none for anything else.
-fn fields(value: Value) -> Fields {
-    match value {
-        Value::Object(fields) => fields,
-        _ => Fields::new(),
     }
 }
 
@@ -1622,13 +1606,13 @@ fn attachment_named(name: &str) -> String {
 pub(crate) mod tests {
     use super::*;
     use crate::accounts::Session;
-    use crate::conflicts::{self, ConflictError, Resolve};
-    use crate::database::{Database, with_each_database};
-    use crate::sync::tests::user_with_token;
-    use crate::sync::{
+    use crate::app::conflicts::{self, ConflictError, Resolve};
+    use crate::app::sync::tests::user_with_token;
+    use crate::app::sync::{
         self, BackfillRequest, InProcess, Page, PullRequest, PushRequest, PushResponse,
     };
-    use crate::{pending_changes, posts, users};
+    use crate::app::{pending_changes, posts, users};
+    use crate::database::{Database, with_each_database};
 
     /// The user's own community on the deployment, made the first time.
     pub(crate) async fn personal(deployment: &Deployment, user: &User) -> Uuid {
@@ -1692,7 +1676,7 @@ pub(crate) mod tests {
             name: name.to_string(),
             content_type: "text/plain".to_string(),
             size: bytes.len() as u64,
-            sha256: sha256_hex(bytes),
+            sha256: sha256::hex(bytes),
             community_ids: vec![community_id],
         }
     }
@@ -1796,8 +1780,8 @@ pub(crate) mod tests {
                 TABLE,
                 file.id,
                 file.version,
-                fields(json!({"name": file.name})),
-                fields(json!({"name": "after.txt"})),
+                json::object_fields(json!({"name": file.name})),
+                json::object_fields(json!({"name": "after.txt"})),
                 now(),
             );
             let mut tx = deployment.begin().await.expect("transaction");
@@ -2611,8 +2595,9 @@ pub(crate) mod tests {
                 "a deleted row keeps its bytes until the purge"
             );
 
-            let after_the_window = now + chrono::Duration::days(crate::purge::RETENTION_DAYS + 1);
-            crate::purge::run(&server, after_the_window)
+            let after_the_window =
+                now + chrono::Duration::days(crate::app::purge::RETENTION_DAYS + 1);
+            crate::app::purge::run(&server, after_the_window)
                 .await
                 .expect("purged");
             let report = delete_unreferenced(&server, after_the_window)
@@ -3018,8 +3003,8 @@ pub(crate) mod tests {
                 TABLE,
                 file.id,
                 2,
-                fields(json!({ "size": 1 })),
-                fields(json!({ "size": 2 })),
+                json::object_fields(json!({ "size": 1 })),
+                json::object_fields(json!({ "size": 2 })),
                 now(),
             );
             let answer = apply_event(&deployment, &alice, &event)
@@ -3079,7 +3064,7 @@ pub(crate) mod tests {
                 id: None,
                 content_type: "IMAGE/GIF".to_string(),
                 size: 3,
-                sha256: sha256_hex(b"GIF"),
+                sha256: sha256::hex(b"GIF"),
             };
 
             let upload = create_upload(&deployment, &alice, &request)

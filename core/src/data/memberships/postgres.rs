@@ -5,8 +5,8 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgConnection};
 use uuid::Uuid;
 
-use crate::memberships::Membership;
-use crate::sync::Cursor;
+use crate::app::memberships::Membership;
+use crate::app::sync::Cursor;
 
 #[derive(FromRow)]
 struct MembershipRow {

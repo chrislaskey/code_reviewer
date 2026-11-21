@@ -1,5 +1,5 @@
 //! The current community API: the community the browser works in, kept
-//! in a cookie of its own, see `app_core::current_community`. A read
+//! in a cookie of its own, see `app_core::app::current_community`. A read
 //! stores the community it answers, so a first read, or a choice that
 //! no longer holds, settles on the user's first community.
 
@@ -12,8 +12,8 @@ use serde::Deserialize;
 use time::Duration;
 use uuid::Uuid;
 
-use app_core::communities::Community;
-use app_core::current_community;
+use app_core::app::communities::Community;
+use app_core::app::current_community;
 use app_core::deployment::Deployment;
 
 use crate::accounts::is_localhost;

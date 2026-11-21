@@ -6,7 +6,7 @@ use sqlx::SqliteConnection;
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
-use crate::sync::Cursor;
+use crate::app::sync::Cursor;
 
 pub async fn cursor(connection: &mut SqliteConnection) -> Result<Option<Cursor>, sqlx::Error> {
     let row: Option<(DateTime<Utc>, Hyphenated)> =

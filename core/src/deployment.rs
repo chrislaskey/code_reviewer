@@ -14,7 +14,7 @@ use chrono::{DateTime, SubsecRound, Utc};
 
 use crate::database::{Database, Transaction};
 #[cfg(feature = "object-storage")]
-use crate::storage::Storage;
+use crate::services::storage::Storage;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Role {
@@ -46,10 +46,10 @@ pub struct Deployment {
     pub avatar_bucket: Option<Storage>,
     /// Stripe, on a server that sells, for the jobs that ask it.
     #[cfg(feature = "stripe")]
-    pub stripe: Option<crate::accounts::stripe::Stripe>,
+    pub stripe: Option<crate::services::stripe::Stripe>,
     /// The App Store, on a server that sells in the iPhone app.
     #[cfg(feature = "app-store")]
-    pub app_store: Option<crate::accounts::app_store::AppStore>,
+    pub app_store: Option<crate::services::app_store::AppStore>,
 }
 
 impl Deployment {
@@ -74,7 +74,7 @@ impl Deployment {
     }
 
     #[cfg(feature = "stripe")]
-    pub fn with_stripe(self, stripe: crate::accounts::stripe::Stripe) -> Deployment {
+    pub fn with_stripe(self, stripe: crate::services::stripe::Stripe) -> Deployment {
         Deployment {
             stripe: Some(stripe),
             ..self
@@ -82,7 +82,7 @@ impl Deployment {
     }
 
     #[cfg(feature = "app-store")]
-    pub fn with_app_store(self, app_store: crate::accounts::app_store::AppStore) -> Deployment {
+    pub fn with_app_store(self, app_store: crate::services::app_store::AppStore) -> Deployment {
         Deployment {
             app_store: Some(app_store),
             ..self

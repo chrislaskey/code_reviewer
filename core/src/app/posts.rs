@@ -17,14 +17,15 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::communities::{self, Community};
+use crate::app::communities::{self, Community};
+use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
+use crate::app::posts_communities::{self, PostCommunityError};
+use crate::app::sync::{Cursor, TableRow};
+use crate::app::users::{self, User};
 use crate::data::posts as records;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
-use crate::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
-use crate::posts_communities::{self, PostCommunityError};
-use crate::sync::{Cursor, TableRow};
-use crate::users::{self, User};
+use crate::helpers::json;
 
 pub const TABLE: &str = "app_posts";
 pub const MAX_BODY_LENGTH: usize = 10_000;
@@ -86,7 +87,7 @@ pub enum PostError {
     #[error(transparent)]
     Community(#[from] PostCommunityError),
     #[error(transparent)]
-    Record(#[from] crate::events::RecordError),
+    Record(#[from] crate::app::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -136,7 +137,7 @@ pub async fn create(
     let event = Event::create(
         TABLE,
         Uuid::now_v7(),
-        fields(json!({ "body": body })),
+        json::object_fields(json!({ "body": body })),
         now(),
     );
     let mut tx = deployment.begin().await?;
@@ -167,8 +168,8 @@ pub async fn update(
             TABLE,
             id,
             post.version,
-            fields(json!({ "body": post.body })),
-            fields(json!({ "body": body })),
+            json::object_fields(json!({ "body": post.body })),
+            json::object_fields(json!({ "body": body })),
             now(),
         );
         apply_in(&mut tx, deployment.role, user, &event)
@@ -188,8 +189,8 @@ pub async fn delete(deployment: &Deployment, user: &User, id: Uuid) -> Result<()
         TABLE,
         id,
         post.version,
-        fields(json!({ "deleted_at": null })),
-        fields(json!({ "deleted_at": now() })),
+        json::object_fields(json!({ "deleted_at": null })),
+        json::object_fields(json!({ "deleted_at": now() })),
         now(),
     );
     let applied = apply_in(&mut tx, deployment.role, user, &event).await?;
@@ -469,14 +470,14 @@ fn rejected(
 impl Post {
     /// The named fields as they travel on the wire.
     pub(crate) fn fields(&self, names: &[&str]) -> Result<Fields, PostError> {
-        let mut all = fields(serde_json::to_value(self)?);
+        let mut all = json::object_fields(serde_json::to_value(self)?);
         all.retain(|name, _| names.contains(&name.as_str()));
         Ok(all)
     }
 
     /// The post with the fields written over it, checked.
     fn with_fields(&self, changes: &Fields) -> Result<Post, PostError> {
-        let mut all = fields(serde_json::to_value(self)?);
+        let mut all = json::object_fields(serde_json::to_value(self)?);
         for (name, value) in changes {
             all.insert(name.clone(), value.clone());
         }
@@ -485,14 +486,6 @@ impl Post {
             body: checked_body(&post.body)?,
             ..post
         })
-    }
-}
-
-/// The fields of a JSON object, or none for anything else.
-fn fields(value: Value) -> Fields {
-    match value {
-        Value::Object(fields) => fields,
-        _ => Fields::new(),
     }
 }
 
@@ -511,9 +504,9 @@ fn checked_body(body: &str) -> Result<String, PostError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::events::EventStatus;
+    use crate::app::users;
     use crate::database::{Database, with_each_database};
-    use crate::events::EventStatus;
-    use crate::users;
 
     fn server(database: Database) -> Deployment {
         Deployment::new(database, Role::Server)
@@ -698,7 +691,7 @@ mod tests {
             let pushed = Event::create(
                 TABLE,
                 Uuid::now_v7(),
-                fields(json!({ "body": too_long })),
+                json::object_fields(json!({ "body": too_long })),
                 now(),
             );
             let answer = apply_event(&deployment, &alice, &pushed)
@@ -846,8 +839,8 @@ mod tests {
                 TABLE,
                 post.id,
                 1,
-                fields(json!({ "body": "before" })),
-                fields(json!({ "body": "after" })),
+                json::object_fields(json!({ "body": "before" })),
+                json::object_fields(json!({ "body": "after" })),
                 now(),
             );
 
@@ -883,8 +876,8 @@ mod tests {
                 TABLE,
                 post.id,
                 1,
-                fields(json!({})),
-                fields(json!({ "user_id": Uuid::now_v7(), "body": "x" })),
+                json::object_fields(json!({})),
+                json::object_fields(json!({ "user_id": Uuid::now_v7(), "body": "x" })),
                 now(),
             );
 
@@ -918,8 +911,8 @@ mod tests {
                 TABLE,
                 post.id,
                 1,
-                fields(json!({ "body": "alice's" })),
-                fields(json!({ "body": "bob's" })),
+                json::object_fields(json!({ "body": "alice's" })),
+                json::object_fields(json!({ "body": "bob's" })),
                 now(),
             );
 
@@ -948,7 +941,7 @@ mod tests {
             let event = Event::create(
                 TABLE,
                 Uuid::now_v7(),
-                fields(json!({ "body": "  " })),
+                json::object_fields(json!({ "body": "  " })),
                 now(),
             );
 

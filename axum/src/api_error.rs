@@ -9,7 +9,6 @@ use axum::response::{IntoResponse, Response};
 use serde_json::json;
 
 use app_core::accounts::AccountError;
-use app_core::accounts::app_store::AppStoreError;
 use app_core::accounts::app_store_notifications::AppStoreNotificationError;
 use app_core::accounts::checkouts::CheckoutError;
 use app_core::accounts::deletions::DeletionError;
@@ -17,23 +16,24 @@ use app_core::accounts::plans::PlanError;
 use app_core::accounts::products::ProductError;
 use app_core::accounts::purchases::PurchaseError;
 use app_core::accounts::store_transactions::StoreTransactionError;
-use app_core::accounts::stripe::StripeError;
 use app_core::accounts::stripe_events::StripeEventError;
 use app_core::accounts::subscriptions::SubscriptionError;
 use app_core::accounts::users::AccountUserError;
-use app_core::avatars::AvatarError;
-use app_core::communities::CommunityError;
+use app_core::app::avatars::AvatarError;
+use app_core::app::communities::CommunityError;
+use app_core::app::current_community::CurrentCommunityError;
+use app_core::app::events::RecordError;
+use app_core::app::files::FileError;
+use app_core::app::files_communities::FileCommunityError;
+use app_core::app::memberships::MembershipError;
+use app_core::app::posts::PostError;
+use app_core::app::posts_communities::PostCommunityError;
+use app_core::app::sync::SyncError;
+use app_core::app::users::UserError;
 use app_core::credentials::CredentialError;
-use app_core::current_community::CurrentCommunityError;
-use app_core::events::RecordError;
-use app_core::field_errors::FieldErrors;
-use app_core::files::FileError;
-use app_core::files_communities::FileCommunityError;
-use app_core::memberships::MembershipError;
-use app_core::posts::PostError;
-use app_core::posts_communities::PostCommunityError;
-use app_core::sync::SyncError;
-use app_core::users::UserError;
+use app_core::helpers::field_errors::FieldErrors;
+use app_core::services::app_store::AppStoreError;
+use app_core::services::stripe::StripeError;
 
 #[derive(Debug)]
 pub struct ApiError {

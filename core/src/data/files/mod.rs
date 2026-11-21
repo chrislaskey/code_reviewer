@@ -1,8 +1,8 @@
 //! Transaction-scoped file records. Workflows own validation and commits.
 
+use crate::app::files::{AcceptedFile, File};
+use crate::app::sync::Cursor;
 use crate::database::Transaction;
-use crate::files::{AcceptedFile, File};
-use crate::sync::Cursor;
 use uuid::Uuid;
 
 #[cfg(feature = "postgres")]

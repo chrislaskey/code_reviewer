@@ -8,8 +8,8 @@ use axum::extract::{Path, State};
 use uuid::Uuid;
 
 use app_core::accounts::products::{self, ProductForSale, ProductShown};
-use app_core::accounts::stripe::Stripe;
 use app_core::deployment::Deployment;
+use app_core::services::stripe::Stripe;
 
 use crate::api_error::ApiError;
 use crate::current_user::CurrentUser;

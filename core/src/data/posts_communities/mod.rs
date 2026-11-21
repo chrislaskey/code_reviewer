@@ -1,8 +1,8 @@
 //! Transaction-scoped post-community association records. Workflows own commits.
 
+use crate::app::posts_communities::{AcceptedPostCommunity, PostCommunity};
+use crate::app::sync::Cursor;
 use crate::database::Transaction;
-use crate::posts_communities::{AcceptedPostCommunity, PostCommunity};
-use crate::sync::Cursor;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 

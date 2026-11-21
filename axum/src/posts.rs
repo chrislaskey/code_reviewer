@@ -1,4 +1,4 @@
-//! The posts API: `app_core::posts` as JSON, for the request's user.
+//! The posts API: `app_core::app::posts` as JSON, for the request's user.
 
 use axum::Json;
 use axum::extract::{Path, State};
@@ -6,8 +6,8 @@ use axum::http::StatusCode;
 use serde::Deserialize;
 use uuid::Uuid;
 
+use app_core::app::posts::{self, Post, PostWithOwnerAndCommunities};
 use app_core::deployment::Deployment;
-use app_core::posts::{self, Post, PostWithOwnerAndCommunities};
 
 use crate::api_error::ApiError;
 use crate::current_user::CurrentUser;

@@ -1,7 +1,7 @@
 //! A person's account: their email and when they proved it, one row of
 //! `accounts_users` per person. Server only, like every `accounts_`
 //! table: an email never reaches another person's device. What the
-//! apps sync of a person is `crate::users`, a row with the same id,
+//! apps sync of a person is `crate::app::users`, a row with the same id,
 //! written with this one at sign-up, see `docs/design/multi-app.md`.
 
 use crate::data::accounts_users as accounts_users_records;
@@ -47,7 +47,7 @@ pub struct AccountUser {
     /// none until then, and such an account has no token.
     pub confirmed_at: Option<DateTime<Utc>>,
     /// When a trial user's 24 hours end; none for every other account,
-    /// and again once a trial signs up, see `crate::trial_users`.
+    /// and again once a trial signs up, see `crate::accounts::trial_users`.
     pub trial_expires_at: Option<DateTime<Utc>>,
     pub inserted_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -225,10 +225,11 @@ fn email_taken(error: sqlx::Error) -> AccountUserError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::users;
     use crate::database::with_each_database;
     use crate::deployment::Role;
     use crate::ops::staff;
-    use crate::{credentials, tokens, users};
+    use crate::{credentials, tokens};
 
     #[tokio::test]
     async fn accounts_users_signup_records_roll_back_together() {

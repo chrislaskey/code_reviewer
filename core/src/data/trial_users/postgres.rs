@@ -1,4 +1,4 @@
-//! What tells a trial user apart, see `crate::trial_users`: an account
+//! What tells a trial user apart, see `crate::accounts::trial_users`: an account
 //! with `trial_expires_at`. A device has no accounts, so each of these
 //! finds nothing there.
 

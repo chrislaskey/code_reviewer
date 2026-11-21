@@ -17,13 +17,14 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind};
+use crate::app::memberships::{self, Membership, id_field};
+use crate::app::posts::Post;
+use crate::app::sync::{Cursor, TableRow};
+use crate::app::users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
-use crate::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
-use crate::memberships::{self, Membership, id_field};
-use crate::posts::Post;
-use crate::sync::{Cursor, TableRow};
-use crate::users::User;
+use crate::helpers::json;
 
 /// A row accepted by this resource's event or replication workflow.
 /// Only this module can construct an accepted write.
@@ -71,7 +72,7 @@ pub enum PostCommunityError {
     #[error("the change was refused: {0}")]
     Rejected(String),
     #[error(transparent)]
-    Record(#[from] crate::events::RecordError),
+    Record(#[from] crate::app::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -151,7 +152,7 @@ pub(crate) async fn add_in(
         None => Event::create(
             TABLE,
             Uuid::now_v7(),
-            fields(json!({
+            json::object_fields(json!({
                 "post_id": post.id,
                 "community_id": community_id,
                 "users_communities_id": membership.id
@@ -163,8 +164,8 @@ pub(crate) async fn add_in(
             TABLE,
             removed.id,
             removed.version,
-            fields(json!({ "deleted_at": removed.deleted_at })),
-            fields(json!({ "deleted_at": null })),
+            json::object_fields(json!({ "deleted_at": removed.deleted_at })),
+            json::object_fields(json!({ "deleted_at": null })),
             now(),
         ),
     };
@@ -193,8 +194,8 @@ pub(crate) async fn remove_in(
         TABLE,
         row.id,
         row.version,
-        fields(json!({ "deleted_at": null })),
-        fields(json!({ "deleted_at": now() })),
+        json::object_fields(json!({ "deleted_at": null })),
+        json::object_fields(json!({ "deleted_at": now() })),
         now(),
     );
     apply_in(tx, role, user, &event).await?.row()
@@ -590,19 +591,12 @@ fn invalid(error: memberships::MembershipError) -> PostCommunityError {
     }
 }
 
-fn fields(value: Value) -> Fields {
-    match value {
-        Value::Object(fields) => fields,
-        _ => Fields::new(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::posts::PostError;
+    use crate::app::{communities, memberships, posts, users};
     use crate::database::{Database, with_each_database};
-    use crate::posts::PostError;
-    use crate::{communities, memberships, posts, users};
 
     fn server(database: Database) -> Deployment {
         Deployment::new(database, Role::Server)

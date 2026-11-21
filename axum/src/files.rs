@@ -1,4 +1,4 @@
-//! The files API: `app_core::files` as JSON, for the request's user.
+//! The files API: `app_core::app::files` as JSON, for the request's user.
 //! `POST /api/files/upload` answers where to PUT a file's bytes, the
 //! page or a device sends them to the bucket, and `POST /api/files`
 //! writes the row once they are there. `GET /api/files/{id}/content`
@@ -13,10 +13,10 @@ use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use app_core::deployment::Deployment;
-use app_core::files::{
+use app_core::app::files::{
     self, File, FileNew, FileSearch, FileSearchResults, FileUpload, FileUploadNew, FileWithState,
 };
+use app_core::deployment::Deployment;
 
 use crate::api_error::ApiError;
 use crate::current_user::CurrentUser;

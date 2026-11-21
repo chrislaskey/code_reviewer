@@ -2,11 +2,11 @@
 //! `log`, the emails are written to the log in full, which is how a dev
 //! reads a sign-in code; `resend`, they are sent through Resend with
 //! `RESEND_API_KEY` and `MAIL_FROM`, the sender as `Name <address>` or a
-//! plain address, see `app_core::mailer`.
+//! plain address, see `app_core::services::mailer`.
 
 use std::env;
 
-use app_core::mailer::{Mailer, Resend};
+use app_core::services::mailer::{Mailer, Resend};
 use secrecy::SecretString;
 
 pub fn open() -> Result<Mailer, String> {

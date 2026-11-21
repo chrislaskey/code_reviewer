@@ -10,9 +10,9 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use app_core::accounts::online::ReturnTo;
-use app_core::accounts::stripe::Stripe;
 use app_core::accounts::subscriptions::{self, SubscriptionChange, SubscriptionShown};
 use app_core::deployment::Deployment;
+use app_core::services::stripe::Stripe;
 
 use crate::api_error::ApiError;
 use crate::checkouts::ServerUrl;

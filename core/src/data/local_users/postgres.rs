@@ -1,5 +1,5 @@
 //! What a local user's move to an account does to the device's rows,
-//! see `crate::local_users`; the counterpart of
+//! see `crate::app::local_users`; the counterpart of
 //! `sqlite::local_users`, which is the one a device runs.
 
 use sqlx::PgConnection;

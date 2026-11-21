@@ -1,7 +1,7 @@
 //! Every email the app sends, composed here, text only, and handed to
 //! the `mailer`. The app's name is `APP_NAME`, to change in a fork.
 
-use crate::mailer::Mail;
+use crate::services::mailer::Mail;
 
 pub const APP_NAME: &str = "Starter Pack";
 

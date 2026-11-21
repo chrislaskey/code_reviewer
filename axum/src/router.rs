@@ -7,9 +7,9 @@
 
 use std::path::Path;
 
-use app_core::accounts::stripe::Stripe;
 use app_core::deployment::Deployment;
-use app_core::mailer::Mailer;
+use app_core::services::mailer::Mailer;
+use app_core::services::stripe::Stripe;
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, FromRef};
 use axum::http::{Method, StatusCode, Uri};
@@ -43,7 +43,7 @@ pub struct AppState {
 }
 
 /// How many trial users the server holds at once, `TRIAL_USERS_MAX`; 0,
-/// the default, turns trials off, see `app_core::trial_users`.
+/// the default, turns trials off, see `app_core::accounts::trial_users`.
 #[derive(Clone, Copy)]
 pub struct TrialUsersMax(pub i64);
 
@@ -172,7 +172,7 @@ pub fn router(svelte_dist: &Path, ops_dist: &Path, state: AppState) -> Router {
         )
         .route(
             "/api/sync/push",
-            post(sync::push).layer(DefaultBodyLimit::max(app_core::sync::MAX_PUSH_BYTES)),
+            post(sync::push).layer(DefaultBodyLimit::max(app_core::app::sync::MAX_PUSH_BYTES)),
         )
         .route("/api/sync/pull", post(sync::pull))
         .route("/api/sync/backfill", post(sync::backfill))
@@ -205,7 +205,7 @@ mod tests {
     use tower::ServiceExt;
 
     use app_core::accounts::{Session, SignInStep};
-    use app_core::storage::Storage;
+    use app_core::services::storage::Storage;
 
     use super::*;
 
@@ -264,10 +264,10 @@ mod tests {
         let mailer = Mailer::memory();
         let stripe = Stripe::memory();
         let alice = signed_up(&deployment, &mailer, "alice@example.com").await;
-        let post = app_core::posts::create(&deployment, &alice.user, "the first post", &[])
+        let post = app_core::app::posts::create(&deployment, &alice.user, "the first post", &[])
             .await
             .expect("a post");
-        let post = app_core::posts::get(&deployment, &alice.user, post.id)
+        let post = app_core::app::posts::get(&deployment, &alice.user, post.id)
             .await
             .expect("the post");
         let post = serde_json::to_value(post).expect("json");
@@ -314,7 +314,7 @@ mod tests {
     /// The code the last email to the address carried.
     fn code_sent_to(mailer: &Mailer, email: &str) -> String {
         let mail = mailer.last_sent_to(email).expect("an email");
-        app_core::mails::code_in(&mail).expect("a code in it")
+        app_core::services::mailer::mails::code_in(&mail).expect("a code in it")
     }
 
     async fn send(
@@ -1098,7 +1098,7 @@ mod tests {
     #[tokio::test]
     async fn trial_users_are_refused_past_their_writes_and_see_only_their_communities() {
         let (router, _) = test_router().await;
-        let trial = app_core::trial_users::create(&router.deployment, 2)
+        let trial = app_core::accounts::trial_users::create(&router.deployment, 2)
             .await
             .expect("a trial");
         let (status, communities) = send_as(
@@ -1118,8 +1118,8 @@ mod tests {
             .collect();
         assert_eq!(names, [&json!("Trial")], "not Alice's Personal");
 
-        for number in 2..app_core::trial_users::MAX_WRITES {
-            app_core::posts::create(
+        for number in 2..app_core::accounts::trial_users::MAX_WRITES {
+            app_core::app::posts::create(
                 &router.deployment,
                 &trial.user,
                 &format!("post {number}"),
@@ -1146,7 +1146,7 @@ mod tests {
     #[tokio::test]
     async fn posts_create_refuses_a_body_over_the_maximum_length() {
         let (router, _) = test_router().await;
-        let too_long = "a".repeat(app_core::posts::MAX_BODY_LENGTH + 1);
+        let too_long = "a".repeat(app_core::app::posts::MAX_BODY_LENGTH + 1);
         let (status, body) = send(
             &router,
             Method::POST,
@@ -1743,7 +1743,7 @@ mod tests {
     async fn files_upload_create_show_rename_and_delete() {
         let (router, _) = test_router().await;
         let bytes = b"some notes".to_vec();
-        let sha256 = app_core::files::sha256_hex(&bytes);
+        let sha256 = app_core::helpers::sha256::hex(&bytes);
         let picked = json!({ "content_type": "text/plain", "size": bytes.len(), "sha256": sha256 });
         let (status, upload) = send(&router, Method::POST, "/api/files/upload", Some(picked)).await;
         assert_eq!(status, StatusCode::OK);
@@ -1781,7 +1781,7 @@ mod tests {
         assert_eq!(found["total"], json!(0));
         let (status, _) = get(&router, "/api/files/search?limit=501").await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-        let other = app_core::files::sha256_hex(b"other");
+        let other = app_core::helpers::sha256::hex(b"other");
         let checked = json!({ "sha256s": [other, sha256] });
         let (status, same) = send(
             &router,
@@ -1898,7 +1898,7 @@ mod tests {
                 "made_at": "2026-11-08T10:00:00Z"
             })
         };
-        let longest = "a".repeat(app_core::posts::MAX_BODY_LENGTH);
+        let longest = "a".repeat(app_core::app::posts::MAX_BODY_LENGTH);
         let four_megabytes: Vec<Value> = (0..400).map(|_| event(longest.clone())).collect();
         let (status, body) = send(
             &router,
@@ -1910,7 +1910,7 @@ mod tests {
         assert_eq!(status, StatusCode::OK, "over the 2 MB of the other routes");
         assert_eq!(body["events"].as_array().expect("answers").len(), 400);
 
-        let over = "a".repeat(app_core::sync::MAX_PUSH_BYTES);
+        let over = "a".repeat(app_core::app::sync::MAX_PUSH_BYTES);
         let (status, _) = send(
             &router,
             Method::POST,
@@ -2239,7 +2239,7 @@ mod tests {
         let (router, _) = test_router().await;
         router
             .stripe
-            .memory_product_put(app_core::accounts::stripe::StripeProduct {
+            .memory_product_put(app_core::services::stripe::StripeProduct {
                 id: "prod_license".to_string(),
                 name: "License".to_string(),
                 description: None,
@@ -2247,7 +2247,7 @@ mod tests {
             });
         router
             .stripe
-            .memory_price_put(app_core::accounts::stripe::StripePrice {
+            .memory_price_put(app_core::services::stripe::StripePrice {
                 id: "price_license".to_string(),
                 product_id: "prod_license".to_string(),
                 lookup_key: Some("license".to_string()),
@@ -2285,7 +2285,7 @@ mod tests {
 
     #[tokio::test]
     async fn accounts_checkouts_create_then_get_records_the_purchase() {
-        use app_core::accounts::stripe::{
+        use app_core::services::stripe::{
             StripeCheckoutSession, StripeCheckoutSessionStatus, StripePaymentStatus, StripePrice,
             StripeProduct,
         };
@@ -2371,7 +2371,7 @@ mod tests {
 
     #[tokio::test]
     async fn accounts_subscriptions_and_the_plan_on_the_current_user() {
-        use app_core::accounts::stripe::{
+        use app_core::services::stripe::{
             StripeCheckoutSession, StripeCheckoutSessionStatus, StripePaymentStatus, StripePrice,
             StripeProduct, StripeSubscription,
         };

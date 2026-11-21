@@ -11,7 +11,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use uuid::Uuid;
 
-use app_core::files::{self as core_files, FileSearch, FileSearchResults};
+use app_core::app::files::{self as core_files, FileSearch, FileSearchResults};
 
 use crate::MAIN_WINDOW;
 use crate::clipboard;

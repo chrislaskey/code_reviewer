@@ -1,12 +1,12 @@
 //! The current community commands: the community the person works in on
 //! this device, kept as a device setting of the signed-in account, see
-//! `app_core::current_community`. Never synced, so no sync starts.
+//! `app_core::app::current_community`. Never synced, so no sync starts.
 
 use tauri::State;
 use uuid::Uuid;
 
-use app_core::communities::Community;
-use app_core::current_community;
+use app_core::app::communities::Community;
+use app_core::app::current_community;
 
 use crate::current_user::signed_in;
 use crate::device_accounts::DeviceAccounts;

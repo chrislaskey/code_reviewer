@@ -13,7 +13,7 @@ use serde::Deserialize;
 
 use app_core::accounts::deletions;
 use app_core::deployment::Deployment;
-use app_core::mailer::Mailer;
+use app_core::services::mailer::Mailer;
 
 use crate::api_error::ApiError;
 use crate::current_user::{CurrentUser, TOKEN_COOKIE};

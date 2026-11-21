@@ -14,11 +14,11 @@
 
 use crate::data::tokens as tokens_records;
 use chrono::{DateTime, Duration, Utc};
-use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::database::Transaction;
 use crate::deployment::now;
+use crate::helpers::{random, sha256};
 
 /// A replacement code already hashed by the token workflow.
 pub(crate) struct AcceptedCodeHash<'a>(&'a str);
@@ -139,7 +139,7 @@ pub(crate) async fn create(
     user_id: Uuid,
     context: Context,
 ) -> Result<String, sqlx::Error> {
-    let token = random_hex(32);
+    let token = random::hex(32);
     insert(tx, user_id, context, hash(&token), None, None).await?;
     Ok(token)
 }
@@ -154,8 +154,8 @@ pub(crate) async fn create_sign_in_code(
     sent_to: Option<&str>,
 ) -> Result<(String, String), sqlx::Error> {
     delete_of_user(tx, user_id, Context::SignInCode).await?;
-    let pending = random_hex(32);
-    let code = random_code();
+    let pending = random::hex(32);
+    let code = random::digits(6);
     insert(
         tx,
         user_id,
@@ -187,7 +187,7 @@ pub(crate) async fn create_device_code(
     user_id: Uuid,
     challenge: &str,
 ) -> Result<String, sqlx::Error> {
-    let code = random_hex(16);
+    let code = random::hex(16);
     insert(
         tx,
         user_id,
@@ -208,7 +208,7 @@ pub(crate) async fn create_delete_code(
     user_id: Uuid,
 ) -> Result<String, sqlx::Error> {
     delete_of_user(tx, user_id, Context::DeleteCode).await?;
-    let code = random_code();
+    let code = random::digits(6);
     insert(
         tx,
         user_id,
@@ -229,7 +229,7 @@ pub(crate) fn delete_code_hash(user_id: Uuid) -> String {
 /// Gives the pending sign-in a new code, its ten minutes starting over
 /// and its wrong attempts forgotten; the code to email.
 pub(crate) async fn reset_code(tx: &mut Transaction, id: Uuid) -> Result<String, sqlx::Error> {
-    let code = random_code();
+    let code = random::digits(6);
     tokens_records::update_code(&mut *tx, id, AcceptedCodeHash(&hash(&code)), now()).await?;
     Ok(code)
 }
@@ -305,34 +305,13 @@ pub(crate) fn made_after_to_be_valid(now: DateTime<Utc>) -> (DateTime<Utc>, Date
 
 /// The hash kept for a token: SHA-256 as hex.
 pub(crate) fn hash(token: &str) -> String {
-    let digest = Sha256::digest(token.as_bytes());
-    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+    sha256::hex(token.as_bytes())
 }
 
 /// The hash a device code row is kept under: of the code and the
 /// device's challenge together.
 pub(crate) fn device_code_hash(code: &str, challenge: &str) -> String {
     hash(&format!("{code}{challenge}"))
-}
-
-/// Random bytes as hex, twice as many characters.
-pub(crate) fn random_hex(bytes: usize) -> String {
-    let mut buffer = vec![0u8; bytes];
-    rand::fill(&mut buffer[..]);
-    buffer.iter().map(|byte| format!("{byte:02x}")).collect()
-}
-
-/// Random letters and digits, for a name a person may read.
-pub(crate) fn random_letters_and_digits(length: usize) -> String {
-    const ALPHABET: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    (0..length)
-        .map(|_| ALPHABET[rand::random_range(0..ALPHABET.len())] as char)
-        .collect()
-}
-
-/// Six digits, leading zeros included.
-fn random_code() -> String {
-    format!("{:06}", rand::random_range(0..1_000_000u32))
 }
 
 async fn insert(
@@ -359,9 +338,9 @@ async fn insert(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::users::{self, UserError};
     use crate::database::with_each_database;
     use crate::deployment::{Deployment, Role};
-    use crate::users::{self, UserError};
 
     #[tokio::test]
     async fn tokens_reset_code_preserves_pending_token_and_restarts_attempts() {

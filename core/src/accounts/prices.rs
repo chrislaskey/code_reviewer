@@ -8,8 +8,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::accounts::stripe::StripePrice;
 use crate::database::Transaction;
+use crate::services::stripe::StripePrice;
 
 /// A record accepted by the prices workflow.
 pub(crate) struct AcceptedPrice<'a>(&'a Price);

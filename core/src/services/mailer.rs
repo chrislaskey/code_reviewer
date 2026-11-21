@@ -5,6 +5,8 @@
 //! through Resend's API, behind the `mail-resend` feature, for
 //! production. The server picks one at start, see `axum/src/mailer.rs`.
 
+pub mod mails;
+
 use std::sync::{Arc, Mutex, PoisonError};
 
 use thiserror::Error;

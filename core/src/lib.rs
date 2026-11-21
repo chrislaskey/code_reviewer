@@ -20,21 +20,10 @@ mod data;
 pub mod database;
 pub mod deployment;
 pub mod device_settings;
-pub mod field_errors;
-pub mod jobs;
-pub mod mailer;
-pub mod mails;
+pub mod helpers;
 pub mod ops;
 #[cfg(feature = "postgres")]
 mod postgres;
+pub mod services;
 mod sqlite;
-#[cfg(feature = "object-storage")]
-pub mod storage;
 pub mod tokens;
-pub mod trial_users;
-
-// Preserve existing resource paths while grouping their implementations under app.
-pub use app::{
-    avatars, communities, conflicts, current_community, events, files, files_communities,
-    local_users, memberships, pending_changes, posts, posts_communities, purge, sync, users,
-};

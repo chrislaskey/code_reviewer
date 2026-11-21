@@ -15,13 +15,13 @@ use stripe_webhook::{Webhook, WebhookError};
 use thiserror::Error;
 
 use crate::accounts::purchases::{self, Store};
-use crate::accounts::stripe::{
-    Stripe, StripeCharge, StripeCheckoutSession, StripeError, StripePrice, StripeProduct,
-    StripeSubscription,
-};
 use crate::accounts::{checkouts, prices, products, subscriptions};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
+use crate::services::stripe::{
+    Stripe, StripeCharge, StripeCheckoutSession, StripeError, StripePrice, StripeProduct,
+    StripeSubscription,
+};
 
 /// A record accepted by the stripe events workflow.
 pub(crate) struct AcceptedStripeEvent<'a>(&'a StripeEvent);

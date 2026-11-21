@@ -1,5 +1,5 @@
 //! What a local user's move to an account does to the device's rows,
-//! see `crate::local_users`.
+//! see `crate::app::local_users`.
 
 use sqlx::SqliteConnection;
 use uuid::Uuid;

@@ -22,8 +22,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::app::users;
 use crate::deployment::{Deployment, Role};
-use crate::{accounts, tokens, users};
+use crate::{accounts, tokens};
 
 /// A record assembled by this resource's workflow.
 pub(crate) struct AcceptedPurge<'a>(&'a Purge);
@@ -73,7 +74,7 @@ pub enum PurgeError {
     #[error("only the server purges")]
     ServerOnly,
     #[error(transparent)]
-    User(#[from] crate::users::UserError),
+    User(#[from] crate::app::users::UserError),
     #[error(transparent)]
     AccountUser(#[from] crate::accounts::users::AccountUserError),
     #[error("database error: {0}")]
@@ -127,10 +128,10 @@ pub async fn horizon(deployment: &Deployment) -> Result<Option<DateTime<Utc>>, P
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::events::{self, EventStatus};
+    use crate::app::{communities, posts, posts_communities};
     use crate::database::{Database, with_each_database};
     use crate::deployment::now;
-    use crate::events::{self, EventStatus};
-    use crate::{communities, posts, posts_communities};
 
     #[tokio::test]
     async fn purge_removes_what_was_deleted_before_the_horizon_with_its_rows_and_events() {
@@ -206,7 +207,7 @@ mod tests {
     async fn purge_removes_a_sign_up_that_never_entered_its_code_after_a_day() {
         with_each_database(|database| async move {
             let deployment = Deployment::new(database, Role::Server);
-            let mailer = crate::mailer::Mailer::memory();
+            let mailer = crate::services::mailer::Mailer::memory();
             crate::accounts::sign_up(&deployment, &mailer, "bob@example.com")
                 .await
                 .expect("bob signed up and stopped there");

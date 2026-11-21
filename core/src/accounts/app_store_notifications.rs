@@ -15,9 +15,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::accounts::app_store::{AppStore, AppStoreError};
 use crate::accounts::store_transactions::{self, StoreTransactionError};
 use crate::deployment::{Deployment, Role, now};
+use crate::services::app_store::{AppStore, AppStoreError};
 
 /// A record accepted by the app store notifications workflow.
 pub(crate) struct AcceptedAppStoreNotification<'a>(&'a AppStoreNotification);
@@ -129,16 +129,16 @@ mod tests {
     use chrono::Duration;
 
     use super::*;
-    use crate::accounts::app_store::{
-        AppStoreEnvironment, AppStoreNotification as Signed, AppStoreRenewal, AppStoreStatus,
-        AppStoreSubscription, AppStoreTransaction,
-    };
     use crate::accounts::store_transactions::tests::catalog;
     use crate::accounts::store_transactions::{StoreProof, StoreRow};
     use crate::accounts::subscriptions::SubscriptionStatus;
     use crate::accounts::{app_store_reconcile, plans, purchases, subscriptions};
+    use crate::app::users::{self, User};
     use crate::database::with_each_database;
-    use crate::users::{self, User};
+    use crate::services::app_store::{
+        AppStoreEnvironment, AppStoreNotification as Signed, AppStoreRenewal, AppStoreStatus,
+        AppStoreSubscription, AppStoreTransaction,
+    };
 
     /// A server with the catalog and the App Store's fake, and Alice.
     async fn set_up(database: crate::database::Database) -> (Deployment, AppStore, User) {

@@ -9,8 +9,8 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::accounts::users::{self as accounts_users, AccountUserError};
+use crate::app::users::User;
 use crate::deployment::{Deployment, Role, now};
-use crate::users::User;
 
 /// A record accepted by this resource's workflow.
 pub(crate) struct AcceptedStaff<'a>(&'a Staff);
@@ -105,8 +105,8 @@ async fn account_with_email(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::users;
     use crate::database::with_each_database;
-    use crate::users;
 
     #[tokio::test]
     async fn staff_create_then_get_then_delete() {

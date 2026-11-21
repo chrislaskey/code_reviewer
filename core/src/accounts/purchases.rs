@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::app::users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role};
-use crate::users::User;
 
 /// A record accepted by the purchases workflow.
 pub(crate) struct AcceptedPurchase<'a>(&'a Purchase);

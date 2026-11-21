@@ -21,14 +21,14 @@ use crate::accounts::online::ReturnTo;
 use crate::accounts::prices;
 use crate::accounts::products::{self, ProductError, ProductKind};
 use crate::accounts::purchases::{self, Purchase, Store};
-use crate::accounts::stripe::{
+use crate::accounts::{plans, subscriptions};
+use crate::app::users::User;
+use crate::database::Transaction;
+use crate::deployment::{Deployment, Role, now};
+use crate::services::stripe::{
     CheckoutMode, Stripe, StripeCheckoutSession, StripeCheckoutSessionNew,
     StripeCheckoutSessionStatus, StripeError, StripePaymentStatus, StripeSubscription,
 };
-use crate::accounts::{plans, subscriptions};
-use crate::database::Transaction;
-use crate::deployment::{Deployment, Role, now};
-use crate::users::User;
 
 /// A checkout status accepted by provider-session processing.
 pub(crate) struct AcceptedStatus(CheckoutStatus);
@@ -395,11 +395,11 @@ async fn customer_for(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::accounts::stripe::{StripeCharge, StripePrice, StripeProduct, StripeTax};
     use crate::accounts::stripe_events;
+    use crate::accounts::trial_users;
+    use crate::app::users;
     use crate::database::with_each_database;
-    use crate::trial_users;
-    use crate::users;
+    use crate::services::stripe::{StripeCharge, StripePrice, StripeProduct, StripeTax};
 
     const SERVER_URL: &str = "http://server.test";
 

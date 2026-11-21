@@ -1,8 +1,8 @@
 //! Transaction-scoped membership records. Workflows own commits.
 
+use crate::app::memberships::{AcceptedMembership, Membership};
+use crate::app::sync::Cursor;
 use crate::database::Transaction;
-use crate::memberships::{AcceptedMembership, Membership};
-use crate::sync::Cursor;
 use uuid::Uuid;
 
 #[cfg(feature = "postgres")]

@@ -13,7 +13,7 @@
 //! which it keeps and sends as a bearer token. A sign-out deletes the
 //! token and clears the cookie. Each route is rate limited, see
 //! `rate_limits`. "Try it now" makes a trial user with no sign-up, see
-//! `app_core::trial_users`, whose cookie lasts until their rows go; a
+//! `app_core::accounts::trial_users`, whose cookie lasts until their rows go; a
 //! sign-up from that browser is theirs.
 
 use axum::Json;
@@ -25,14 +25,14 @@ use axum_extra::extract::CookieJar;
 use axum_extra::extract::cookie::{Cookie, SameSite};
 use serde::{Deserialize, Serialize};
 
+use app_core::accounts::trial_users;
 use app_core::accounts::{
     self, AccountError, CodeSent, PasswordUpdate, SecondFactor, Session, SignInStep,
 };
+use app_core::app::users::{self, User};
 use app_core::deployment::Deployment;
-use app_core::mailer::Mailer;
+use app_core::services::mailer::Mailer;
 use app_core::tokens::Context;
-use app_core::trial_users;
-use app_core::users::{self, User};
 
 use crate::api_error::ApiError;
 use crate::current_user::{CurrentToken, CurrentUser, TOKEN_COOKIE};

@@ -1,8 +1,8 @@
 //! Transaction-scoped user records. Workflows own validation and commits.
 
+use crate::app::sync::Cursor;
+use crate::app::users::{AcceptedUser, User};
 use crate::database::Transaction;
-use crate::sync::Cursor;
-use crate::users::{AcceptedUser, User};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 

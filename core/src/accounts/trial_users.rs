@@ -28,11 +28,12 @@ use uuid::Uuid;
 
 use crate::accounts::users::{self as accounts_users, AccountUserError};
 use crate::accounts::{AccountError, Session};
-use crate::communities::{self, CommunityError};
+use crate::app::communities::{self, CommunityError};
+use crate::app::users::{self, User, UserError};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
+use crate::helpers::random;
 use crate::tokens::{self, Context};
-use crate::users::{self, User, UserError};
 
 /// How long the pages say a trial lasts.
 pub const SHOWN_HOURS: i64 = 24;
@@ -101,7 +102,7 @@ pub async fn create(deployment: &Deployment, max: i64) -> Result<Session, TrialU
     if trial_users_records::count(&mut tx).await? >= max {
         return Err(TrialUserError::Full);
     }
-    let name = format!("{NAME_PREFIX}{}", tokens::random_letters_and_digits(11));
+    let name = format!("{NAME_PREFIX}{}", random::letters_and_digits(11));
     let email = format!("{name}@{EMAIL_DOMAIN}");
     let trial_expires_at = now() + Duration::hours(SHOWN_HOURS);
     let account =
@@ -184,10 +185,11 @@ pub(crate) async fn show_communities_in(
 mod tests {
     use super::*;
     use crate::accounts::{self, NextStep, SignInStep};
+    use crate::app::sync::{self, PullRequest};
+    use crate::app::{memberships, posts};
     use crate::database::with_each_database;
-    use crate::mailer::Mailer;
-    use crate::sync::{self, PullRequest};
-    use crate::{mails, memberships, posts};
+    use crate::services::mailer::Mailer;
+    use crate::services::mailer::mails;
 
     fn server(database: crate::database::Database) -> Deployment {
         Deployment::new(database, Role::Server)
@@ -372,16 +374,16 @@ mod tests {
                 .expect_err("refused");
             assert!(matches!(
                 error,
-                posts::PostError::Record(crate::events::RecordError::TrialWritesFull)
+                posts::PostError::Record(crate::app::events::RecordError::TrialWritesFull)
             ));
             assert_eq!(
                 error.to_string(),
                 "This trial has reached its limit. Sign up to keep going."
             );
-            let pushed = crate::events::Event::create(
+            let pushed = crate::app::events::Event::create(
                 posts::TABLE,
                 Uuid::now_v7(),
-                crate::events::Fields::from_iter([("body".to_string(), "pushed".into())]),
+                crate::app::events::Fields::from_iter([("body".to_string(), "pushed".into())]),
                 now(),
             );
             let request = sync::PushRequest {
@@ -608,7 +610,7 @@ mod tests {
                     .is_none()
             );
             assert_eq!(
-                crate::events::list_of_table(&mut tx, posts::TABLE)
+                crate::app::events::list_of_table(&mut tx, posts::TABLE)
                     .await
                     .expect("the log")
                     .len(),
@@ -629,7 +631,7 @@ mod tests {
             let server = server(database);
             let trial = create(&server, 10).await.expect("a trial").user;
             let a_day_and_a_half = now() + Duration::hours(36);
-            crate::purge::run(&server, a_day_and_a_half)
+            crate::app::purge::run(&server, a_day_and_a_half)
                 .await
                 .expect("purged");
             assert!(

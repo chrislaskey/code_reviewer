@@ -1,7 +1,7 @@
 //! Transaction-scoped purges storage. Workflows own policy and commits.
 
+use crate::app::purge::AcceptedPurge;
 use crate::database::Transaction;
-use crate::purge::AcceptedPurge;
 use chrono::{DateTime, Utc};
 
 #[cfg(feature = "postgres")]
@@ -34,13 +34,13 @@ impl Table {
     /// Returns the fixed table name; callers cannot supply SQL identifiers.
     pub(crate) fn name(self) -> &'static str {
         match self {
-            Self::PostsCommunities => crate::posts_communities::TABLE,
-            Self::Posts => crate::posts::TABLE,
-            Self::FilesCommunities => crate::files_communities::TABLE,
-            Self::Files => crate::files::TABLE,
-            Self::Memberships => crate::memberships::TABLE,
-            Self::Communities => crate::communities::TABLE,
-            Self::Users => crate::users::TABLE,
+            Self::PostsCommunities => crate::app::posts_communities::TABLE,
+            Self::Posts => crate::app::posts::TABLE,
+            Self::FilesCommunities => crate::app::files_communities::TABLE,
+            Self::Files => crate::app::files::TABLE,
+            Self::Memberships => crate::app::memberships::TABLE,
+            Self::Communities => crate::app::communities::TABLE,
+            Self::Users => crate::app::users::TABLE,
         }
     }
 }

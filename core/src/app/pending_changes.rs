@@ -8,13 +8,13 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::communities::{self, CommunityError};
+use crate::app::communities::{self, CommunityError};
+use crate::app::events::{self, EventKind, Fields, StoredEvent};
+use crate::app::files::{self, FileError};
+use crate::app::files_communities;
+use crate::app::posts::{self, PostError};
+use crate::app::users::{self, UserError};
 use crate::deployment::Deployment;
-use crate::events::{self, EventKind, Fields, StoredEvent};
-use crate::files::{self, FileError};
-use crate::files_communities;
-use crate::posts::{self, PostError};
-use crate::users::{self, UserError};
 
 /// A change waiting to reach the server, as the page shows it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -98,10 +98,10 @@ fn pending_change(stored: StoredEvent, about: Option<String>) -> PendingChange {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::sync::{self, InProcess};
+    use crate::app::users;
     use crate::database::with_each_database;
     use crate::deployment::Role;
-    use crate::sync::{self, InProcess};
-    use crate::users;
 
     #[tokio::test]
     async fn pending_changes_list_what_waits_and_nothing_once_synced() {

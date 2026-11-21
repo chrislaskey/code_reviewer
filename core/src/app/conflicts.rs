@@ -13,13 +13,13 @@ use serde_json::Value;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::communities::{self, CommunityError};
+use crate::app::communities::{self, CommunityError};
+use crate::app::events::{self, AnswerStatus, Event, EventKind, EventStatus, Fields, StoredEvent};
+use crate::app::files::{self, FileError};
+use crate::app::posts::{self, PostError};
+use crate::app::users::{self, User, UserError};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
-use crate::events::{self, AnswerStatus, Event, EventKind, EventStatus, Fields, StoredEvent};
-use crate::files::{self, FileError};
-use crate::posts::{self, PostError};
-use crate::users::{self, User, UserError};
 
 /// A conflicted change as the page shows it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

@@ -1,4 +1,4 @@
-//! The communities API: `app_core::communities` as JSON, for the
+//! The communities API: `app_core::app::communities` as JSON, for the
 //! request's user.
 
 use axum::Json;
@@ -7,7 +7,7 @@ use axum::http::StatusCode;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use app_core::communities::{self, Community, CommunityAndMembership};
+use app_core::app::communities::{self, Community, CommunityAndMembership};
 use app_core::deployment::Deployment;
 
 use crate::api_error::ApiError;

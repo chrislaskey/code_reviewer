@@ -7,8 +7,8 @@ use sqlx::{FromRow, SqliteConnection};
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
-use crate::posts::Post;
-use crate::sync::Cursor;
+use crate::app::posts::Post;
+use crate::app::sync::Cursor;
 
 #[derive(FromRow)]
 struct PostRow {

@@ -6,13 +6,13 @@
 //! the sandbox's purchases are taken. None set, the server sells nothing
 //! in the iPhone app and its notifications route is a 404; some set and
 //! not the others is a mistake, refused at start. See
-//! `app_core::accounts::app_store` and `docs/design/purchasing-phones.md`.
+//! `app_core::services::app_store` and `docs/design/purchasing-phones.md`.
 
 use std::env;
 
 use secrecy::SecretString;
 
-use app_core::accounts::app_store::{AppStore, AppStoreSettings};
+use app_core::services::app_store::{AppStore, AppStoreSettings};
 
 const REQUIRED: [&str; 4] = [
     "APP_STORE_BUNDLE_ID",

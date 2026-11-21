@@ -1,4 +1,4 @@
-//! The avatars commands: `app_core::avatars` as the pages call it with
+//! The avatars commands: `app_core::app::avatars` as the pages call it with
 //! `invoke`, for the user signed in on this device. Online only: both
 //! ask the web server, which holds the bucket's keys; the page PUTs the
 //! file to the URL the first answers. An error is `{error, errors}`, the
@@ -7,9 +7,9 @@
 use serde::Serialize;
 use tauri::State;
 
-use app_core::avatars::{self, AvatarError, AvatarUpdate, AvatarUpload, AvatarUploadNew};
-use app_core::field_errors::FieldErrors;
-use app_core::users::User;
+use app_core::app::avatars::{self, AvatarError, AvatarUpdate, AvatarUpload, AvatarUploadNew};
+use app_core::app::users::User;
+use app_core::helpers::field_errors::FieldErrors;
 
 use crate::device_accounts::DeviceAccounts;
 use crate::sync::SyncServer;

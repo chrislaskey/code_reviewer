@@ -107,9 +107,9 @@ pub async fn set<T: Serialize>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::users::SignedIn;
     use crate::database::with_each_database;
     use crate::deployment::Role;
-    use crate::users::SignedIn;
 
     #[tokio::test]
     async fn device_settings_upgrade_adds_what_is_missing_and_keeps_what_is_set() {

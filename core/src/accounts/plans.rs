@@ -14,8 +14,8 @@ use crate::accounts::prices;
 use crate::accounts::products::Grant;
 use crate::accounts::purchases::Store;
 use crate::accounts::subscriptions::{self, SubscriptionStatus};
+use crate::app::users::User;
 use crate::deployment::{Deployment, Role};
-use crate::users::User;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Plan {
@@ -104,14 +104,14 @@ pub async fn payment_failed(
 mod tests {
     use super::*;
     use crate::accounts::checkouts::{self, CheckoutError, CheckoutStatus};
-    use crate::accounts::stripe::{
+    use crate::accounts::{products, stripe_events};
+    use crate::app::users;
+    use crate::database::with_each_database;
+    use crate::deployment::now;
+    use crate::services::stripe::{
         CheckoutMode, Stripe, StripeCheckoutSession, StripeCheckoutSessionStatus,
         StripePaymentStatus, StripePrice, StripeProduct, StripeSubscription,
     };
-    use crate::accounts::{products, stripe_events};
-    use crate::database::with_each_database;
-    use crate::deployment::now;
-    use crate::users;
 
     async fn catalog(deployment: &Deployment) -> Stripe {
         let stripe = Stripe::memory();

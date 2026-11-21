@@ -7,10 +7,10 @@ use crate::data::accounts_subscriptions as accounts_subscriptions_records;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::accounts::app_store::{self, AppStore, AppStoreError};
 use crate::accounts::purchases::Store;
 use crate::accounts::store_transactions::{self, StoreTransactionError};
 use crate::deployment::{Deployment, Role};
+use crate::services::app_store::{self, AppStore, AppStoreError};
 
 /// What the job asked Apple for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

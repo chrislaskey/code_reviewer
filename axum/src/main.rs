@@ -190,7 +190,7 @@ async fn main() -> Result<(), String> {
 /// A command on the database, run instead of the server.
 async fn command(
     deployment: &app_core::deployment::Deployment,
-    stripe: Option<&app_core::accounts::stripe::Stripe>,
+    stripe: Option<&app_core::services::stripe::Stripe>,
     arguments: &[String],
 ) -> Result<(), String> {
     let words: Vec<&str> = arguments.iter().map(String::as_str).collect();

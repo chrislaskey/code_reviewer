@@ -1,12 +1,12 @@
-//! The server's recurring jobs, see `app_core::jobs`: woken up by a loop
+//! The server's recurring jobs, see `app_core::app::jobs`: woken up by a loop
 //! every `TICK` while the server runs, and by `app_web jobs run` for a
 //! scheduler outside it. Both run only what is due, so they never run a
 //! job twice in its interval.
 
 use std::time::Duration;
 
+use app_core::app::jobs::{self, Job};
 use app_core::deployment::{self, Deployment};
-use app_core::jobs::{self, Job};
 
 /// How often the loop asks for the jobs due.
 const TICK: Duration = Duration::from_secs(15 * 60);

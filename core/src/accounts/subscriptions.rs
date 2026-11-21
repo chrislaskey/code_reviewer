@@ -20,10 +20,10 @@ use crate::accounts::online::ReturnTo;
 use crate::accounts::prices::{self, Price, PriceInterval};
 use crate::accounts::products::{self, ProductError, ProductKind};
 use crate::accounts::purchases::Store;
-use crate::accounts::stripe::{Stripe, StripeError, StripeSubscription};
+use crate::app::users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
-use crate::users::User;
+use crate::services::stripe::{Stripe, StripeError, StripeSubscription};
 
 /// A record accepted by the subscriptions workflow.
 pub(crate) struct AcceptedSubscription<'a>(&'a Subscription);

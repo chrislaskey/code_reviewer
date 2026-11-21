@@ -1,7 +1,7 @@
 //! Transaction-scoped jobs storage. Workflows own policy and commits.
 
+use crate::app::jobs::{Job, JobRecord};
 use crate::database::Transaction;
-use crate::jobs::{Job, JobRecord};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 

@@ -1,5 +1,5 @@
 //! Who a request is from: the user its token stands for, see
-//! `app_core::users::get_by_token`. The apps send the token as
+//! `app_core::app::users::get_by_token`. The apps send the token as
 //! `Authorization: Bearer`; a browser sends the `token` cookie a sign-in
 //! set, see `accounts`. A request with no token, or one the server does
 //! not know, is answered 401, whatever it asks for.
@@ -13,9 +13,9 @@ use serde::{Deserialize, Serialize};
 
 use app_core::accounts::plans::{self, Plan};
 use app_core::accounts::users as accounts_users;
+use app_core::app::users::{self, Kind, User};
 use app_core::deployment::Deployment;
 use app_core::ops::staff::{self, StaffError};
-use app_core::users::{self, Kind, User};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 

@@ -6,8 +6,8 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgConnection};
 use uuid::Uuid;
 
-use crate::files_communities::FileCommunity;
-use crate::sync::Cursor;
+use crate::app::files_communities::FileCommunity;
+use crate::app::sync::Cursor;
 
 #[derive(FromRow)]
 struct FileCommunityRow {

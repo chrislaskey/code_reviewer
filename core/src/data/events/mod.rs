@@ -1,7 +1,7 @@
 //! Transaction-scoped events storage. Workflows own policy and commits.
 
+use crate::app::events::{AcceptedEvent, Conflicts, EventStatus, StoredEvent};
 use crate::database::Transaction;
-use crate::events::{AcceptedEvent, Conflicts, EventStatus, StoredEvent};
 use uuid::Uuid;
 
 #[cfg(feature = "postgres")]

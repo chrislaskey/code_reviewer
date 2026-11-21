@@ -1,6 +1,6 @@
 //! The quick picker where there is none: every platform but macOS.
 
-use app_core::files::{FileSearch, FileSearchResults};
+use app_core::app::files::{FileSearch, FileSearchResults};
 use tauri::AppHandle;
 use uuid::Uuid;
 

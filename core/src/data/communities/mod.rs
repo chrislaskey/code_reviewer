@@ -1,8 +1,8 @@
 //! Transaction-scoped community records. Workflows own commits.
 
-use crate::communities::{AcceptedCommunity, Community};
+use crate::app::communities::{AcceptedCommunity, Community};
+use crate::app::sync::Cursor;
 use crate::database::Transaction;
-use crate::sync::Cursor;
 use uuid::Uuid;
 
 #[cfg(feature = "postgres")]

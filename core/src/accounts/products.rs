@@ -13,10 +13,10 @@ use uuid::Uuid;
 
 use crate::accounts::prices::{self, Price};
 use crate::accounts::purchases;
-use crate::accounts::stripe::{Stripe, StripeError, StripeProduct};
+use crate::app::users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
-use crate::users::User;
+use crate::services::stripe::{Stripe, StripeError, StripeProduct};
 
 /// A record accepted by the products workflow.
 pub(crate) struct AcceptedProduct<'a>(&'a Product);
@@ -292,8 +292,8 @@ fn for_sale(product: Product, prices: &[Price]) -> Option<ProductForSale> {
 mod tests {
     use super::*;
     use crate::accounts::prices::PriceInterval;
-    use crate::accounts::stripe::StripePrice;
     use crate::database::with_each_database;
+    use crate::services::stripe::StripePrice;
 
     fn stripe_product(id: &str, name: &str) -> StripeProduct {
         StripeProduct {

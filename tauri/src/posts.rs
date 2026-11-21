@@ -1,4 +1,4 @@
-//! The posts commands: `app_core::posts` as the pages call it with `invoke`,
+//! The posts commands: `app_core::app::posts` as the pages call it with `invoke`,
 //! for the user signed in on this device. A command is named resource
 //! first, `posts_list`, like the page's `postsList`, since the commands
 //! are one namespace across resources, and that is its name on the wire.
@@ -8,7 +8,7 @@
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 
-use app_core::posts::{self, Post, PostWithOwnerAndCommunities};
+use app_core::app::posts::{self, Post, PostWithOwnerAndCommunities};
 
 use crate::current_user::signed_in;
 use crate::device_accounts::DeviceAccounts;

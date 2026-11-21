@@ -19,13 +19,14 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::communities::Community;
+use crate::app::communities::Community;
+use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
+use crate::app::posts_communities;
+use crate::app::sync::{Cursor, TableRow};
+use crate::app::users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
-use crate::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
-use crate::posts_communities;
-use crate::sync::{Cursor, TableRow};
-use crate::users::User;
+use crate::helpers::json;
 
 /// A row accepted by this resource's event or replication workflow.
 /// Only this module can construct an accepted write.
@@ -68,7 +69,7 @@ pub enum MembershipError {
     #[error("the change was refused: {0}")]
     Rejected(String),
     #[error(transparent)]
-    Record(#[from] crate::events::RecordError),
+    Record(#[from] crate::app::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -151,7 +152,7 @@ pub(crate) async fn join_in(
         None => Event::create(
             TABLE,
             Uuid::now_v7(),
-            fields(
+            json::object_fields(
                 json!({ "user_id": user.id, "community_id": community_id, "role": ROLE_MEMBER }),
             ),
             now(),
@@ -161,8 +162,8 @@ pub(crate) async fn join_in(
             TABLE,
             left.id,
             left.version,
-            fields(json!({ "deleted_at": left.deleted_at })),
-            fields(json!({ "deleted_at": null })),
+            json::object_fields(json!({ "deleted_at": left.deleted_at })),
+            json::object_fields(json!({ "deleted_at": null })),
             now(),
         ),
     };
@@ -182,8 +183,8 @@ pub(crate) async fn leave_in(
         TABLE,
         membership.id,
         membership.version,
-        fields(json!({ "deleted_at": null })),
-        fields(json!({ "deleted_at": now() })),
+        json::object_fields(json!({ "deleted_at": null })),
+        json::object_fields(json!({ "deleted_at": now() })),
         now(),
     );
     apply_in(tx, role, user, &event).await?.membership()
@@ -476,19 +477,12 @@ pub(crate) fn id_field(fields: &Fields, name: &str) -> Option<Uuid> {
         .and_then(|id| Uuid::parse_str(id).ok())
 }
 
-fn fields(value: Value) -> Fields {
-    match value {
-        Value::Object(fields) => fields,
-        _ => Fields::new(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::{communities, posts, posts_communities, users};
     use crate::data::posts_communities as posts_communities_records;
     use crate::database::{Database, with_each_database};
-    use crate::{communities, posts, posts_communities, users};
 
     fn server(database: Database) -> Deployment {
         Deployment::new(database, Role::Server)
@@ -683,7 +677,7 @@ mod tests {
             let event = Event::create(
                 TABLE,
                 Uuid::now_v7(),
-                fields(
+                json::object_fields(
                     json!({ "user_id": alice.id, "community_id": gardening.id, "role": "member" }),
                 ),
                 now(),
@@ -698,8 +692,8 @@ mod tests {
                 TABLE,
                 alices.id,
                 alices.version,
-                fields(json!({ "deleted_at": null })),
-                fields(json!({ "deleted_at": now() })),
+                json::object_fields(json!({ "deleted_at": null })),
+                json::object_fields(json!({ "deleted_at": now() })),
                 now(),
             );
             let answer = apply_event(&deployment, &bob, &event)

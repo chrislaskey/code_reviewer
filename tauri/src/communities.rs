@@ -1,11 +1,11 @@
-//! The communities commands: `app_core::communities` as the pages call
+//! The communities commands: `app_core::app::communities` as the pages call
 //! it, for the user signed in on this device. A write starts a sync. A
 //! form's error is `{error, errors}`, as the web's 422 body is.
 
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 
-use app_core::communities::{self, Community, CommunityAndMembership, CommunityError};
+use app_core::app::communities::{self, Community, CommunityAndMembership, CommunityError};
 
 use crate::avatars::FormError;
 use crate::current_user::signed_in;

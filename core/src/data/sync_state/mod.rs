@@ -1,7 +1,7 @@
 //! Transaction-scoped sync state storage. Workflows own policy and commits.
 
+use crate::app::sync::Cursor;
 use crate::database::Transaction;
-use crate::sync::Cursor;
 use uuid::Uuid;
 
 #[cfg(feature = "postgres")]

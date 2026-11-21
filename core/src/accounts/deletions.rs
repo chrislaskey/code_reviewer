@@ -26,17 +26,19 @@ use crate::data::ops_staff as ops_staff_records;
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::accounts::trial_users;
 use crate::accounts::users::{self as accounts_users, AccountUser, AccountUserError};
 use crate::accounts::{AccountError, MAX_CODE_ATTEMPTS};
-use crate::communities::{self, CommunityError};
+use crate::app::communities::{self, CommunityError};
+use crate::app::events::{Answer, AnswerStatus, Event, Fields};
+use crate::app::memberships::{self, MembershipError};
+use crate::app::posts::{self, PostError};
+use crate::app::users::{self, User, UserError};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
-use crate::events::{Answer, AnswerStatus, Event, Fields};
-use crate::mailer::{MailError, Mailer};
-use crate::memberships::{self, MembershipError};
-use crate::posts::{self, PostError};
-use crate::users::{self, User, UserError};
-use crate::{mails, tokens, trial_users};
+use crate::services::mailer::mails;
+use crate::services::mailer::{MailError, Mailer};
+use crate::tokens;
 
 #[derive(Debug, Error)]
 pub enum DeletionError {
@@ -291,7 +293,7 @@ async fn stripe_end(deployment: &Deployment, left: StripeLeft) {
 /// sweep takes what no live row points at.
 #[cfg(feature = "object-storage")]
 async fn bucket_empty(deployment: &Deployment, user_id: Uuid) {
-    if let Err(error) = crate::avatars::delete_of_user(deployment, user_id).await {
+    if let Err(error) = crate::app::avatars::delete_of_user(deployment, user_id).await {
         tracing::warn!("could not delete the pictures of {user_id}: {error}");
     }
 }
@@ -303,10 +305,10 @@ mod tests {
     use super::*;
     use crate::accounts::tests::{code_sent_to, signed_up_for_a_device};
     use crate::accounts::{self, Session};
+    use crate::app::sync::{self, InProcess};
+    use crate::app::users::tests::device_of;
+    use crate::app::{purge, users};
     use crate::database::with_each_database;
-    use crate::sync::{self, InProcess};
-    use crate::users::tests::device_of;
-    use crate::{purge, users};
 
     fn server(database: crate::database::Database) -> Deployment {
         Deployment::new(database, Role::Server)
@@ -426,8 +428,8 @@ mod tests {
     #[cfg(feature = "object-storage")]
     #[tokio::test]
     async fn deletions_create_leaves_the_files_of_communities_with_other_members() {
-        use crate::files::tests::{new_file, server as server_with_bucket};
-        use crate::files::{self, FileNew};
+        use crate::app::files::tests::{new_file, server as server_with_bucket};
+        use crate::app::files::{self, FileNew};
 
         with_each_database(|database| async move {
             let (server, storage) = server_with_bucket(database);
@@ -616,14 +618,14 @@ mod tests {
     #[cfg(feature = "stripe")]
     async fn on_a_stripe_plan(
         server: &Deployment,
-        stripe: &crate::accounts::stripe::Stripe,
+        stripe: &crate::services::stripe::Stripe,
         alice: &User,
     ) -> String {
-        use crate::accounts::stripe::{
+        use crate::accounts::{checkouts, online, plans, products, stripe_reconcile};
+        use crate::services::stripe::{
             Stripe, StripeCheckoutSession, StripeCheckoutSessionStatus, StripePaymentStatus,
             StripePrice, StripeProduct, StripeSubscription,
         };
-        use crate::accounts::{checkouts, online, plans, products, stripe_reconcile};
 
         stripe.memory_product_put(StripeProduct {
             id: "prod_single".to_string(),
@@ -690,16 +692,16 @@ mod tests {
     }
 
     #[cfg(feature = "stripe")]
-    fn stripe_state(stripe: &crate::accounts::stripe::Stripe) -> (String, usize) {
+    fn stripe_state(stripe: &crate::services::stripe::Stripe) -> (String, usize) {
         match stripe {
-            crate::accounts::stripe::Stripe::Memory(memory) => {
+            crate::services::stripe::Stripe::Memory(memory) => {
                 let memory = memory.lock().expect("the memory");
                 (
                     memory.subscriptions["sub_1"].status.clone(),
                     memory.customers.len(),
                 )
             }
-            crate::accounts::stripe::Stripe::Api(_) => unreachable!("tests use memory"),
+            crate::services::stripe::Stripe::Api(_) => unreachable!("tests use memory"),
         }
     }
 
@@ -707,7 +709,7 @@ mod tests {
     #[tokio::test]
     async fn deletions_create_ends_a_stripe_plan_and_deletes_the_customer() {
         with_each_database(|database| async move {
-            let stripe = crate::accounts::stripe::Stripe::memory();
+            let stripe = crate::services::stripe::Stripe::memory();
             let server = server(database).with_stripe(stripe.clone());
             let mailer = Mailer::memory();
             let alice = signed_up_for_a_device(&server, "alice@example.com").await;
@@ -727,7 +729,7 @@ mod tests {
     #[tokio::test]
     async fn deletions_create_leaves_a_plan_stripe_missed_to_the_reconcile() {
         with_each_database(|database| async move {
-            let stripe = crate::accounts::stripe::Stripe::memory();
+            let stripe = crate::services::stripe::Stripe::memory();
             // No Stripe on the deployment: as if the call after the commit failed
             let server = server(database);
             let mailer = Mailer::memory();

@@ -14,9 +14,9 @@ use axum::http::{HeaderMap, StatusCode};
 use secrecy::SecretString;
 use serde_json::{Value, json};
 
-use app_core::accounts::stripe::Stripe;
 use app_core::accounts::stripe_events::{self, StripeEventCreated};
 use app_core::deployment::Deployment;
+use app_core::services::stripe::Stripe;
 
 use crate::api_error::ApiError;
 use crate::router::AppState;

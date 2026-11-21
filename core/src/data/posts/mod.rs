@@ -3,8 +3,8 @@
 
 use uuid::Uuid;
 
+use crate::app::posts::{AcceptedPost, Post};
 use crate::database::Transaction;
-use crate::posts::{AcceptedPost, Post};
 
 #[cfg(feature = "postgres")]
 mod postgres;
@@ -64,7 +64,7 @@ pub(crate) async fn update(
 /// Protocol reads include tombstones; authoritative writes retain server versions.
 pub(crate) mod replication {
     use super::*;
-    use crate::sync::Cursor;
+    use crate::app::sync::Cursor;
 
     /// Gets a row regardless of visibility or deletion for event processing.
     pub(crate) async fn get(tx: &mut Transaction, id: Uuid) -> Result<Option<Post>, sqlx::Error> {

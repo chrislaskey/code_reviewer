@@ -13,9 +13,9 @@ use thiserror::Error;
 
 use crate::accounts::products::{self, ProductError};
 use crate::accounts::purchases::Store;
-use crate::accounts::stripe::{Stripe, StripeError};
 use crate::accounts::{checkouts, subscriptions};
 use crate::deployment::{Deployment, Role, now};
+use crate::services::stripe::{Stripe, StripeError};
 
 /// What the job asked Stripe for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -95,12 +95,12 @@ pub async fn run(
 mod tests {
     use super::*;
     use crate::accounts::plans;
-    use crate::accounts::stripe::{
+    use crate::app::users;
+    use crate::database::with_each_database;
+    use crate::services::stripe::{
         StripeCheckoutSession, StripeCheckoutSessionStatus, StripePaymentStatus, StripePrice,
         StripeProduct, StripeSubscription,
     };
-    use crate::database::with_each_database;
-    use crate::users;
 
     fn subscription(status: &str, customer_id: &str) -> StripeSubscription {
         StripeSubscription {

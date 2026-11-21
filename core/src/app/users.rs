@@ -16,11 +16,11 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::accounts::users::{self as accounts_users, AccountUserError};
+use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
+use crate::app::sync::{Cursor, TableRow};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::device_settings::{self, DeviceSettingsError, SIGNED_IN};
-use crate::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
-use crate::sync::{Cursor, TableRow};
 use crate::tokens;
 
 /// A row accepted by this resource's event, lifecycle or replication workflow.
@@ -111,7 +111,7 @@ pub enum UserError {
     #[error(transparent)]
     DeviceSettings(#[from] DeviceSettingsError),
     #[error(transparent)]
-    Record(#[from] crate::events::RecordError),
+    Record(#[from] crate::app::events::RecordError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
