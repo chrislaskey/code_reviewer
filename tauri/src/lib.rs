@@ -1,43 +1,29 @@
 //! The desktop and mobile app: one window showing the Svelte pages
 //! (`../svelte`), and a Tauri command per `app_core` function the pages
-//! call, one module per resource, each command named resource first,
-//! `posts_list`, since the commands are one namespace. The app keeps a
+//! call, one module per resource at the path of the core module it
+//! calls, `app::posts`, each command named resource first, `posts_list`,
+//! since the commands are one namespace, see
+//! `docs/design/code-organization-axum-tauri-svelte.md`. The app keeps a
 //! SQLite file per account signed in on it and one of them active, see
 //! `device_accounts`; the other commands read and write the active one
-//! as its user, see `current_user` and `accounts`, and it syncs with the web
+//! as its user, see `user_auth` and `accounts`, and it syncs with the web
 //! server, see `sync`. A sign-in happens in the system browser, see
 //! `accounts`. On macOS ⌃⌘T anywhere opens the quick picker, a second
 //! window, see `quick_picker`.
 
 mod accounts;
-#[cfg(desktop)]
-mod accounts_loopback;
-#[cfg(target_os = "ios")]
-mod accounts_sheet;
-mod avatars;
+mod app;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 mod clipboard;
-mod communities;
-mod conflicts;
-mod current_community;
-mod current_user;
-mod deletions;
+mod command_error;
 mod device_accounts;
-mod files;
-mod local_users;
 #[cfg(target_os = "macos")]
 mod macos;
-mod memberships;
-mod pending_changes;
-mod posts;
 mod public_pages;
-mod purchasing;
 mod quick_picker;
 mod server_urls;
-#[cfg(mobile)]
-mod store_sheet;
-mod store_transactions;
 mod sync;
+mod user_auth;
 
 use tauri::{Manager, WindowEvent};
 
@@ -55,15 +41,15 @@ pub fn run() {
         .register_asynchronous_uri_scheme_protocol("files", |context, request, responder| {
             let app = context.app_handle().clone();
             tauri::async_runtime::spawn(async move {
-                responder.respond(files::content_response(&app, request.uri()).await);
+                responder.respond(app::files::content_response(&app, request.uri()).await);
             });
         })
         .setup(|app| {
             device_accounts::open_and_manage(app)?;
             #[cfg(desktop)]
-            app.manage(accounts_loopback::AccountsLoopback::default());
+            app.manage(accounts::sign_in_loopback::AccountsLoopback::default());
             sync::setup(app)?;
-            store_transactions::spawn_send_unfinished(app.handle().clone());
+            accounts::store_transactions::spawn_send_unfinished(app.handle().clone());
             quick_picker::register(app.handle())?;
             Ok(())
         })
@@ -73,12 +59,12 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            current_user::current_user_get,
-            current_user::current_user_update,
-            current_community::current_community_get,
-            current_community::current_community_update,
-            avatars::avatars_create_upload,
-            avatars::avatars_update,
+            app::current_user::current_user_get,
+            app::current_user::current_user_update,
+            app::current_community::current_community_get,
+            app::current_community::current_community_update,
+            app::avatars::avatars_create_upload,
+            app::avatars::avatars_update,
             accounts::accounts_sign_in_start,
             accounts::accounts_sign_in_pending,
             accounts::accounts_sign_in_finish,
@@ -86,68 +72,68 @@ pub fn run() {
             accounts::accounts_sign_out,
             accounts::accounts_second_factors,
             accounts::accounts_password_update,
-            deletions::accounts_deletions_code_create,
-            deletions::accounts_deletions_create,
-            communities::communities_list,
-            communities::communities_get,
-            communities::communities_create,
-            communities::communities_update,
-            communities::communities_delete,
-            memberships::memberships_join,
-            memberships::memberships_leave,
+            accounts::deletions::accounts_deletions_code_create,
+            accounts::deletions::accounts_deletions_create,
+            app::communities::communities_list,
+            app::communities::communities_get,
+            app::communities::communities_create,
+            app::communities::communities_update,
+            app::communities::communities_delete,
+            app::memberships::memberships_join,
+            app::memberships::memberships_leave,
             public_pages::public_pages_open,
-            posts::posts_list,
-            posts::posts_get,
-            posts::posts_create,
-            posts::posts_update,
-            posts::posts_delete,
-            files::files_search,
-            files::files_list_duplicates,
-            files::files_get,
-            files::files_create,
-            files::files_update,
-            files::files_delete,
-            files::files_cache_get,
-            files::files_cache_delete,
-            files::files_copy_supported,
-            files::files_copy,
-            files::files_download_supported,
-            files::files_download,
+            app::posts::posts_list,
+            app::posts::posts_get,
+            app::posts::posts_create,
+            app::posts::posts_update,
+            app::posts::posts_delete,
+            app::files::files_search,
+            app::files::files_list_duplicates,
+            app::files::files_get,
+            app::files::files_create,
+            app::files::files_update,
+            app::files::files_delete,
+            app::files::files_cache_get,
+            app::files::files_cache_delete,
+            app::files::files_copy_supported,
+            app::files::files_copy,
+            app::files::files_download_supported,
+            app::files::files_download,
             sync::sync_run,
             sync::sync_status,
             sync::sync_set_offline,
-            conflicts::conflicts_list,
-            conflicts::conflicts_reapply,
-            conflicts::conflicts_try_again,
-            conflicts::conflicts_let_go,
-            pending_changes::pending_changes_list,
+            app::conflicts::conflicts_list,
+            app::conflicts::conflicts_reapply,
+            app::conflicts::conflicts_try_again,
+            app::conflicts::conflicts_let_go,
+            app::pending_changes::pending_changes_list,
             device_accounts::device_accounts_list,
             device_accounts::device_accounts_switch,
             device_accounts::device_accounts_deactivate,
             device_accounts::device_accounts_remove,
-            local_users::local_users_can_create,
-            local_users::local_users_create,
-            local_users::local_users_move,
-            local_users::local_users_keep_separate,
+            app::local_users::local_users_can_create,
+            app::local_users::local_users_create,
+            app::local_users::local_users_move,
+            app::local_users::local_users_keep_separate,
             quick_picker::quick_picker_files_search,
             quick_picker::quick_picker_paste,
             quick_picker::quick_picker_close,
             quick_picker::quick_picker_open_app,
             quick_picker::quick_picker_accessibility_request,
-            purchasing::accounts_products_list,
-            purchasing::accounts_products_get,
-            purchasing::accounts_checkouts_create,
-            purchasing::accounts_checkouts_get,
-            purchasing::accounts_purchases_list,
-            purchasing::accounts_purchases_get,
-            purchasing::accounts_subscriptions_list,
-            purchasing::accounts_subscriptions_get,
-            purchasing::accounts_subscriptions_update,
-            purchasing::accounts_subscriptions_portal_create,
-            store_transactions::accounts_store_get,
-            store_transactions::accounts_store_transactions_create,
-            store_transactions::accounts_store_transactions_restore,
-            store_transactions::accounts_subscriptions_manage_open
+            accounts::products::accounts_products_list,
+            accounts::products::accounts_products_get,
+            accounts::checkouts::accounts_checkouts_create,
+            accounts::checkouts::accounts_checkouts_get,
+            accounts::purchases::accounts_purchases_list,
+            accounts::purchases::accounts_purchases_get,
+            accounts::subscriptions::accounts_subscriptions_list,
+            accounts::subscriptions::accounts_subscriptions_get,
+            accounts::subscriptions::accounts_subscriptions_update,
+            accounts::subscriptions::accounts_subscriptions_portal_create,
+            accounts::store_transactions::accounts_store_get,
+            accounts::store_transactions::accounts_store_transactions_create,
+            accounts::store_transactions::accounts_store_transactions_restore,
+            accounts::subscriptions::accounts_subscriptions_manage_open
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

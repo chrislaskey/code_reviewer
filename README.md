@@ -30,8 +30,8 @@ phones, not for speed; `AGENTS.md` says how the code is written.
 A page calls `postsList()`, `postsGet(id)`, `postsCreate(body)`,
 `postsUpdate(id, body)` or `postsDelete(id)` from `svelte/src/lib/core/`.
 Inside the Tauri app each is a command of the same name
-(`tauri/src/posts.rs`); in a browser each is a request to the JSON API
-(`axum/src/posts.rs`):
+(`tauri/src/app/posts.rs`); in a browser each is a request to the JSON API
+(`axum/src/app/posts.rs`):
 
 | Call | Request |
 | --- | --- |
@@ -49,7 +49,7 @@ Inside the Tauri app each is a command of the same name
 | `membershipsLeave(communityId)` | `DELETE /api/memberships/:community_id`, 204 |
 | `filesSearch({name, offset, limit})`, `filesGet(id)` | `GET /api/files/search?name=...&offset=...&limit=...`, a page of the files whose names contain `name`, newest first, up to 500, with `total`, how many match; `GET /api/files/:id`. Each file with how it is shown and where it stands |
 | `filesSha256(file)`, `filesListDuplicates(sha256s)` | the picked file's SHA-256, worked out in the page; `POST /api/files/duplicates` with `{"sha256s": [...]}`, up to 500, the files the user sees with any of them |
-| `filesCreate(file, name, communityIds, onProgress?, sha256?)`, `filesCreateAtOnce` | `POST /api/files/upload` for where to PUT the bytes, the PUT to the bucket, then `POST /api/files`, 201; in the app one command, the bytes kept on the device and sent by the next sync. A page creates `filesCreateAtOnce` files at a time, 3 on the web and 1 in the app |
+| `filesCreate(file, name, communityIds, onProgress?, sha256?)`, `filesCreateAtOnce` | `POST /api/files/uploads` for where to PUT the bytes, the PUT to the bucket, then `POST /api/files`, 201; in the app one command, the bytes kept on the device and sent by the next sync. A page creates `filesCreateAtOnce` files at a time, 3 on the web and 1 in the app |
 | `filesUpdate(id, name, communityIds)` | `PUT /api/files/:id` with `{"name": "...", "community_ids": [...]}`, its communities among the user's |
 | `filesDelete(id)` | `DELETE /api/files/:id`, 204: out of the user's communities, deleted when those were its last |
 | `filesContentUrl(id)` | `/api/files/:id/content`, a redirect to the bytes for an `<img>`; in the app the `files` protocol, serving the device's copy |
@@ -89,10 +89,12 @@ status, 404 for a missing post, 403 for someone else's and 422 for a
 blank one, and `{"error": "..."}`; the app answers the message; and the
 page shows the message either way.
 
-To add to a resource, or add one: the function in `core/`, a route in
-`axum/src/router.rs` with its handler, a command in `tauri/src/lib.rs`
-with its function, named with the resource (`posts_list`, its name on
-the wire too), the two calls in `svelte/src/lib/core/`, then the page.
+To add to a resource, or add one: the function in `core/`, its handler
+at the same path in `axum/src/` (`app/posts.rs`) with its route in
+`axum/src/router.rs`, its command at the same path in `tauri/src/`
+listed in `tauri/src/lib.rs`, named with the resource (`posts_list`, its
+name on the wire too), the two calls in `svelte/src/lib/core/`, then the
+page, see `docs/design/code-organization-axum-tauri-svelte.md`.
 
 How the apps' local databases and the web server, the system of record,
 converge is under "Sync".
@@ -128,15 +130,15 @@ pending token. The code, five wrong tries at most, confirms the email
 the first time. A password is optional, a second factor: an account
 that has one is asked for it after the code, a new account is offered
 to make one or skip, and a signed-in person makes or changes theirs at
-`/accounts/password`. A forgotten one is reset at the password step,
+`/accounts/password/edit`. A forgotten one is reset at the password step,
 unless `accounts::FORGOTTEN_PASSWORD` is changed to lock out. The last step makes the token; a sign-out deletes it. Emails are
 lowercased, and a sign-up with an email that has an account is answered
 as a new one, its owner emailed instead. Where the email goes is
 `MAILER`: unset or `log`, the server logs it in full, which is how a dev
 reads the code; `resend`, it goes through [Resend](https://resend.com)
-with `RESEND_API_KEY` and `MAIL_FROM` (`axum/src/mailer.rs`). The
+with `RESEND_API_KEY` and `MAIL_FROM` (`axum/src/config/mailer.rs`). The
 server resolves the user of every other request from its token,
-`axum/src/current_user.rs`: the apps send it as `Authorization: Bearer`,
+`axum/src/user_auth.rs`: the apps send it as `Authorization: Bearer`,
 and a browser sends the cookie the code set (`HttpOnly`,
 `SameSite=Strict`, `Secure` away from localhost). A request with no
 token, or a token the server does not know, is 401, whatever it asks
@@ -233,7 +235,7 @@ bucket has, pushes everything else, pulls, then PUTs the bytes to a
 signed URL and pushes the files' events; the server writes a file's row
 only once its bytes are in the bucket. Another device gets the row by
 the pull and the bytes the first time a page shows the file, through
-the app's `files` protocol (`tauri/src/files.rs`), and keeps them. On
+the app's `files` protocol (`tauri/src/app/files.rs`), and keeps them. On
 the web the page PUTs the bytes first, then creates the row.
 
 A file is waiting, refused or synced. Waiting is tried by every sync;
@@ -418,10 +420,10 @@ shows the page at the path, swapped in place:
 | Path | Shows |
 | --- | --- |
 | `/` | on the web the public website's home page, `public/index.html`, not the router's; in the apps the router sends it to `/home` |
-| `/home` | `HomePage.svelte` |
+| `/home` | `home/HomePage.svelte` |
 | `/accounts/sign-up` | `accounts/AccountsSignUpPage.svelte`, on the web: the name and email, then the code, then a password to make or skip |
 | `/accounts/settings` | `accounts/AccountsSettingsPage.svelte`, the person's own account: their email and the way to their password |
-| `/accounts/password` | `accounts/AccountsPasswordEditPage.svelte`, their first password or a new one; asks the server, so online only in the apps |
+| `/accounts/password/edit` | `accounts/password/AccountsPasswordEditPage.svelte`, their first password or a new one; asks the server, so online only in the apps |
 | `/support` | `support/SupportIndexPage.svelte`, the support app: a placeholder |
 | `/forum` | `forum/ForumIndexPage.svelte`, the forum app: a placeholder |
 | `/ops` | not the router's: the ops app, a build of its own (`svelte/dist-ops`) with `ops/OpsHomePage.svelte`, for staff and a 404 to anyone else: a placeholder. `cargo run -p app_web -- ops staff create <email>` makes an account staff |
@@ -438,7 +440,15 @@ shows the page at the path, swapped in place:
 | `/conflicts` | `conflicts/ConflictsIndexPage.svelte`, inside the apps: the changes waiting to reach the server and those it did not keep |
 | `/accounts` | `accounts/AccountsIndexPage.svelte`, inside the apps: the accounts on the device, to switch, add and remove |
 
-The New and Edit pages share `posts/PostsForm.svelte`, the body and a
+A page's folder is its path's, `/accounts/products/:id` being
+`accounts/products/AccountsProductsShowPage.svelte`, and its paths are
+RESTful: `index`, `show`, `new` and `edit`. The pieces several of a
+folder's pages share, or large enough to stand alone, are in its
+`components/`; those shared across folders are in `svelte/src/lib/`, the
+generic ones among the core components in `lib/components/`, and the
+app's frame, the header, nav and menus, in `lib/layouts/`.
+
+The New and Edit pages share `posts/components/PostsForm.svelte`, the body and a
 checkbox per community the person is in. A write that worked navigates
 to the post, or the list after a delete, through `navigateToUrl` in
 `router.js`. The post page shows Edit and Delete to the owner, which it
@@ -471,7 +481,7 @@ opens the system browser on the web's sign-in page
 `docs/design/accounts-sign-in.md`): the app keeps a verifier in
 `device.db` and puts its hash in the page's URL as the challenge; the
 page, done, shows a code; the person pastes it into the dialog
-(`accounts/AccountsSignInDialog.svelte`), and the app exchanges the code
+(`accounts/components/AccountsSignInDialog.svelte`), and the app exchanges the code
 and the verifier for its token, which goes into the file of the user
 the server names. The app sees no password at a sign-in, and the browser is not
 signed in afterwards. Where the page is comes from `BROWSER_SIGN_IN_URL`, else
@@ -479,7 +489,7 @@ signed in afterwards. Where the page is comes from `BROWSER_SIGN_IN_URL`, else
 sets to the dev server's, else the sync server's own `/accounts/sign-in`. A sign-out
 closes the account and keeps its file; Remove from device deletes it,
 after a confirmation, and asks again when a change in it has not
-reached the server (`accounts/AccountsRemoveDialog.svelte`). Only the
+reached the server (`accounts/components/AccountsRemoveDialog.svelte`). Only the
 active account syncs. A sync answered 401, the token expired or deleted
 elsewhere, signs the account out on the device, data kept. At most 100
 accounts. At start every account's file is brought up to date, orphan

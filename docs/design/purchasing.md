@@ -252,7 +252,7 @@ so a phone store later changes neither.
 |---|---|
 | Core | `core/src/accounts/products.rs`, `prices.rs`, `checkouts.rs`, `purchases.rs`, `subscriptions.rs`, `plans.rs`, `stripe.rs` (the client), `stripe_events.rs` |
 | API | `/api/accounts/products`, `/api/accounts/products/:id`, `POST /api/accounts/checkouts`, `/api/accounts/checkouts/:id`, `/api/accounts/purchases[/:id]`, `/api/accounts/subscriptions[/:id]`, `PUT /api/accounts/subscriptions/:id` (switch, cancel, resume), `POST /api/accounts/subscriptions/:id/portal` |
-| Tauri | `tauri/src/purchasing.rs`: `accounts_products_list` and the rest, each asking the API with the device's token through `app_core::accounts::online`, step 7 |
+| Tauri | `tauri/src/accounts/`: `accounts_products_list` and the rest, one module per resource, each asking the API with the device's token through `app_core::accounts::online`, step 7 |
 | Pages | `AccountsProductsIndexPage`, `AccountsProductsShowPage`, `AccountsCheckoutsShowPage`, `AccountsPurchasesIndexPage`, `AccountsPurchasesShowPage`, `AccountsSubscriptionsIndexPage`, `AccountsSubscriptionsShowPage` |
 
 Stripe's own "trial" is called **free days** here
@@ -297,7 +297,7 @@ Stripe's own "trial" is called **free days** here
 7. **Desktop.** Built: `app_core::accounts::online`, the purchasing API
    asked with the device's token through the sync's `Http`, its JSON
    passed to the pages as it came, so the app has none of the Stripe
-   crates; the Tauri commands in `tauri/src/purchasing.rs`. Stripe's
+   crates; the Tauri commands under `tauri/src/accounts/`. Stripe's
    checkout and portal open in the system browser with
    `"return_to": "app"`, and come back to `/accounts/back-to-app`, open
    to anyone, as that browser may not be signed in; the app's pages ask

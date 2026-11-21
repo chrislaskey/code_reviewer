@@ -6,9 +6,9 @@
      pastes it where the person was typing; Escape closes. With nobody
      signed in, it says so and opens the app. -->
 <script>
+  import { TileGrid } from "../lib/components/index.js";
   import { tick } from "svelte";
   import FileImage from "../lib/FileImage.svelte";
-  import TileGrid from "../lib/TileGrid.svelte";
   import {
     currentUserGet,
     filesContentUrl,
@@ -21,7 +21,7 @@
     quickPickerPaste,
   } from "../lib/core/index.js";
   import { PagedSearch } from "../lib/paged_search.svelte.js";
-  import { fileSize } from "../files/file_size.js";
+  import { fileSize } from "../lib/file_size.js";
 
   let signedIn = $state(true);
   let name = $state("");

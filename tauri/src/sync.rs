@@ -172,7 +172,7 @@ async fn run_after_waiting(app: &AppHandle, spawned: bool) -> Result<Report, Str
         && !report.offline
         && online::plan_is_stale(&deployment).await.unwrap_or(true)
     {
-        crate::purchasing::plan_refresh(&deployment, &server.transport).await;
+        crate::accounts::plans::refresh(&deployment, &server.transport).await;
     }
     if result.as_ref().is_ok_and(Report::more_files_to_send) {
         spawn(app.clone());

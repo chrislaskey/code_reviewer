@@ -7,8 +7,7 @@
   import { currentUserForget } from "../lib/current_user.js";
   import { navigateToUrl } from "../lib/router.js";
   import { accountsSignInUrl, accountsSignUpUrl, postsIndexUrl } from "../lib/routes.js";
-  import { Button, ErrorMessage, Heading, Link, Text } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
+  import { Button, ErrorMessage, Heading, Link, Page, Text } from "../lib/components/index.js";
 
   /** Whether a trial can start; null until the server answered. */
   let available = $state(/** @type {boolean | null} */ (null));

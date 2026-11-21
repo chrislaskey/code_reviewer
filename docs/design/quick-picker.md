@@ -22,7 +22,7 @@ rest is AppKit, Accessibility and Core Graphics calls made from Rust.
 ```
 svelte/src/quick-picker.html, quick-picker/   the window's page, an HTML entry of its own
 svelte/src/lib/core/                          quickPickerFilesSearch, quickPickerPaste, ... as every page's calls
-svelte/src/lib/TileGrid.svelte, paged_search.svelte.js   the grid and its pages, shared with the files index
+svelte/src/lib/components/TileGrid.svelte, paged_search.svelte.js   the grid and its pages, shared with the files index
 tauri/src/quick_picker/
   mod.rs          the commands
   popup.rs        the shortcut, open and close, copy and paste

@@ -27,11 +27,10 @@
   import { currentUserForget } from "../lib/current_user.js";
   import { navigateToUrl } from "../lib/router.js";
   import { postsIndexUrl } from "../lib/routes.js";
-  import AccountsMoveDialog from "./AccountsMoveDialog.svelte";
-  import AccountsRemoveDialog from "./AccountsRemoveDialog.svelte";
-  import AccountsSignInDialog from "./AccountsSignInDialog.svelte";
-  import { Badge, Button, ErrorMessage, Heading, Panel, Text } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
+  import AccountsMoveDialog from "./components/AccountsMoveDialog.svelte";
+  import AccountsRemoveDialog from "./components/AccountsRemoveDialog.svelte";
+  import AccountsSignInDialog from "./components/AccountsSignInDialog.svelte";
+  import { Badge, Button, ErrorMessage, Heading, Page, Panel, Text } from "../lib/components/index.js";
 
   /** @typedef {{user_id: string, email: string, signed_in: boolean, local: boolean, active: boolean, last_active_at: string}} DeviceAccount */
 

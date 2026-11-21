@@ -19,9 +19,8 @@
   } from "../lib/core/index.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { conflictsIndexUrl, filesEditUrl, filesIndexUrl } from "../lib/routes.js";
-  import { fileSize } from "./file_size.js";
-  import { Button, ErrorMessage, Heading, Link, Text } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
+  import { fileSize } from "../lib/file_size.js";
+  import { Button, ErrorMessage, Heading, Link, Page, Text } from "../lib/components/index.js";
 
   const id = pathParams().id;
   let shown = $state();

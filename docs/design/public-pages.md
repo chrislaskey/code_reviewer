@@ -43,7 +43,7 @@ The app's own home page is `/home`, on the web and in the apps alike,
 so `/` is never two pages. A public page must not be named like a path
 of the app's (`home`, `posts`, `accounts`).
 
-- **The web server** does this in `axum/src/public.rs`.
+- **The web server** does this in `axum/src/public_pages.rs`.
 - **The dev server** does the same in `vite.config.js`, since in dev the
   browser loads its pages from it.
 - **The desktop and phone apps** never show a public page: their window

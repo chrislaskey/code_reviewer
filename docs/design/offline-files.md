@@ -96,7 +96,7 @@ alternatives weighed and how it was settled.
   row is deleted is removed; a file with no row is removed once it is
   a day old.
 - **The endpoints are beside the resource** (5b):
-  `POST /api/files/upload`, where a device sends its id and the web
+  `POST /api/files/uploads`, where a device sends its id and the web
   lets the server make one, and a `GET` under `/api/files/:id/` that
   redirects to a signed download URL, `/content`.
 - **One PUT per file, started over if cut off** (5c). **No checksum**
@@ -343,7 +343,7 @@ Open:
 - 5b. Settled: beside the resource, not under `/api/sync/`. Open: the
   download's name, `/content` or `/url`; it answers a redirect to the
   bytes for `<img src>`, not a URL in JSON.
-  - `POST /api/files/upload`, `{id, content_type, size}`: answers
+  - `POST /api/files/uploads`, `{id, content_type, size}`: answers
     `uploaded` or a signed PUT URL, good for 10 minutes as an avatar's
     is. A device sends the id it made; the web sends none and the
     server makes one and answers it. The file has no row on the server

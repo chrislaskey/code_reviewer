@@ -4,9 +4,8 @@
   import { FormError, communitiesCreate } from "../lib/core/index.js";
   import { navigateToUrl } from "../lib/router.js";
   import { communitiesIndexUrl, communitiesShowUrl } from "../lib/routes.js";
-  import CommunitiesForm from "./CommunitiesForm.svelte";
-  import { Heading, Link } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
+  import CommunitiesForm from "./components/CommunitiesForm.svelte";
+  import { Heading, Link, Page } from "../lib/components/index.js";
 
   let name = $state("");
   /** @type {Record<string, string[]>} */

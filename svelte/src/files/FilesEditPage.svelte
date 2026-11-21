@@ -1,13 +1,11 @@
 <!-- Editing a file, at /files/:id/edit: its name, and its communities
      among the person's; its bytes never change. Done, it shows the file -->
 <script>
-  import FieldErrors from "../lib/FieldErrors.svelte";
   import { FormError, filesGet, filesUpdate } from "../lib/core/index.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { filesShowUrl } from "../lib/routes.js";
-  import { Button, ErrorMessage, Heading, Input, Label, Link } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
-  import FilesCommunitiesField from "./FilesCommunitiesField.svelte";
+  import { Button, ErrorMessage, FieldErrors, Heading, Input, Label, Link, Page } from "../lib/components/index.js";
+  import FilesCommunitiesField from "./components/FilesCommunitiesField.svelte";
 
   const id = pathParams().id;
   let loaded = $state(false);

@@ -4,9 +4,8 @@
   import { postsGet, postsUpdate } from "../lib/core/index.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { postsShowUrl } from "../lib/routes.js";
-  import PostsForm from "./PostsForm.svelte";
-  import { ErrorMessage, Heading, Link } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
+  import PostsForm from "./components/PostsForm.svelte";
+  import { ErrorMessage, Heading, Link, Page } from "../lib/components/index.js";
 
   const id = pathParams().id;
   let loaded = $state(false);

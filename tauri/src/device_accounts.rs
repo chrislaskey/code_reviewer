@@ -9,7 +9,7 @@
 //! At start the list is swept of orphans, every database is brought up
 //! to date, and the last active account is opened again if it is still
 //! signed in. One of the accounts may be a local user, made by Skip
-//! with no account on the server, see `local_users`: it lists, switches
+//! with no account on the server, see `app::local_users`: it lists, switches
 //! and removes like any other, has no sign-out, and becomes an account's
 //! own when the person signs up or in and moves what they made.
 

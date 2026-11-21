@@ -3,7 +3,7 @@
      docs/design/purchasing.md. -->
 <script>
   import PublicPagesLinks from "../lib/PublicPagesLinks.svelte";
-  import AccountsNeeded from "./AccountsNeeded.svelte";
+  import AccountsNeeded from "../lib/AccountsNeeded.svelte";
   import { currentUserLoad } from "../lib/current_user.js";
   import {
     accountsDeletionsNewUrl,
@@ -12,8 +12,7 @@
     accountsPurchasesIndexUrl,
     accountsSubscriptionsIndexUrl,
   } from "../lib/routes.js";
-  import { Heading, Link, Text } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
+  import { Heading, Link, Page, Text } from "../lib/components/index.js";
 
   /** @type {import("../lib/current_user.js").User | null} */
   let currentUser = $state(null);

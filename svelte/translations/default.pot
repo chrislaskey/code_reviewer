@@ -3,234 +3,231 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Plural-Forms: nplurals=2; plural=(n!=1);\n"
 
-#: src/posts/PostsForm.svelte:46
-#: src/posts/PostsShowPage.svelte:37
+#: src/posts/PostsShowPage.svelte:36
+#: src/posts/components/PostsForm.svelte:46
 msgid "Post"
 msgstr ""
 
-#: src/posts/PostsIndexPage.svelte:30
-#: src/posts/PostsShowPage.svelte:41
+#: src/posts/PostsIndexPage.svelte:29
+#: src/posts/PostsShowPage.svelte:40
 #, javascript-format
 msgid "in ${ communityNames }"
 msgstr ""
 
-#: src/posts/PostsShowPage.svelte:44
+#: src/posts/PostsShowPage.svelte:43
 msgid "Edit"
 msgstr ""
 
-#: src/posts/PostsShowPage.svelte:46
+#: src/posts/PostsShowPage.svelte:45
 msgid "Delete"
 msgstr ""
 
-#: src/posts/PostsNewPage.svelte:32
-#: src/posts/PostsShowPage.svelte:48
+#: src/posts/PostsNewPage.svelte:31
+#: src/posts/PostsShowPage.svelte:47
 msgid "Back to posts"
 msgstr ""
 
-#: src/posts/PostsShowPage.svelte:24
+#: src/posts/PostsShowPage.svelte:23
 msgid "Delete this post?"
 msgstr ""
 
-#: src/posts/PostsIndexPage.svelte:25
-#: src/posts/PostsNewPage.svelte:28
+#: src/posts/PostsIndexPage.svelte:24
+#: src/posts/PostsNewPage.svelte:27
 msgid "New post"
 msgstr ""
 
-#: src/lib/AppNav.svelte:28
-#: src/posts/PostsIndexPage.svelte:23
+#: src/lib/layouts/AppNav.svelte:28
+#: src/posts/PostsIndexPage.svelte:22
 msgid "Posts"
 msgstr ""
 
-#: src/posts/PostsIndexPage.svelte:27
+#: src/posts/PostsIndexPage.svelte:26
 msgid "No posts yet."
 msgstr ""
 
-#: src/posts/PostsIndexPage.svelte:33
+#: src/posts/PostsIndexPage.svelte:32
 msgid "Show"
 msgstr ""
 
-#: src/posts/PostsForm.svelte:47
-msgid "What's on your mind?"
-msgstr ""
-
-#: src/posts/PostsForm.svelte:48
-msgid "In"
-msgstr ""
-
-#: src/posts/PostsEditPage.svelte:43
+#: src/posts/PostsEditPage.svelte:42
 msgid "Edit post"
 msgstr ""
 
-#: src/posts/PostsEditPage.svelte:44
+#: src/posts/PostsEditPage.svelte:43
 msgid "Save"
 msgstr ""
 
-#: src/posts/PostsEditPage.svelte:48
+#: src/posts/PostsEditPage.svelte:47
 msgid "Back to the post"
 msgstr ""
 
-#: src/lib/ThemeMenu.svelte:21
+#: src/posts/components/PostsForm.svelte:47
+msgid "What's on your mind?"
+msgstr ""
+
+#: src/posts/components/PostsForm.svelte:48
+msgid "In"
+msgstr ""
+
+#: src/lib/layouts/ThemeMenu.svelte:21
 #, javascript-format
 msgid "Theme: ${ current }"
 msgstr ""
 
-#: src/lib/BottomBar.svelte:40
-#: src/lib/ThemeMenu.svelte:22
+#: src/lib/layouts/BottomBar.svelte:40
+#: src/lib/layouts/ThemeMenu.svelte:22
 msgid "Theme"
 msgstr ""
 
-#: src/lib/SyncMenu.svelte:55
+#: src/lib/layouts/SyncMenu.svelte:55
 msgid "Sync"
 msgstr ""
 
-#: src/lib/SyncMenu.svelte:56
+#: src/lib/layouts/SyncMenu.svelte:56
 msgid "Offline"
 msgstr ""
 
-#: src/lib/SyncMenu.svelte:57
+#: src/lib/layouts/SyncMenu.svelte:57
 #, javascript-format
 msgid "${ status.conflicts } not saved"
 msgstr ""
 
-#: src/lib/SyncMenu.svelte:58
+#: src/lib/layouts/SyncMenu.svelte:58
 #, javascript-format
 msgid "${ status.pending } waiting"
 msgstr ""
 
-#: src/lib/SyncMenu.svelte:61
+#: src/lib/layouts/SyncMenu.svelte:61
 msgid "Working offline"
 msgstr ""
 
-#: src/lib/SyncMenu.svelte:64
+#: src/lib/layouts/SyncMenu.svelte:64
 #, javascript-format
 msgid "${ status.conflicts } change was not saved on the server"
 msgid_plural "${ status.conflicts } changes were not saved on the server"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/lib/SyncMenu.svelte:69
+#: src/lib/layouts/SyncMenu.svelte:69
 #, javascript-format
 msgid "${ status.pending } waiting to sync"
 msgstr ""
 
-#: src/lib/SyncMenu.svelte:70
+#: src/lib/layouts/SyncMenu.svelte:70
 msgid "Everything is synced"
 msgstr ""
 
-#: src/lib/SyncMenu.svelte:74
+#: src/lib/layouts/SyncMenu.svelte:74
 msgid "Go online"
 msgstr ""
 
-#: src/lib/SyncMenu.svelte:77
+#: src/lib/layouts/SyncMenu.svelte:77
 msgid "Sync now"
 msgstr ""
 
-#: src/lib/SyncMenu.svelte:80
+#: src/lib/layouts/SyncMenu.svelte:80
 msgid "Work offline"
 msgstr ""
 
-#: src/lib/BottomBar.svelte:32
+#: src/lib/layouts/BottomBar.svelte:32
 msgid "Close menu"
 msgstr ""
 
-#: src/lib/BottomBar.svelte:34
-#: src/lib/BottomBar.svelte:56
+#: src/lib/layouts/BottomBar.svelte:34
+#: src/lib/layouts/BottomBar.svelte:56
 msgid "Menu"
 msgstr ""
 
-#: src/lib/AppNav.svelte:70
-#: src/lib/BottomBar.svelte:42
+#: src/lib/layouts/AppNav.svelte:70
+#: src/lib/layouts/BottomBar.svelte:42
 msgid "Main"
 msgstr ""
 
-#: src/lib/AppHeader.svelte:19
-#: src/lib/AppHeader.svelte:20
-#: src/lib/BottomBar.svelte:49
+#: src/lib/layouts/AppHeader.svelte:19
+#: src/lib/layouts/AppHeader.svelte:20
+#: src/lib/layouts/BottomBar.svelte:49
 msgid "Back"
 msgstr ""
 
-#: src/lib/AppHeader.svelte:23
-#: src/lib/AppHeader.svelte:24
-#: src/lib/BottomBar.svelte:52
+#: src/lib/layouts/AppHeader.svelte:23
+#: src/lib/layouts/AppHeader.svelte:24
+#: src/lib/layouts/BottomBar.svelte:52
 msgid "Forward"
 msgstr ""
 
-#: src/lib/AppNav.svelte:25
+#: src/lib/layouts/AppNav.svelte:25
 #. * @type {Link[]} 
 msgid "Home"
 msgstr ""
 
-#: src/lib/AppNav.svelte:29
+#: src/lib/layouts/AppNav.svelte:29
 #. * @type {Link[]} 
 msgid "Files"
 msgstr ""
 
-#: src/lib/AppNav.svelte:30
+#: src/lib/layouts/AppNav.svelte:30
 #. * @type {Link[]} 
 msgid "Communities"
 msgstr ""
 
-#: src/lib/AppNav.svelte:31
+#: src/lib/layouts/AppNav.svelte:31
 #. * @type {Link[]} 
 msgid "Support"
 msgstr ""
 
-#: src/lib/AppNav.svelte:32
+#: src/lib/layouts/AppNav.svelte:32
 #. * @type {Link[]} 
 msgid "Forum"
 msgstr ""
 
-#: src/lib/AppNav.svelte:36
+#: src/lib/layouts/AppNav.svelte:36
 #. * @type {Link[]} 
 msgid "Ops"
 msgstr ""
 
-#: src/lib/AccountMenu.svelte:45
+#: src/lib/layouts/AccountMenu.svelte:45
 msgid "Account"
 msgstr ""
 
-#: src/lib/AccountMenu.svelte:48
+#: src/lib/layouts/AccountMenu.svelte:48
 msgid "Trial"
 msgstr ""
 
-#: src/lib/AccountMenu.svelte:49
+#: src/lib/layouts/AccountMenu.svelte:49
 msgid "Sign up to keep what you make."
 msgstr ""
 
-#: src/lib/AccountMenu.svelte:51
+#: src/lib/layouts/AccountMenu.svelte:51
 msgid "On this device only"
 msgstr ""
 
-#: src/lib/AccountMenu.svelte:54
-#: src/lib/AccountMenu.svelte:73
+#: src/lib/layouts/AccountMenu.svelte:54
+#: src/lib/layouts/AccountMenu.svelte:73
 msgid "Sign up"
 msgstr ""
 
-#: src/lib/AccountMenu.svelte:57
+#: src/lib/layouts/AccountMenu.svelte:57
 msgid "Profile"
 msgstr ""
 
-#: src/lib/AccountMenu.svelte:60
+#: src/lib/layouts/AccountMenu.svelte:60
 msgid "Account settings"
 msgstr ""
 
-#: src/lib/AccountMenu.svelte:63
+#: src/lib/layouts/AccountMenu.svelte:63
 msgid "Switch account"
 msgstr ""
 
-#: src/lib/AccountMenu.svelte:66
+#: src/lib/layouts/AccountMenu.svelte:66
 msgid "Sign out"
 msgstr ""
 
-#: src/lib/AccountMenu.svelte:69
-msgid "Accounts"
-msgstr ""
-
-#: src/lib/AccountMenu.svelte:71
+#: src/lib/layouts/AccountMenu.svelte:69
+#: src/lib/layouts/AccountMenu.svelte:71
 msgid "Sign in"
 msgstr ""
 
-#: src/posts/PostsNewPage.svelte:29
+#: src/posts/PostsNewPage.svelte:28
 msgctxt "verb"
 msgid "Post"
 msgstr ""

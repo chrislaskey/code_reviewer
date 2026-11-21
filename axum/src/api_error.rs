@@ -32,6 +32,7 @@ use app_core::app::users::UserError;
 use app_core::data::accounts_credentials::CredentialError;
 use app_core::data::accounts_users::AccountUserError;
 use app_core::helpers::field_errors::FieldErrors;
+use app_core::ops::staff::StaffError;
 use app_core::services::app_store::AppStoreError;
 use app_core::services::stripe::StripeError;
 
@@ -478,6 +479,18 @@ impl From<ProductError> for ApiError {
             ProductError::ServerOnly | ProductError::Database(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
+        };
+        ApiError::new(status, error.to_string())
+    }
+}
+
+impl From<StaffError> for ApiError {
+    fn from(error: StaffError) -> Self {
+        let status = match error {
+            StaffError::NotStaff => StatusCode::NOT_FOUND,
+            StaffError::NoAccount { .. } => StatusCode::NOT_FOUND,
+            StaffError::AccountUser(error) => return error.into(),
+            StaffError::ServerOnly | StaffError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         ApiError::new(status, error.to_string())
     }

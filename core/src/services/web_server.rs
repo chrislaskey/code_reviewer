@@ -474,7 +474,7 @@ impl Transport for Http {
         token: Option<&str>,
         request: FileUploadNew,
     ) -> Result<FileUpload, SyncError> {
-        self.post(token, "/api/files/upload", &request).await
+        self.post(token, "/api/files/uploads", &request).await
     }
 
     /// PUTs the file to the signed URL, streamed from the disk, with the

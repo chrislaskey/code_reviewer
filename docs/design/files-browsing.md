@@ -9,8 +9,8 @@ served by the same design, a little slower, not by another one.
 
 Built in `files::search`, `GET /api/files/search`, the `files_search`
 command, `filesSearch` in `svelte/src/lib/core/`, and
-`svelte/src/files/FilesIndexPage.svelte` with `FilesGrid.svelte`. The
-grid is `svelte/src/lib/TileGrid.svelte` and the pages it asks for
+`svelte/src/files/FilesIndexPage.svelte` with `components/FilesGrid.svelte`. The
+grid is `svelte/src/lib/components/TileGrid.svelte` and the pages it asks for
 `lib/paged_search.svelte.js`, which the desktop quick picker shares
 (`quick-picker.md`).
 

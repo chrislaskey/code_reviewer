@@ -4,9 +4,8 @@
   import { postsCreate } from "../lib/core/index.js";
   import { navigateToUrl } from "../lib/router.js";
   import { postsShowUrl, postsIndexUrl } from "../lib/routes.js";
-  import PostsForm from "./PostsForm.svelte";
-  import { Heading, Link } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
+  import PostsForm from "./components/PostsForm.svelte";
+  import { Heading, Link, Page } from "../lib/components/index.js";
 
   let text = $state("");
   let communityIds = $state([]);

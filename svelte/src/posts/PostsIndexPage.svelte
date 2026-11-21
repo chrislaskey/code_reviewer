@@ -4,8 +4,7 @@
   import { t } from "ttag";
   import { onSynced, postsList } from "../lib/core/index.js";
   import { postsNewUrl, postsShowUrl } from "../lib/routes.js";
-  import { Button, ErrorMessage, Heading, Link, Panel, Text } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
+  import { Button, ErrorMessage, Heading, Link, Page, Panel, Text } from "../lib/components/index.js";
 
   let posts = $state([]);
   let error = $state("");

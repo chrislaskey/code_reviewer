@@ -169,7 +169,7 @@ of the App Store's code by drawing the line where the stores differ:
   Core's `StoreProof` enum has the App Store's variant now; Google's is
   one more variant.
 - **The device talks to a store through one Rust trait**,
-  `StoreSheet` in `tauri/src/store_sheet.rs`: the store's prices for
+  `StoreSheet` in `tauri/src/accounts/store_sheet.rs`: the store's prices for
   some lookup keys, buy a lookup key for a user id (with the plan it
   replaces), the transactions not yet finished, finish one, open the
   store's subscriptions page. The commands are written against it;

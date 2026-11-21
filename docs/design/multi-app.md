@@ -35,6 +35,7 @@ other app carries its name:
 |---|---|---|
 | Table | `app_posts` | `support_tickets` |
 | Core module | `core/src/app/posts.rs` | `core/src/support/` |
+| Route and command modules | `axum/src/app/posts.rs`, `tauri/src/app/posts.rs` | `axum/src/support/`, `tauri/src/support/` |
 | API path | `/api/posts` | `/api/support/...` |
 | Page path and folder | `/posts`, `svelte/src/posts/` | `/support/...`, `svelte/src/support/` |
 
@@ -43,6 +44,8 @@ other app carries its name:
   `ops.rs`/`ops/`, called by their paths, `app_core::app::posts`. Each
   table's records are `core/src/data/<table>/`, named after the table,
   see `docs/design/code-organization.md`.
+  The web server's route handlers and the app's Tauri commands sit at
+  the same paths, see `docs/design/code-organization-axum-tauri-svelte.md`.
 - **Paths**: `app` owns the top level and is the fallback; another app
   owns its subpath. The public website owns `/` and its pages' names.
 - **Pages**: one Svelte app, each page loaded when visited, as today.
@@ -51,7 +54,7 @@ other app carries its name:
   its files under `/ops/`. The staff's tools are not in what users
   load, and not in the desktop and phone apps, which bundle
   `svelte/dist`. A link to it loads the page in full.
-- **The nav** (`svelte/src/lib/AppNav.svelte`) links the apps: Support,
+- **The nav** (`svelte/src/lib/layouts/AppNav.svelte`) links the apps: Support,
   Forum, the person's email to their account, and Ops for staff.
 - **Depends on**: `accounts`, then `app`, then every other app. Never
   the other way.

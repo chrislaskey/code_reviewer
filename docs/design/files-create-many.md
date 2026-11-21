@@ -6,7 +6,7 @@ with each duplicate, and watch each file go. Built on the single-file
 create of `files-communities.md` and `offline-files-decisions.md`,
 which stays as it is: many files are many creates.
 
-Built in `svelte/src/files/FilesNewPage.svelte` and `FilesNewRow.svelte`,
+Built in `svelte/src/files/FilesNewPage.svelte` and `components/FilesNewRow.svelte`,
 on `files::list_duplicates` and the sync's `files::FILES_PER_SYNC`.
 Meant for a library at once, thousands of small images
 say: up to 5,000 files in a list, each up to the 25 MB of one file. A

@@ -13,7 +13,7 @@ export const ACCOUNTS_SIGN_UP_PATH = "/accounts/sign-up";
 export const ACCOUNTS_SIGN_IN_PATH = "/accounts/sign-in";
 export const ACCOUNTS_TRIAL_PATH = "/accounts/trial";
 export const ACCOUNTS_SETTINGS_PATH = "/accounts/settings";
-export const ACCOUNTS_PASSWORD_EDIT_PATH = "/accounts/password";
+export const ACCOUNTS_PASSWORD_EDIT_PATH = "/accounts/password/edit";
 export const ACCOUNTS_DELETIONS_NEW_PATH = "/accounts/deletions/new";
 export const ACCOUNTS_PRODUCTS_INDEX_PATH = "/accounts/products";
 export const ACCOUNTS_PRODUCTS_SHOW_PATH = "/accounts/products/:id";
@@ -36,7 +36,7 @@ export const COMMUNITIES_NEW_PATH = "/communities/new";
 export const COMMUNITIES_SHOW_PATH = "/communities/:id";
 export const COMMUNITIES_EDIT_PATH = "/communities/:id/edit";
 export const CONFLICTS_INDEX_PATH = "/conflicts";
-export const PROFILE_EDIT_PATH = "/profile";
+export const PROFILE_EDIT_PATH = "/profile/edit";
 // The other apps, each under its own path, see docs/design/multi-app.md.
 export const SUPPORT_INDEX_PATH = "/support";
 export const FORUM_INDEX_PATH = "/forum";

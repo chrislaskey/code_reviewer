@@ -4,10 +4,9 @@
   import { communitiesDelete, communitiesGet, onSynced } from "../lib/core/index.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { communitiesEditUrl, communitiesIndexUrl } from "../lib/routes.js";
-  import CommunitiesDeleteDialog from "./CommunitiesDeleteDialog.svelte";
-  import CommunitiesMembershipButton from "./CommunitiesMembershipButton.svelte";
-  import { Button, ErrorMessage, Heading, Link, Text } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
+  import CommunitiesDeleteDialog from "./components/CommunitiesDeleteDialog.svelte";
+  import CommunitiesMembershipButton from "./components/CommunitiesMembershipButton.svelte";
+  import { Button, ErrorMessage, Heading, Link, Page, Text } from "../lib/components/index.js";
 
   const id = pathParams().id;
   let shown = $state();

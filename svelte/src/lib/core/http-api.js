@@ -431,7 +431,7 @@ export const filesCreateAtOnce = 3;
  */
 export async function filesCreate(file, name, communityIds, onProgress, sha256) {
   sha256 ??= await sha256Of(file);
-  const upload = await send("POST", "/api/files/upload", { content_type: file.type, size: file.size, sha256 });
+  const upload = await send("POST", "/api/files/uploads", { content_type: file.type, size: file.size, sha256 });
   if (!upload.uploaded) await putFile(upload, file, onProgress);
   return send("POST", "/api/files", {
     id: upload.id,

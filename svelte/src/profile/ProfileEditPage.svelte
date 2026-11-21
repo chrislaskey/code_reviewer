@@ -1,16 +1,14 @@
-<!-- The person's profile, at /profile: their name and their picture. A
+<!-- The person's profile, at /profile/edit: their name and their picture. A
      name is written where the page runs, so the app changes it offline
      and syncs it later; a picture goes straight to object storage, see
      avatarsUpload in lib/core/. A local user is told their account is
      only on this device; they and a trial user have no picture, which
      needs an account on the server. -->
 <script>
-  import FieldErrors from "../lib/FieldErrors.svelte";
   import { FormError, avatarsUpload, currentUserGet, currentUserUpdate } from "../lib/core/index.js";
   import { currentUserForget } from "../lib/current_user.js";
   import { accountsIndexUrl } from "../lib/routes.js";
-  import { Alert, Button, ErrorMessage, FileInput, Heading, Input, Label, Text } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
+  import { Alert, Button, ErrorMessage, FieldErrors, FileInput, Heading, Input, Label, Page, Text } from "../lib/components/index.js";
 
   /** @type {{name: string, kind?: string, avatar_url?: string | null} | null} */
   let currentUser = $state(null);

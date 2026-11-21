@@ -20,10 +20,9 @@
   import { currentCommunityLoad } from "../lib/current_community.js";
   import { navigateToUrl } from "../lib/router.js";
   import { filesIndexUrl, filesShowUrl } from "../lib/routes.js";
-  import { Alert, Button, FileInput, Heading, Label, Link, Text } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
-  import FilesCommunitiesField from "./FilesCommunitiesField.svelte";
-  import FilesNewRow from "./FilesNewRow.svelte";
+  import { Alert, Button, FileInput, Heading, Label, Link, Page, Text } from "../lib/components/index.js";
+  import FilesCommunitiesField from "./components/FilesCommunitiesField.svelte";
+  import FilesNewRow from "./components/FilesNewRow.svelte";
 
   const MAX_FILES = 5000;
   /** Checksums asked about in one request, the most the server takes. */

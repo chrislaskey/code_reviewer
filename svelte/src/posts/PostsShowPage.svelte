@@ -5,8 +5,7 @@
   import { currentUserLoad } from "../lib/current_user.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { postsEditUrl, postsIndexUrl } from "../lib/routes.js";
-  import { Button, ErrorMessage, Heading, Link, Panel, Text } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
+  import { Button, ErrorMessage, Heading, Link, Page, Panel, Text } from "../lib/components/index.js";
 
   const id = pathParams().id;
   let shown = $state();

@@ -3,10 +3,9 @@
 //! `docs/design/accounts-sign-in.md`: `accounts_sign_in_start` makes
 //! the verifier, keeps it in `device.db`, and opens the browser at the
 //! sign-in page `server_urls` names with the verifier's challenge; the
-//! page, done,
-//! shows a code the person pastes into the app, or returns it by
-//! itself: on a desktop to `accounts_loopback`, on an iPhone through the
-//! sign-in sheet of `accounts_sheet`; and
+//! page, done, shows a code the person pastes into the app, or returns
+//! it by itself: on a desktop to `sign_in_loopback`, on an iPhone
+//! through the sign-in sheet of `sign_in_sheet`; and
 //! `accounts_sign_in_finish` exchanges it with the verifier for the
 //! session, which goes into the account's own file, see
 //! `device_accounts`, which becomes the active one and syncs. The app
@@ -15,6 +14,26 @@
 //! online. A sign-out syncs first, so a change still
 //! waiting reaches the server, then closes the account, whose data stays
 //! for the next sign-in.
+//!
+//! The accounts app's other commands are its submodules, each named as
+//! the web server's route module for the same resource. A phone buys in
+//! its store, `store_transactions` through `store_sheet`; the desktop on
+//! Stripe's pages, `stripe_pages`.
+
+pub mod checkouts;
+pub mod deletions;
+pub mod plans;
+pub mod products;
+pub mod purchases;
+#[cfg(desktop)]
+pub mod sign_in_loopback;
+#[cfg(target_os = "ios")]
+pub mod sign_in_sheet;
+#[cfg(mobile)]
+pub mod store_sheet;
+pub mod store_transactions;
+pub mod stripe_pages;
+pub mod subscriptions;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, Url};
@@ -30,7 +49,7 @@ const SIGN_IN_RETURNED_EVENT: &str = "accounts-sign-in-returned";
 /// How the page hands the code back to the app by itself.
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum AppReturn {
-    /// To `accounts_loopback`'s listener on this computer.
+    /// To `sign_in_loopback`'s listener on this computer.
     Port(u16),
     /// To the app's scheme, which closes the iPhone's sign-in sheet.
     #[cfg_attr(not(target_os = "ios"), allow(dead_code))]
@@ -90,7 +109,7 @@ pub async fn accounts_sign_in_start(
 /// listener could not start, where the person pastes it.
 #[cfg(desktop)]
 fn app_return(app: &AppHandle) -> Option<AppReturn> {
-    crate::accounts_loopback::start(app)
+    crate::accounts::sign_in_loopback::start(app)
         .inspect_err(|error| log::warn!("{error}; the code is pasted instead"))
         .ok()
         .map(AppReturn::Port)
@@ -109,7 +128,7 @@ fn app_return(_app: &AppHandle) -> Option<AppReturn> {
 #[cfg(target_os = "ios")]
 fn sign_in_page_open(app: &AppHandle, url: String, verifier: String) -> Result<(), String> {
     log::info!("opening the sign-in sheet at {url}");
-    crate::accounts_sheet::open(app, url, verifier);
+    crate::accounts::sign_in_sheet::open(app, url, verifier);
     Ok(())
 }
 
@@ -136,7 +155,7 @@ pub async fn accounts_sign_in_pending(
 /// Exchanges the code the browser showed, with the verifier kept at the
 /// start, for the session, and keeps it as the active account; or, on a
 /// device with a local user, offers to move what they made into the
-/// account, see `local_users`.
+/// account, see `app::local_users`.
 #[tauri::command]
 pub async fn accounts_sign_in_finish(
     app: AppHandle,
@@ -170,7 +189,7 @@ pub async fn sign_in_finish(app: &AppHandle, code: &str) -> Result<SignInFinishe
         .await
         .map_err(|error| error.to_string())?;
     stop_loopback(app);
-    crate::store_transactions::spawn_send_unfinished(app.clone());
+    crate::accounts::store_transactions::spawn_send_unfinished(app.clone());
     sync::spawn(app.clone());
     Ok(finished)
 }
@@ -220,7 +239,7 @@ pub fn device_code_in(url: &str) -> Option<String> {
 
 fn stop_loopback(_app: &AppHandle) {
     #[cfg(desktop)]
-    crate::accounts_loopback::stop(_app);
+    crate::accounts::sign_in_loopback::stop(_app);
 }
 
 #[tauri::command]

@@ -2,9 +2,8 @@
 <script>
   import { communitiesList, onSynced } from "../lib/core/index.js";
   import { communitiesNewUrl, communitiesShowUrl } from "../lib/routes.js";
-  import CommunitiesMembershipButton from "./CommunitiesMembershipButton.svelte";
-  import { Button, ErrorMessage, Heading, Link, Panel, Text } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
+  import CommunitiesMembershipButton from "./components/CommunitiesMembershipButton.svelte";
+  import { Button, ErrorMessage, Heading, Link, Page, Panel, Text } from "../lib/components/index.js";
 
   let communities = $state([]);
   let error = $state("");

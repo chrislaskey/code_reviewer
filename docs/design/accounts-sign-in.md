@@ -7,7 +7,7 @@ user's id, and a sign-up's name, from the email since 2026-11-20, is the only th
 `app_users` syncs besides their picture; read `app_users` below as
 that pair. The code is `core/src/accounts.rs`,
 `core/src/data/accounts_tokens/`, `core/src/services/mailer.rs` and `core/src/services/mailer/mails.rs`,
-`axum/src/accounts.rs`, `axum/src/mailer.rs` and
+`axum/src/accounts.rs`, `axum/src/config/mailer.rs` and
 `axum/src/rate_limits.rs`, `tauri/src/accounts.rs` with the
 `device_sign_in` table in `tauri/src/device_accounts.rs`, and the pages
 under `svelte/src/accounts/`. Every item under "To decide" is
@@ -49,7 +49,7 @@ code, or made at sign-up (items 4, 5 and 22), read it as moved here.
   password and no session, and the next sign-in is the code alone.
 - **A device's sign-in** is the same pages with its challenge; whichever
   step finishes answers the device code.
-- **Later**, signed in, `/accounts/password`
+- **Later**, signed in, `/accounts/password/edit`
   (`AccountsPasswordEditPage.svelte`) makes the first password or
   changes it, the current one required when there is one,
   `accounts::password_update`. In the apps the page asks the server
@@ -100,7 +100,7 @@ device code it navigates to `http://127.0.0.1:<port>/?code=…`, built by
 `accountsAppReturnUrl`, which takes only a port, so the page can send
 a code nowhere but this computer. The listener answers its first
 request with a redirect to `/accounts/back-to-app` on the web and
-hands the URL to `tauri/src/accounts_loopback.rs`, which finishes the
+hands the URL to `tauri/src/accounts/sign_in_loopback.rs`, which finishes the
 sign-in as a pasted code does, brings the window to the front, and
 emits `accounts-sign-in-returned` for the accounts page, `{result:
 "finished", finished}` or `{result: "failed", error}`. The page still
@@ -116,7 +116,7 @@ in place of universal links. iOS does not open the app from a universal
 link on the domain the person is already browsing, nor from a redirect
 they did not tap, and the end of a sign-in on the server's own pages is
 both. `accounts_sign_in_start` opens the sign-in page in the sheet over
-the app, `tauri/src/accounts_sheet.rs` through our own plugin,
+the app, `tauri/src/accounts/sign_in_sheet.rs` through our own plugin,
 `tauri/plugins/web-auth-session` (the published ones either drop the
 session, so the sheet can close at once, or are called only from
 JavaScript). The query carries `app_scheme`, the app's bundle
@@ -573,7 +573,7 @@ constant, to change in a fork. HTML, templates and a sender name are
 later.
 
 The server opens the mailer at start beside the database,
-`axum/src/mailer.rs`: `MAILER` unset or `log` gives `Log`, `resend`
+`axum/src/config/mailer.rs`: `MAILER` unset or `log` gives `Log`, `resend`
 gives `Resend` from `RESEND_API_KEY` and `MAIL_FROM`, and the server
 refuses to start when either is missing. The router's state becomes
 a struct of the deployment and the mailer, with `FromRef` for each,

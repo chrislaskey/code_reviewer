@@ -33,7 +33,7 @@ use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::KeyExtractor;
 
 use crate::api_error::ApiError;
-use crate::router::AppState;
+use crate::state::AppState;
 
 /// Emails an address is sent in an hour, codes and the rest.
 pub const EMAILS_PER_HOUR_PER_ADDRESS: u32 = 5;

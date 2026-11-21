@@ -1,19 +1,21 @@
 //! The ops app on the web server: its API under `/api/ops`; its pages,
-//! a build of their own (`svelte/dist-ops`), at `/ops` and under it;
-//! and the commands that say who is staff, `app_web ops staff create
-//! <email>` and `delete`. All of it is for staff: to anyone else, signed
+//! a build of their own (`svelte/dist-ops`), at `/ops` and under it.
+//! Who is staff is said from the command line, see
+//! `command_line::ops_staff`. All of it is for staff: to anyone else, signed
 //! in or not, every path of it is a 404, as a path that does not exist,
 //! so nothing tells them there is an ops app. See
 //! `docs/design/multi-app.md`.
 
+pub mod current_staff;
+
 use std::path::Path;
 
+use axum::Router;
 use axum::extract::{Request, State};
 use axum::http::{Method, StatusCode, Uri};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
-use axum::{Extension, Json, Router};
 use tower_http::services::{ServeDir, ServeFile};
 
 use app_core::data::ops_staff::Staff;
@@ -21,13 +23,14 @@ use app_core::deployment::Deployment;
 use app_core::ops::staff::{self, StaffError};
 
 use crate::api_error::ApiError;
-use crate::current_user::CurrentUser;
-use crate::router::{AppState, api_not_found};
+use crate::router::api_not_found;
+use crate::state::AppState;
+use crate::user_auth::CurrentUser;
 
 /// The API's routes, for staff.
 pub fn api(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/api/ops/current-staff", get(current_staff))
+        .route("/api/ops/current-staff", get(current_staff::get))
         .route_layer(middleware::from_fn_with_state(state, api_for_staff))
 }
 
@@ -85,43 +88,5 @@ async fn pages_for_staff(
     match staff_of(&deployment, user).await? {
         Some(_) => Ok(next.run(request).await),
         None => Ok(StatusCode::NOT_FOUND.into_response()),
-    }
-}
-
-/// `GET /api/ops/current-staff`: the staff row of the request's user.
-async fn current_staff(Extension(staff): Extension<Staff>) -> Json<Staff> {
-    Json(staff)
-}
-
-impl From<StaffError> for ApiError {
-    fn from(error: StaffError) -> Self {
-        let status = match error {
-            StaffError::NotStaff => StatusCode::NOT_FOUND,
-            StaffError::NoAccount { .. } => StatusCode::NOT_FOUND,
-            StaffError::AccountUser(error) => return error.into(),
-            StaffError::ServerOnly | StaffError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        };
-        ApiError::new(status, error.to_string())
-    }
-}
-
-/// `ops staff create <email>` and `ops staff delete <email>`.
-pub async fn command(deployment: &Deployment, words: &[&str]) -> Result<(), String> {
-    match words {
-        ["staff", "create", email] => {
-            staff::create(deployment, email)
-                .await
-                .map_err(|error| error.to_string())?;
-            println!("{email} is staff");
-            Ok(())
-        }
-        ["staff", "delete", email] => {
-            staff::delete(deployment, email)
-                .await
-                .map_err(|error| error.to_string())?;
-            println!("{email} is staff no longer");
-            Ok(())
-        }
-        _ => Err("commands: ops staff create <email>, ops staff delete <email>".to_string()),
     }
 }

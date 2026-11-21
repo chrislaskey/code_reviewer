@@ -12,23 +12,29 @@
 //! cookie; the device exchanges it with its verifier for its session,
 //! which it keeps and sends as a bearer token. A sign-out deletes the
 //! token and clears the cookie. Each route is rate limited, see
-//! `rate_limits`. "Try it now" makes a trial user with no sign-up, see
-//! `app_core::accounts::trial_users`, whose cookie lasts until their rows go; a
-//! sign-up from that browser is theirs.
+//! `rate_limits`. A sign-up from a trial user's browser is theirs, see
+//! `trial_users`. The accounts app's other routes are its submodules,
+//! each at the path of the core module it calls.
+
+pub mod app_store_notifications;
+pub mod checkouts;
+pub mod deletions;
+pub mod products;
+pub mod purchases;
+pub mod store_transactions;
+pub mod stripe_events;
+pub mod subscriptions;
+pub mod trial_users;
 
 use axum::Json;
 use axum::extract::State;
-use axum::http::header::HOST;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum_extra::extract::CookieJar;
-use axum_extra::extract::cookie::{Cookie, SameSite};
-use serde::{Deserialize, Serialize};
+use axum_extra::extract::cookie::Cookie;
+use serde::Deserialize;
 
-use app_core::accounts::trial_users;
-use app_core::accounts::{
-    self, AccountError, CodeSent, PasswordUpdate, SecondFactor, Session, SignInStep,
-};
+use app_core::accounts::{self, CodeSent, PasswordUpdate, SecondFactor, Session, SignInStep};
 use app_core::app::users;
 use app_core::data::accounts_tokens::Context;
 use app_core::data::app_users::User;
@@ -36,9 +42,8 @@ use app_core::deployment::Deployment;
 use app_core::services::mailer::Mailer;
 
 use crate::api_error::ApiError;
-use crate::current_user::{CurrentToken, CurrentUser, TOKEN_COOKIE};
-use crate::rate_limits::{ClientIpAddr, RateLimits};
-use crate::router::TrialUsersMax;
+use crate::rate_limits::RateLimits;
+use crate::user_auth::{CurrentToken, CurrentUser, TOKEN_COOKIE, signed_in_user_of, token_cookie};
 
 #[derive(Deserialize)]
 pub struct SignIn {
@@ -114,69 +119,10 @@ async fn trial_user_of(deployment: &Deployment, jar: &CookieJar) -> Result<Optio
     let Some(user) = signed_in_user_of(deployment, jar).await? else {
         return Ok(None);
     };
-    let is_trial = trial_users::is_trial(deployment, &user)
+    let is_trial = app_core::accounts::trial_users::is_trial(deployment, &user)
         .await
         .map_err(users::UserError::from)?;
     Ok(is_trial.then_some(user))
-}
-
-/// The user of the browser's cookie, if it has one the server knows.
-async fn signed_in_user_of(
-    deployment: &Deployment,
-    jar: &CookieJar,
-) -> Result<Option<User>, ApiError> {
-    let Some(cookie) = jar.get(TOKEN_COOKIE) else {
-        return Ok(None);
-    };
-    match users::get_by_token(deployment, cookie.value()).await {
-        Ok(user) => Ok(Some(user)),
-        Err(users::UserError::UnknownToken | users::UserError::AccountDeleted) => Ok(None),
-        Err(error) => Err(error.into()),
-    }
-}
-
-#[derive(Serialize)]
-pub struct TrialAvailable {
-    pub available: bool,
-}
-
-/// `GET /api/accounts/trial`: whether "Try it now" would make a trial
-/// user, for the pages to offer it.
-pub async fn trial_get(
-    State(deployment): State<Deployment>,
-    State(TrialUsersMax(max)): State<TrialUsersMax>,
-) -> Result<Json<TrialAvailable>, ApiError> {
-    let count = trial_users::count(&deployment)
-        .await
-        .map_err(AccountError::from)?;
-    let available = max > 0 && count < max;
-    Ok(Json(TrialAvailable { available }))
-}
-
-/// `POST /api/accounts/trial`, "Try it now": a trial user, signed in
-/// with a cookie that lasts as long as their rows are kept. A browser
-/// already signed in, as a trial user or anyone, is answered who it is
-/// and nothing is made. A client IP makes so many an hour, see
-/// `rate_limits`; one refused because the server holds all the trial
-/// users it may is a 503, which `ApiError` writes to the log.
-pub async fn trial_create(
-    State(deployment): State<Deployment>,
-    State(TrialUsersMax(max)): State<TrialUsersMax>,
-    State(limits): State<RateLimits>,
-    ClientIpAddr(client_ip): ClientIpAddr,
-    headers: HeaderMap,
-    jar: CookieJar,
-) -> Result<Response, ApiError> {
-    if signed_in_user_of(&deployment, &jar).await?.is_some() {
-        return Ok(StatusCode::NO_CONTENT.into_response());
-    }
-    limits.check_trial_user(client_ip)?;
-    let session = trial_users::create(&deployment, max)
-        .await
-        .map_err(AccountError::from)?;
-    let kept_for = time::Duration::seconds(trial_users::kept_for().num_seconds());
-    let jar = jar.add(token_cookie(&session.token, &headers, Some(kept_for)));
-    Ok((StatusCode::CREATED, jar, Json(session)).into_response())
 }
 
 pub async fn sign_in(
@@ -368,32 +314,4 @@ pub async fn sign_out(
     accounts::sign_out(&deployment, &token).await?;
     let jar = jar.remove(Cookie::build(TOKEN_COOKIE).path("/"));
     Ok((StatusCode::NO_CONTENT, jar))
-}
-
-/// The cookie a browser keeps the token in: for `keep_for`, or without
-/// it until the browser closes. `Secure` unless the request came to
-/// localhost, where there is no TLS.
-pub(crate) fn token_cookie(
-    token: &str,
-    headers: &HeaderMap,
-    keep_for: Option<time::Duration>,
-) -> Cookie<'static> {
-    let cookie = Cookie::build((TOKEN_COOKIE, token.to_string()))
-        .path("/")
-        .http_only(true)
-        .same_site(SameSite::Strict)
-        .secure(!is_localhost(headers));
-    match keep_for {
-        Some(keep_for) => cookie.max_age(keep_for).build(),
-        None => cookie.build(),
-    }
-}
-
-pub(crate) fn is_localhost(headers: &HeaderMap) -> bool {
-    let host = headers
-        .get(HOST)
-        .and_then(|host| host.to_str().ok())
-        .unwrap_or_default();
-    let host = host.rsplit_once(':').map_or(host, |(name, _port)| name);
-    matches!(host, "localhost" | "127.0.0.1" | "[::1]")
 }

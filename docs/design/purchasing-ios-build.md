@@ -191,7 +191,7 @@ transactions as plain values, so tests need no Apple-signed data.
 New crate, **approved** after step 0: `tauri-plugin-iap`, iOS only in
 `tauri/Cargo.toml`'s `cfg(target_os = "ios")` dependencies.
 
-- [x] `tauri/src/store_sheet.rs`: the `StoreSheet` trait (prices for
+- [x] `tauri/src/accounts/store_sheet.rs`: the `StoreSheet` trait (prices for
       lookup keys, buy, unfinished transactions, finish, open
       subscriptions), the iOS one on the plugin, and an "not available
       yet" one for Android.
@@ -250,7 +250,7 @@ Where the work went another way than a box says:
   the core function behind the route, checking the proof with the
   store's module; `apply_in` is store-neutral. A transaction refused
   by a notification (no account to give it to) is logged and recorded.
-- **Step 3.** The settings are read in `axum/src/app_store.rs`; with
+- **Step 3.** The settings are read in `axum/src/config/app_store.rs`; with
   `APP_STORE_APP_ID` unset only sandbox data is taken. Only
   `AppleRootCA-G3` and `-G2` are checked in; the older Apple Inc. root
   could not be fetched and is not needed for App Store data.

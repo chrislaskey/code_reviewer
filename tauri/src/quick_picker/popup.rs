@@ -14,13 +14,13 @@ use uuid::Uuid;
 use app_core::app::files::{self as core_files, FileSearch, FileSearchResults};
 
 use crate::MAIN_WINDOW;
+use crate::app::files;
 use crate::clipboard;
-use crate::current_user::signed_in;
 use crate::device_accounts::DeviceAccounts;
-use crate::files;
 use crate::macos::ScreenRect;
 use crate::macos::running_app::{self, RunningApp};
 use crate::macos::{accessibility, keyboard};
+use crate::user_auth::signed_in;
 
 use super::panel;
 use super::placement::{self, Placement, TextPlacement};

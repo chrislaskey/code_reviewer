@@ -12,8 +12,7 @@
     pendingChangesList,
   } from "../lib/core/index.js";
   import { postsIndexUrl } from "../lib/routes.js";
-  import { Button, ErrorMessage, Heading, Link, Panel, Text } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
+  import { Button, ErrorMessage, Heading, Link, Page, Panel, Text } from "../lib/components/index.js";
 
   let pending = $state([]);
   let conflicts = $state([]);

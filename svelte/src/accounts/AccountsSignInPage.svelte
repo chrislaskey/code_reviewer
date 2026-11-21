@@ -6,11 +6,10 @@
 <script>
   import { accountsSignIn, accountsTrialGet } from "../lib/core/index.js";
   import { accountsSignUpUrl, accountsTrialUrl } from "../lib/routes.js";
-  import AccountsForm from "./AccountsForm.svelte";
-  import AccountsSignInSteps from "./AccountsSignInSteps.svelte";
+  import AccountsForm from "./components/AccountsForm.svelte";
+  import AccountsSignInSteps from "./components/AccountsSignInSteps.svelte";
   import { KEEP_SIGNED_IN_CHECKED } from "./keep_signed_in.js";
-  import { Heading, Link, Text } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
+  import { Heading, Link, Page, Text } from "../lib/components/index.js";
 
   const query = new URLSearchParams(window.location.search);
   const challenge = query.get("challenge") ?? "";

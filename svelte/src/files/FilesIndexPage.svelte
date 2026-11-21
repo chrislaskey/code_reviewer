@@ -11,13 +11,12 @@
 <script>
   import AnimationsToggle from "../lib/AnimationsToggle.svelte";
   import FileImage from "../lib/FileImage.svelte";
-  import FilesGrid from "./FilesGrid.svelte";
+  import FilesGrid from "./components/FilesGrid.svelte";
   import { filesCacheDelete, filesCacheGet, filesContentUrl, filesSearch, filesSearchWaitMs, onSynced } from "../lib/core/index.js";
   import { filesNewUrl, filesShowUrl } from "../lib/routes.js";
-  import { fileSize } from "./file_size.js";
+  import { fileSize } from "../lib/file_size.js";
   import { filesView, setFilesView } from "./files_view.js";
-  import { Badge, Button, ErrorMessage, Heading, Icon, Input, Link, Panel, Text } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
+  import { Badge, Button, ErrorMessage, Heading, Icon, Input, Link, Page, Panel, Text } from "../lib/components/index.js";
   import { PAGE_SIZE, PagedSearch } from "../lib/paged_search.svelte.js";
 
   /** @type {{ view: import("./files_view.js").FilesView, label: string, icon: string }[]} */

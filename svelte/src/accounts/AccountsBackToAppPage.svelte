@@ -4,8 +4,7 @@
      signed in. The app asks the server again when it has the focus. See
      docs/design/purchasing.md, step 7, and accounts-sign-in.md. -->
 <script>
-  import { Heading, Text } from "../lib/components/index.js";
-  import Page from "../lib/Page.svelte";
+  import { Heading, Page, Text } from "../lib/components/index.js";
 </script>
 
 <Page>

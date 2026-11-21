@@ -99,7 +99,7 @@ which the cleanup removes, and never a row without a file.
 
 | Step | Who | What |
 | --- | --- | --- |
-| 1 | device, `files::ask_about_waiting` | for each pending create on `app_files`, the oldest `files::FILES_PER_SYNC` (100), asks `POST /api/files/upload` with `{id, content_type, size, sha256}` |
+| 1 | device, `files::ask_about_waiting` | for each pending create on `app_files`, the oldest `files::FILES_PER_SYNC` (100), asks `POST /api/files/uploads` with `{id, content_type, size, sha256}` |
 | 2 | server | checks the size; looks at `files/<creator id>/<file id>`. There, of that size and with that checksum: `uploaded`. Otherwise a PUT URL signed for the content type and the checksum, good for 10 minutes |
 | 3 | device | pushes every pending event except those of a file not answered `uploaded`, `files::held_back`; a rename waits with its create |
 | 4 | device | pulls, backfills, prunes, as ever |

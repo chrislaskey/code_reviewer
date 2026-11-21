@@ -9,7 +9,7 @@
 // or a page's code does not load, the page says so above it rather than
 // going nowhere (page_load_error.svelte.js).
 import { Navigation, createRouter } from "sv-router";
-import AppLayout from "./AppLayout.svelte";
+import AppLayout from "./layouts/AppLayout.svelte";
 import { hasDeviceAccounts } from "./core/index.js";
 import { currentUserLoad } from "./current_user.js";
 import { pageLoadErrorClear, pageLoadErrorShow } from "./page_load_error.svelte.js";
@@ -81,8 +81,8 @@ const { navigate, route } = createRouter({
       pageLoadErrorShow(`This page could not load: ${problem instanceof Error ? problem.message : problem}`);
     },
   },
-  [PUBLIC_HOME_PATH]: () => import("../HomePage.svelte"),
-  [HOME_PATH]: () => import("../HomePage.svelte"),
+  [PUBLIC_HOME_PATH]: () => import("../home/HomePage.svelte"),
+  [HOME_PATH]: () => import("../home/HomePage.svelte"),
   [ACCOUNTS_INDEX_PATH]: () => import("../accounts/AccountsIndexPage.svelte"),
   [ACCOUNTS_SIGN_UP_PATH]: () => import("../accounts/AccountsSignUpPage.svelte"),
   [ACCOUNTS_SIGN_IN_PATH]: () => import("../accounts/AccountsSignInPage.svelte"),
@@ -102,16 +102,16 @@ const { navigate, route } = createRouter({
   [CONFLICTS_INDEX_PATH]: () => import("../conflicts/ConflictsIndexPage.svelte"),
   [PROFILE_EDIT_PATH]: () => import("../profile/ProfileEditPage.svelte"),
   [ACCOUNTS_SETTINGS_PATH]: () => import("../accounts/AccountsSettingsPage.svelte"),
-  [ACCOUNTS_PASSWORD_EDIT_PATH]: () => import("../accounts/AccountsPasswordEditPage.svelte"),
-  [ACCOUNTS_DELETIONS_NEW_PATH]: () => import("../accounts/AccountsDeletionsNewPage.svelte"),
-  [ACCOUNTS_PRODUCTS_INDEX_PATH]: () => import("../accounts/AccountsProductsIndexPage.svelte"),
-  [ACCOUNTS_PRODUCTS_SHOW_PATH]: () => import("../accounts/AccountsProductsShowPage.svelte"),
-  [ACCOUNTS_CHECKOUTS_SHOW_PATH]: () => import("../accounts/AccountsCheckoutsShowPage.svelte"),
+  [ACCOUNTS_PASSWORD_EDIT_PATH]: () => import("../accounts/password/AccountsPasswordEditPage.svelte"),
+  [ACCOUNTS_DELETIONS_NEW_PATH]: () => import("../accounts/deletions/AccountsDeletionsNewPage.svelte"),
+  [ACCOUNTS_PRODUCTS_INDEX_PATH]: () => import("../accounts/products/AccountsProductsIndexPage.svelte"),
+  [ACCOUNTS_PRODUCTS_SHOW_PATH]: () => import("../accounts/products/AccountsProductsShowPage.svelte"),
+  [ACCOUNTS_CHECKOUTS_SHOW_PATH]: () => import("../accounts/checkouts/AccountsCheckoutsShowPage.svelte"),
   [ACCOUNTS_BACK_TO_APP_PATH]: () => import("../accounts/AccountsBackToAppPage.svelte"),
-  [ACCOUNTS_PURCHASES_INDEX_PATH]: () => import("../accounts/AccountsPurchasesIndexPage.svelte"),
-  [ACCOUNTS_PURCHASES_SHOW_PATH]: () => import("../accounts/AccountsPurchasesShowPage.svelte"),
-  [ACCOUNTS_SUBSCRIPTIONS_INDEX_PATH]: () => import("../accounts/AccountsSubscriptionsIndexPage.svelte"),
-  [ACCOUNTS_SUBSCRIPTIONS_SHOW_PATH]: () => import("../accounts/AccountsSubscriptionsShowPage.svelte"),
+  [ACCOUNTS_PURCHASES_INDEX_PATH]: () => import("../accounts/purchases/AccountsPurchasesIndexPage.svelte"),
+  [ACCOUNTS_PURCHASES_SHOW_PATH]: () => import("../accounts/purchases/AccountsPurchasesShowPage.svelte"),
+  [ACCOUNTS_SUBSCRIPTIONS_INDEX_PATH]: () => import("../accounts/subscriptions/AccountsSubscriptionsIndexPage.svelte"),
+  [ACCOUNTS_SUBSCRIPTIONS_SHOW_PATH]: () => import("../accounts/subscriptions/AccountsSubscriptionsShowPage.svelte"),
   [SUPPORT_INDEX_PATH]: () => import("../support/SupportIndexPage.svelte"),
   [FORUM_INDEX_PATH]: () => import("../forum/ForumIndexPage.svelte"),
 });

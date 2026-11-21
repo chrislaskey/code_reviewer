@@ -1,10 +1,10 @@
 # Navigation: what was left out
 
 The layout follows Code Reviewer's: a gutter of tabs down the left edge
-(`svelte/src/lib/AppNav.svelte`), and on small windows a bar along the
+(`svelte/src/lib/layouts/AppNav.svelte`), and on small windows a bar along the
 bottom with Home, Back, Forward and a Menu sheet
-(`svelte/src/lib/BottomBar.svelte`). A header across the window's top
-(`svelte/src/lib/AppHeader.svelte`) holds what has no place in either:
+(`svelte/src/lib/layouts/BottomBar.svelte`). A header across the window's top
+(`svelte/src/lib/layouts/AppHeader.svelte`) holds what has no place in either:
 Back and Forward in the desktop app, the community switcher, the sync
 status (`SyncMenu.svelte`) and the person (`AccountMenu.svelte`), with
 the trial's and a failed payment's banners below it (`AppLayout.svelte`).
