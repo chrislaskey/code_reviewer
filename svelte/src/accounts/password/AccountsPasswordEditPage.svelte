@@ -4,6 +4,7 @@
      one. The server keeps it, so in the app this needs a connection. -->
 <script>
   import { accountsPasswordUpdate, accountsSecondFactors } from "../../lib/core/index.js";
+  import { errorMessageOf } from "../../lib/error_message.js";
   import { accountsCurrentShowUrl } from "../../lib/routes.js";
   import { Button, ErrorMessage, Heading, Input, Link, Page, Text } from "../../lib/components/index.js";
 
@@ -17,7 +18,7 @@
 
   accountsSecondFactors().then(
     (factors) => (hasPassword = factors.includes("password")),
-    (problem) => (error = problem instanceof Error ? problem.message : String(problem)),
+    (problem) => (error = errorMessageOf(problem)),
   );
 
   /** @param {SubmitEvent} event */
@@ -33,7 +34,7 @@
       current = "";
       password = "";
     } catch (problem) {
-      error = problem instanceof Error ? problem.message : String(problem);
+      error = errorMessageOf(problem);
     } finally {
       busy = false;
     }

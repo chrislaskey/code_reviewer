@@ -1,7 +1,9 @@
 <!-- One community, at /communities/:id, to join or leave, and for a
      member to edit or delete -->
 <script>
-  import { communitiesDelete, communitiesGet, onSynced } from "../lib/core/index.js";
+  import { communitiesDelete, communitiesGet } from "../lib/core/index.js";
+  import { loaded } from "../lib/loaded.svelte.js";
+  import { errorMessageOf } from "../lib/error_message.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { communitiesEditUrl, communitiesIndexUrl } from "../lib/routes.js";
   import CommunitiesDeleteDialog from "./components/CommunitiesDeleteDialog.svelte";
@@ -9,19 +11,10 @@
   import { Button, ErrorMessage, Heading, Link, Page, Text } from "../lib/components/index.js";
 
   const id = pathParams().id;
-  let shown = $state();
+  const shown = loaded(() => communitiesGet(id), { reloadOnSync: true });
   let error = $state("");
   let deleting = $state(false);
   let busy = $state(false);
-
-  async function load() {
-    try {
-      shown = await communitiesGet(id);
-      error = "";
-    } catch (problem) {
-      error = String(problem);
-    }
-  }
 
   async function remove() {
     busy = true;
@@ -31,41 +24,39 @@
       await navigateToUrl(communitiesIndexUrl());
     } catch (problem) {
       deleting = false;
-      error = String(problem);
+      error = errorMessageOf(problem);
     } finally {
       busy = false;
     }
   }
-
-  $effect(() => onSynced(load));
-  load();
 </script>
 
 <Page>
-  <Heading level={1}>{shown ? shown.community.name : "Community"}</Heading>
+  <Heading level={1}>{shown.value?.community.name ?? "Community"}</Heading>
 
-  <ErrorMessage message={error} />
-  {#if shown}
+  <ErrorMessage message={error || shown.error} />
+  {#if shown.value}
+    {@const { community, membership } = shown.value}
     <Text tone="muted">
-      Created {shown.community.inserted_at}
-      {#if shown.membership}
+      Created {community.inserted_at}
+      {#if membership}
         · you are a member
       {/if}
     </Text>
     <div class="flex flex-wrap gap-2">
       <CommunitiesMembershipButton
         communityId={id}
-        membership={shown.membership}
-        onchange={load}
+        {membership}
+        onchange={shown.reload}
         onerror={(problem) => (error = problem)}
       />
-      {#if shown.membership}
+      {#if membership}
         <Button size="sm" href={communitiesEditUrl(id)}>Edit</Button>
         <Button size="sm" variant="ghost" onclick={() => (deleting = true)}>Delete</Button>
       {/if}
     </div>
     <CommunitiesDeleteDialog
-      community={deleting ? shown.community : null}
+      community={deleting ? community : null}
       {busy}
       ondelete={remove}
       oncancel={() => (deleting = false)}

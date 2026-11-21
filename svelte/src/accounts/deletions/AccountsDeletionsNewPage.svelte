@@ -7,6 +7,7 @@
      list's. -->
 <script>
   import { accountsDeletionsCodeCreate, accountsDeletionsCreate, hasDeviceAccounts } from "../../lib/core/index.js";
+  import { errorMessageOf } from "../../lib/error_message.js";
   import { currentUserForget, currentUserLoad } from "../../lib/current_user.js";
   import { navigateToUrl } from "../../lib/router.js";
   import { PUBLIC_HOME_PATH, accountsIndexUrl, accountsCurrentShowUrl } from "../../lib/routes.js";
@@ -27,7 +28,7 @@
 
   currentUserLoad().then(
     (user) => (currentUser = user),
-    (problem) => (error = String(problem)),
+    (problem) => (error = errorMessageOf(problem)),
   );
 
   /** @param {() => Promise<void>} action */
@@ -37,7 +38,7 @@
     try {
       await action();
     } catch (problem) {
-      error = problem instanceof Error ? problem.message : String(problem);
+      error = errorMessageOf(problem);
     } finally {
       busy = false;
     }

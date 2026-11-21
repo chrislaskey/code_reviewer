@@ -2,6 +2,7 @@
      among the person's; its bytes never change. Done, it shows the file -->
 <script>
   import { FormError, filesGet, filesUpdate } from "../lib/core/index.js";
+  import { errorMessageOf } from "../lib/error_message.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { filesShowUrl } from "../lib/routes.js";
   import { Button, ErrorMessage, FieldErrors, Heading, Input, Label, Link, Page } from "../lib/components/index.js";
@@ -24,7 +25,7 @@
       communityIds = shown.communities.map((community) => community.id);
       loaded = true;
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     }
   }
 
@@ -39,7 +40,7 @@
       await navigateToUrl(filesShowUrl(id));
     } catch (problem) {
       if (problem instanceof FormError) errors = problem.errors;
-      error = problem instanceof Error ? problem.message : String(problem);
+      error = errorMessageOf(problem);
     } finally {
       busy = false;
     }

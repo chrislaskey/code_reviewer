@@ -8,48 +8,45 @@
     conflictsList,
     conflictsReapply,
     conflictsTryAgain,
-    onSynced,
     pendingChangesList,
   } from "../lib/core/index.js";
+  import { loaded } from "../lib/loaded.svelte.js";
+  import { errorMessageOf } from "../lib/error_message.js";
   import { postsIndexUrl } from "../lib/routes.js";
   import { Button, ErrorMessage, Heading, Link, Page, Panel, Text } from "../lib/components/index.js";
 
-  let pending = $state([]);
-  let conflicts = $state([]);
+  const changes = loaded(
+    async () => {
+      const [pending, conflicts] = await Promise.all([pendingChangesList(), conflictsList()]);
+      return { pending, conflicts };
+    },
+    { reloadOnSync: true },
+  );
+  let pending = $derived(changes.value?.pending ?? []);
+  let conflicts = $derived(changes.value?.conflicts ?? []);
   let error = $state("");
-
-  async function load() {
-    try {
-      [pending, conflicts] = await Promise.all([pendingChangesList(), conflictsList()]);
-    } catch (problem) {
-      error = String(problem);
-    }
-  }
 
   /** @param {() => Promise<unknown>} resolve */
   async function resolveThen(resolve) {
     error = "";
     try {
       await resolve();
-      await load();
+      await changes.reload();
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     }
   }
 
   /** @param {unknown} value */
   const shown = (value) => (value === null || value === undefined ? "" : String(value));
-
-  $effect(() => onSynced(load));
-  load();
 </script>
 
 <Page>
   <Heading level={1}>Changes not on the server</Heading>
 
-  <ErrorMessage message={error} />
+  <ErrorMessage message={error || changes.error} />
 
-  {#if pending.length === 0 && conflicts.length === 0 && !error}
+  {#if changes.value && pending.length === 0 && conflicts.length === 0}
     <Text tone="muted">Every change reached the server.</Text>
   {/if}
 

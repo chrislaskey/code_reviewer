@@ -2,23 +2,12 @@
      those in their communities -->
 <script>
   import { t } from "ttag";
-  import { onSynced, postsList } from "../lib/core/index.js";
+  import { postsList } from "../lib/core/index.js";
+  import { loaded } from "../lib/loaded.svelte.js";
   import { postsNewUrl, postsShowUrl } from "../lib/routes.js";
   import { Button, ErrorMessage, Heading, Link, Page, Panel, Text } from "../lib/components/index.js";
 
-  let posts = $state([]);
-  let error = $state("");
-
-  async function load() {
-    try {
-      posts = await postsList();
-    } catch (problem) {
-      error = String(problem);
-    }
-  }
-
-  $effect(() => onSynced(load));
-  load();
+  const posts = loaded(postsList, { reloadOnSync: true });
 </script>
 
 <Page>
@@ -27,14 +16,14 @@
     <Button variant="primary" size="sm" href={postsNewUrl()}>{t`New post`}</Button>
   </div>
 
-  <ErrorMessage message={error} />
+  <ErrorMessage message={posts.error} />
 
-  {#if posts.length === 0 && !error}
+  {#if posts.value?.length === 0}
     <Text tone="muted">{t`No posts yet.`}</Text>
   {/if}
 
   <ul class="flex flex-col gap-3">
-    {#each posts as { post, owner, communities } (post.id)}
+    {#each posts.value ?? [] as { post, owner, communities } (post.id)}
       <Panel as="li">
         <Text tone="muted">
           {owner.name} · {post.inserted_at}

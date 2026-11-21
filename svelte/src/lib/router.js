@@ -12,6 +12,7 @@ import { Navigation, createRouter } from "sv-router";
 import AppLayout from "./layouts/AppLayout.svelte";
 import { hasDeviceAccounts } from "./core/index.js";
 import { currentUserLoad } from "./current_user.js";
+import { errorMessageOf } from "./error_message.js";
 import { pageLoadErrorClear, pageLoadErrorShow } from "./page_load_error.svelte.js";
 import {
   ACCOUNTS_INDEX_PATH,
@@ -70,7 +71,7 @@ const { navigate, route } = createRouter({
       try {
         user = await currentUserLoad();
       } catch (problem) {
-        pageLoadErrorShow(`Could not check who is signed in: ${problem instanceof Error ? problem.message : problem}`);
+        pageLoadErrorShow(`Could not check who is signed in: ${errorMessageOf(problem)}`);
         return;
       }
       if (!user) throw navigateToUrl(hasDeviceAccounts ? accountsIndexUrl() : accountsSignInUrl());
@@ -78,7 +79,7 @@ const { navigate, route } = createRouter({
     onError(problem) {
       // A redirect from beforeLoad arrives here too
       if (problem instanceof Navigation || problem instanceof Promise) return;
-      pageLoadErrorShow(`This page could not load: ${problem instanceof Error ? problem.message : problem}`);
+      pageLoadErrorShow(`This page could not load: ${errorMessageOf(problem)}`);
     },
   },
   [PUBLIC_HOME_PATH]: () => import("../home/HomePage.svelte"),

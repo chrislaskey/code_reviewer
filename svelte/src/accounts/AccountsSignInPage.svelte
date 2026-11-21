@@ -5,6 +5,7 @@
      The email is filled in from ?email=. -->
 <script>
   import { accountsSignIn, accountsTrialGet } from "../lib/core/index.js";
+  import { errorMessageOf } from "../lib/error_message.js";
   import { accountsSignUpUrl, accountsTrialUrl } from "../lib/routes.js";
   import AccountsForm from "./components/AccountsForm.svelte";
   import AccountsSignInSteps from "./components/AccountsSignInSteps.svelte";
@@ -30,7 +31,7 @@
     try {
       pending = (await accountsSignIn(email)).pending;
     } catch (problem) {
-      error = problem instanceof Error ? problem.message : String(problem);
+      error = errorMessageOf(problem);
     } finally {
       busy = false;
     }

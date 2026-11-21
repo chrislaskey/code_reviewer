@@ -2,6 +2,7 @@
      `onchange` runs once the membership changed. -->
 <script>
   import { membershipsJoin, membershipsLeave } from "../../lib/core/index.js";
+  import { errorMessageOf } from "../../lib/error_message.js";
   import { currentCommunityChanged } from "../../lib/current_community.js";
   import { Button } from "../../lib/components/index.js";
 
@@ -25,7 +26,7 @@
       currentCommunityChanged();
       onchange();
     } catch (problem) {
-      onerror(String(problem));
+      onerror(errorMessageOf(problem));
     } finally {
       busy = false;
     }

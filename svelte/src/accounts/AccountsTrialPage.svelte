@@ -4,6 +4,7 @@
      the button, never from opening the page. -->
 <script>
   import { accountsTrialCreate, accountsTrialGet } from "../lib/core/index.js";
+  import { errorMessageOf } from "../lib/error_message.js";
   import { currentUserForget } from "../lib/current_user.js";
   import { navigateToUrl } from "../lib/router.js";
   import { accountsSignInUrl, accountsSignUpUrl, postsIndexUrl } from "../lib/routes.js";
@@ -16,7 +17,7 @@
 
   accountsTrialGet().then(
     (answer) => (available = answer),
-    (problem) => (error = problem instanceof Error ? problem.message : String(problem)),
+    (problem) => (error = errorMessageOf(problem)),
   );
 
   async function start() {
@@ -27,7 +28,7 @@
       currentUserForget();
       await navigateToUrl(postsIndexUrl());
     } catch (problem) {
-      error = problem instanceof Error ? problem.message : String(problem);
+      error = errorMessageOf(problem);
     } finally {
       busy = false;
     }

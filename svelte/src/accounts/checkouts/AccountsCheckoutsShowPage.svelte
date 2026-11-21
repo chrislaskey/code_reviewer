@@ -6,6 +6,7 @@
      docs/design/purchasing.md, P3. -->
 <script>
   import { accountsCheckoutsGet, hasDeviceAccounts } from "../../lib/core/index.js";
+  import { errorMessageOf } from "../../lib/error_message.js";
   import { currentUserReload } from "../../lib/current_user.js";
   import { pathParams } from "../../lib/router.js";
   import {
@@ -33,7 +34,7 @@
       if (pending && asked < ASK_AT_MOST) timer = setTimeout(load, ASK_AGAIN_MS);
       if (checkout.status === "paid") await currentUserReload();
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     }
   }
 

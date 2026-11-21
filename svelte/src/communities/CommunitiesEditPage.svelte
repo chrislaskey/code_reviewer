@@ -2,6 +2,7 @@
      community -->
 <script>
   import { FormError, communitiesGet, communitiesUpdate } from "../lib/core/index.js";
+  import { errorMessageOf } from "../lib/error_message.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { communitiesShowUrl } from "../lib/routes.js";
   import CommunitiesForm from "./components/CommunitiesForm.svelte";
@@ -20,7 +21,7 @@
       name = (await communitiesGet(id)).community.name;
       loaded = true;
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     }
   }
 
@@ -33,7 +34,7 @@
       await navigateToUrl(communitiesShowUrl(id));
     } catch (problem) {
       if (problem instanceof FormError) errors = problem.errors;
-      error = problem instanceof Error ? problem.message : String(problem);
+      error = errorMessageOf(problem);
     } finally {
       busy = false;
     }

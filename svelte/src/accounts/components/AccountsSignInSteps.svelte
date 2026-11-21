@@ -6,6 +6,7 @@
      device instead, see docs/design/accounts-sign-in.md. -->
 <script>
   import { accountsCode, accountsCodeResend, accountsSignInNewPassword, accountsSignInPassword, accountsSignInResetPassword } from "../../lib/core/index.js";
+  import { errorMessageOf } from "../../lib/error_message.js";
   import { currentUserForget } from "../../lib/current_user.js";
   import { navigateToUrl } from "../../lib/router.js";
   import { postsIndexUrl } from "../../lib/routes.js";
@@ -46,7 +47,7 @@
     try {
       await action();
     } catch (problem) {
-      error = problem instanceof Error ? problem.message : String(problem);
+      error = errorMessageOf(problem);
     } finally {
       busy = false;
     }

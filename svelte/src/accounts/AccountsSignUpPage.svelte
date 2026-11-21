@@ -7,6 +7,7 @@
 <script>
   import PublicPagesLinks from "../lib/PublicPagesLinks.svelte";
   import { accountsSignUp, accountsTrialGet } from "../lib/core/index.js";
+  import { errorMessageOf } from "../lib/error_message.js";
   import { accountsSignInUrl, accountsTrialUrl } from "../lib/routes.js";
   import AccountsForm from "./components/AccountsForm.svelte";
   import AccountsSignInSteps from "./components/AccountsSignInSteps.svelte";
@@ -32,7 +33,7 @@
     try {
       pending = (await accountsSignUp(email)).pending;
     } catch (problem) {
-      error = problem instanceof Error ? problem.message : String(problem);
+      error = errorMessageOf(problem);
     } finally {
       busy = false;
     }

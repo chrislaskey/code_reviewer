@@ -20,6 +20,7 @@
     quickPickerOpenApp,
     quickPickerPaste,
   } from "../lib/core/index.js";
+  import { errorMessageOf } from "../lib/error_message.js";
   import { PagedSearch } from "../lib/paged_search.svelte.js";
   import { fileSize } from "../lib/file_size.js";
 
@@ -56,7 +57,7 @@
     try {
       user = await currentUserGet();
     } catch (problem) {
-      message = String(problem);
+      message = errorMessageOf(problem);
     }
     signedIn = Boolean(user);
     if (signedIn) await search.startOverFromTop();
@@ -89,7 +90,7 @@
       await quickPickerPaste(file.id);
       message = "";
     } catch (problem) {
-      message = String(problem);
+      message = errorMessageOf(problem);
     }
   }
 
@@ -97,7 +98,7 @@
     try {
       await quickPickerOpenApp();
     } catch (problem) {
-      message = String(problem);
+      message = errorMessageOf(problem);
     }
   }
 

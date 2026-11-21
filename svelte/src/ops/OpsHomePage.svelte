@@ -4,6 +4,7 @@
   import { homeUrl } from "../lib/routes.js";
   import { opsCurrentStaffGet } from "./api.js";
   import { ErrorMessage, Heading, Link, Text } from "../lib/components/index.js";
+  import { errorMessageOf } from "../lib/error_message.js";
 
   /** @type {{user_id: string, inserted_at: string} | null} */
   let staff = $state(null);
@@ -11,7 +12,7 @@
 
   opsCurrentStaffGet().then(
     (answer) => (staff = answer),
-    (problem) => (error = String(problem)),
+    (problem) => (error = errorMessageOf(problem)),
   );
 </script>
 

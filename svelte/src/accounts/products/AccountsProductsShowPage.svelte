@@ -16,6 +16,8 @@
     accountsStoreTransactionsCreate,
     accountsSubscriptionsUpdate,
   } from "../../lib/core/index.js";
+  import { loaded } from "../../lib/loaded.svelte.js";
+  import { errorMessageOf } from "../../lib/error_message.js";
   import { currentUserLoad, currentUserReload } from "../../lib/current_user.js";
   import { navigateToUrl, pathParams } from "../../lib/router.js";
   import {
@@ -29,22 +31,15 @@
   import { Button, ErrorMessage, Heading, Link, Page, Text } from "../../lib/components/index.js";
 
   const id = pathParams().id;
-  let product = $state();
-  /** @type {import("../../lib/current_user.js").User | null} */
-  let currentUser = $state(null);
+  const shown = loaded(() => accountsProductsGet(id));
+  const user = loaded(currentUserLoad);
+  let product = $derived(shown.value);
+  let currentUser = $derived(user.value ?? null);
   let buying = $state(false);
   let pending = $state(false);
   let error = $state("");
   /** Where this app sells: Stripe, or the phone's store. */
   const store = $derived(product?.store ?? "stripe");
-
-  Promise.all([accountsProductsGet(id), currentUserLoad()]).then(
-    ([shown, user]) => {
-      product = shown;
-      currentUser = user;
-    },
-    (problem) => (error = String(problem)),
-  );
 
   /** @param {string} priceId */
   async function planSwitch(priceId) {
@@ -57,7 +52,7 @@
       await currentUserReload();
       await navigateToUrl(accountsSubscriptionsShowUrl(plan.subscription_id));
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
       buying = false;
     }
   }
@@ -73,7 +68,7 @@
       if (url) window.location.assign(url);
       else await navigateToUrl(accountsCheckoutsShowUrl(checkout.id));
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
       buying = false;
     }
   }
@@ -94,7 +89,7 @@
       if (bought.purchase) return navigateToUrl(accountsPurchasesShowUrl(bought.purchase.id));
       if (bought.subscription) return navigateToUrl(accountsSubscriptionsShowUrl(bought.subscription.id));
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     }
     buying = false;
   }
@@ -102,7 +97,7 @@
 
 <Page>
 
-  <ErrorMessage message={error} />
+  <ErrorMessage message={error || shown.error || user.error} />
   {#if product}
     <Heading level={1}>{product.name}</Heading>
     {#if product.description}

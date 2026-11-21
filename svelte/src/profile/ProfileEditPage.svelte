@@ -6,6 +6,7 @@
      needs an account on the server. -->
 <script>
   import { FormError, avatarsUpload, currentUserGet, currentUserUpdate } from "../lib/core/index.js";
+  import { errorMessageOf } from "../lib/error_message.js";
   import { currentUserForget } from "../lib/current_user.js";
   import { accountsIndexUrl } from "../lib/routes.js";
   import { Alert, Button, ErrorMessage, FieldErrors, FileInput, Heading, Input, Label, Page, Text } from "../lib/components/index.js";
@@ -29,7 +30,7 @@
       currentUser = await currentUserGet();
       name = currentUser?.name ?? "";
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     }
   }
 
@@ -52,7 +53,7 @@
       currentUserForget();
     } catch (problem) {
       if (problem instanceof FormError) errors = problem.errors;
-      error = problem instanceof Error ? problem.message : String(problem);
+      error = errorMessageOf(problem);
     } finally {
       busy = false;
       progress = null;
@@ -69,7 +70,7 @@
       name = currentUser?.name ?? "";
       currentUserForget();
     } catch (problem) {
-      nameError = problem instanceof Error ? problem.message : String(problem);
+      nameError = errorMessageOf(problem);
     } finally {
       nameBusy = false;
     }

@@ -2,6 +2,7 @@
 <script>
   import { t } from "ttag";
   import { postsGet, postsUpdate } from "../lib/core/index.js";
+  import { errorMessageOf } from "../lib/error_message.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { postsShowUrl } from "../lib/routes.js";
   import PostsForm from "./components/PostsForm.svelte";
@@ -21,7 +22,7 @@
       communityIds = communities.map((community) => community.id);
       loaded = true;
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     }
   }
 
@@ -31,7 +32,7 @@
       await postsUpdate(id, text, communityIds);
       await navigateToUrl(postsShowUrl(id));
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     } finally {
       busy = false;
     }

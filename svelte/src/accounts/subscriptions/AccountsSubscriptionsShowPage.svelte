@@ -16,6 +16,7 @@
     accountsSubscriptionsPortalCreate,
     accountsSubscriptionsUpdate,
   } from "../../lib/core/index.js";
+  import { errorMessageOf } from "../../lib/error_message.js";
   import { currentUserReload } from "../../lib/current_user.js";
   import { pathParams } from "../../lib/router.js";
   import { accountsProductsShowUrl, accountsSubscriptionsIndexUrl } from "../../lib/routes.js";
@@ -37,7 +38,7 @@
   function load() {
     accountsSubscriptionsGet(id).then(
       (shown) => (subscription = shown),
-      (problem) => (error = String(problem)),
+      (problem) => (error = errorMessageOf(problem)),
     );
   }
 
@@ -63,7 +64,7 @@
       subscription = await accountsSubscriptionsUpdate(id, change);
       await currentUserReload();
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     } finally {
       busy = false;
     }
@@ -75,7 +76,7 @@
       await accountsSubscriptionsManageOpen();
       inBrowser = true;
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     }
   }
 
@@ -90,7 +91,7 @@
       }
       inBrowser = true;
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     }
     busy = false;
   }

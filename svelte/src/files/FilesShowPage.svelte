@@ -15,28 +15,21 @@
     filesDownload,
     filesDownloadSupported,
     filesGet,
-    onSynced,
   } from "../lib/core/index.js";
+  import { loaded } from "../lib/loaded.svelte.js";
+  import { errorMessageOf } from "../lib/error_message.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { conflictsIndexUrl, filesEditUrl, filesIndexUrl } from "../lib/routes.js";
   import { fileSize } from "../lib/file_size.js";
   import { Button, ErrorMessage, Heading, Link, Page, Text } from "../lib/components/index.js";
 
   const id = pathParams().id;
-  let shown = $state();
-  let canDownload = $state(false);
-  let canCopy = $state(false);
+  const file = loaded(() => filesGet(id), { reloadOnSync: true });
+  const can = loaded(async () => ({ download: await filesDownloadSupported(), copy: await filesCopySupported() }));
+  let shown = $derived(file.value);
   let copied = $state(false);
   let saved = $state("");
   let error = $state("");
-
-  async function load() {
-    try {
-      [shown, canDownload, canCopy] = await Promise.all([filesGet(id), filesDownloadSupported(), filesCopySupported()]);
-    } catch (problem) {
-      error = String(problem);
-    }
-  }
 
   async function copy() {
     error = "";
@@ -45,7 +38,7 @@
       copied = true;
       setTimeout(() => (copied = false), 2000);
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     }
   }
 
@@ -55,7 +48,7 @@
       const path = await filesDownload(id);
       saved = path ? `Saved to ${path}` : "";
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     }
   }
 
@@ -65,18 +58,15 @@
       await filesDelete(id);
       await navigateToUrl(filesIndexUrl());
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     }
   }
-
-  $effect(() => onSynced(load));
-  load();
 </script>
 
 <Page>
   <Heading level={1}>{shown ? shown.file.name : "File"}</Heading>
 
-  <ErrorMessage message={error} />
+  <ErrorMessage message={error || file.error} />
   {#if shown}
     <Text tone="muted">
       {shown.creator ? shown.creator.name : "A former member"} · in {shown.communities
@@ -100,7 +90,7 @@
 
     {#if shown.shown_as === "image"}
       <AnimationsToggle />
-      {#if canCopy}
+      {#if can.value?.copy}
         <button type="button" class="cursor-copy self-start text-left" title="Copy to the clipboard" onclick={copy}>
           <FileImage src={filesContentUrl(id)} alt={shown.file.name} class="file-shown" />
         </button>
@@ -119,7 +109,7 @@
     {/if}
 
     <div class="flex flex-wrap items-center gap-2">
-      {#if canDownload}
+      {#if can.value?.download}
         <Button size="sm" onclick={download}>Download</Button>
       {/if}
       <Button size="sm" href={filesEditUrl(id)}>Edit</Button>

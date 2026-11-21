@@ -17,6 +17,7 @@
     filesSha256,
     filesUpdate,
   } from "../lib/core/index.js";
+  import { errorMessageOf } from "../lib/error_message.js";
   import { currentCommunityLoad } from "../lib/current_community.js";
   import { navigateToUrl } from "../lib/router.js";
   import { filesIndexUrl, filesShowUrl } from "../lib/routes.js";
@@ -170,7 +171,7 @@
       try {
         sha256s.set(row, await filesSha256(row.file));
       } catch (problem) {
-        problems.set(row, problem instanceof Error ? problem.message : String(problem));
+        problems.set(row, errorMessageOf(problem));
       }
       hashed += 1;
     });
@@ -253,7 +254,7 @@
       }
     } catch (problem) {
       if (problem instanceof FormError) row.errors = problem.errors;
-      row.error = problem instanceof Error ? problem.message : String(problem);
+      row.error = errorMessageOf(problem);
       row.status = "failed";
     } finally {
       row.progress = null;

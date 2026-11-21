@@ -2,25 +2,20 @@
      The receipt is the email Stripe sent. See docs/design/purchasing.md, P5. -->
 <script>
   import { accountsPurchasesGet } from "../../lib/core/index.js";
+  import { loaded } from "../../lib/loaded.svelte.js";
   import { pathParams } from "../../lib/router.js";
   import { accountsPurchasesIndexUrl } from "../../lib/routes.js";
   import { moneyFormat } from "../money.js";
   import { ErrorMessage, Heading, Link, Page, Text } from "../../lib/components/index.js";
 
   const id = pathParams().id;
-  let purchase = $state();
-  let error = $state("");
-
-  accountsPurchasesGet(id).then(
-    (shown) => (purchase = shown),
-    (problem) => (error = String(problem)),
-  );
+  const shown = loaded(() => accountsPurchasesGet(id));
 </script>
 
 <Page>
-
-  <ErrorMessage message={error} />
-  {#if purchase}
+  <ErrorMessage message={shown.error} />
+  {#if shown.value}
+    {@const purchase = shown.value}
     <Heading level={1}>{purchase.product_name}</Heading>
     <Text>{moneyFormat(purchase.amount, purchase.currency)}, tax included</Text>
     <Text tone="muted">Bought {new Date(purchase.inserted_at).toLocaleString()}</Text>

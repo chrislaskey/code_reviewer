@@ -2,6 +2,7 @@
      done, it shows the community -->
 <script>
   import { FormError, communitiesCreate } from "../lib/core/index.js";
+  import { errorMessageOf } from "../lib/error_message.js";
   import { navigateToUrl } from "../lib/router.js";
   import { communitiesIndexUrl, communitiesShowUrl } from "../lib/routes.js";
   import CommunitiesForm from "./components/CommunitiesForm.svelte";
@@ -22,7 +23,7 @@
       await navigateToUrl(communitiesShowUrl(community.id));
     } catch (problem) {
       if (problem instanceof FormError) errors = problem.errors;
-      error = problem instanceof Error ? problem.message : String(problem);
+      error = errorMessageOf(problem);
     } finally {
       busy = false;
     }

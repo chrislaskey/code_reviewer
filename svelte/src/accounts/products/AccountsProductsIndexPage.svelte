@@ -5,14 +5,16 @@
      P1, and docs/design/purchasing-phones.md, M2. -->
 <script>
   import { accountsProductsList, accountsStoreTransactionsRestore } from "../../lib/core/index.js";
+  import { loaded } from "../../lib/loaded.svelte.js";
+  import { errorMessageOf } from "../../lib/error_message.js";
   import { currentUserReload } from "../../lib/current_user.js";
   import { accountsProductsShowUrl } from "../../lib/routes.js";
   import { priceFormat } from "../money.js";
   import { storePriceFormat } from "../stores.js";
   import { Button, ErrorMessage, Heading, Link, Page, Text } from "../../lib/components/index.js";
 
-  let products = $state([]);
-  let loaded = $state(false);
+  const shown = loaded(accountsProductsList);
+  let products = $derived(shown.value ?? []);
   let error = $state("");
   let restoring = $state(false);
   let restored = $state("");
@@ -28,26 +30,18 @@
       restored = recorded === 1 ? "1 purchase restored." : `${recorded} purchases restored.`;
       if (refused.length > 0) error = refused.join(" ");
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     } finally {
       restoring = false;
     }
   }
-
-  accountsProductsList().then(
-    (list) => {
-      products = list;
-      loaded = true;
-    },
-    (problem) => (error = String(problem)),
-  );
 </script>
 
 <Page>
   <Heading level={1}>Plans and products</Heading>
 
-  <ErrorMessage message={error} />
-  {#if loaded && products.length === 0}
+  <ErrorMessage message={error || shown.error} />
+  {#if shown.value?.length === 0}
     <Text tone="muted">Nothing is for sale yet.</Text>
   {/if}
 

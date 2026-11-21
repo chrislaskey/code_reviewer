@@ -2,33 +2,24 @@
      /accounts/purchases. See docs/design/purchasing.md, P5. -->
 <script>
   import { accountsPurchasesList } from "../../lib/core/index.js";
+  import { loaded } from "../../lib/loaded.svelte.js";
   import { accountsProductsIndexUrl, accountsPurchasesShowUrl } from "../../lib/routes.js";
   import { moneyFormat } from "../money.js";
   import { ErrorMessage, Heading, Link, Page, Text } from "../../lib/components/index.js";
 
-  let purchases = $state([]);
-  let loaded = $state(false);
-  let error = $state("");
-
-  accountsPurchasesList().then(
-    (list) => {
-      purchases = list;
-      loaded = true;
-    },
-    (problem) => (error = String(problem)),
-  );
+  const purchases = loaded(accountsPurchasesList);
 </script>
 
 <Page>
   <Heading level={1}>Purchases</Heading>
 
-  <ErrorMessage message={error} />
-  {#if loaded && purchases.length === 0}
+  <ErrorMessage message={purchases.error} />
+  {#if purchases.value?.length === 0}
     <Text tone="muted">Nothing bought yet. <Link href={accountsProductsIndexUrl()}>See what is for sale</Link></Text>
   {/if}
 
   <ul class="flex flex-col gap-2">
-    {#each purchases as purchase (purchase.id)}
+    {#each purchases.value ?? [] as purchase (purchase.id)}
       <li>
         <Link href={accountsPurchasesShowUrl(purchase.id)}>{purchase.product_name}</Link>
         <Text as="span" tone="muted">

@@ -24,6 +24,7 @@
     localUsersMove,
     onAccountsSignInReturned,
   } from "../lib/core/index.js";
+  import { errorMessageOf } from "../lib/error_message.js";
   import { currentUserForget } from "../lib/current_user.js";
   import { navigateToUrl } from "../lib/router.js";
   import { postsIndexUrl } from "../lib/routes.js";
@@ -58,7 +59,7 @@
       canSkip = await localUsersCanCreate();
       signingIn = await accountsSignInPending();
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     }
   }
 
@@ -69,7 +70,7 @@
     try {
       await action();
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     } finally {
       busy = false;
     }
@@ -108,7 +109,7 @@
       try {
         finished = await accountsSignInFinish(code);
       } catch (problem) {
-        signInError = String(problem);
+        signInError = errorMessageOf(problem);
         return;
       }
       await signedIn(finished);
@@ -161,7 +162,7 @@
       try {
         await answer();
       } catch (problem) {
-        moveError = String(problem);
+        moveError = errorMessageOf(problem);
         return;
       }
       moveOffered = null;

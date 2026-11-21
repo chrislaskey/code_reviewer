@@ -11,6 +11,7 @@
   import { t } from "ttag";
   import HeaderMenu from "./HeaderMenu.svelte";
   import { accountsSignOut, hasDeviceAccounts } from "../core/index.js";
+  import { errorMessageOf } from "../error_message.js";
   import { currentUserForget } from "../current_user.js";
   import { navigateToUrl } from "../router.js";
   import {
@@ -45,7 +46,7 @@
       currentUserForget();
       await navigateToUrl(hasDeviceAccounts ? accountsIndexUrl() : accountsSignInUrl());
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     } finally {
       busy = false;
     }

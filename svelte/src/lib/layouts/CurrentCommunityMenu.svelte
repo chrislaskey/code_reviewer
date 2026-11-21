@@ -6,6 +6,7 @@
      chooses the first match. Choosing one reloads the page in it. -->
 <script>
   import { communitiesList, currentCommunityUpdate, onSynced } from "../core/index.js";
+  import { errorMessageOf } from "../error_message.js";
   import { currentCommunityLoad, onCurrentCommunityChanged } from "../current_community.js";
   import { communitiesIndexUrl } from "../routes.js";
   import { Button, Dialog, ErrorMessage, Heading, Icon, Input, Link } from "../components/index.js";
@@ -42,7 +43,7 @@
     try {
       mine = (await communitiesList()).filter(({ membership }) => membership !== null).map(({ community }) => community);
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
     }
   }
 
@@ -53,7 +54,7 @@
       await currentCommunityUpdate(communityId);
       window.location.reload();
     } catch (problem) {
-      error = String(problem);
+      error = errorMessageOf(problem);
       busy = false;
     }
   }

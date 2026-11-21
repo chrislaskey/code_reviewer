@@ -4,6 +4,7 @@
 // Starting over asks again for the pages on screen and replaces them at
 // once; an answer to an older start is dropped. See
 // docs/design/files-browsing.md.
+import { errorMessageOf } from "./error_message.js";
 
 export const PAGE_SIZE = 200;
 
@@ -43,7 +44,7 @@ export class PagedSearch {
       this.rows = next;
       this.error = "";
     } catch (problem) {
-      if (asked === this.#generation) this.error = String(problem);
+      if (asked === this.#generation) this.error = errorMessageOf(problem);
     }
   }
 
@@ -78,7 +79,7 @@ export class PagedSearch {
     } catch (problem) {
       if (asked !== this.#generation) return;
       this.#pagesAsked.delete(page);
-      this.error = String(problem);
+      this.error = errorMessageOf(problem);
     }
   }
 }
