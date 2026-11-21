@@ -17,11 +17,11 @@ use uuid::Uuid;
 
 use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
 use crate::app::sync::{Cursor, TableRow};
+use crate::data::accounts_tokens;
 use crate::data::accounts_users::{self, AccountUserError};
 use crate::data::device_settings::{self, DeviceSettingsError, SIGNED_IN};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
-use crate::tokens;
 
 /// What a person changes of their own row; the rest is the server's.
 pub(crate) const UPDATE_FIELDS: &[&str] = &["name"];
@@ -421,11 +421,11 @@ pub(crate) async fn delete_of_unconfirmed_accounts_before(
 /// server does not know, or one that has expired, stands for nobody,
 /// and one of a deleted account is `AccountDeleted`.
 pub async fn get_by_token(deployment: &Deployment, token: &str) -> Result<User, UserError> {
-    let (api_made_after, session_made_after) = tokens::made_after_to_be_valid(now());
+    let (api_made_after, session_made_after) = accounts_tokens::made_after_to_be_valid(now());
     let mut tx = deployment.begin().await?;
     let user = app_users::authentication::get_by_token_hash(
         &mut tx,
-        &tokens::hash(token),
+        &accounts_tokens::hash(token),
         api_made_after,
         session_made_after,
     )

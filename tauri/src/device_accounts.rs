@@ -1340,7 +1340,8 @@ mod tests {
 
 /// How long a sign-in started in the browser is waited for, the pending
 /// sign-in's own validity on the server.
-pub const SIGN_IN_WAIT_MINUTES: i64 = app_core::tokens::SIGN_IN_CODE_VALIDITY_MINUTES;
+pub const SIGN_IN_WAIT_MINUTES: i64 =
+    app_core::data::accounts_tokens::SIGN_IN_CODE_VALIDITY_MINUTES;
 
 /// A sign-in waiting on the browser, as the accounts page shows it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]

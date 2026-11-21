@@ -6,7 +6,7 @@ use sqlx::{FromRow, SqliteConnection};
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
-use crate::tokens::{Context, Token};
+use super::{Context, Token};
 
 #[derive(FromRow)]
 struct TokenRow {

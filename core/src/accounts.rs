@@ -57,7 +57,8 @@ use uuid::Uuid;
 use crate::app::communities::{self, CommunityError};
 use crate::app::sync::{SyncError, Transport};
 use crate::app::users::{SignedIn, UserError};
-use crate::credentials::{self, CredentialError};
+use crate::data::accounts_credentials::{self, CredentialError};
+use crate::data::accounts_tokens::{self, Context};
 use crate::data::app_users::User;
 use crate::data::device_settings::{self, DeviceSettingsError, SIGNED_IN};
 use crate::database::Transaction;
@@ -65,7 +66,6 @@ use crate::deployment::{Deployment, Role, now};
 use crate::helpers::random;
 use crate::services::mailer::mails;
 use crate::services::mailer::{MailError, Mailer};
-use crate::tokens::{self, Context};
 
 use crate::data::accounts_users::{self, AccountUser, AccountUserError};
 
@@ -228,14 +228,16 @@ pub async fn sign_up(
             (mail, random::hex(32))
         }
         Some(account) => {
-            let (pending, code) = tokens::create_sign_in_code(&mut tx, account.id, None).await?;
+            let (pending, code) =
+                accounts_tokens::create_sign_in_code(&mut tx, account.id, None).await?;
             (mails::sign_in_code(&account.email, &code), pending)
         }
         None => {
             let account = accounts_users::create(&mut tx, Uuid::now_v7(), &email, false).await?;
             let name = crate::app::users::name_from_email_in(&mut tx, &email, account.id).await?;
             crate::app::users::create_in(&mut tx, account.id, &name).await?;
-            let (pending, code) = tokens::create_sign_in_code(&mut tx, account.id, None).await?;
+            let (pending, code) =
+                accounts_tokens::create_sign_in_code(&mut tx, account.id, None).await?;
             (mails::sign_in_code(&account.email, &code), pending)
         }
     };
@@ -261,7 +263,8 @@ pub async fn sign_in(
         // A trial user's address is made up: nothing to send, nobody to tell
         Some(account) if account.trial_expires_at.is_some() => (None, random::hex(32)),
         Some(account) => {
-            let (pending, code) = tokens::create_sign_in_code(&mut tx, account.id, None).await?;
+            let (pending, code) =
+                accounts_tokens::create_sign_in_code(&mut tx, account.id, None).await?;
             (Some(mails::sign_in_code(&account.email, &code)), pending)
         }
         None => (Some(mails::no_account(&email)), random::hex(32)),
@@ -305,7 +308,7 @@ pub async fn sign_up_from_trial(
             let name = crate::app::users::name_from_email_in(&mut tx, &email, trial.id).await?;
             crate::app::users::update_name_in(&mut tx, trial.id, &name).await?;
             let (pending, code) =
-                tokens::create_sign_in_code(&mut tx, trial.id, Some(&email)).await?;
+                accounts_tokens::create_sign_in_code(&mut tx, trial.id, Some(&email)).await?;
             (mails::sign_in_code(&email, &code), pending)
         }
     };
@@ -327,11 +330,16 @@ pub async fn resend_code(
         return Err(AccountError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let row = tokens::get_valid(&mut tx, &tokens::hash(pending), Context::SignInCode, now())
-        .await?
-        .ok_or(AccountError::CodeDoesNotMatch)?;
+    let row = accounts_tokens::get_valid(
+        &mut tx,
+        &accounts_tokens::hash(pending),
+        Context::SignInCode,
+        now(),
+    )
+    .await?
+    .ok_or(AccountError::CodeDoesNotMatch)?;
     let account = live_account_in(&mut tx, row.user_id).await?;
-    let code = tokens::reset_code(&mut tx, row.id).await?;
+    let code = accounts_tokens::reset_code(&mut tx, row.id).await?;
     tx.commit().await?;
     let sent_to = row.sent_to.unwrap_or(account.email);
     mailer.send(mails::sign_in_code(&sent_to, &code)).await?;
@@ -348,9 +356,14 @@ pub async fn resend_code_to(
         return Err(AccountError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let row = tokens::get_valid(&mut tx, &tokens::hash(pending), Context::SignInCode, now())
-        .await?
-        .ok_or(AccountError::CodeDoesNotMatch)?;
+    let row = accounts_tokens::get_valid(
+        &mut tx,
+        &accounts_tokens::hash(pending),
+        Context::SignInCode,
+        now(),
+    )
+    .await?
+    .ok_or(AccountError::CodeDoesNotMatch)?;
     let account = live_account_in(&mut tx, row.user_id).await?;
     tx.commit().await?;
     Ok(row.sent_to.unwrap_or(account.email))
@@ -487,12 +500,12 @@ pub async fn password_update(
     }
     let mut tx = deployment.begin().await?;
     let current = update.current.as_deref().unwrap_or_default();
-    if credentials::is_set(&mut tx, user.id).await?
-        && !credentials::verify(&mut tx, Some(user.id), current).await?
+    if accounts_credentials::is_set(&mut tx, user.id).await?
+        && !accounts_credentials::verify(&mut tx, Some(user.id), current).await?
     {
         return Err(AccountError::PasswordDoesNotMatch);
     }
-    credentials::set(&mut tx, user.id, &update.password).await?;
+    accounts_credentials::set(&mut tx, user.id, &update.password).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -522,7 +535,7 @@ pub async fn password_update_on_device(
 
 /// Exchanges the device code, with the verifier the device kept, for
 /// the device's session, once: the row is found by the code and the
-/// verifier's hash together, see `tokens::create_device_code`, and
+/// verifier's hash together, see `accounts_tokens::create_device_code`, and
 /// deleted.
 pub async fn sign_in_with_device_code(
     deployment: &Deployment,
@@ -533,18 +546,18 @@ pub async fn sign_in_with_device_code(
         return Err(AccountError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    let token_hash = tokens::device_code_hash(code, &challenge_of(verifier));
-    let row = tokens::get_valid(&mut tx, &token_hash, Context::DeviceCode, now())
+    let token_hash = accounts_tokens::device_code_hash(code, &challenge_of(verifier));
+    let row = accounts_tokens::get_valid(&mut tx, &token_hash, Context::DeviceCode, now())
         .await?
         .ok_or(AccountError::UnknownDeviceCode)?;
-    tokens::delete_by_id(&mut tx, row.id).await?;
+    accounts_tokens::delete_by_id(&mut tx, row.id).await?;
     let account = accounts_users::get(&mut tx, row.user_id)
         .await?
         .ok_or(AccountError::UnknownDeviceCode)?;
     let user = live_user_in(&mut tx, row.user_id)
         .await?
         .ok_or(AccountError::UnknownDeviceCode)?;
-    let token = tokens::create(&mut tx, user.id, Context::Api).await?;
+    let token = accounts_tokens::create(&mut tx, user.id, Context::Api).await?;
     tx.commit().await?;
     Ok(Session {
         user,
@@ -560,7 +573,7 @@ pub async fn sign_out(deployment: &Deployment, token: &str) -> Result<(), Accoun
         return Err(AccountError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
-    tokens::delete(&mut tx, token).await?;
+    accounts_tokens::delete(&mut tx, token).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -576,7 +589,7 @@ pub fn verifier_and_challenge() -> (String, String) {
 
 /// The challenge a verifier proves: its SHA-256 as hex.
 pub fn challenge_of(verifier: &str) -> String {
-    tokens::hash(verifier)
+    accounts_tokens::hash(verifier)
 }
 
 /// Exchanges the device code through the transport, `sign_in_with_device_code`
@@ -698,7 +711,7 @@ async fn prove<Finished: FromFinish>(
     };
     let step = match next {
         Some(next) => {
-            let pending = tokens::create_sign_in_password(&mut tx, account.id).await?;
+            let pending = accounts_tokens::create_sign_in_password(&mut tx, account.id).await?;
             SignInStep::Next {
                 next,
                 pending,
@@ -752,14 +765,19 @@ async fn match_code_in(
     pending: &str,
     code: &str,
 ) -> Result<(AccountUser, Option<NextStep>), AccountError> {
-    let row = tokens::get_valid(tx, &tokens::hash(pending), Context::SignInCode, now())
-        .await?
-        .ok_or(AccountError::CodeDoesNotMatch)?;
-    if row.code_hash.as_deref() != Some(tokens::hash(code.trim()).as_str()) {
+    let row = accounts_tokens::get_valid(
+        tx,
+        &accounts_tokens::hash(pending),
+        Context::SignInCode,
+        now(),
+    )
+    .await?
+    .ok_or(AccountError::CodeDoesNotMatch)?;
+    if row.code_hash.as_deref() != Some(accounts_tokens::hash(code.trim()).as_str()) {
         count_attempt_in(tx, row.id).await?;
         return Err(AccountError::CodeDoesNotMatch);
     }
-    tokens::delete_by_id(tx, row.id).await?;
+    accounts_tokens::delete_by_id(tx, row.id).await?;
     let account = live_account_in(tx, row.user_id).await?;
     let first_sign_in = account.confirmed_at.is_none();
     let account = match row.sent_to.as_deref() {
@@ -803,7 +821,7 @@ async fn sign_up_trial_in(
     }
     accounts_users::sign_up_trial(tx, account.id, email).await?;
     crate::accounts::trial_users::show_communities_in(tx, account.id).await?;
-    tokens::delete_of_user(tx, account.id, Context::Session).await?;
+    accounts_tokens::delete_of_user(tx, account.id, Context::Session).await?;
     live_account_in(tx, account.id).await
 }
 
@@ -814,14 +832,19 @@ async fn match_password_in(
     pending: &str,
     password: &str,
 ) -> Result<(AccountUser, Option<NextStep>), AccountError> {
-    let row = tokens::get_valid(tx, &tokens::hash(pending), Context::SignInPassword, now())
-        .await?
-        .ok_or(AccountError::SignInExpired)?;
-    if !credentials::verify(tx, Some(row.user_id), password).await? {
+    let row = accounts_tokens::get_valid(
+        tx,
+        &accounts_tokens::hash(pending),
+        Context::SignInPassword,
+        now(),
+    )
+    .await?
+    .ok_or(AccountError::SignInExpired)?;
+    if !accounts_credentials::verify(tx, Some(row.user_id), password).await? {
         count_attempt_in(tx, row.id).await?;
         return Err(AccountError::PasswordDoesNotMatch);
     }
-    tokens::delete_by_id(tx, row.id).await?;
+    accounts_tokens::delete_by_id(tx, row.id).await?;
     Ok((live_account_in(tx, row.user_id).await?, None))
 }
 
@@ -833,16 +856,21 @@ async fn keep_new_password_in(
     pending: &str,
     password: Option<&str>,
 ) -> Result<(AccountUser, Option<NextStep>), AccountError> {
-    let row = tokens::get_valid(tx, &tokens::hash(pending), Context::SignInPassword, now())
-        .await?
-        .ok_or(AccountError::SignInExpired)?;
-    if credentials::is_set(tx, row.user_id).await? {
+    let row = accounts_tokens::get_valid(
+        tx,
+        &accounts_tokens::hash(pending),
+        Context::SignInPassword,
+        now(),
+    )
+    .await?
+    .ok_or(AccountError::SignInExpired)?;
+    if accounts_credentials::is_set(tx, row.user_id).await? {
         return Err(AccountError::SignInExpired);
     }
     if let Some(password) = password {
-        credentials::set(tx, row.user_id, password).await?;
+        accounts_credentials::set(tx, row.user_id, password).await?;
     }
-    tokens::delete_by_id(tx, row.id).await?;
+    accounts_tokens::delete_by_id(tx, row.id).await?;
     Ok((live_account_in(tx, row.user_id).await?, None))
 }
 
@@ -858,22 +886,27 @@ async fn keep_reset_password_in(
     if forgotten_password == ForgottenPassword::LockedOut {
         return Err(AccountError::PasswordResetNotAllowed);
     }
-    let row = tokens::get_valid(tx, &tokens::hash(pending), Context::SignInPassword, now())
-        .await?
-        .ok_or(AccountError::SignInExpired)?;
-    if !credentials::is_set(tx, row.user_id).await? {
+    let row = accounts_tokens::get_valid(
+        tx,
+        &accounts_tokens::hash(pending),
+        Context::SignInPassword,
+        now(),
+    )
+    .await?
+    .ok_or(AccountError::SignInExpired)?;
+    if !accounts_credentials::is_set(tx, row.user_id).await? {
         return Err(AccountError::SignInExpired);
     }
-    credentials::set(tx, row.user_id, password).await?;
-    tokens::delete_by_id(tx, row.id).await?;
+    accounts_credentials::set(tx, row.user_id, password).await?;
+    accounts_tokens::delete_by_id(tx, row.id).await?;
     Ok((live_account_in(tx, row.user_id).await?, None))
 }
 
 /// Counts a wrong attempt against the pending token; the one that
 /// reaches `MAX_CODE_ATTEMPTS` deletes it.
 async fn count_attempt_in(tx: &mut Transaction, id: Uuid) -> Result<(), AccountError> {
-    if tokens::count_attempt(tx, id).await? >= MAX_CODE_ATTEMPTS {
-        tokens::delete_by_id(tx, id).await?;
+    if accounts_tokens::count_attempt(tx, id).await? >= MAX_CODE_ATTEMPTS {
+        accounts_tokens::delete_by_id(tx, id).await?;
     }
     Ok(())
 }
@@ -883,7 +916,7 @@ async fn second_factors_in(
     account_id: Uuid,
 ) -> Result<Vec<SecondFactor>, AccountError> {
     let mut factors = Vec::new();
-    if credentials::is_set(tx, account_id).await? {
+    if accounts_credentials::is_set(tx, account_id).await? {
         factors.push(SecondFactor::Password);
     }
     Ok(factors)
@@ -897,8 +930,10 @@ async fn finish_in(
     finish: Finish<'_>,
 ) -> Result<String, AccountError> {
     Ok(match finish {
-        Finish::Session => tokens::create(tx, user.id, Context::Session).await?,
-        Finish::Device { challenge } => tokens::create_device_code(tx, user.id, challenge).await?,
+        Finish::Session => accounts_tokens::create(tx, user.id, Context::Session).await?,
+        Finish::Device { challenge } => {
+            accounts_tokens::create_device_code(tx, user.id, challenge).await?
+        }
     })
 }
 

@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgConnection};
 use uuid::Uuid;
 
-use crate::tokens::{Context, Token};
+use super::{Context, Token};
 
 #[derive(FromRow)]
 struct TokenRow {

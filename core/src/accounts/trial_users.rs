@@ -28,12 +28,12 @@ use uuid::Uuid;
 use crate::accounts::{AccountError, Session};
 use crate::app::communities::{self, CommunityError};
 use crate::app::users::{self, UserError};
+use crate::data::accounts_tokens::{self, Context};
 use crate::data::accounts_users::{self, AccountUserError};
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::random;
-use crate::tokens::{self, Context};
 
 /// How long the pages say a trial lasts.
 pub const SHOWN_HOURS: i64 = 24;
@@ -109,7 +109,7 @@ pub async fn create(deployment: &Deployment, max: i64) -> Result<Session, TrialU
         accounts_users::create_trial(&mut tx, Uuid::now_v7(), &email, trial_expires_at).await?;
     let user = users::create_in(&mut tx, account.id, &name).await?;
     communities::create_in(&mut tx, Role::Server, &user, COMMUNITY_NAME).await?;
-    let token = tokens::create(&mut tx, user.id, Context::Session).await?;
+    let token = accounts_tokens::create(&mut tx, user.id, Context::Session).await?;
     tx.commit().await?;
     Ok(Session {
         user,

@@ -29,7 +29,7 @@ use app_core::app::posts::PostError;
 use app_core::app::posts_communities::PostCommunityError;
 use app_core::app::sync::SyncError;
 use app_core::app::users::UserError;
-use app_core::credentials::CredentialError;
+use app_core::data::accounts_credentials::CredentialError;
 use app_core::data::accounts_users::AccountUserError;
 use app_core::helpers::field_errors::FieldErrors;
 use app_core::services::app_store::AppStoreError;

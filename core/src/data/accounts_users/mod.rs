@@ -240,11 +240,12 @@ pub mod billing {
 mod tests {
     use super::*;
     use crate::app::users;
+    use crate::data::accounts_credentials;
+    use crate::data::accounts_tokens;
     use crate::database::with_each_database;
     use crate::deployment::Deployment;
     use crate::deployment::Role;
     use crate::ops::staff;
-    use crate::{credentials, tokens};
 
     #[tokio::test]
     async fn accounts_users_signup_records_roll_back_together() {
@@ -258,10 +259,10 @@ mod tests {
             users::create_in(&mut tx, id, "Alice")
                 .await
                 .expect("profile");
-            credentials::set(&mut tx, id, "correct horse battery")
+            accounts_credentials::set(&mut tx, id, "correct horse battery")
                 .await
                 .expect("password");
-            let token = tokens::create(&mut tx, id, tokens::Context::Api)
+            let token = accounts_tokens::create(&mut tx, id, accounts_tokens::Context::Api)
                 .await
                 .expect("token");
             confirm(&mut tx, id).await.expect("confirm");
@@ -277,12 +278,21 @@ mod tests {
             let mut tx = deployment.begin().await.expect("transaction");
             assert!(get(&mut tx, id).await.expect("account").is_none());
             assert!(users::get_in(&mut tx, id).await.expect("profile").is_none());
-            assert!(!credentials::is_set(&mut tx, id).await.expect("password"));
             assert!(
-                tokens::get_valid(&mut tx, &tokens::hash(&token), tokens::Context::Api, now())
+                !accounts_credentials::is_set(&mut tx, id)
                     .await
-                    .expect("token")
-                    .is_none()
+                    .expect("password")
+            );
+            assert!(
+                accounts_tokens::get_valid(
+                    &mut tx,
+                    &accounts_tokens::hash(&token),
+                    accounts_tokens::Context::Api,
+                    now()
+                )
+                .await
+                .expect("token")
+                .is_none()
             );
         })
         .await;
@@ -300,10 +310,10 @@ mod tests {
             let profile = users::create_in(&mut tx, id, "Alice")
                 .await
                 .expect("profile");
-            credentials::set(&mut tx, id, "correct horse battery")
+            accounts_credentials::set(&mut tx, id, "correct horse battery")
                 .await
                 .expect("password");
-            let token = tokens::create(&mut tx, id, tokens::Context::Api)
+            let token = accounts_tokens::create(&mut tx, id, accounts_tokens::Context::Api)
                 .await
                 .expect("token");
             tx.commit().await.expect("commit");
@@ -312,28 +322,50 @@ mod tests {
                 .expect("staff");
             let mut tx = deployment.begin().await.expect("transaction");
             delete_unconfirmed(&mut tx, id).await.expect("cleanup");
-            assert!(!credentials::is_set(&mut tx, id).await.expect("password"));
+            assert!(
+                !accounts_credentials::is_set(&mut tx, id)
+                    .await
+                    .expect("password")
+            );
             drop(tx);
             assert!(staff::get(&deployment, &profile).await.is_ok());
             let mut tx = deployment.begin().await.expect("transaction");
-            assert!(credentials::is_set(&mut tx, id).await.expect("password"));
             assert!(
-                tokens::get_valid(&mut tx, &tokens::hash(&token), tokens::Context::Api, now())
+                accounts_credentials::is_set(&mut tx, id)
                     .await
-                    .expect("token")
-                    .is_some()
+                    .expect("password")
+            );
+            assert!(
+                accounts_tokens::get_valid(
+                    &mut tx,
+                    &accounts_tokens::hash(&token),
+                    accounts_tokens::Context::Api,
+                    now()
+                )
+                .await
+                .expect("token")
+                .is_some()
             );
             delete_unconfirmed(&mut tx, id).await.expect("cleanup");
             tx.commit().await.expect("commit");
             let mut tx = deployment.begin().await.expect("transaction");
             assert!(get(&mut tx, id).await.expect("account").is_none());
             assert!(users::get_in(&mut tx, id).await.expect("profile").is_none());
-            assert!(!credentials::is_set(&mut tx, id).await.expect("password"));
             assert!(
-                tokens::get_valid(&mut tx, &tokens::hash(&token), tokens::Context::Api, now())
+                !accounts_credentials::is_set(&mut tx, id)
                     .await
-                    .expect("token")
-                    .is_none()
+                    .expect("password")
+            );
+            assert!(
+                accounts_tokens::get_valid(
+                    &mut tx,
+                    &accounts_tokens::hash(&token),
+                    accounts_tokens::Context::Api,
+                    now()
+                )
+                .await
+                .expect("token")
+                .is_none()
             );
             tx.commit().await.expect("commit");
             assert!(matches!(

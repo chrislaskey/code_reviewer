@@ -34,13 +34,13 @@ use crate::app::events::{Answer, AnswerStatus, Event, Fields};
 use crate::app::memberships::{self, MembershipError};
 use crate::app::posts::{self, PostError};
 use crate::app::users::{self, UserError};
+use crate::data::accounts_tokens;
 use crate::data::accounts_users::{self, AccountUser, AccountUserError};
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::services::mailer::mails;
 use crate::services::mailer::{MailError, Mailer};
-use crate::tokens;
 
 #[derive(Debug, Error)]
 pub enum DeletionError {
@@ -94,7 +94,7 @@ pub async fn code_create(
     if account.trial_expires_at.is_some() {
         return Err(DeletionError::TrialHasNoCode);
     }
-    let code = tokens::create_delete_code(&mut tx, account.id).await?;
+    let code = accounts_tokens::create_delete_code(&mut tx, account.id).await?;
     tx.commit().await?;
     mailer
         .send(mails::delete_code(&account.email, &code))
@@ -214,21 +214,21 @@ async fn match_code_in(
     user_id: Uuid,
     code: &str,
 ) -> Result<(), DeletionError> {
-    let row = tokens::get_valid(
+    let row = accounts_tokens::get_valid(
         tx,
-        &tokens::delete_code_hash(user_id),
-        tokens::Context::DeleteCode,
+        &accounts_tokens::delete_code_hash(user_id),
+        accounts_tokens::Context::DeleteCode,
         now(),
     )
     .await?
     .ok_or(DeletionError::CodeDoesNotMatch)?;
-    if row.code_hash.as_deref() != Some(tokens::hash(code.trim()).as_str()) {
-        if tokens::count_attempt(tx, row.id).await? >= MAX_CODE_ATTEMPTS {
-            tokens::delete_by_id(tx, row.id).await?;
+    if row.code_hash.as_deref() != Some(accounts_tokens::hash(code.trim()).as_str()) {
+        if accounts_tokens::count_attempt(tx, row.id).await? >= MAX_CODE_ATTEMPTS {
+            accounts_tokens::delete_by_id(tx, row.id).await?;
         }
         return Err(DeletionError::CodeDoesNotMatch);
     }
-    tokens::delete_by_id(tx, row.id).await?;
+    accounts_tokens::delete_by_id(tx, row.id).await?;
     Ok(())
 }
 

@@ -23,9 +23,9 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::app::users;
+use crate::data::accounts_tokens;
 use crate::data::accounts_users;
 use crate::deployment::{Deployment, Role};
-use crate::tokens;
 
 /// How long a deleted row is kept, and how long a device may stay away.
 pub const RETENTION_DAYS: i64 = 90;
@@ -80,7 +80,7 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
     }
     let events = app_events::maintenance::delete_of_missing_rows(&mut tx).await?;
     removed.insert("app_events".to_string(), events);
-    let expired_tokens = tokens::delete_expired(&mut tx, now).await?;
+    let expired_tokens = accounts_tokens::delete_expired(&mut tx, now).await?;
     removed.insert("accounts_tokens".to_string(), expired_tokens);
     let unconfirmed_before = now - Duration::days(UNCONFIRMED_DAYS);
     users::delete_of_unconfirmed_accounts_before(&mut tx, unconfirmed_before).await?;

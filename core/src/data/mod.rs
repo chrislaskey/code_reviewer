@@ -7,7 +7,7 @@
 pub(crate) mod accounts_app_store_notifications;
 #[cfg(feature = "stripe")]
 pub(crate) mod accounts_checkouts;
-pub(crate) mod accounts_credentials;
+pub mod accounts_credentials;
 #[cfg(feature = "stripe")]
 pub(crate) mod accounts_prices;
 #[cfg(feature = "stripe")]
@@ -18,7 +18,7 @@ pub(crate) mod accounts_purchases;
 pub(crate) mod accounts_stripe_events;
 #[cfg(feature = "stripe")]
 pub(crate) mod accounts_subscriptions;
-pub(crate) mod accounts_tokens;
+pub mod accounts_tokens;
 pub mod accounts_users;
 pub mod app_communities;
 pub(crate) mod app_events;
