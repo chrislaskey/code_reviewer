@@ -36,3 +36,8 @@ owner chose, visibility, backfill and prune, see
   deleted from a device's queue, so only conflicts stay; the server's
   log grows with every write, and the purge removes only the events of
   rows that are gone.
+- **An app without communities.** Communities are the template's
+  sharing model, see `docs/design/template-and-apps.md`, so an app that
+  has no use for them still runs through one. A setting that makes
+  sign-up join every user to one shared community, and hides the
+  community pages, would let such an app ignore them.
