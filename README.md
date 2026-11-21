@@ -78,7 +78,7 @@ Inside the Tauri app each is a command of the same name
 | `pendingChangesList()` | none: the web has nothing waiting |
 | `deviceAccountsList()`, `deviceAccountsSwitch(userId)`, `deviceAccountsDeactivate()`, `deviceAccountsRemove(userId, losingChanges)` | none: the web keeps no accounts, see "Accounts on a device" |
 
-Both call the function in `app_core::posts` (`core/src/app/posts.rs`),
+Both call the function in `app_core::app::posts` (`core/src/app/posts.rs`),
 `posts::list`, `posts::get` and so on, named through their module as the
 standard library's `fs::read` is, as the user acting, see [Who the
 user is](#who-the-user-is), and answer with the same JSON, serialized
@@ -106,13 +106,13 @@ what they own or what is in a community of theirs, see
 with their name and picture, written by the server at sign-up and
 synced to devices like any row. Their email, with `confirmed_at` once
 they proved it, is their account's, `accounts_users`
-(`core/src/accounts/users.rs`), a row with the same id that stays on the
+(`core/src/data/accounts_users/`), a row with the same id that stays on the
 server, so an email never reaches another person's device; see
 `docs/design/multi-app.md` for the apps one deployment carries and
 which tables are whose. Credentials never leave the server either: the password hash
-is in `accounts_credentials` (`core/src/credentials.rs`, Argon2id) and
+is in `accounts_credentials` (`core/src/data/accounts_credentials/`, Argon2id) and
 every secret the server hands out in `accounts_tokens`
-(`core/src/tokens.rs`), kept as hashes, each in a context that sets how
+(`core/src/data/accounts_tokens/`), kept as hashes, each in a context that sets how
 long it lives: `api` for the apps' bearer tokens, a year; `session` for
 the browser's cookie, sixty days; `sign_in_code` for a sign-in waiting
 for its emailed code, ten minutes; `device_code` for a finished browser
@@ -123,7 +123,7 @@ every sign-up and sign-in ends with a six-digit code emailed to the
 person, the design in `docs/design/accounts-sign-in.md`. A sign-up
 writes the account, unconfirmed, and the user with their name, a sign-in finds
 the account by its email; both then make a pending sign-in, email its code
-(`core/src/mails.rs` through `core/src/mailer.rs`) and answer the
+(`core/src/services/mailer/mails.rs` through `core/src/services/mailer.rs`) and answer the
 pending token. The code, five wrong tries at most, confirms the email
 the first time. A password is optional, a second factor: an account
 that has one is asked for it after the code, a new account is offered
@@ -198,7 +198,7 @@ What was left out, changing the email and the rest of the Phoenix flow, is
 
 A form's rules are declared on its request's struct in core with
 `garde`, `#[garde(custom(is_image_type))]`, and checked with
-`FieldErrors::check` (`core/src/field_errors.rs`), which answers the
+`FieldErrors::check` (`core/src/helpers/field_errors.rs`), which answers the
 messages by field, as an Ecto changeset's errors. The server answers
 them with 422 as `{"error": "...", "errors": {"field": ["message"]}}`,
 an app's command answers the same object, and both are thrown to the
@@ -207,7 +207,7 @@ page as a `FormError` (`svelte/src/lib/core/form_error.js`), whose
 to. The page checks nothing itself beyond `accept` and `required`.
 
 A file goes from the person's device straight to object storage, never
-through the server (`core/src/app/avatars.rs`, `core/src/storage.rs`, over
+through the server (`core/src/app/avatars.rs`, `core/src/services/storage.rs`, over
 `object_store`): the server checks what was picked and answers a URL
 signed for its key and content type, the page PUTs the file there, and
 the server checks the file arrived and is the image it said before the
@@ -261,11 +261,14 @@ along, and rejoining brings them back. The decisions are
 `docs/design/offline-sync.md` under "Communities and what a user sees",
 and what was left out is `docs/suggestions/communities.md`.
 
-Application resource workflows live under `core/src/app/`, declared by
-`core/src/app.rs`, alongside the accounts and ops modules. They remain
-re-exported at the crate root, so `app_core::posts` still works alongside
-`app_core::app::posts`. Database/deployment code, shared helpers and
-`data/`, `sqlite/`, `postgres/` remain at the root.
+Core is organized as the Elixir applications it was ported from are, see
+`docs/design/code-organization.md`: `data/` holds each table's schema and
+low-level context, its baseline validation and its reads and writes;
+`services/` the clients for other services (Stripe, the App Store, mail,
+object storage, and a device's client of the web server); `helpers/`
+generic functions; and each app's directory, `app/`, `accounts/` and
+`ops/`, its high-level contexts, the functions the server and the apps
+call. `database.rs` and `deployment.rs` stay at the root.
 
 ## The database
 
@@ -283,8 +286,8 @@ and dispatch to private SQLite/PostgreSQL adapters (for example,
 `core/src/data/app_posts/sqlite.rs` and `postgres.rs`). Workflows compose
 contexts for authorization, sync and multi-resource changes. Atomic bulk
 lifecycle and maintenance operations are explicit exceptions documented
-in `docs/design/low-level-contexts.md`. The backend root modules contain
-only migration runners; there is no shared SQL-dispatch bypass macro.
+in `docs/design/low-level-contexts.md`. There is no shared SQL-dispatch
+bypass macro.
 
 The database is [sqlx](https://github.com/launchbadge/sqlx): async, one
 library for both databases, with `$1` placeholders in both. Ids are
@@ -356,7 +359,7 @@ design, carried over from the Phoenix version, is
   `POST /api/sync/backfill` for everything in each community the user
   just joined; then prunes the posts the user no longer sees. A row from
   the server never replaces a row with an event still pending.
-* **Recurring jobs** (`core/src/jobs.rs`, `docs/design/jobs.md`): the
+* **Recurring jobs** (`core/src/app/jobs.rs`, `docs/design/jobs.md`): the
   purge, then the sweeps of both buckets, daily on the server. The
   server runs those due every 15 minutes; `cargo run -p app_web -- jobs
   run` does the same once, for a scheduler outside it, and `jobs run
@@ -378,7 +381,7 @@ every half minute, unless the
 person chose to work offline from the nav, a choice kept in the device's
 database (`device_settings`, one JSON value per key for what a person
 chooses on a device, every one declared with its first value in
-`core/src/device_settings.rs` and added to a device when the app starts)
+`core/src/data/device_settings/` and added to a device when the app starts)
 that makes a sync return at once with no request until they go online
 again. It syncs against the web
 server `tauri/src/server_urls.rs` resolves when the app starts:

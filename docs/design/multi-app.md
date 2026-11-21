@@ -38,12 +38,11 @@ other app carries its name:
 | API path | `/api/posts` | `/api/support/...` |
 | Page path and folder | `/posts`, `svelte/src/posts/` | `/support/...`, `svelte/src/support/` |
 
-- **Rust modules**: `core/src/app.rs` declares the app workflows under
-  `core/src/app/`, alongside `accounts.rs`/`accounts/` and `ops.rs`/`ops/`.
-  App modules are re-exported from the crate root, so both
-  `app_core::app::posts` and existing `app_core::posts` references work.
-  Shared infrastructure stays at the root; `data`, `sqlite` and
-  `postgres` keep their existing locations.
+- **Rust modules**: `core/src/app.rs` declares the app's high-level
+  contexts under `core/src/app/`, alongside `accounts.rs`/`accounts/` and
+  `ops.rs`/`ops/`, called by their paths, `app_core::app::posts`. Each
+  table's records are `core/src/data/<table>/`, named after the table,
+  see `docs/design/code-organization.md`.
 - **Paths**: `app` owns the top level and is the fallback; another app
   owns its subpath. The public website owns `/` and its pages' names.
 - **Pages**: one Svelte app, each page loaded when visited, as today.

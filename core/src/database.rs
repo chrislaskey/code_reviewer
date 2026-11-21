@@ -4,15 +4,20 @@
 //! runs the migrations under `migrations/`, so every deployment has the
 //! same tables. A core function runs in one `Transaction` on it, and
 //! each record context dispatches to its private SQLite or PostgreSQL
-//! adapter. The backend root modules hold only migration runners.
+//! adapter.
 
 use std::path::Path;
 use std::str::FromStr;
 
+use sqlx::migrate::Migrator;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions};
 use thiserror::Error;
 
-use crate::sqlite;
+/// The SQLite migrations, embedded.
+static SQLITE_MIGRATOR: Migrator = sqlx::migrate!("migrations/sqlite");
+/// The PostgreSQL migrations, embedded.
+#[cfg(feature = "postgres")]
+static POSTGRES_MIGRATOR: Migrator = sqlx::migrate!("migrations/postgres");
 
 #[derive(Clone, Debug)]
 pub enum Database {
@@ -110,7 +115,7 @@ impl Database {
     }
 
     async fn migrate_sqlite(pool: SqlitePool) -> Result<Database, DatabaseError> {
-        sqlite::MIGRATOR.run(&pool).await?;
+        SQLITE_MIGRATOR.run(&pool).await?;
         Ok(Database::Sqlite(pool))
     }
 
@@ -131,7 +136,7 @@ impl Database {
             .connect_with(options)
             .await
             .map_err(DatabaseError::Open)?;
-        crate::postgres::MIGRATOR.run(&pool).await?;
+        POSTGRES_MIGRATOR.run(&pool).await?;
         Ok(Database::Postgres(pool))
     }
 }

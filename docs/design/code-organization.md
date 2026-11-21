@@ -1,6 +1,6 @@
 # Code organization in core
 
-Status: agreed 2026-11-21; being built in the steps below.
+Status: built 2026-11-21, steps 1 to 5 below.
 
 ## Request
 
@@ -20,11 +20,11 @@ core/src/
   services/    stripe, app_store, mailer (+ mails), storage, web_server (a device's client of our server)
   helpers/     field_errors, fields, sha256, random
   app/         the app's high-level contexts, jobs included
-  accounts/    the accounts app's, trial_users, tokens and credentials workflows included
+  accounts/    the accounts app's, trial_users included
   ops/         the ops app's
 ```
 
-`database.rs` and `deployment.rs` fit none of the four, as Elixir's `Repo` and `Application` sit outside them; they stay at the root.
+`database.rs` (with the embedded migrations) and `deployment.rs` fit none of the four, as Elixir's `Repo` and `Application` sit outside them; they stay at the root.
 
 ## Decisions
 
@@ -42,6 +42,13 @@ core/src/
 3. Schemas and baseline validation into `data/`; rename `data` modules to their tables; fold `tokens`, `credentials`, `device_settings` and `accounts/prices` record code into their contexts; make `data` public.
 4. Split `app/sync.rs`: the HTTP client to `services/web_server`, the rest stays; event types into `data/events`.
 5. Update `AGENTS.md`, `multi-app.md` and `low-level-contexts.md`.
+
+## As built
+
+- A module that already was a table's low-level context moved into `data` whole, its functions becoming the context's: `accounts::users` (only the deployment's `get` stays there), `tokens`, `credentials`, `device_settings`. Their `create` and `get` check and normalize their input themselves, as an Ecto context does.
+- An enum that names a column's values moves with its schema (`Job`, `CheckoutStatus`, `Store`, `SubscriptionStatus`, `PriceInterval`); methods on it that translate a service's types or decide policy stay in the app's module as a second `impl` (`CheckoutStatus::of`, `Job::interval`).
+- `Cursor` is the schema of `app_sync_state`; `Event`, `StoredEvent` and the queue's reads and writes are `data/app_events`. Merging and answering an event stay in `app::events`. `data` imports nothing from the apps or services.
+- `services/web_server` holds the `Transport` a sync and a sign-in go through: `Http` for the apps, `InProcess` for tests.
 
 ## Open
 

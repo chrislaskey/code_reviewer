@@ -1,6 +1,6 @@
 # Low-level Rust contexts: analysis and refactor proposal
 
-Status: storage-context extraction implemented across the existing resources, infrastructure and documented bulk lifecycle operations. PostgreSQL runtime parity and upstream dependency warnings remain recorded validation limits. The known SQLite advisory is being retained while waiting for a published upstream fix, by the project owner's decision; see `dependency-security.md`.
+Status: superseded in layout by `code-organization.md` (2026-11-21), which moved each schema and its validation into its `data` module, named after its table; the bulk exceptions below still hold. Earlier status: storage-context extraction implemented across the existing resources, infrastructure and documented bulk lifecycle operations. PostgreSQL runtime parity and upstream dependency warnings remain recorded validation limits. The known SQLite advisory is being retained while waiting for a published upstream fix, by the project owner's decision; see `dependency-security.md`.
 
 ## Original request
 
@@ -279,11 +279,11 @@ These operations pass through explicit context entry points, but remain exceptio
 | --- | --- |
 | `data/local_users` | Multi-table ownership transfer, local tombstone cleanup and converted-user deletion in the account-conversion transaction |
 | `data/trial_users` | Trial isolation queries, promotion visibility timestamps, whole-trial deletion and expiry cleanup across related resources |
-| `data/sync_state` maintenance | Device resync clears multiple tables while retaining pending/refused-file state; page application and reset keep their existing boundaries |
-| `data/purges` maintenance | Retention hard deletion across an explicit business-table allowlist, preserving version/time cutoffs and children-first order |
-| `data/events` maintenance | Event cleanup for missing rows reads multiple business tables |
-| `data/users` and `data/accounts_users` maintenance | Unconfirmed/orphan-account cleanup and foreign-key cascades to credentials, tokens and staff |
-| `data/posts` and other resource maintenance | Physical removal/pruning on devices can cascade into association rows |
+| `data/app_sync_state` maintenance | Device resync clears multiple tables while retaining pending/refused-file state; page application and reset keep their existing boundaries |
+| `data/app_purges` maintenance | Retention hard deletion across an explicit business-table allowlist, preserving version/time cutoffs and children-first order |
+| `data/app_events` maintenance | Event cleanup for missing rows reads multiple business tables |
+| `data/app_users` and `data/accounts_users` maintenance | Unconfirmed/orphan-account cleanup and foreign-key cascades to credentials, tokens and staff |
+| `data/app_posts` and other resource maintenance | Physical removal/pruning on devices can cascade into association rows |
 | Resource adapters' read joins | Visibility predicates, authentication joins and purchase/subscription projections may read related resources without loading them individually |
 | Database/migration setup and test fixtures | Connection/migration execution and deliberate test-state setup are outside production record operations |
 

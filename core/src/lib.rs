@@ -1,17 +1,21 @@
 //! The application: what the web server (`../axum`) and the Tauri desktop
-//! and mobile app (`../tauri`) both run. One module per resource, with
-//! `list`, `get`, `create`, `update` and `delete` functions called through
-//! the module, `posts::list`, that return plain data the UI shows. They
-//! read and write the `Deployment` that opened the database, see
-//! `deployment`; the server and the app only translate between their
-//! transport and these functions.
+//! and mobile app (`../tauri`) both run, organized as the project owner's
+//! Elixir applications are, see `docs/design/code-organization.md`:
 //!
-//! Application entry points own transactions and enforce the acting user's
-//! scope. Internal contexts under `data` borrow those transactions and own
-//! private database adapters. Synced business writes use events so devices
-//! and the server converge; identity, commerce and infrastructure records
-//! use their existing transactional workflows. Bulk maintenance exceptions
-//! are documented in `docs/design/low-level-contexts.md`.
+//! - `data`: each table's schema and low-level context, its baseline
+//!   validation and its reads and writes, borrowing the caller's
+//!   transaction. Only a context issues SQL, through private adapters.
+//! - `services`: clients for the services the application talks to.
+//! - `helpers`: generic functions any module may call.
+//! - `app`, `accounts`, `ops`: each app's high-level contexts, the
+//!   functions the server and the app both call, `posts::list`, which take
+//!   the `Deployment`, own the transaction and check the acting user.
+//! - `database`, `deployment`: the connection, its migrations, and the
+//!   role a deployment plays.
+//!
+//! Synced writes are events so devices and the server converge. Bulk
+//! maintenance exceptions are documented in
+//! `docs/design/low-level-contexts.md`.
 
 pub mod accounts;
 pub mod app;
@@ -20,7 +24,4 @@ pub mod database;
 pub mod deployment;
 pub mod helpers;
 pub mod ops;
-#[cfg(feature = "postgres")]
-mod postgres;
 pub mod services;
-mod sqlite;

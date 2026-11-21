@@ -81,11 +81,11 @@ Every core function takes the `users::User` acting. `app_users` is the
 app's view of each person, their name and picture, one row per person,
 written by the server at sign-up and synced like any row, so a post can
 show who wrote it. Their email is their account's, `accounts_users`
-(`core/src/accounts/users.rs`), a row with the same id that never
+(`core/src/data/accounts_users/`), a row with the same id that never
 leaves the server: only `app_` tables sync, see `multi-app.md`.
 Credentials never leave the server either: `accounts_credentials` holds the
-password hash (`core/src/credentials.rs`) and `accounts_tokens` the API
-tokens (`core/src/tokens.rs`), as hashes, good for a year, both by the
+password hash (`core/src/data/accounts_credentials/`) and `accounts_tokens` the API
+tokens (`core/src/data/accounts_tokens/`), as hashes, good for a year, both by the
 user's id. The flows are `core/src/accounts.rs`: `sign_up`, `sign_in`
 and `sign_out` on the server, with an email and its emailed code, each a
 plain server write and never an event; and `sign_up_on_device`,
@@ -436,7 +436,7 @@ A person can choose to work offline, and choose to go online again, from
 the nav. The choice is a device setting, a row of `device_settings`, the
 table of what a person chooses on a device, one JSON value per key so a
 new setting needs no migration. Every setting is declared once, with the
-value a device starts with, in `core/src/device_settings.rs`, and the app
+value a device starts with, in `core/src/data/device_settings/`, and the app
 brings a device up to date with that list when it starts, adding what is
 missing and leaving what the person set; that is also where a release
 that changes a setting rewrites what an earlier one stored. The choice

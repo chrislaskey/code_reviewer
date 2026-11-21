@@ -6,7 +6,7 @@ later returns are not.** Since `multi-app.md` the email and
 user's id, and a sign-up's name, from the email since 2026-11-20, is the only thing of a person that
 `app_users` syncs besides their picture; read `app_users` below as
 that pair. The code is `core/src/accounts.rs`,
-`core/src/tokens.rs`, `core/src/mailer.rs` and `core/src/mails.rs`,
+`core/src/data/accounts_tokens/`, `core/src/services/mailer.rs` and `core/src/services/mailer/mails.rs`,
 `axum/src/accounts.rs`, `axum/src/mailer.rs` and
 `axum/src/rate_limits.rs`, `tauri/src/accounts.rs` with the
 `device_sign_in` table in `tauri/src/device_accounts.rs`, and the pages
@@ -548,7 +548,7 @@ Both are migrations, SQLite and PostgreSQL, and are asked for here.
 
 ## The mailer
 
-`core/src/mailer.rs`: `Mail { to, subject, text }`, `MailError`, and
+`core/src/services/mailer.rs`: `Mail { to, subject, text }`, `MailError`, and
 `enum Mailer { Log, Memory(Arc<Mutex<Vec<Mail>>>), Resend(Resend) }`
 with `async fn send(&self, mail: Mail) -> Result<(), MailError>`.
 `Log` writes the email in full at `info` through `tracing`, every
@@ -562,7 +562,7 @@ request fails; the key is a `SecretString` from the `secrecy` crate,
 read from the environment at start, so it never prints and is only
 exposed at the one line that sets the header.
 
-`core/src/mails.rs` composes every email the app sends, text only:
+`core/src/services/mailer/mails.rs` composes every email the app sends, text only:
 `mails::sign_in_code(to, code)`, subject "Your Starter Pack code",
 "Your code is 123456. It expires in ten minutes. If you did not ask
 for it, ignore this email."; `mails::already_signed_up(to)`, subject

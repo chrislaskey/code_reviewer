@@ -1,5 +1,5 @@
-//! Application resources and workflows, shared by server and device deployments.
-//! Record contexts and shared infrastructure remain at the crate root.
+//! The app's high-level contexts, shared by server and device deployments.
+//! Their records are under `data`.
 
 pub mod avatars;
 pub mod communities;

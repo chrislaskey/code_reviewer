@@ -8,7 +8,7 @@ call.
 
 ## Core decides what is due
 
-`core/src/jobs.rs` holds every job, `Job`, with the role it runs on,
+`core/src/app/jobs.rs` holds every job, `Job` (named in `core/src/data/app_jobs/`), with the role it runs on,
 how often, and the order: `Job::ALL`. Today they are the server's:
 
 | Job | Runs | Order |
