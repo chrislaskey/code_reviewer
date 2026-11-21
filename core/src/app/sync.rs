@@ -32,7 +32,7 @@ use crate::accounts::{self, AccountError, Session};
 use crate::app::avatars::{AvatarUpdate, AvatarUpload, AvatarUploadNew};
 use crate::app::communities::{self, CommunityError};
 use crate::app::events::{self, Answer, AnswerStatus, Event, EventKind, EventStatus, StoredEvent};
-use crate::app::files::{self, File, FileError, FileUpload, FileUploadNew};
+use crate::app::files::{self, FileError, FileUpload, FileUploadNew};
 use crate::app::files_communities::{self, FileCommunityError};
 use crate::app::memberships::{self, MembershipError};
 use crate::app::posts::{self, PostError};
@@ -40,6 +40,7 @@ use crate::app::posts_communities::{self, PostCommunityError};
 use crate::app::purge::{self, PurgeError};
 use crate::app::users::{self, UserError};
 use crate::data::app_communities::{self, Community};
+use crate::data::app_files::{self, File};
 use crate::data::app_files_communities::{self, FileCommunity};
 use crate::data::app_posts::{self, Post};
 use crate::data::app_posts_communities::{self, PostCommunity};
@@ -215,7 +216,7 @@ pub async fn push(
                 memberships::apply_event(deployment, user, event).await?
             }
             app_posts::TABLE => posts::apply_event(deployment, user, event).await?,
-            files::TABLE => files::apply_event(deployment, user, event).await?,
+            app_files::TABLE => files::apply_event(deployment, user, event).await?,
             app_files_communities::TABLE => {
                 files_communities::apply_event(deployment, user, event).await?
             }
@@ -453,7 +454,7 @@ async fn with_parents(
                     send(
                         &mut out,
                         &mut sent,
-                        files::TABLE,
+                        app_files::TABLE,
                         file.id,
                         SyncedRow::File(file),
                     )?;
@@ -493,7 +494,7 @@ async fn with_parents(
             SyncedRow::Membership(membership) => (app_users_communities::TABLE, membership.id),
             SyncedRow::Post(post) => (app_posts::TABLE, post.id),
             SyncedRow::PostCommunity(row) => (app_posts_communities::TABLE, row.id),
-            SyncedRow::File(file) => (files::TABLE, file.id),
+            SyncedRow::File(file) => (app_files::TABLE, file.id),
             SyncedRow::FileCommunity(row) => (app_files_communities::TABLE, row.id),
         };
         send(&mut out, &mut sent, table, id, row)?;
@@ -558,7 +559,7 @@ fn table_rank(table: &str) -> usize {
         app_users_communities::TABLE => 2,
         app_posts::TABLE => 3,
         app_posts_communities::TABLE => 4,
-        files::TABLE => 5,
+        app_files::TABLE => 5,
         app_files_communities::TABLE => 6,
         _ => 7,
     }
@@ -1402,7 +1403,7 @@ async fn push_batch<T: Transport>(
                     // A file is the only copy of its bytes, so it is never
                     // dropped: it waits while the server only lacks the
                     // bytes, and is kept for the person otherwise
-                    (EventKind::Create, false) if event.table == files::TABLE => {
+                    (EventKind::Create, false) if event.table == app_files::TABLE => {
                         let refused = if reason == files::FILE_NOT_UPLOADED {
                             events::count_attempt(&mut tx, event.id, &reason).await?
                         } else {
@@ -1624,7 +1625,7 @@ async fn apply_row(tx: &mut Transaction, user: &User, row: &TableRow) -> Result<
         app_posts_communities::TABLE => {
             Ok(posts_communities::apply_server_row(tx, &row.row).await?)
         }
-        files::TABLE => Ok(files::apply_server_row(tx, &row.row).await?),
+        app_files::TABLE => Ok(files::apply_server_row(tx, &row.row).await?),
         app_files_communities::TABLE => {
             Ok(files_communities::apply_server_row(tx, &row.row).await?)
         }
@@ -1640,7 +1641,7 @@ async fn delete_row(tx: &mut Transaction, table: &str, id: Uuid) -> Result<(), S
         app_users_communities::TABLE => Ok(memberships::delete_row(tx, id).await?),
         app_posts::TABLE => Ok(posts::delete_row(tx, id).await?),
         app_posts_communities::TABLE => Ok(posts_communities::delete_row(tx, id).await?),
-        files::TABLE => Ok(files::delete_row(tx, id).await?),
+        app_files::TABLE => Ok(files::delete_row(tx, id).await?),
         app_files_communities::TABLE => Ok(files_communities::delete_row(tx, id).await?),
         other => Err(SyncError::Malformed(format!(
             "a row of an unknown table '{other}'"

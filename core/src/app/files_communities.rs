@@ -19,10 +19,11 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind};
-use crate::app::files::{self, File};
+use crate::app::files;
 use crate::app::memberships::{self, id_field};
 use crate::app::sync::{Cursor, TableRow};
 use crate::data::app_communities::Community;
+use crate::data::app_files::File;
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
@@ -712,7 +713,7 @@ mod tests {
             assert!(matches!(error, FileCommunityError::UnknownFile { .. }));
 
             let rename = Event::update(
-                files::TABLE,
+                app_files::TABLE,
                 file.id,
                 file.version,
                 json::object_fields(json!({ "name": file.name })),
@@ -928,7 +929,7 @@ mod tests {
             let files_sent: Vec<Value> = page
                 .rows
                 .iter()
-                .filter(|row| row.table == files::TABLE)
+                .filter(|row| row.table == app_files::TABLE)
                 .map(|row| row.row["id"].clone())
                 .collect();
             assert_eq!(files_sent, [json!(shared.id)]);
@@ -1044,7 +1045,7 @@ mod tests {
                 .await
                 .expect("a page");
             assert!(
-                page.rows.iter().all(|row| row.table != files::TABLE),
+                page.rows.iter().all(|row| row.table != app_files::TABLE),
                 "the file is in cooking only, which bob is not in"
             );
             let (device, _folder) = device_with_folder(&bob, &bobs_token).await;

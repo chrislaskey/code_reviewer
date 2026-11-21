@@ -22,7 +22,7 @@ pub(crate) mod accounts_tokens;
 pub(crate) mod accounts_users;
 pub mod app_communities;
 pub(crate) mod app_events;
-pub(crate) mod app_files;
+pub mod app_files;
 pub mod app_files_communities;
 pub(crate) mod app_jobs;
 pub mod app_posts;

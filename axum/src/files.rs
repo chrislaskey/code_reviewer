@@ -14,8 +14,9 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use app_core::app::files::{
-    self, File, FileNew, FileSearch, FileSearchResults, FileUpload, FileUploadNew, FileWithState,
+    self, FileNew, FileSearch, FileSearchResults, FileUpload, FileUploadNew, FileWithState,
 };
+use app_core::data::app_files::File;
 use app_core::deployment::Deployment;
 
 use crate::api_error::ApiError;

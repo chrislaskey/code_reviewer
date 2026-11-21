@@ -8,7 +8,7 @@ use sqlx::{FromRow, SqliteConnection};
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
-use crate::app::files::File;
+use super::File;
 use crate::app::sync::Cursor;
 
 #[derive(FromRow)]

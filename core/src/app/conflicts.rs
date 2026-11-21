@@ -19,6 +19,7 @@ use crate::app::files::{self, FileError};
 use crate::app::posts::{self, PostError};
 use crate::app::users::{self, UserError};
 use crate::data::app_communities;
+use crate::data::app_files;
 use crate::data::app_posts;
 use crate::data::app_users::{self, User};
 use crate::database::Transaction;
@@ -125,7 +126,7 @@ pub async fn reapply(deployment: &Deployment, user: &User, id: Uuid) -> Result<(
         now(),
     );
     let answer = match stored.event.table.as_str() {
-        files::TABLE => {
+        app_files::TABLE => {
             files::apply_in(&mut tx, deployment.role, user, &event, true)
                 .await?
                 .answer
@@ -174,7 +175,8 @@ pub async fn try_again(deployment: &Deployment, id: Uuid) -> Result<(), Conflict
 pub async fn let_go(deployment: &Deployment, id: Uuid) -> Result<(), ConflictError> {
     let mut tx = deployment.begin().await?;
     let stored = get(&mut tx, id).await?;
-    let refused_file = stored.event.table == files::TABLE && stored.event.kind == EventKind::Create;
+    let refused_file =
+        stored.event.table == app_files::TABLE && stored.event.kind == EventKind::Create;
     if refused_file {
         files::forget_in(&mut tx, stored.event.row_id).await?;
     } else {
@@ -219,7 +221,7 @@ async fn row_of(tx: &mut Transaction, event: &Event) -> Result<Option<Row>, Conf
                 })
             })
             .transpose()?,
-        files::TABLE => files::get_in(tx, event.row_id)
+        app_files::TABLE => files::get_in(tx, event.row_id)
             .await?
             .filter(|file| file.deleted_at.is_none())
             .map(|file| {

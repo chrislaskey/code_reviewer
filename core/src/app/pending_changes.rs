@@ -15,6 +15,7 @@ use crate::app::files_communities;
 use crate::app::posts::{self, PostError};
 use crate::app::users::{self, UserError};
 use crate::data::app_communities;
+use crate::data::app_files;
 use crate::data::app_files_communities;
 use crate::data::app_posts;
 use crate::data::app_users;
@@ -59,7 +60,7 @@ pub async fn list(deployment: &Deployment) -> Result<Vec<PendingChange>, Pending
             app_posts::TABLE => posts::get_in(&mut tx, stored.event.row_id)
                 .await?
                 .map(|post| post.body.lines().next().unwrap_or_default().to_string()),
-            files::TABLE => files::get_in(&mut tx, stored.event.row_id)
+            app_files::TABLE => files::get_in(&mut tx, stored.event.row_id)
                 .await?
                 .map(|file| file.name),
             app_files_communities::TABLE => {

@@ -26,7 +26,10 @@
 //! `delete_unreferenced_on_device` in the account's folder, at the end
 //! of each sync.
 
-use crate::data::app_files;
+use crate::data::app_files::{
+    self, AcceptedFile, File, TABLE, content_type_or_unknown, is_content_type, is_file_name,
+    is_file_size, is_sha256,
+};
 use crate::data::app_files_communities;
 use crate::data::app_users_communities;
 use std::collections::BTreeSet;
@@ -56,23 +59,6 @@ use crate::helpers::field_errors::FieldErrors;
 use crate::helpers::{json, sha256};
 use crate::services::storage::{Storage, StorageError};
 
-/// A row accepted by this resource's event, lifecycle or replication workflow.
-/// Only this module can construct an accepted write.
-pub(crate) struct AcceptedFile<'a>(&'a File);
-
-impl AcceptedFile<'_> {
-    /// Borrows the accepted row for persistence.
-    pub(crate) fn row(&self) -> &File {
-        self.0
-    }
-}
-
-pub const TABLE: &str = "app_files";
-/// The largest file, 25 MB.
-pub const MAX_BYTES: u64 = 25 * 1024 * 1024;
-pub const MAX_NAME_LENGTH: usize = 255;
-/// What a file with no content type of its own is sent as.
-pub const UNKNOWN_CONTENT_TYPE: &str = "application/octet-stream";
 /// Why a device refuses a waiting file itself: there is nothing to send.
 pub const BYTES_GONE: &str = "the file's bytes are no longer on this device";
 /// Why the server leaves a create pending: the bytes are not in its
@@ -104,29 +90,6 @@ const UPLOAD_URL_LIFETIME: std::time::Duration = std::time::Duration::from_secs(
 /// How long a signed download URL works.
 #[cfg(feature = "object-storage")]
 pub const DOWNLOAD_URL_LIFETIME: std::time::Duration = std::time::Duration::from_secs(60 * 60);
-
-/// A file's row, with the sync columns every synced row carries, see
-/// `docs/design/offline-sync.md`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct File {
-    pub id: Uuid,
-    /// Who created it: a record, not an owner, see `files_communities`.
-    pub created_by_id: Uuid,
-    pub name: String,
-    pub content_type: String,
-    /// In bytes.
-    pub size: u64,
-    /// The bytes' SHA-256, lowercase hex.
-    pub sha256: String,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    /// The server's version, 0 on a device's file not yet pushed.
-    pub version: i64,
-    /// When the server last wrote it; none on a device's file not yet pushed.
-    pub last_synced_at: Option<DateTime<Utc>>,
-    pub deleted_at: Option<DateTime<Utc>>,
-    pub deleted_by_id: Option<Uuid>,
-}
 
 /// Where a file stands between a device and the server.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -301,6 +264,12 @@ pub enum FileError {
 impl From<SyncError> for FileError {
     fn from(error: SyncError) -> FileError {
         FileError::Sync(Box::new(error))
+    }
+}
+
+impl From<FieldErrors> for FileError {
+    fn from(errors: FieldErrors) -> FileError {
+        FileError::Invalid(errors)
     }
 }
 
@@ -921,7 +890,7 @@ pub(crate) async fn apply_server_row(tx: &mut Transaction, row: &Value) -> Resul
     if events::has_pending(tx, TABLE, file.id).await? {
         return Ok(false);
     }
-    app_files::replication::upsert(&mut *tx, AcceptedFile(&file)).await?;
+    app_files::replication::upsert(&mut *tx, &file).await?;
     Ok(true)
 }
 
@@ -1062,7 +1031,8 @@ pub(crate) async fn delete_with_last_community(
         file.version += 1;
         file.last_synced_at = Some(file.updated_at);
     }
-    app_files::update(&mut *tx, AcceptedFile(&file)).await?;
+    let file = AcceptedFile::new(file)?;
+    app_files::update(&mut *tx, &file).await?;
     Ok(())
 }
 
@@ -1374,7 +1344,10 @@ pub(crate) async fn apply_in(
                 deleted_at: None,
                 deleted_by_id: None,
             };
-            let file = match blank.with_fields(&event.changes) {
+            let accepted = blank
+                .with_fields(&event.changes)
+                .and_then(|file| Ok(AcceptedFile::new(file)?));
+            let file = match accepted {
                 Ok(file) => file,
                 Err(error) => return rejected(event, format!("invalid: {error}"), None),
             };
@@ -1393,7 +1366,8 @@ pub(crate) async fn apply_in(
             if !uploaded {
                 return rejected(event, FILE_NOT_UPLOADED, None);
             }
-            app_files::create(&mut *tx, AcceptedFile(&file)).await?;
+            app_files::create(&mut *tx, &file).await?;
+            let file = file.into_row();
             files_communities::create_with_file(tx, user, &file, &communities).await?;
             finish(tx, role, user, event, Conflicts::new(), file).await
         }
@@ -1420,8 +1394,12 @@ pub(crate) async fn apply_in(
                     updated.version += 1;
                     updated.last_synced_at = Some(now);
                 }
-                app_files::update(&mut *tx, AcceptedFile(&updated)).await?;
-                updated
+                let updated = match AcceptedFile::new(updated) {
+                    Ok(updated) => updated,
+                    Err(error) => return rejected(event, format!("invalid: {error}"), Some(file)),
+                };
+                app_files::update(&mut *tx, &updated).await?;
+                updated.into_row()
             };
             finish(tx, role, user, event, conflicts, file).await
         }
@@ -1468,27 +1446,13 @@ impl File {
         Ok(all)
     }
 
-    /// The file with the fields written over it, checked.
+    /// The file with the fields written over it, not yet checked.
     fn with_fields(&self, changes: &Fields) -> Result<File, FileError> {
         let mut all = json::object_fields(serde_json::to_value(self)?);
         for (name, value) in changes {
             all.insert(name.clone(), value.clone());
         }
-        let file: File = serde_json::from_value(Value::Object(all))?;
-        let checked = FileNew {
-            id: file.id,
-            name: file.name.clone(),
-            content_type: file.content_type.clone(),
-            size: file.size,
-            sha256: file.sha256.clone(),
-            community_ids: Vec::new(),
-        }
-        .checked()?;
-        Ok(File {
-            name: checked.name,
-            content_type: checked.content_type,
-            ..file
-        })
+        Ok(serde_json::from_value(Value::Object(all))?)
     }
 }
 
@@ -1534,58 +1498,6 @@ fn checked_community_ids(community_ids: &[Uuid]) -> Result<(), FileError> {
             "community_ids",
             "needs a community".to_string(),
         )));
-    }
-    Ok(())
-}
-
-/// The content type a browser gave, or the unknown one when it gave none.
-fn content_type_or_unknown(content_type: &str) -> String {
-    match content_type.trim() {
-        "" => UNKNOWN_CONTENT_TYPE.to_string(),
-        content_type => content_type.to_lowercase(),
-    }
-}
-
-fn is_file_name(value: &str, _context: &()) -> garde::Result {
-    if value.trim().is_empty() {
-        return Err(garde::Error::new("is blank"));
-    }
-    if value.chars().count() > MAX_NAME_LENGTH {
-        return Err(garde::Error::new("is longer than 255 characters"));
-    }
-    Ok(())
-}
-
-/// A `type/subtype`, with parameters or not, in printable ASCII.
-fn is_content_type(value: &str, _context: &()) -> garde::Result {
-    let essence = value.split(';').next().unwrap_or_default().trim();
-    let well_formed = essence.split_once('/').is_some_and(|(kind, subtype)| {
-        !kind.is_empty() && !subtype.is_empty() && !subtype.contains('/')
-    });
-    let printable = value.chars().all(|c| c.is_ascii_graphic() || c == ' ');
-    if !well_formed || !printable || value.len() > MAX_NAME_LENGTH {
-        return Err(garde::Error::new("is not a content type"));
-    }
-    Ok(())
-}
-
-/// A SHA-256 as lowercase hex.
-fn is_sha256(value: &str, _context: &()) -> garde::Result {
-    let hex = value
-        .chars()
-        .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c));
-    if value.len() != 64 || !hex {
-        return Err(garde::Error::new("is not a SHA-256"));
-    }
-    Ok(())
-}
-
-fn is_file_size(value: &u64, _context: &()) -> garde::Result {
-    if *value == 0 {
-        return Err(garde::Error::new("is empty"));
-    }
-    if *value > MAX_BYTES {
-        return Err(garde::Error::new("is larger than 25 MB"));
     }
     Ok(())
 }
@@ -2759,7 +2671,7 @@ pub(crate) mod tests {
                 id: Uuid::now_v7(),
                 name: "  ".to_string(),
                 content_type: "not a type".to_string(),
-                size: MAX_BYTES + 1,
+                size: app_files::MAX_BYTES + 1,
                 sha256: "not a checksum".to_string(),
                 community_ids: Vec::new(),
             };
@@ -2785,7 +2697,7 @@ pub(crate) mod tests {
             let file = create(&deployment, &alice, &untyped)
                 .await
                 .expect("a file of no known type");
-            assert_eq!(file.content_type, UNKNOWN_CONTENT_TYPE);
+            assert_eq!(file.content_type, app_files::UNKNOWN_CONTENT_TYPE);
         })
         .await;
     }
@@ -3098,7 +3010,7 @@ pub(crate) mod tests {
             assert_eq!(upload.upload_url, None);
 
             let too_large = FileUploadNew {
-                size: MAX_BYTES + 1,
+                size: app_files::MAX_BYTES + 1,
                 ..request
             };
             let error = create_upload(&deployment, &alice, &too_large)

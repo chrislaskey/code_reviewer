@@ -32,7 +32,6 @@ use uuid::Uuid;
 use crate::accounts::Session;
 use crate::app::communities::{self, CommunityError};
 use crate::app::events::{self, Event};
-use crate::app::files;
 use crate::app::files_communities::{self, FileCommunityNew};
 use crate::app::users::{self, SignedIn, UserError};
 use crate::data::app_users::{self, User};
@@ -333,7 +332,7 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
             })
             .collect();
         add(
-            files::TABLE,
+            app_files::TABLE,
             file.id,
             file.inserted_at,
             &parents,
@@ -357,6 +356,7 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
 mod tests {
     use super::*;
     use crate::accounts;
+    use crate::app::files;
     use crate::app::files::tests::server;
     use crate::app::posts;
     use crate::app::sync::{self, InProcess};
@@ -452,7 +452,7 @@ mod tests {
         in_community: app_posts::Post,
         in_none: app_posts::Post,
         deleted: app_posts::Post,
-        file: files::File,
+        file: app_files::File,
     }
 
     async fn made_by(device: &Deployment, local: &User) -> Made {
