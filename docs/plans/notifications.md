@@ -181,7 +181,7 @@ through the App Store or TestFlight:
 
 - **Development builds use APNs' sandbox** (`api.sandbox.push.apple.com`).
   An app signed with a development provisioning profile and installed with
-  `bin/run-on-iphone` gets a sandbox device token, and pushes sent to the
+  `bin/reinstall` gets a sandbox device token, and pushes sent to the
   sandbox reach it, locked or not. A private app can stay on the sandbox
   for good; a paid account's development profile lasts a year.
 - **The simulator gets real pushes** on an Apple silicon Mac (Xcode 14+,

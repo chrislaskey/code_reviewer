@@ -1079,7 +1079,7 @@ pass through Apple.
   directory. Without them push is off and nothing else changes; broken
   ones log a warning at launch instead of stopping the server.
 * **Sandbox only** (`api.sandbox.push.apple.com`, `aps-environment:
-  development`): development builds installed with `bin/run-on-iphone` get
+  development`): development builds installed with `bin/reinstall` get
   sandbox tokens, and the app is never released, so there's no production
   host to choose.
 * **Sending** (`apple_push.rs`) is one HTTP/2 POST per phone with `reqwest`,

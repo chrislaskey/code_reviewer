@@ -87,8 +87,8 @@ xcrun simctl launch booted com.chrislaskey.codereviewer
 
 On a phone: copy `.env.example` to `.env` (ignored by git) and set your
 signing team, register the phone in that team's developer account, turn on
-Developer Mode on it, then `bin/run-on-iphone` builds, installs and
-launches it (`bin/run-on-iphone --help`). To pair it, turn on remote
+Developer Mode on it, then `bin/reinstall` builds, installs and
+launches it (`bin/reinstall --help`). To pair it, turn on remote
 access on the desktop's Remote page (Tailscale running, HTTPS certificates
 on for the tailnet), pair a device, and paste the code on the phone's
 Remote page.

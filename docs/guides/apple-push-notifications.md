@@ -6,7 +6,7 @@ once per Apple developer team. See `docs/plans/notifications.md` for why
 the phone needs APNs.
 
 The app stays on APNs' **sandbox** for good: development builds installed
-with `bin/run-on-iphone` (or run in the simulator) get sandbox tokens, and
+with `bin/reinstall` (or run in the simulator) get sandbox tokens, and
 no App Store or TestFlight release is needed.
 
 ## What you need
@@ -67,7 +67,7 @@ The iOS app asks for push with the `aps-environment: development`
 entitlement in
 `tauri/src-tauri/gen/apple/code_reviewer_iOS/code_reviewer_iOS.entitlements`.
 Xcode's automatic signing makes a new provisioning profile that includes
-push the next time `bin/run-on-iphone` builds. If the app logs "no valid
+push the next time `bin/reinstall` builds. If the app logs "no valid
 aps-environment entitlement", delete the old profile in Xcode → Settings →
 Accounts → Download Manual Profiles, and build again.
 

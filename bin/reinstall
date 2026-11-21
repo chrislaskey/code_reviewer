@@ -3,7 +3,7 @@
 # Builds the iOS app for a phone, then installs and launches it on a
 # connected iPhone.
 #
-# Run `bin/run-on-iphone --help` for the details.
+# Run `bin/reinstall --help` for the details.
 
 set -eo pipefail
 
@@ -15,12 +15,12 @@ XCODE_PROJECT="$ROOT/tauri/src-tauri/gen/apple/code_reviewer.xcodeproj/project.p
 help() {
   cat <<USAGE
 Builds the iOS app for a phone, then installs and launches it on a
-connected iPhone.
+connected iPhone, over the copy already there, keeping its data.
 
 Usage: $0 [DEVICE]
 
 DEVICE is a name or identifier from \`xcrun devicectl list devices\`. When
-left out, the first connected iPhone.
+left out, the first iPhone connected or paired over the network.
 
 Why not \`cargo tauri ios run\`: with tauri-cli 2.12.4 it builds and signs
 the app, then fails exporting it ("Couldn't load -exportOptionsPlist").
@@ -55,7 +55,7 @@ export APPLE_DEVELOPMENT_TEAM
 device="${1:-}"
 if [ -z "$device" ]; then
   device="$(xcrun devicectl list devices 2>/dev/null \
-    | awk '/connected/ && /iPhone/' \
+    | awk '/iPhone/ && (/connected/ || /available/)' \
     | grep -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}' \
     | head -n 1 || true)"
   [ -n "$device" ] || fail "no connected iPhone; plug one in and unlock it, or name one (\`xcrun devicectl list devices\`)"
