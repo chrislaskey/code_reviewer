@@ -1,9 +1,33 @@
-//! Transaction-scoped membership records. Workflows own commits.
+//! Membership records: the `Membership` schema and the reads and writes of
+//! `app_users_communities`. Callers own and commit the transaction. Writes
+//! are crate-private: a membership syncs, so each write is an event
+//! applied by `app::memberships`.
 
-use crate::app::memberships::{AcceptedMembership, Membership};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
 use crate::app::sync::Cursor;
 use crate::database::Transaction;
-use uuid::Uuid;
+
+pub const TABLE: &str = "app_users_communities";
+pub const ROLE_MEMBER: &str = "member";
+
+/// A user's membership in a community, with the sync columns every
+/// synced row carries.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Membership {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub community_id: Uuid,
+    pub role: String,
+    pub inserted_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub version: i64,
+    pub last_synced_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<DateTime<Utc>>,
+    pub deleted_by_id: Option<Uuid>,
+}
 
 #[cfg(feature = "postgres")]
 mod postgres;
@@ -20,16 +44,13 @@ macro_rules! query {
 }
 
 /// The relationship whose live rows are needed by the caller's workflow.
-pub(crate) enum Filter {
+pub enum Filter {
     User(Uuid),
     Community(Uuid),
 }
 
 /// Lists live memberships, oldest first with an ID tie-breaker.
-pub(crate) async fn list(
-    tx: &mut Transaction,
-    filter: Filter,
-) -> Result<Vec<Membership>, sqlx::Error> {
+pub async fn list(tx: &mut Transaction, filter: Filter) -> Result<Vec<Membership>, sqlx::Error> {
     match filter {
         Filter::User(id) => query!(tx, list_live_of_user(id)),
         Filter::Community(id) => query!(tx, list_live_of_community(id)),
@@ -37,7 +58,7 @@ pub(crate) async fn list(
 }
 
 /// Gets the user's live membership in a community.
-pub(crate) async fn get(
+pub async fn get(
     tx: &mut Transaction,
     user_id: Uuid,
     community_id: Uuid,
@@ -51,33 +72,30 @@ pub(crate) async fn get(
 /// Persists a row accepted by the resource workflow.
 pub(crate) async fn create(
     tx: &mut Transaction,
-    membership: AcceptedMembership<'_>,
+    membership: &Membership,
 ) -> Result<(), sqlx::Error> {
-    query!(tx, insert(membership.row()))
+    query!(tx, insert(membership))
 }
 
 /// Persists a row accepted by the resource workflow.
 pub(crate) async fn update(
     tx: &mut Transaction,
-    membership: AcceptedMembership<'_>,
+    membership: &Membership,
 ) -> Result<bool, sqlx::Error> {
-    query!(tx, update(membership.row()))
+    query!(tx, update(membership))
 }
 
 /// Explicit replication access for internal resource workflows.
-pub(crate) mod replication {
+pub mod replication {
     use super::*;
 
     /// Reads protocol state, including tombstones, in the caller transaction.
-    pub(crate) async fn get(
-        tx: &mut Transaction,
-        id: Uuid,
-    ) -> Result<Option<Membership>, sqlx::Error> {
+    pub async fn get(tx: &mut Transaction, id: Uuid) -> Result<Option<Membership>, sqlx::Error> {
         query!(tx, get(id))
     }
 
     /// Reads protocol state, including tombstones, in the caller transaction.
-    pub(crate) async fn get_by_user_and_community(
+    pub async fn get_by_user_and_community(
         tx: &mut Transaction,
         user_id: Uuid,
         community_id: Uuid,
@@ -86,7 +104,7 @@ pub(crate) mod replication {
     }
 
     /// Reads protocol state, including tombstones, in the caller transaction.
-    pub(crate) async fn list_synced_after(
+    pub async fn list_synced_after(
         tx: &mut Transaction,
         user_id: Uuid,
         after: &Cursor,
@@ -98,9 +116,9 @@ pub(crate) mod replication {
     /// Persists a row accepted by the resource workflow.
     pub(crate) async fn upsert(
         tx: &mut Transaction,
-        membership: AcceptedMembership<'_>,
+        membership: &Membership,
     ) -> Result<(), sqlx::Error> {
-        query!(tx, upsert(membership.row()))
+        query!(tx, upsert(membership))
     }
 }
 

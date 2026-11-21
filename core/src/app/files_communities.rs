@@ -11,7 +11,7 @@
 //! nothing tells them a file is elsewhere.
 
 use crate::data::app_files;
-use crate::data::app_files_communities;
+use crate::data::app_files_communities::{self, FileCommunity, TABLE};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -28,35 +28,8 @@ use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;
 
-/// A row accepted by this resource's event or replication workflow.
-/// Only this module can construct an accepted write.
-pub(crate) struct AcceptedFileCommunity<'a>(&'a FileCommunity);
-
-impl AcceptedFileCommunity<'_> {
-    /// Borrows the accepted row for persistence.
-    pub(crate) fn row(&self) -> &FileCommunity {
-        self.0
-    }
-}
-
-pub const TABLE: &str = "app_files_communities";
 const CREATE_FIELDS: &[&str] = &["file_id", "community_id"];
 const UPDATE_FIELDS: &[&str] = &["deleted_at"];
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FileCommunity {
-    pub id: Uuid,
-    pub file_id: Uuid,
-    pub community_id: Uuid,
-    /// The member who put the file in the community.
-    pub created_by_id: Uuid,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub version: i64,
-    pub last_synced_at: Option<DateTime<Utc>>,
-    pub deleted_at: Option<DateTime<Utc>>,
-    pub deleted_by_id: Option<Uuid>,
-}
 
 /// A row a file's create carries: the id the device made for it, and
 /// the community.
@@ -278,7 +251,7 @@ pub(crate) async fn create_with_file(
             deleted_at: None,
             deleted_by_id: None,
         };
-        app_files_communities::create(&mut *tx, AcceptedFileCommunity(&row)).await?;
+        app_files_communities::create(&mut *tx, &row).await?;
     }
     Ok(())
 }
@@ -338,7 +311,7 @@ pub(crate) async fn apply_server_row(
     {
         return Ok(false);
     }
-    app_files_communities::replication::upsert(&mut *tx, AcceptedFileCommunity(&row)).await?;
+    app_files_communities::replication::upsert(&mut *tx, &row).await?;
     Ok(true)
 }
 
@@ -499,7 +472,7 @@ async fn apply_in(
                         deleted_at: None,
                         deleted_by_id: None,
                     };
-                    app_files_communities::create(&mut *tx, AcceptedFileCommunity(&row)).await?;
+                    app_files_communities::create(&mut *tx, &row).await?;
                     row
                 }
             }
@@ -604,7 +577,7 @@ async fn write_changed(
         row.version += 1;
         row.last_synced_at = Some(now);
     }
-    app_files_communities::update(&mut *tx, AcceptedFileCommunity(row)).await?;
+    app_files_communities::update(&mut *tx, row).await?;
     Ok(())
 }
 

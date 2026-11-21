@@ -129,9 +129,10 @@ pub async fn horizon(deployment: &Deployment) -> Result<Option<DateTime<Utc>>, P
 mod tests {
     use super::*;
     use crate::app::events::{self, EventStatus};
-    use crate::app::{communities, posts, posts_communities};
+    use crate::app::{communities, posts};
     use crate::data::app_communities;
     use crate::data::app_posts;
+    use crate::data::app_posts_communities;
     use crate::database::{Database, with_each_database};
     use crate::deployment::now;
 
@@ -170,7 +171,7 @@ mod tests {
             let later = now() + Duration::days(RETENTION_DAYS + 1);
             let report = run(&deployment, later).await.expect("purged");
             assert_eq!(report.removed[app_posts::TABLE], 1);
-            assert_eq!(report.removed[posts_communities::TABLE], 1);
+            assert_eq!(report.removed[app_posts_communities::TABLE], 1);
             assert_eq!(report.removed[app_communities::TABLE], 0);
             assert_eq!(
                 report.removed["app_events"], 3,

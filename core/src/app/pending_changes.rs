@@ -15,6 +15,7 @@ use crate::app::files_communities;
 use crate::app::posts::{self, PostError};
 use crate::app::users::{self, UserError};
 use crate::data::app_communities;
+use crate::data::app_files_communities;
 use crate::data::app_posts;
 use crate::data::app_users;
 use crate::deployment::Deployment;
@@ -61,7 +62,7 @@ pub async fn list(deployment: &Deployment) -> Result<Vec<PendingChange>, Pending
             files::TABLE => files::get_in(&mut tx, stored.event.row_id)
                 .await?
                 .map(|file| file.name),
-            files_communities::TABLE => {
+            app_files_communities::TABLE => {
                 match files_communities::get_in(&mut tx, stored.event.row_id)
                     .await
                     .map_err(FileError::from)?

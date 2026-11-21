@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgConnection};
 use uuid::Uuid;
 
-use crate::app::memberships::Membership;
+use super::Membership;
 use crate::app::sync::Cursor;
 
 #[derive(FromRow)]

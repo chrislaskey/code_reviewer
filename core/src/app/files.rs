@@ -27,6 +27,7 @@
 //! of each sync.
 
 use crate::data::app_files;
+use crate::data::app_files_communities;
 use crate::data::app_users_communities;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -698,7 +699,7 @@ pub async fn held_back(
     held_back.extend(refused);
     let mut rows = BTreeSet::new();
     for stored in events::pending(&mut tx).await? {
-        if stored.event.table != files_communities::TABLE {
+        if stored.event.table != app_files_communities::TABLE {
             continue;
         }
         let row = files_communities::get_in(&mut tx, stored.event.row_id)
@@ -1002,7 +1003,7 @@ pub async fn local_copy<T: Transport>(
 pub(crate) async fn forget_in(tx: &mut Transaction, id: Uuid) -> Result<(), FileError> {
     events::delete_of_row(tx, TABLE, id).await?;
     for row in files_communities_of(tx, id).await? {
-        events::delete_of_row(tx, files_communities::TABLE, row).await?;
+        events::delete_of_row(tx, app_files_communities::TABLE, row).await?;
     }
     Ok(app_files::maintenance::delete(tx, id).await?)
 }
@@ -1011,7 +1012,7 @@ pub(crate) async fn forget_in(tx: &mut Transaction, id: Uuid) -> Result<(), File
 /// device: those its create wrote, and those written since.
 async fn files_communities_of(tx: &mut Transaction, id: Uuid) -> Result<Vec<Uuid>, FileError> {
     let mut rows = Vec::new();
-    for stored in events::list_of_table(tx, files_communities::TABLE).await? {
+    for stored in events::list_of_table(tx, app_files_communities::TABLE).await? {
         if let Some(row) = files_communities::get_in(tx, stored.event.row_id).await?
             && row.file_id == id
         {

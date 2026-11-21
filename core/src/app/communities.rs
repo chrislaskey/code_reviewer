@@ -17,9 +17,10 @@ use uuid::Uuid;
 
 use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind, Fields};
 use crate::app::files_communities;
-use crate::app::memberships::{self, Membership, MembershipError};
+use crate::app::memberships::{self, MembershipError};
 use crate::app::sync::{Cursor, TableRow};
 use crate::data::app_users::User;
+use crate::data::app_users_communities::Membership;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::field_errors::FieldErrors;
@@ -617,7 +618,7 @@ mod tests {
             assert_eq!(alices[0].community, gardening);
             let membership = alices[0].membership.as_ref().expect("joined");
             assert_eq!(membership.user_id, alice.id);
-            assert_eq!(membership.role, memberships::ROLE_MEMBER);
+            assert_eq!(membership.role, app_users_communities::ROLE_MEMBER);
 
             let bobs = list(&deployment, &bob).await.expect("the list");
             assert_eq!(bobs[0].community, gardening);

@@ -32,9 +32,9 @@ use uuid::Uuid;
 use crate::accounts::Session;
 use crate::app::communities::{self, CommunityError};
 use crate::app::events::{self, Event};
+use crate::app::files;
 use crate::app::files_communities::{self, FileCommunityNew};
 use crate::app::users::{self, SignedIn, UserError};
-use crate::app::{files, memberships, posts_communities};
 use crate::data::app_users::{self, User};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
@@ -265,7 +265,7 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
         app_users_communities::list(&mut *tx, app_users_communities::Filter::User(user.id)).await?
     {
         add(
-            memberships::TABLE,
+            app_users_communities::TABLE,
             membership.id,
             membership.inserted_at,
             &[membership.community_id],
@@ -293,7 +293,7 @@ async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), Local
                 .await?
         {
             add(
-                posts_communities::TABLE,
+                app_posts_communities::TABLE,
                 row.id,
                 row.inserted_at,
                 &[row.post_id, row.community_id, row.users_communities_id],

@@ -6,7 +6,7 @@ use sqlx::{FromRow, SqliteConnection};
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
-use crate::app::memberships::Membership;
+use super::Membership;
 use crate::app::sync::Cursor;
 
 #[derive(FromRow)]

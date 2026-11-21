@@ -33,15 +33,18 @@ use crate::app::avatars::{AvatarUpdate, AvatarUpload, AvatarUploadNew};
 use crate::app::communities::{self, CommunityError};
 use crate::app::events::{self, Answer, AnswerStatus, Event, EventKind, EventStatus, StoredEvent};
 use crate::app::files::{self, File, FileError, FileUpload, FileUploadNew};
-use crate::app::files_communities::{self, FileCommunity, FileCommunityError};
-use crate::app::memberships::{self, Membership, MembershipError};
+use crate::app::files_communities::{self, FileCommunityError};
+use crate::app::memberships::{self, MembershipError};
 use crate::app::posts::{self, PostError};
-use crate::app::posts_communities::{self, PostCommunity, PostCommunityError};
+use crate::app::posts_communities::{self, PostCommunityError};
 use crate::app::purge::{self, PurgeError};
 use crate::app::users::{self, UserError};
 use crate::data::app_communities::{self, Community};
+use crate::data::app_files_communities::{self, FileCommunity};
 use crate::data::app_posts::{self, Post};
+use crate::data::app_posts_communities::{self, PostCommunity};
 use crate::data::app_users::{self, User};
+use crate::data::app_users_communities::{self, Membership};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, now};
 use crate::device_settings::{self, DeviceSettingsError, WORK_OFFLINE};
@@ -208,13 +211,15 @@ pub async fn push(
         let answer = match event.table.as_str() {
             app_users::TABLE => users::apply_event(deployment, user, event).await?,
             app_communities::TABLE => communities::apply_event(deployment, user, event).await?,
-            memberships::TABLE => memberships::apply_event(deployment, user, event).await?,
+            app_users_communities::TABLE => {
+                memberships::apply_event(deployment, user, event).await?
+            }
             app_posts::TABLE => posts::apply_event(deployment, user, event).await?,
             files::TABLE => files::apply_event(deployment, user, event).await?,
-            files_communities::TABLE => {
+            app_files_communities::TABLE => {
                 files_communities::apply_event(deployment, user, event).await?
             }
-            posts_communities::TABLE => {
+            app_posts_communities::TABLE => {
                 posts_communities::apply_event(deployment, user, event).await?
             }
             _ => Answer::rejected(event.id, "unknown_table", None),
@@ -474,7 +479,7 @@ async fn with_parents(
                     send(
                         &mut out,
                         &mut sent,
-                        memberships::TABLE,
+                        app_users_communities::TABLE,
                         membership.id,
                         SyncedRow::Membership(membership),
                     )?;
@@ -485,11 +490,11 @@ async fn with_parents(
         let (table, id) = match &row {
             SyncedRow::User(user) => (app_users::TABLE, user.id),
             SyncedRow::Community(community) => (app_communities::TABLE, community.id),
-            SyncedRow::Membership(membership) => (memberships::TABLE, membership.id),
+            SyncedRow::Membership(membership) => (app_users_communities::TABLE, membership.id),
             SyncedRow::Post(post) => (app_posts::TABLE, post.id),
-            SyncedRow::PostCommunity(row) => (posts_communities::TABLE, row.id),
+            SyncedRow::PostCommunity(row) => (app_posts_communities::TABLE, row.id),
             SyncedRow::File(file) => (files::TABLE, file.id),
-            SyncedRow::FileCommunity(row) => (files_communities::TABLE, row.id),
+            SyncedRow::FileCommunity(row) => (app_files_communities::TABLE, row.id),
         };
         send(&mut out, &mut sent, table, id, row)?;
     }
@@ -550,11 +555,11 @@ fn table_rank(table: &str) -> usize {
     match table {
         app_users::TABLE => 0,
         app_communities::TABLE => 1,
-        memberships::TABLE => 2,
+        app_users_communities::TABLE => 2,
         app_posts::TABLE => 3,
-        posts_communities::TABLE => 4,
+        app_posts_communities::TABLE => 4,
         files::TABLE => 5,
-        files_communities::TABLE => 6,
+        app_files_communities::TABLE => 6,
         _ => 7,
     }
 }
@@ -1601,7 +1606,7 @@ async fn apply_row(tx: &mut Transaction, user: &User, row: &TableRow) -> Result<
     match row.table.as_str() {
         app_users::TABLE => Ok(users::apply_server_row(tx, &row.row).await?),
         app_communities::TABLE => Ok(communities::apply_server_row(tx, &row.row).await?),
-        memberships::TABLE => {
+        app_users_communities::TABLE => {
             let incoming: Membership = serde_json::from_value(row.row.clone())
                 .map_err(|error| SyncError::Malformed(error.to_string()))?;
             let joined = incoming.user_id == user.id
@@ -1616,9 +1621,13 @@ async fn apply_row(tx: &mut Transaction, user: &User, row: &TableRow) -> Result<
             Ok(written)
         }
         app_posts::TABLE => Ok(posts::apply_server_row(tx, &row.row).await?),
-        posts_communities::TABLE => Ok(posts_communities::apply_server_row(tx, &row.row).await?),
+        app_posts_communities::TABLE => {
+            Ok(posts_communities::apply_server_row(tx, &row.row).await?)
+        }
         files::TABLE => Ok(files::apply_server_row(tx, &row.row).await?),
-        files_communities::TABLE => Ok(files_communities::apply_server_row(tx, &row.row).await?),
+        app_files_communities::TABLE => {
+            Ok(files_communities::apply_server_row(tx, &row.row).await?)
+        }
         other => Err(SyncError::Malformed(format!(
             "a row of an unknown table '{other}'"
         ))),
@@ -1628,11 +1637,11 @@ async fn apply_row(tx: &mut Transaction, user: &User, row: &TableRow) -> Result<
 async fn delete_row(tx: &mut Transaction, table: &str, id: Uuid) -> Result<(), SyncError> {
     match table {
         app_communities::TABLE => Ok(communities::delete_row(tx, id).await?),
-        memberships::TABLE => Ok(memberships::delete_row(tx, id).await?),
+        app_users_communities::TABLE => Ok(memberships::delete_row(tx, id).await?),
         app_posts::TABLE => Ok(posts::delete_row(tx, id).await?),
-        posts_communities::TABLE => Ok(posts_communities::delete_row(tx, id).await?),
+        app_posts_communities::TABLE => Ok(posts_communities::delete_row(tx, id).await?),
         files::TABLE => Ok(files::delete_row(tx, id).await?),
-        files_communities::TABLE => Ok(files_communities::delete_row(tx, id).await?),
+        app_files_communities::TABLE => Ok(files_communities::delete_row(tx, id).await?),
         other => Err(SyncError::Malformed(format!(
             "a row of an unknown table '{other}'"
         ))),
@@ -1665,7 +1674,7 @@ pub(crate) mod tests {
             events::delete_of_row(&mut tx, app_communities::TABLE, membership.community_id)
                 .await
                 .expect("removed");
-            events::delete_of_row(&mut tx, memberships::TABLE, membership.id)
+            events::delete_of_row(&mut tx, app_users_communities::TABLE, membership.id)
                 .await
                 .expect("removed");
         }
@@ -1717,11 +1726,11 @@ pub(crate) mod tests {
                 deleted_at: None,
                 deleted_by_id: None,
             };
-            let membership = memberships::Membership {
+            let membership = app_users_communities::Membership {
                 id: Uuid::now_v7(),
                 user_id: user.id,
                 community_id: community.id,
-                role: memberships::ROLE_MEMBER.to_string(),
+                role: app_users_communities::ROLE_MEMBER.to_string(),
                 inserted_at: now,
                 updated_at: now,
                 version: 1,
@@ -3300,15 +3309,16 @@ pub(crate) mod tests {
             .remove(0);
             assert!(position(app_users::TABLE, alice.id) < position(app_posts::TABLE, post.id));
             assert!(
-                position(app_posts::TABLE, post.id) < position(posts_communities::TABLE, row.id)
+                position(app_posts::TABLE, post.id)
+                    < position(app_posts_communities::TABLE, row.id)
             );
             assert!(
                 position(app_communities::TABLE, gardening.id)
-                    < position(posts_communities::TABLE, row.id)
+                    < position(app_posts_communities::TABLE, row.id)
             );
             assert!(
-                position(memberships::TABLE, row.users_communities_id)
-                    < position(posts_communities::TABLE, row.id)
+                position(app_users_communities::TABLE, row.users_communities_id)
+                    < position(app_posts_communities::TABLE, row.id)
             );
             assert_eq!(
                 page.rows

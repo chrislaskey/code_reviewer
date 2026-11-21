@@ -5,7 +5,8 @@
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 
-use app_core::app::memberships::{self, Membership};
+use app_core::app::memberships;
+use app_core::data::app_users_communities::Membership;
 
 use crate::current_user::signed_in;
 use crate::device_accounts::DeviceAccounts;

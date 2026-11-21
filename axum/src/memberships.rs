@@ -6,7 +6,8 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use uuid::Uuid;
 
-use app_core::app::memberships::{self, Membership};
+use app_core::app::memberships;
+use app_core::data::app_users_communities::Membership;
 use app_core::deployment::Deployment;
 
 use crate::api_error::ApiError;

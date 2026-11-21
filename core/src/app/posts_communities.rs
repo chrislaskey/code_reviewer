@@ -10,52 +10,24 @@
 //! is applied through the same add and remove, and the server's row comes
 //! back.
 
-use crate::data::app_posts_communities;
+use crate::data::app_posts_communities::{self, PostCommunity, TABLE};
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::app::events::{self, Answer, AnswerStatus, Conflicts, Event, EventKind};
-use crate::app::memberships::{self, Membership, id_field};
+use crate::app::memberships::{self, id_field};
 use crate::app::sync::{Cursor, TableRow};
 use crate::data::app_posts::Post;
 use crate::data::app_users::User;
+use crate::data::app_users_communities::Membership;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;
 
-/// A row accepted by this resource's event or replication workflow.
-/// Only this module can construct an accepted write.
-pub(crate) struct AcceptedPostCommunity<'a>(&'a PostCommunity);
-
-impl AcceptedPostCommunity<'_> {
-    /// Borrows the accepted row for persistence.
-    pub(crate) fn row(&self) -> &PostCommunity {
-        self.0
-    }
-}
-
-pub const TABLE: &str = "app_posts_communities";
 const CREATE_FIELDS: &[&str] = &["post_id", "community_id", "users_communities_id"];
 const UPDATE_FIELDS: &[&str] = &["deleted_at"];
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PostCommunity {
-    pub id: Uuid,
-    pub post_id: Uuid,
-    pub community_id: Uuid,
-
-    /// The owner's membership the post was added under.
-    pub users_communities_id: Uuid,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub version: i64,
-    pub last_synced_at: Option<DateTime<Utc>>,
-    pub deleted_at: Option<DateTime<Utc>>,
-    pub deleted_by_id: Option<Uuid>,
-}
 
 #[derive(Debug, Error)]
 pub enum PostCommunityError {
@@ -316,7 +288,7 @@ pub(crate) async fn apply_server_row(
     {
         return Ok(false);
     }
-    app_posts_communities::replication::upsert(&mut *tx, AcceptedPostCommunity(&row)).await?;
+    app_posts_communities::replication::upsert(&mut *tx, &row).await?;
     Ok(true)
 }
 
@@ -472,7 +444,7 @@ async fn apply_in(
                         deleted_at: None,
                         deleted_by_id: None,
                     };
-                    app_posts_communities::create(&mut *tx, AcceptedPostCommunity(&row)).await?;
+                    app_posts_communities::create(&mut *tx, &row).await?;
                     row
                 }
             }
@@ -557,7 +529,7 @@ async fn write_changed(
         row.version += 1;
         row.last_synced_at = Some(now);
     }
-    app_posts_communities::update(&mut *tx, AcceptedPostCommunity(row)).await?;
+    app_posts_communities::update(&mut *tx, row).await?;
     Ok(())
 }
 

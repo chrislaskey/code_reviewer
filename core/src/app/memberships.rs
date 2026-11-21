@@ -11,10 +11,9 @@
 //! comes back whatever the device wrote.
 
 use crate::data::app_communities;
-use crate::data::app_users_communities;
+use crate::data::app_users_communities::{self, Membership, ROLE_MEMBER, TABLE};
 use crate::data::trial_users;
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
@@ -28,35 +27,8 @@ use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;
 
-/// A row accepted by this resource's event or replication workflow.
-/// Only this module can construct an accepted write.
-pub(crate) struct AcceptedMembership<'a>(&'a Membership);
-
-impl AcceptedMembership<'_> {
-    /// Borrows the accepted row for persistence.
-    pub(crate) fn row(&self) -> &Membership {
-        self.0
-    }
-}
-
-pub const TABLE: &str = "app_users_communities";
-pub const ROLE_MEMBER: &str = "member";
 const CREATE_FIELDS: &[&str] = &["user_id", "community_id", "role"];
 const UPDATE_FIELDS: &[&str] = &["deleted_at"];
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Membership {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub community_id: Uuid,
-    pub role: String,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub version: i64,
-    pub last_synced_at: Option<DateTime<Utc>>,
-    pub deleted_at: Option<DateTime<Utc>>,
-    pub deleted_by_id: Option<Uuid>,
-}
 
 #[derive(Debug, Error)]
 pub enum MembershipError {
@@ -216,7 +188,7 @@ pub(crate) async fn apply_server_row(
     if events::has_pending(tx, TABLE, membership.id).await? {
         return Ok(false);
     }
-    app_users_communities::replication::upsert(&mut *tx, AcceptedMembership(&membership)).await?;
+    app_users_communities::replication::upsert(&mut *tx, &membership).await?;
     Ok(true)
 }
 
@@ -328,8 +300,7 @@ async fn apply_in(
                         deleted_at: None,
                         deleted_by_id: None,
                     };
-                    app_users_communities::create(&mut *tx, AcceptedMembership(&membership))
-                        .await?;
+                    app_users_communities::create(&mut *tx, &membership).await?;
                     membership
                 }
             }
@@ -455,7 +426,7 @@ async fn write_changed(
         membership.version += 1;
         membership.last_synced_at = Some(now);
     }
-    app_users_communities::update(&mut *tx, AcceptedMembership(membership)).await?;
+    app_users_communities::update(&mut *tx, membership).await?;
     Ok(())
 }
 

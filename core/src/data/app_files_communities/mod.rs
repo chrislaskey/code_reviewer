@@ -1,9 +1,32 @@
-//! Transaction-scoped file-community association records. Workflows own commits.
+//! File community records: the `FileCommunity` schema and the reads and
+//! writes of `app_files_communities`. Callers own and commit the
+//! transaction. Writes are crate-private: a file community row syncs, so
+//! each write is an event applied by `app::files_communities`.
 
-use crate::app::files_communities::{AcceptedFileCommunity, FileCommunity};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
 use crate::app::sync::Cursor;
 use crate::database::Transaction;
-use uuid::Uuid;
+
+pub const TABLE: &str = "app_files_communities";
+
+/// A file in a community, with the sync columns every synced row carries.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FileCommunity {
+    pub id: Uuid,
+    pub file_id: Uuid,
+    pub community_id: Uuid,
+    /// The member who put the file in the community.
+    pub created_by_id: Uuid,
+    pub inserted_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub version: i64,
+    pub last_synced_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<DateTime<Utc>>,
+    pub deleted_by_id: Option<Uuid>,
+}
 
 #[cfg(feature = "postgres")]
 mod postgres;
@@ -20,7 +43,7 @@ macro_rules! query {
 }
 
 /// A required relationship scope for internal association reads.
-pub(crate) enum Filter<'a> {
+pub enum Filter<'a> {
     /// Every live row of the files, in every community.
     Files(&'a [Uuid]),
     /// The live rows of the files in the communities the user is in.
@@ -32,7 +55,7 @@ pub(crate) enum Filter<'a> {
 }
 
 /// Lists live association rows within the workflow's relationship scope.
-pub(crate) async fn list(
+pub async fn list(
     tx: &mut Transaction,
     filter: Filter<'_>,
 ) -> Result<Vec<FileCommunity>, sqlx::Error> {
@@ -47,35 +70,26 @@ pub(crate) async fn list(
 }
 
 /// Persists a row accepted by the resource workflow.
-pub(crate) async fn create(
-    tx: &mut Transaction,
-    row: AcceptedFileCommunity<'_>,
-) -> Result<(), sqlx::Error> {
-    query!(tx, insert(row.row()))
+pub(crate) async fn create(tx: &mut Transaction, row: &FileCommunity) -> Result<(), sqlx::Error> {
+    query!(tx, insert(row))
 }
 
 /// Persists a row accepted by the resource workflow.
-pub(crate) async fn update(
-    tx: &mut Transaction,
-    row: AcceptedFileCommunity<'_>,
-) -> Result<bool, sqlx::Error> {
-    query!(tx, update(row.row()))
+pub(crate) async fn update(tx: &mut Transaction, row: &FileCommunity) -> Result<bool, sqlx::Error> {
+    query!(tx, update(row))
 }
 
 /// Explicit replication access for internal resource workflows.
-pub(crate) mod replication {
+pub mod replication {
     use super::*;
 
     /// Reads protocol state, including tombstones, in the caller transaction.
-    pub(crate) async fn get(
-        tx: &mut Transaction,
-        id: Uuid,
-    ) -> Result<Option<FileCommunity>, sqlx::Error> {
+    pub async fn get(tx: &mut Transaction, id: Uuid) -> Result<Option<FileCommunity>, sqlx::Error> {
         query!(tx, get(id))
     }
 
     /// Reads protocol state, including tombstones, in the caller transaction.
-    pub(crate) async fn get_by_file_and_community(
+    pub async fn get_by_file_and_community(
         tx: &mut Transaction,
         file_id: Uuid,
         community_id: Uuid,
@@ -84,7 +98,7 @@ pub(crate) mod replication {
     }
 
     /// Reads protocol state, including tombstones, in the caller transaction.
-    pub(crate) async fn list_synced_after(
+    pub async fn list_synced_after(
         tx: &mut Transaction,
         user_id: Uuid,
         after: &Cursor,
@@ -96,13 +110,13 @@ pub(crate) mod replication {
     /// Persists a row accepted by the resource workflow.
     pub(crate) async fn upsert(
         tx: &mut Transaction,
-        row: AcceptedFileCommunity<'_>,
+        row: &FileCommunity,
     ) -> Result<(), sqlx::Error> {
-        query!(tx, upsert(row.row()))
+        query!(tx, upsert(row))
     }
 
     /// Lists live association rows for a membership-authorized backfill.
-    pub(crate) async fn list_live_of_community_after(
+    pub async fn list_live_of_community_after(
         tx: &mut Transaction,
         community_id: Uuid,
         after: &Cursor,
