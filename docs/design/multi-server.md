@@ -199,9 +199,44 @@ module once a second component, such as the nav, does.
 - Push notifications, which hit the same wall as purchases: the APNs
   and FCM keys are the app's.
 - Self-signed certificates for servers on a business's own network.
-- Refreshing what a kept server said of itself, its display name and
-  its listing, after a sync when the last check is a day old. Left out
-  while nothing acts on the listing after a server is added.
+- **Server settings**, discussed 2026-11-22, for when servers differ in
+  more than their address: one small document of keys and values a
+  server publishes about itself, of which branding and features on or
+  off by default are uses, not the design.
+  - **Keys over values.** Mostly keys that turn on code the app already
+    has, `features.files: true`, `branding.theme: "acme"`; direct values
+    only for small checked ones, a color. Never code, markup or styles.
+  - **The server is the gatekeeper.** It holds the truth, in its config
+    to start with, and its API and sync refuse what is off. The device's
+    copy only decides what the app offers, offline too; changing it on a
+    device shows what the server then refuses.
+  - **Travel.** `GET /api/servers/current/settings` answers the document;
+    `/api/servers/current` and every sync response carry its
+    `settings_version`, a hash; a device whose stored hash differs
+    fetches it in the background, then any file it names, a logo, whose
+    content hash changed. So a change reaches a device on its next sync,
+    with no timer and no request on a quiet day, and only the active
+    account's server is asked. Not through the synced tables: they are
+    per user and need a token, and settings are the server's and needed
+    before sign-in.
+  - **On the device**, on the server's `device_servers` row, a
+    `settings` column with its version, and files under
+    `servers/<id>/`: shared by the server's accounts, kept through a
+    sign-out, there before a sign-in. The default server starts from the
+    build's defaults.
+  - **In code**, one typed Rust struct of the known keys, each with a
+    default; an unknown key ignored, a missing one defaulted, so a new
+    setting needs no protocol version: the protocol version says whether
+    two sides can talk at all, settings what a server offers. The pages
+    read it through the current server, which becomes a shared `$state`
+    module then.
+  - **To settle then:** a server dressing as the app's own to phish, so
+    the host and a "not the app's own server" mark stay outside its
+    settings; images limited in size and type; the app's icon and store
+    listing cannot change at runtime.
+
+  It replaces refreshing a kept server's display name and listing on a
+  timer, and a branding-only design.
 - Apps with no default server, where every server is the person's own,
   as Code Reviewer's phone app pairs with a Mac today: `multiServer =
   any` with no default configured skips the listing, shows no warning
