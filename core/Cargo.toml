@@ -64,6 +64,7 @@ sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio",
 thiserror = { workspace = true }
 tokio = { version = "1", features = ["rt", "fs", "io-util"] }
 tracing = "0.1"
+url = "2"
 uuid = { version = "1", features = ["v7", "serde"] }
 
 [dev-dependencies]

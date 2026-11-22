@@ -37,6 +37,7 @@ use app_core::data::app_users::User;
 use app_core::data::device_settings::{self, DeviceSettingsError};
 use app_core::database::{Database, DatabaseError};
 use app_core::deployment::{Deployment, FileStore, Role, now};
+use app_core::servers::ServerError;
 use app_core::services::web_server::{Http, Transport};
 use app_core::sync::{self, SyncError};
 
@@ -123,6 +124,10 @@ pub enum DeviceAccountsError {
     LocalUserHasNoSignOut,
     #[error("No sign-in is waiting to be moved into; sign in again")]
     NoMoveOffered,
+    #[error("Could not reach {url}: {reason}")]
+    ServerUnreachable { url: String, reason: String },
+    #[error(transparent)]
+    Server(#[from] ServerError),
     #[error(transparent)]
     LocalUser(#[from] LocalUserError),
     #[error(transparent)]

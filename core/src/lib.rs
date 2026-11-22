@@ -11,7 +11,9 @@
 //!   functions the server and the app both call, `posts::list`, which take
 //!   the `Deployment`, own the transaction and check the acting user.
 //! - `database`, `deployment`: the connection, its migrations, and the
-//!   role a deployment plays.
+//!   role a deployment plays; `servers`: what a server says it is, for
+//!   a device signing in to another server, see
+//!   `docs/design/multi-server.md`.
 //!
 //! Synced writes are events so devices and the server converge. Bulk
 //! maintenance exceptions are documented in
@@ -25,5 +27,6 @@ pub mod deployment;
 pub mod helpers;
 pub mod jobs;
 pub mod ops;
+pub mod servers;
 pub mod services;
 pub mod sync;

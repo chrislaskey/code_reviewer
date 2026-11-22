@@ -1,5 +1,6 @@
 //! Every route: the JSON API under `/api`, grouped by app as core is,
-//! with the ops app's under `/api/ops`, see `ops`, the public website's
+//! with the ops app's under `/api/ops`, see `ops`, what the server says
+//! it is under `/api/servers`, see `servers`, the public website's
 //! pages, see `public_pages`, the ops app's pages, then the Svelte pages.
 //! A path none of them and the built files don't know gets `index.html`,
 //! so the pages' router (`svelte/src/lib/router.js`) shows the page at
@@ -24,13 +25,14 @@ use crate::app::{
 };
 use crate::state::AppState;
 use crate::sync;
-use crate::{accounts, ops, public_pages, rate_limits};
+use crate::{accounts, ops, public_pages, rate_limits, servers};
 
 pub fn router(svelte_dist: &Path, ops_dist: &Path, state: AppState) -> Router {
     let pages = ServeDir::new(svelte_dist).fallback(ServeFile::new(svelte_dist.join("index.html")));
     Router::new()
         .merge(app_api())
         .merge(accounts_api(&state))
+        .merge(servers_api(&state))
         .merge(ops::api(state.clone()))
         .route("/api", any(api_not_found))
         .route("/api/{*path}", any(api_not_found))
@@ -99,6 +101,17 @@ fn app_api() -> Router<AppState> {
             get(sync::bytes::content),
         )
         .route("/api/sync/backfill", post(sync::backfill))
+}
+
+/// What this server says it is, and the servers it lists, rate limited
+/// per client IP so names cannot be guessed quickly, see `servers`.
+fn servers_api(state: &AppState) -> Router<AppState> {
+    let listed = Router::new()
+        .route("/api/servers/{name}", get(servers::get))
+        .layer(rate_limits::per_ip_layer(state.trust_proxy_headers));
+    Router::new()
+        .route("/api/servers/current", get(servers::current::get))
+        .merge(listed)
 }
 
 /// The accounts app's API, `accounts`: signing in and out, rate limited

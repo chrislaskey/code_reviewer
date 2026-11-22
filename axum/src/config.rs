@@ -1,7 +1,8 @@
 //! The server's settings, read from the environment at start: where it
 //! listens, where the built pages are, whether it is behind a proxy, how
-//! many trial users it holds and its address as people reach it; and,
-//! one module each, its database, mailer, buckets, Stripe and App Store.
+//! many trial users it holds, its address as people reach it, its name
+//! for the apps and the other servers it lists; and, one module each,
+//! its database, mailer, buckets, Stripe and App Store.
 
 pub mod app_store;
 pub mod database;
@@ -13,8 +14,12 @@ use std::env;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
 
+use app_core::servers::{ListedServers, ServerDescription, ServerName};
+use app_core::services::mailer::mails::APP_NAME;
+
 const DEFAULT_HOST: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 const DEFAULT_PORT: u16 = 4000;
+const DEFAULT_SERVER_NAME: &str = "default";
 
 /// The address to listen on: `HOST`, `0.0.0.0` in a container so its
 /// proxy reaches the server, else only this machine.
@@ -97,4 +102,26 @@ impl ServerUrl {
         }
         Ok(ServerUrl(url))
     }
+}
+
+/// What this server says it is, see `app_core::servers`: `SERVER_NAME`,
+/// a slug, `default` when unset, and `SERVER_DISPLAY_NAME`, the app's
+/// name when unset.
+pub fn server_description() -> Result<ServerDescription, String> {
+    let name = env::var("SERVER_NAME").unwrap_or_else(|_| DEFAULT_SERVER_NAME.to_string());
+    let name = ServerName::parse(name.trim()).map_err(|error| format!("SERVER_NAME: {error}"))?;
+    let display_name = env::var("SERVER_DISPLAY_NAME")
+        .ok()
+        .map(|display_name| display_name.trim().to_string())
+        .filter(|display_name| !display_name.is_empty())
+        .unwrap_or_else(|| APP_NAME.to_string());
+    Ok(ServerDescription::current(name, &display_name))
+}
+
+/// The other servers this one lists, `LISTED_SERVERS`, entries of a name
+/// and an origin, `acme=https://acme.example,beta=https://beta.example`;
+/// none when unset. A malformed entry stops the server at start.
+pub fn listed_servers() -> Result<ListedServers, String> {
+    let entries = env::var("LISTED_SERVERS").unwrap_or_default();
+    ListedServers::parse(&entries).map_err(|error| format!("LISTED_SERVERS: {error}"))
 }

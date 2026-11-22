@@ -1028,6 +1028,8 @@ async fn stripe_webhooks_create_is_not_found_without_a_secret() {
         stripe_signing_secret: StripeSigningSecret(None),
         stripe: Some(router.stripe.clone()),
         server_url: ServerUrl("http://server.test".to_string()),
+        server_description: test_server_description(),
+        listed_servers: std::sync::Arc::new(test_listed_servers()),
     };
     let dist = std::env::temp_dir().join(format!("app_web_test_{}", std::process::id()));
     let without_stripe = super::router(&dist, &dist.join("ops"), state);

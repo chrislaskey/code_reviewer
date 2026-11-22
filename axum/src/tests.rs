@@ -6,6 +6,7 @@ mod accounts;
 mod app;
 mod ops;
 mod router;
+mod servers;
 
 use std::fs;
 
@@ -102,6 +103,8 @@ async fn test_router_with(
         ))),
         stripe: Some(stripe.clone()),
         server_url: ServerUrl("http://server.test".to_string()),
+        server_description: test_server_description(),
+        listed_servers: std::sync::Arc::new(test_listed_servers()),
     };
     let test_router = TestRouter {
         router: router(&dist, &ops_dist, state),
@@ -112,6 +115,17 @@ async fn test_router_with(
         stripe,
     };
     (test_router, post)
+}
+
+/// The server the tests describe: `test`, "Test Server".
+fn test_server_description() -> app_core::servers::ServerDescription {
+    let name = app_core::servers::ServerName::parse("test").expect("a name");
+    app_core::servers::ServerDescription::current(name, "Test Server")
+}
+
+/// The one server the tests list, `acme` at `https://acme.example.com`.
+fn test_listed_servers() -> app_core::servers::ListedServers {
+    app_core::servers::ListedServers::parse("acme=https://acme.example.com").expect("listed")
 }
 
 /// A user signed up on the server and finished with their code.

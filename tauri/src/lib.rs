@@ -22,6 +22,7 @@ mod macos;
 mod public_pages;
 mod quick_picker;
 mod server_urls;
+mod servers;
 mod sync;
 mod user_auth;
 
@@ -111,6 +112,7 @@ pub fn run() {
             device_accounts::device_accounts_switch,
             device_accounts::device_accounts_deactivate,
             device_accounts::device_accounts_remove,
+            servers::servers_get,
             app::local_users::local_users_can_create,
             app::local_users::local_users_create,
             app::local_users::local_users_move,

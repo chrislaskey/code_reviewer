@@ -9,6 +9,8 @@ use crate::app::avatars::{AvatarUpdate, AvatarUpload, AvatarUploadNew};
 use crate::app::users::{self, UserError};
 use crate::data::app_users::User;
 use crate::deployment::Deployment;
+#[cfg(feature = "sync-http")]
+use crate::servers::{ListedServer, ServerDescription};
 #[cfg(feature = "object-storage")]
 use crate::sync::bytes::{self, BytesError};
 use crate::sync::bytes::{Upload, UploadNew};
@@ -346,6 +348,43 @@ impl Http {
         let path = "/api/accounts/current/password";
         self.send(reqwest::Method::PUT, Some(token), path, request)
             .await
+    }
+
+    /// What the server says it is, `/api/servers/current`, asked of a
+    /// server before signing in to it.
+    pub async fn servers_current_get(&self) -> Result<ServerDescription, SyncError> {
+        self.send(reqwest::Method::GET, None, "/api/servers/current", &())
+            .await
+    }
+
+    /// The server this server lists by the name at the origin, or none,
+    /// `/api/servers/:name?url=`, asked of the default server.
+    pub async fn servers_get(
+        &self,
+        name: &str,
+        url: &str,
+    ) -> Result<Option<ListedServer>, SyncError> {
+        let response = self
+            .client
+            .get(format!("{}/api/servers/{name}", self.base_url))
+            .query(&[("url", url)])
+            .send()
+            .await
+            .map_err(|error| SyncError::Transport(error.to_string()))?;
+        let status = response.status();
+        if status == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        if !status.is_success() {
+            return Err(SyncError::Transport(format!(
+                "the server refused /api/servers/{name} with {status}"
+            )));
+        }
+        response
+            .json()
+            .await
+            .map(Some)
+            .map_err(|error| SyncError::Malformed(error.to_string()))
     }
 
     async fn post<Request: Serialize, Response: serde::de::DeserializeOwned>(

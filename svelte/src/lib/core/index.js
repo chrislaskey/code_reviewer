@@ -41,6 +41,7 @@ export const deviceAccountsList = core.deviceAccountsList;
 export const deviceAccountsSwitch = core.deviceAccountsSwitch;
 export const deviceAccountsDeactivate = core.deviceAccountsDeactivate;
 export const deviceAccountsRemove = core.deviceAccountsRemove;
+export const serversGet = core.serversGet;
 export const accountsTrialGet = core.accountsTrialGet;
 export const accountsTrialCreate = core.accountsTrialCreate;
 export const accountsProductsList = core.accountsProductsList;

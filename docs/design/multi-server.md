@@ -1,7 +1,7 @@
 # Signing in to another server from the app
 
-**Status: agreed, 2026-11-22; step 1 built, see the build order at the
-end.** The design as discussed; where the code differs in a name, the
+**Status: agreed, 2026-11-22; steps 1 and 2 built, see the build order
+at the end.** The design as discussed; where the code differs in a name, the
 code is right.
 
 Most apps built from the template have one web server, compiled into
@@ -152,6 +152,10 @@ itself with and the app checks against.
 
 ## The details
 
+- **The app a server runs** is `APP_IDENTIFIER` in
+  `core/src/app/identity.rs`, a seam every fork edits with the
+  `identifier` of `tauri/tauri.conf.json`; a test of the Tauri app
+  keeps the two equal.
 - **A server's own name**: `SERVER_NAME`, a slug, and
   `SERVER_DISPLAY_NAME`, read in `axum/src/config.rs`; unset, `default`
   and the product name, so a deployment of today needs no change.
@@ -198,10 +202,9 @@ Each step leaves every check green and the app working.
    `device_accounts` and `device_sign_in`, folders by a device id, the
    transport in the active account, `server_urls` per server. Only the
    default server's row exists; nothing changes for the person.
-2. **The server describes itself.** `GET /api/servers/current`, with the app
-   identifier, protocol version, name and display name; `GET /api/servers/:name?url=`
-   from a static list in the config; a Tauri command that checks a
-   typed URL against both.
+2. **The server describes itself.** Built: `app_core::servers`,
+   `axum/src/servers.rs`, and the Tauri command `servers_get`, which
+   checks a typed URL and keeps nothing.
 3. **Another server on the accounts page.** The `multiServer` setting,
    "Custom server", the checks and the warning, the host on each
    account row, purchases hidden on accounts of other servers.

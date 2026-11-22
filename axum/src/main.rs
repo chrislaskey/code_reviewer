@@ -11,7 +11,10 @@
 //! `rate_limits`. It sells through Stripe with `STRIPE_SECRET_KEY` and
 //! `STRIPE_TAX`, see `config::stripe`, whose webhook needs
 //! `STRIPE_WEBHOOK_SECRET`, and whose return links start with
-//! `SERVER_URL`; every setting is read at start, see `config`.
+//! `SERVER_URL`. It tells the apps what it is, `SERVER_NAME` and
+//! `SERVER_DISPLAY_NAME`, and which other servers it lists,
+//! `LISTED_SERVERS`, see `servers`; every setting is read at start, see
+//! `config`.
 //!
 //! It runs the recurring jobs as they come due, see `jobs`. With
 //! arguments it runs a command on that database instead and exits:
@@ -33,6 +36,7 @@ mod ops;
 mod public_pages;
 mod rate_limits;
 mod router;
+mod servers;
 mod state;
 mod sync;
 #[cfg(test)]
@@ -100,6 +104,8 @@ async fn main() -> Result<(), String> {
         stripe_signing_secret: config::stripe::open_signing_secret(),
         stripe,
         server_url: ServerUrl::open()?,
+        server_description: config::server_description()?,
+        listed_servers: std::sync::Arc::new(config::listed_servers()?),
     };
 
     let address = SocketAddr::new(config::host()?, config::port()?);

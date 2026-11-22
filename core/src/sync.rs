@@ -49,6 +49,12 @@ use events::{Answer, AnswerStatus};
 use purge::PurgeError;
 use synced_table::{SyncedTable, TableError};
 
+/// The version of the sync's protocol, which a server describes itself
+/// with, see `servers`: a device syncs with a server of its own version
+/// alone. Raised by a change a device of the version before could not
+/// sync through.
+pub const PROTOCOL_VERSION: u32 = 1;
+
 /// How far back from its cursor's time a pull starts, so a row written
 /// in a transaction that committed after a later one is not missed.
 pub const OVERLAP_SECONDS: i64 = 60;

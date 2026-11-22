@@ -220,6 +220,17 @@ export function deviceAccountsRemove(id, losingChanges) {
   return invoke("device_accounts_remove", { id, losingChanges });
 }
 
+/**
+ * Checks a server other than the build's default, before signing in
+ * there: `{url, name, display_name, listing}`, the URL as its origin and
+ * `listing` one of "default", "listed", "unlisted" or "unchecked"; refused
+ * for a server of another app or protocol version.
+ * @param {string} url
+ */
+export function serversGet(url) {
+  return invoke("servers_get", { url });
+}
+
 // Trial users are the web's; a device has a local user instead.
 
 export function accountsTrialGet() {

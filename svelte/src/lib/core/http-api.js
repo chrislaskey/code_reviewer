@@ -251,6 +251,11 @@ export function deviceAccountsRemove(_id, _losingChanges) {
   return Promise.reject(new Error("no accounts are kept on the web"));
 }
 
+/** @param {string} _url */
+export function serversGet(_url) {
+  return Promise.reject(new Error("the web is on one server"));
+}
+
 // A trial user: someone using the app on the web without signing up,
 // for a day, see docs/design/accounts-local-and-trial-users.md.
 

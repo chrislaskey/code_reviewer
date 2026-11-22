@@ -6,6 +6,7 @@ pub mod communities;
 pub mod current_community;
 pub mod files;
 pub mod files_communities;
+pub mod identity;
 pub mod jobs;
 pub mod local_users;
 pub mod memberships;
