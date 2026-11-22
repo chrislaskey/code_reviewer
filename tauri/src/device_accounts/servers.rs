@@ -4,17 +4,21 @@
 //! other the person added. Each account is one server's, and the app
 //! talks to the active account's server alone. A typed URL is checked
 //! before the person signs in there, `server_check`: what the server
-//! says it is, and whether the default server lists it.
+//! says it is, and whether the default server lists it. Once the person
+//! confirms it, it is kept, `server_keep`, and the sign-in starts there.
 
 use serde::Serialize;
+use tauri::{AppHandle, State};
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
+use app_core::deployment::now;
 use app_core::servers::{self, ListedServer, ServerName};
 use app_core::services::web_server::Http;
 use app_core::sync::SyncError;
 
 use super::{DeviceAccounts, DeviceAccountsError};
+use crate::command_error::CommandError;
 
 /// Whether the default server lists a server, as a check found it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -34,9 +38,13 @@ pub enum Listing {
 pub struct ServerChecked {
     /// The origin the URL normalizes to.
     pub url: String,
+    /// Its host and port, as the pages show it.
+    pub host: String,
     pub name: String,
     /// What the server calls itself, for display only.
     pub display_name: String,
+    pub app_identifier: String,
+    pub protocol_version: u32,
     pub listing: Listing,
 }
 
@@ -133,11 +141,51 @@ impl DeviceAccounts {
             listing_of(&origin, answer)
         };
         Ok(ServerChecked {
+            host: super::host_of(&origin),
             url: origin,
             name: description.name,
             display_name: description.display_name,
+            app_identifier: description.app_identifier,
+            protocol_version: description.protocol_version,
             listing,
         })
+    }
+
+    /// Keeps a server the person confirmed, with what its check found,
+    /// in place of what an earlier check found; the default server's
+    /// own row when it is the default server.
+    pub async fn server_keep(
+        &self,
+        checked: &ServerChecked,
+    ) -> Result<DeviceServer, DeviceAccountsError> {
+        if checked.listing == Listing::Default {
+            return self.default_server().await;
+        }
+        let listed = match checked.listing {
+            Listing::Listed => "listed",
+            Listing::Default | Listing::Unlisted | Listing::Unchecked => "unlisted",
+        };
+        let row: ServerRow = sqlx::query_as(
+            "INSERT INTO device_servers
+               (id, url, name, display_name, app_identifier, protocol_version, listed, checked_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             ON CONFLICT (url) DO UPDATE SET name = excluded.name,
+               display_name = excluded.display_name, app_identifier = excluded.app_identifier,
+               protocol_version = excluded.protocol_version, listed = excluded.listed,
+               checked_at = excluded.checked_at
+             RETURNING id, url",
+        )
+        .bind(Uuid::now_v7().hyphenated())
+        .bind(&checked.url)
+        .bind(&checked.name)
+        .bind(&checked.display_name)
+        .bind(&checked.app_identifier)
+        .bind(i64::from(checked.protocol_version))
+        .bind(listed)
+        .bind(now())
+        .fetch_one(&self.list)
+        .await?;
+        Ok(row.into())
     }
 
     /// Makes the default server's row when the device has none yet.
@@ -152,6 +200,18 @@ impl DeviceAccounts {
         .await?;
         Ok(())
     }
+}
+
+/// Keeps the server at the URL, checked again and allowed by the
+/// build's `multiServer` setting, for a sign-in to start there.
+#[tauri::command]
+pub async fn device_servers_create(
+    app: AppHandle,
+    device: State<'_, DeviceAccounts>,
+    url: String,
+) -> Result<DeviceServer, CommandError> {
+    let checked = crate::servers::checked_and_allowed(&app, &device, &url).await?;
+    Ok(device.server_keep(&checked).await?)
 }
 
 /// The listing the default server answered: listed only when its entry

@@ -198,8 +198,8 @@ export function accountsCodeResend(pending) {
 
 // The browser is where a sign-in happens; nothing waits on it.
 
-/** @param {string} [_email] */
-export function accountsSignInStart(_email) {
+/** @param {string} [_email] @param {string} [_serverId] */
+export function accountsSignInStart(_email, _serverId) {
   return Promise.reject(new Error("the web signs in on its own page"));
 }
 
@@ -249,6 +249,16 @@ export function deviceAccountsDeactivate() {
 /** @param {string} _id @param {boolean} _losingChanges */
 export function deviceAccountsRemove(_id, _losingChanges) {
   return Promise.reject(new Error("no accounts are kept on the web"));
+}
+
+/** @returns {Promise<"none" | "listed_only" | "any">} */
+export function multiServerGet() {
+  return Promise.resolve("none");
+}
+
+/** @param {string} _url */
+export function deviceServersCreate(_url) {
+  return Promise.reject(new Error("the web is on one server"));
 }
 
 /** @param {string} _url */

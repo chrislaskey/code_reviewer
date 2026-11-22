@@ -14,13 +14,26 @@ use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
 
 /// The store this app sells through, for the pages to word Buy and
-/// Manage by: `app_store`, `play_store`, or `stripe` on the desktop.
+/// Manage by: `app_store`, `play_store`, or `stripe` on the desktop; or
+/// `none` for an account on a server other than the default one, where
+/// nothing is sold, see `docs/design/multi-server.md`.
 #[tauri::command]
-pub fn accounts_store_get(app: AppHandle) -> &'static str {
+pub async fn accounts_store_get(
+    app: AppHandle,
+    device: State<'_, DeviceAccounts>,
+) -> Result<&'static str, CommandError> {
+    if !device.active_on_default_server().await {
+        return Ok(STORE_NONE);
+    }
+    Ok(store_of(&app))
+}
+
+/// The store this build sells through.
+fn store_of(app: &AppHandle) -> &'static str {
     #[cfg(mobile)]
     {
         use crate::accounts::store_sheet::StoreSheet;
-        crate::accounts::store_sheet::of(&app).store()
+        crate::accounts::store_sheet::of(app).store()
     }
     #[cfg(desktop)]
     {
@@ -28,6 +41,13 @@ pub fn accounts_store_get(app: AppHandle) -> &'static str {
         "stripe"
     }
 }
+
+/// What `accounts_store_get` answers where nothing is sold.
+const STORE_NONE: &str = "none";
+
+/// Refused on an account of a server other than the default one, where
+/// nothing is sold.
+pub const NOT_ON_THIS_SERVER: &str = "Plans and products are sold on the app's own server alone";
 
 /// M1: the store's sheet for the price's lookup key, then the proof
 /// recorded by the server, then the transaction finished. Answers the
@@ -102,6 +122,9 @@ mod on_phone {
         device: &DeviceAccounts,
         price_id: Uuid,
     ) -> Result<Value, CommandError> {
+        if !device.active_on_default_server().await {
+            return Err(super::NOT_ON_THIS_SERVER.into());
+        }
         let (deployment, transport, user) = signed_in_with_transport(device).await?;
         let lookup_key = lookup_key_of(app, &deployment, &transport, price_id).await?;
         let sheet = store_sheet::of(app);
@@ -118,6 +141,9 @@ mod on_phone {
     }
 
     pub async fn restore(app: &AppHandle, device: &DeviceAccounts) -> Result<Value, CommandError> {
+        if !device.active_on_default_server().await {
+            return Err(super::NOT_ON_THIS_SERVER.into());
+        }
         let (deployment, transport) = device.active_with_transport().await?;
         let sheet = store_sheet::of(app);
         let mut recorded = 0;
@@ -134,6 +160,9 @@ mod on_phone {
 
     pub async fn send_unfinished(app: &AppHandle) {
         let device = app.state::<DeviceAccounts>();
+        if !device.active_on_default_server().await {
+            return;
+        }
         let Ok((deployment, transport)) = device.active_with_transport().await else {
             return;
         };
@@ -201,7 +230,7 @@ mod on_phone {
 /// a plan's length, `store_period`. A price the store does not sell
 /// has neither.
 pub async fn with_store_prices(app: &AppHandle, products: Value) -> Value {
-    let store = accounts_store_get(app.clone());
+    let store = store_of(app);
     let mut products = products;
     #[cfg(mobile)]
     let prices = {

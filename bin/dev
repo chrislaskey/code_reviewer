@@ -53,6 +53,11 @@ Ports:
                session's tmux environment, so each worktree's apps run on
                ports of their own.
 
+Other servers:
+  MULTI_SERVER   none, listed_only or any: the app's multiServer setting
+                 for the session, in place of tauri.conf.json's, so the
+                 accounts page offers Custom server.
+
 Examples:
   bin/dev                          # the web, on 4000 and 1420
   bin/dev desktop                  # the desktop app, its pages on 1420
@@ -221,7 +226,15 @@ sign_in_url="http://localhost:$vite_port/accounts/sign-in"
 # dev server of the CLI's own, and the two URLs the app needs, under the
 # starter-pack entry of plugins, since a phone build gets no environment
 # from here (tauri/src/server_urls.rs).
-tauri_config="{\"build\":{\"devUrl\":\"http://localhost:$vite_port\",\"beforeDevCommand\":\"\"},\"plugins\":{\"starter-pack\":{\"syncServerUrl\":\"http://localhost:$web_port\",\"browserSignInUrl\":\"$sign_in_url\"}}}"
+# MULTI_SERVER, when set, is the build's multiServer setting for this
+# session, see docs/design/multi-server.md.
+multi_server_config=""
+case "${MULTI_SERVER:-}" in
+  "") ;;
+  none|listed_only|any) multi_server_config=",\"multiServer\":\"$MULTI_SERVER\"" ;;
+  *) echo "bin/dev: MULTI_SERVER must be none, listed_only or any, got '$MULTI_SERVER'" >&2; exit 1 ;;
+esac
+tauri_config="{\"build\":{\"devUrl\":\"http://localhost:$vite_port\",\"beforeDevCommand\":\"\"},\"plugins\":{\"starter-pack\":{\"syncServerUrl\":\"http://localhost:$web_port\",\"browserSignInUrl\":\"$sign_in_url\"$multi_server_config}}}"
 
 # Up once set up, its key written, and its S3 API answering; a failure
 # when bin/storage exits first or is not up in 30 seconds.

@@ -72,6 +72,11 @@ pub struct DeviceAccount {
     pub local: bool,
     pub active: bool,
     pub last_active_at: DateTime<Utc>,
+    /// The host of the account's server, `acme.example.com`; `None` on
+    /// the default server, and for a local user.
+    pub server_host: Option<String>,
+    /// What the account's server calls itself; `None` as `server_host`.
+    pub server_display_name: Option<String>,
 }
 
 /// What finishing a sign-in in the browser answers.
@@ -183,6 +188,8 @@ struct Row {
     local: bool,
     active: bool,
     last_active_at: DateTime<Utc>,
+    server_url: Option<String>,
+    server_display_name: Option<String>,
 }
 
 impl From<Row> for DeviceAccount {
@@ -196,8 +203,18 @@ impl From<Row> for DeviceAccount {
             local: row.local,
             active: row.active,
             last_active_at: row.last_active_at,
+            server_host: row.server_url.as_deref().map(host_of),
+            server_display_name: row.server_display_name,
         }
     }
+}
+
+/// An origin's host and port, as the pages show it: `https://` dropped.
+fn host_of(origin: &str) -> String {
+    origin
+        .split_once("://")
+        .map_or(origin, |(_, host)| host)
+        .to_string()
 }
 
 /// Opens the device's accounts as the app starts and hands them to the
@@ -250,7 +267,10 @@ impl DeviceAccounts {
     /// Every account, the most recently active first.
     pub async fn list(&self) -> Result<Vec<DeviceAccount>, DeviceAccountsError> {
         let rows: Vec<Row> = sqlx::query_as(
-            "SELECT id, server_id, user_id, email, signed_in, local, active, last_active_at FROM device_accounts ORDER BY last_active_at DESC, email",
+            "SELECT a.id, a.server_id, a.user_id, a.email, a.signed_in, a.local, a.active,
+               a.last_active_at, s.url AS server_url, s.display_name AS server_display_name
+             FROM device_accounts a LEFT JOIN device_servers s ON s.id = a.server_id
+             ORDER BY a.last_active_at DESC, a.email",
         )
         .fetch_all(&self.list)
         .await?;
@@ -297,6 +317,16 @@ impl DeviceAccounts {
             Some(server) => Ok(server),
             None => self.default_server().await,
         }
+    }
+
+    /// Whether the active account, if any, is on the default server,
+    /// the only one purchases go to, see `docs/design/multi-server.md`.
+    pub async fn active_on_default_server(&self) -> bool {
+        self.active
+            .read()
+            .await
+            .as_ref()
+            .is_none_or(|active| active.server.url.is_none())
     }
 
     /// The transport to an account's server, for a removal, which may be
@@ -610,7 +640,10 @@ impl DeviceAccounts {
 
     async fn get(&self, id: Uuid) -> Result<DeviceAccount, DeviceAccountsError> {
         let row: Option<Row> = sqlx::query_as(
-            "SELECT id, server_id, user_id, email, signed_in, local, active, last_active_at FROM device_accounts WHERE id = $1",
+            "SELECT a.id, a.server_id, a.user_id, a.email, a.signed_in, a.local, a.active,
+               a.last_active_at, s.url AS server_url, s.display_name AS server_display_name
+             FROM device_accounts a LEFT JOIN device_servers s ON s.id = a.server_id
+             WHERE a.id = $1",
         )
         .bind(id.hyphenated())
         .fetch_optional(&self.list)
@@ -626,7 +659,10 @@ impl DeviceAccounts {
         user_id: Uuid,
     ) -> Result<Option<DeviceAccount>, DeviceAccountsError> {
         let row: Option<Row> = sqlx::query_as(
-            "SELECT id, server_id, user_id, email, signed_in, local, active, last_active_at FROM device_accounts WHERE server_id = $1 AND user_id = $2",
+            "SELECT a.id, a.server_id, a.user_id, a.email, a.signed_in, a.local, a.active,
+               a.last_active_at, s.url AS server_url, s.display_name AS server_display_name
+             FROM device_accounts a LEFT JOIN device_servers s ON s.id = a.server_id
+             WHERE a.server_id = $1 AND a.user_id = $2",
         )
         .bind(server_id.hyphenated())
         .bind(user_id.hyphenated())
@@ -1525,6 +1561,71 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn device_accounts_a_kept_server_names_its_accounts_and_keeps_purchases_off() {
+        use servers::{Listing, ServerChecked};
+        let directory = tempfile::tempdir().expect("a directory");
+        let server = server().await;
+        let device = DeviceAccounts::open(directory.path(), SERVER_URL)
+            .await
+            .expect("opened");
+        let checked = ServerChecked {
+            url: "https://acme.example.com:8443".to_string(),
+            host: "acme.example.com:8443".to_string(),
+            name: "acme".to_string(),
+            display_name: "Acme".to_string(),
+            app_identifier: app_core::app::identity::APP_IDENTIFIER.to_string(),
+            protocol_version: sync::PROTOCOL_VERSION,
+            listing: Listing::Unlisted,
+        };
+        let acme = device.server_keep(&checked).await.expect("kept");
+        assert_eq!(acme.url.as_deref(), Some("https://acme.example.com:8443"));
+        let again = device
+            .server_keep(&ServerChecked {
+                display_name: "Acme Corp".to_string(),
+                listing: Listing::Listed,
+                ..checked.clone()
+            })
+            .await
+            .expect("kept again");
+        assert_eq!(again, acme, "one row per origin");
+        let default = device
+            .server_keep(&ServerChecked {
+                listing: Listing::Default,
+                ..checked
+            })
+            .await
+            .expect("the default");
+        assert_eq!(default, device.default_server().await.expect("the default"));
+
+        assert!(device.active_on_default_server().await, "nobody active");
+        device
+            .keep_signed_in(acme.id, signed_up(&server, "alice@example.com").await)
+            .await
+            .expect("on acme");
+        assert!(!device.active_on_default_server().await);
+        let on_acme = device.list().await.expect("listed");
+        assert_eq!(
+            on_acme[0].server_host.as_deref(),
+            Some("acme.example.com:8443")
+        );
+        assert_eq!(on_acme[0].server_display_name.as_deref(), Some("Acme Corp"));
+
+        device
+            .keep_signed_in(default.id, signed_up(&server, "bob@example.com").await)
+            .await
+            .expect("on the default server");
+        assert!(device.active_on_default_server().await);
+        let bob = device
+            .list()
+            .await
+            .expect("listed")
+            .into_iter()
+            .find(|account| account.email == "bob@example.com")
+            .expect("bob");
+        assert_eq!(bob.server_host, None, "the default server shows no host");
+    }
+
+    #[tokio::test]
     async fn device_accounts_hold_at_most_the_cap() {
         let directory = tempfile::tempdir().expect("a directory");
         let server = server().await;
@@ -1564,6 +1665,8 @@ pub const SIGN_IN_WAIT_MINUTES: i64 =
 /// A sign-in waiting on the browser, as the accounts page shows it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct PendingSignIn {
+    /// The server it is on, for the sign-in to open there again.
+    pub server_id: Uuid,
     pub email: Option<String>,
     pub started_at: DateTime<Utc>,
 }
@@ -1615,6 +1718,7 @@ impl DeviceAccounts {
     /// `SIGN_IN_WAIT_MINUTES` ago; a stale one is forgotten.
     pub async fn sign_in_pending(&self) -> Result<Option<PendingSignIn>, DeviceAccountsError> {
         Ok(self.sign_in_row().await?.map(|row| PendingSignIn {
+            server_id: row.server_id.into_uuid(),
             email: row.email,
             started_at: row.started_at,
         }))

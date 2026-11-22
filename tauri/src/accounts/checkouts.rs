@@ -12,6 +12,7 @@ use uuid::Uuid;
 
 use app_core::accounts::online;
 
+use crate::accounts::store_transactions::NOT_ON_THIS_SERVER;
 use crate::accounts::{plans, stripe_pages};
 use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
@@ -26,6 +27,9 @@ pub async fn accounts_checkouts_create(
     price_id: Uuid,
 ) -> Result<Value, CommandError> {
     stripe_pages::refused_on_a_phone()?;
+    if !device.active_on_default_server().await {
+        return Err(NOT_ON_THIS_SERVER.into());
+    }
     let (deployment, transport) = device.active_with_transport().await?;
     let created = online::checkouts_create(&deployment, &transport, price_id)
         .await

@@ -41,6 +41,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, Url};
 #[cfg(not(target_os = "ios"))]
 use tauri_plugin_opener::OpenerExt;
+use uuid::Uuid;
 
 use crate::command_error::CommandError;
 use crate::device_accounts::servers::DeviceServer;
@@ -85,16 +86,21 @@ pub struct SignInStarted {
     pub in_sheet: bool,
 }
 
-/// Keeps a verifier and opens the sign-in page, with the email filled
-/// in for an account signed out on this device: in the browser, or on
-/// an iPhone in the sign-in sheet over the app.
+/// Keeps a verifier and opens the sign-in page of the server, the
+/// default one when none is named, with the email filled in for an
+/// account signed out on this device: in the browser, or on an iPhone
+/// in the sign-in sheet over the app.
 #[tauri::command]
 pub async fn accounts_sign_in_start(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     email: Option<String>,
+    server_id: Option<Uuid>,
 ) -> Result<SignInStarted, CommandError> {
-    let server = device.default_server().await?;
+    let server = match server_id {
+        Some(id) => device.server_get(id).await?,
+        None => device.default_server().await?,
+    };
     let (verifier, challenge) = accounts::verifier_and_challenge();
     device
         .sign_in_start(server.id, &verifier, email.as_deref())

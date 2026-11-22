@@ -135,10 +135,11 @@ export function accountsCodeResend(_pending) {
  * on an iPhone the page opens in the sign-in sheet over the app,
  * answered `{in_sheet: true}`, which returns the code itself.
  * @param {string} [email]
+ * @param {string} [serverId] the server to sign in to, the default one when none
  * @returns {Promise<{in_sheet: boolean}>}
  */
-export function accountsSignInStart(email) {
-  return invoke("accounts_sign_in_start", { email: email || null });
+export function accountsSignInStart(email, serverId) {
+  return invoke("accounts_sign_in_start", { email: email || null, serverId: serverId || null });
 }
 
 /** The sign-in waiting on the browser, `{email, started_at}`, or null. */
@@ -218,6 +219,24 @@ export function deviceAccountsDeactivate() {
  */
 export function deviceAccountsRemove(id, losingChanges) {
   return invoke("device_accounts_remove", { id, losingChanges });
+}
+
+/**
+ * Which servers other than the build's default the app may sign in to:
+ * "none", "listed_only" or "any".
+ * @returns {Promise<"none" | "listed_only" | "any">}
+ */
+export function multiServerGet() {
+  return invoke("multi_server_get");
+}
+
+/**
+ * Keeps a server checked with serversGet, checked again, for a sign-in
+ * to start there: `{id, url}`.
+ * @param {string} url
+ */
+export function deviceServersCreate(url) {
+  return invoke("device_servers_create", { url });
 }
 
 /**
@@ -636,7 +655,10 @@ export function accountsDeletionsCreate(code) {
 // sheet, then the server records the proof, then the store's
 // transaction is finished.
 
-/** The store this app sells through: `app_store`, `play_store`, or `stripe` on the desktop. */
+/**
+ * The store this app sells through: `app_store`, `play_store`, or `stripe`
+ * on the desktop; `none` on an account of a server other than the app's own.
+ */
 export function accountsStoreGet() {
   return invoke("accounts_store_get");
 }

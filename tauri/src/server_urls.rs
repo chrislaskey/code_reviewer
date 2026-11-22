@@ -70,7 +70,8 @@ fn pick(from_environment: Option<String>, from_config: Option<String>, fallback:
         .unwrap_or(fallback)
 }
 
-fn configured(app: &AppHandle, key: &str) -> Option<String> {
+/// A value of the `starter-pack` entry in `tauri.conf.json`.
+pub(crate) fn configured(app: &AppHandle, key: &str) -> Option<String> {
     app.config()
         .plugins
         .0

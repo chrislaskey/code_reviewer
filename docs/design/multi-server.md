@@ -1,7 +1,7 @@
 # Signing in to another server from the app
 
-**Status: agreed, 2026-11-22; steps 1 and 2 built, see the build order
-at the end.** The design as discussed; where the code differs in a name, the
+**Status: agreed and built, 2026-11-22, but for what "Not built yet"
+lists.** The design as discussed; where the code differs in a name, the
 code is right.
 
 Most apps built from the template have one web server, compiled into
@@ -205,9 +205,27 @@ Each step leaves every check green and the app working.
 2. **The server describes itself.** Built: `app_core::servers`,
    `axum/src/servers.rs`, and the Tauri command `servers_get`, which
    checks a typed URL and keeps nothing.
-3. **Another server on the accounts page.** The `multiServer` setting,
-   "Custom server", the checks and the warning, the host on each
-   account row, purchases hidden on accounts of other servers.
+3. **Another server on the accounts page.** Built: the `multiServer`
+   setting, `MULTI_SERVER` in `bin/dev` for a session; "Custom server",
+   `AccountsCustomServer`, which checks the URL with `servers_get`, shows
+   the host, the display name and the listing with its warning, and on
+   confirmation keeps the server, `device_servers_create`, which checks
+   it again, and signs in there, `accounts_sign_in_start` with its
+   server; the host on each account row; `accounts_store_get` answering
+   `none` on another server's account, which hides the account page's
+   purchasing, and the buying commands refusing there.
+
+## Not built yet
+
+- **A server's protocol version after it was added.** It is checked
+  when the server is added; a sync with a server that later moved to
+  another version is not refused by the app, only by whatever the
+  server answers. To build with the first change of the version.
+- **Opening only the account's server's URLs in the browser.** The
+  URLs a server hands the app to open are Stripe's checkout and portal
+  pages, both refused on another server's account, where nothing is
+  sold; a general check waits for the first other URL a server hands
+  over.
 
 These are framework files: the change goes to the template in its own
 commits, with `cargo run -p framework_check -- lock`, and the

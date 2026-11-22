@@ -22,18 +22,20 @@
     localUsersCreate,
     localUsersKeepSeparate,
     localUsersMove,
+    multiServerGet,
     onAccountsSignInReturned,
   } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
   import { currentUserForget } from "../lib/current_user.svelte.js";
   import { navigateToUrl } from "../lib/router.js";
   import { postsIndexUrl } from "../lib/routes.js";
+  import AccountsCustomServer from "./components/AccountsCustomServer.svelte";
   import AccountsMoveDialog from "./components/AccountsMoveDialog.svelte";
   import AccountsRemoveDialog from "./components/AccountsRemoveDialog.svelte";
   import AccountsSignInDialog from "./components/AccountsSignInDialog.svelte";
   import { Badge, Button, ErrorMessage, Heading, Page, Panel, Text } from "../lib/components/index.js";
 
-  /** @typedef {{id: string, server_id: string | null, user_id: string, email: string, signed_in: boolean, local: boolean, active: boolean, last_active_at: string}} DeviceAccount */
+  /** @typedef {{id: string, server_id: string | null, server_host: string | null, server_display_name: string | null, user_id: string, email: string, signed_in: boolean, local: boolean, active: boolean, last_active_at: string}} DeviceAccount */
 
   /** @type {DeviceAccount[]} */
   let accounts = $state([]);
@@ -41,8 +43,10 @@
   let removing = $state(null);
   /** @type {{pending: number, conflicts: number} | null} */
   let loss = $state(null);
-  /** @type {{email: string | null, in_sheet?: boolean} | null} */
+  /** @type {{email: string | null, server_id: string | null, in_sheet?: boolean} | null} */
   let signingIn = $state(null);
+  /** @type {"none" | "listed_only" | "any"} */
+  let multiServer = $state("none");
   let signInError = $state("");
   let canSkip = $state(false);
   /** @type {{email: string, items: number} | null} */
@@ -57,6 +61,7 @@
     try {
       accounts = await deviceAccountsList();
       canSkip = await localUsersCanCreate();
+      multiServer = await multiServerGet();
       signingIn = await accountsSignInPending();
     } catch (problem) {
       error = errorMessageOf(problem);
@@ -87,16 +92,18 @@
 
   /**
    * Closes the active account and opens the browser to sign in, then
-   * waits for the code in the dialog.
+   * waits for the code in the dialog: on the server, the app's own when
+   * none.
    * @param {string | null} email
+   * @param {string | null} [serverId]
    */
-  function openBrowser(email) {
+  function openBrowser(email, serverId = null) {
     return doThen(async () => {
       await deviceAccountsDeactivate();
       currentUserForget();
       signInError = "";
-      const started = await accountsSignInStart(email ?? undefined);
-      signingIn = { email, in_sheet: started.in_sheet };
+      const started = await accountsSignInStart(email ?? undefined, serverId ?? undefined);
+      signingIn = { email, server_id: serverId, in_sheet: started.in_sheet };
       accounts = await deviceAccountsList();
     });
   }
@@ -214,7 +221,12 @@
   <ul class="flex flex-col gap-3">
     {#each accounts as account (account.id)}
       <Panel as="li" layout="row" class="flex-wrap">
-        <span class="grow">{account.local ? "On this device only" : account.email}</span>
+        <span class="flex grow flex-col">
+          <span>{account.local ? "On this device only" : account.email}</span>
+          {#if account.server_host}
+            <Text as="span" tone="muted" size="sm">{account.server_display_name} · {account.server_host}</Text>
+          {/if}
+        </span>
         {#if account.local}
           <Button size="sm" variant="primary" onclick={() => openBrowser(null)} disabled={busy}>
             Sign up or sign in
@@ -226,7 +238,7 @@
           <Button size="sm" onclick={() => switchTo(account)} disabled={busy}>Switch</Button>
         {:else}
           <Badge tone="ghost">Signed out</Badge>
-          <Button size="sm" onclick={() => openBrowser(account.email)} disabled={busy}>Sign in</Button>
+          <Button size="sm" onclick={() => openBrowser(account.email, account.server_id)} disabled={busy}>Sign in</Button>
         {/if}
         <Button size="sm" variant="ghost" onclick={() => ((loss = null), (removing = account))} disabled={busy}>
           Remove from device
@@ -245,12 +257,16 @@
     {/if}
   </div>
 
+  {#if multiServer !== "none"}
+    <AccountsCustomServer {busy} onsignin={(serverId) => openBrowser(null, serverId)} />
+  {/if}
+
   <AccountsSignInDialog
     pending={signingIn?.in_sheet ? null : signingIn}
     error={signInError}
     {busy}
     onfinish={finishSignIn}
-    onopenbrowser={() => openBrowser(signingIn?.email ?? null)}
+    onopenbrowser={() => openBrowser(signingIn?.email ?? null, signingIn?.server_id ?? null)}
     oncancel={cancelSignIn}
   />
 

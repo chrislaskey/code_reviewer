@@ -112,6 +112,8 @@ pub fn run() {
             device_accounts::device_accounts_switch,
             device_accounts::device_accounts_deactivate,
             device_accounts::device_accounts_remove,
+            device_accounts::servers::device_servers_create,
+            servers::multi_server_get,
             servers::servers_get,
             app::local_users::local_users_can_create,
             app::local_users::local_users_create,
