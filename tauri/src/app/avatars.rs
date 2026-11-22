@@ -13,15 +13,13 @@ use app_core::data::app_users::User;
 
 use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
-use crate::sync::SyncServer;
 
 #[tauri::command]
 pub async fn avatars_update(
     device: State<'_, DeviceAccounts>,
-    server: State<'_, SyncServer>,
     key: String,
 ) -> Result<User, CommandError> {
-    let deployment = device.active().await?;
+    let (deployment, transport) = device.active_with_transport().await?;
     let request = AvatarUpdate { key };
-    Ok(avatars::update_on_device(&deployment, server.transport(), &request).await?)
+    Ok(avatars::update_on_device(&deployment, &transport, &request).await?)
 }

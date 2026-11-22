@@ -12,7 +12,6 @@ use uuid::Uuid;
 
 use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
-use crate::sync::SyncServer;
 
 /// The store this app sells through, for the pages to word Buy and
 /// Manage by: `app_store`, `play_store`, or `stripe` on the desktop.
@@ -38,14 +37,13 @@ pub fn accounts_store_get(app: AppHandle) -> &'static str {
 pub async fn accounts_store_transactions_create(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
-    server: State<'_, SyncServer>,
     price_id: Uuid,
 ) -> Result<Value, CommandError> {
     #[cfg(mobile)]
-    return on_phone::create(&app, &device, &server, price_id).await;
+    return on_phone::create(&app, &device, price_id).await;
     #[cfg(desktop)]
     {
-        let _ = (app, device, server, price_id);
+        let _ = (app, device, price_id);
         Err(ON_THE_DESKTOP.into())
     }
 }
@@ -57,13 +55,12 @@ pub async fn accounts_store_transactions_create(
 pub async fn accounts_store_transactions_restore(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
-    server: State<'_, SyncServer>,
 ) -> Result<Value, CommandError> {
     #[cfg(mobile)]
-    return on_phone::restore(&app, &device, &server).await;
+    return on_phone::restore(&app, &device).await;
     #[cfg(desktop)]
     {
-        let _ = (app, device, server);
+        let _ = (app, device);
         Err(ON_THE_DESKTOP.into())
     }
 }
@@ -90,29 +87,29 @@ mod on_phone {
 
     use app_core::accounts::online;
     use app_core::deployment::Deployment;
+    use app_core::services::web_server::Http;
 
     use crate::accounts::store_sheet::{
         self, StoreSheet, StoreSheetPurchase, StoreSheetTransaction,
     };
     use crate::command_error::CommandError;
     use crate::device_accounts::DeviceAccounts;
-    use crate::sync::{SyncServer, online_error};
+    use crate::sync::online_error;
+    use crate::user_auth::signed_in_with_transport;
 
     pub async fn create(
         app: &AppHandle,
         device: &DeviceAccounts,
-        server: &SyncServer,
         price_id: Uuid,
     ) -> Result<Value, CommandError> {
-        let deployment = device.active().await?;
-        let user_id = device.active_user_id().await.ok_or("Nobody is signed in")?;
-        let lookup_key = lookup_key_of(app, &deployment, server, price_id).await?;
+        let (deployment, transport, user) = signed_in_with_transport(device).await?;
+        let lookup_key = lookup_key_of(app, &deployment, &transport, price_id).await?;
         let sheet = store_sheet::of(app);
-        match sheet.buy(&lookup_key, user_id).await? {
+        match sheet.buy(&lookup_key, user.id).await? {
             StoreSheetPurchase::Purchased(transaction) => {
                 let recorded =
-                    send_then_finish(app, &sheet, &deployment, server, &transaction).await?;
-                crate::accounts::plans::refresh(&deployment, server.transport()).await;
+                    send_then_finish(app, &sheet, &deployment, &transport, &transaction).await?;
+                crate::accounts::plans::refresh(&deployment, &transport).await;
                 Ok(recorded)
             }
             StoreSheetPurchase::Cancelled => Ok(json!({ "cancelled": true })),
@@ -120,29 +117,24 @@ mod on_phone {
         }
     }
 
-    pub async fn restore(
-        app: &AppHandle,
-        device: &DeviceAccounts,
-        server: &SyncServer,
-    ) -> Result<Value, CommandError> {
-        let deployment = device.active().await?;
+    pub async fn restore(app: &AppHandle, device: &DeviceAccounts) -> Result<Value, CommandError> {
+        let (deployment, transport) = device.active_with_transport().await?;
         let sheet = store_sheet::of(app);
         let mut recorded = 0;
         let mut refused = Vec::new();
         for transaction in sheet.restore().await? {
-            match send_then_finish(app, &sheet, &deployment, server, &transaction).await {
+            match send_then_finish(app, &sheet, &deployment, &transport, &transaction).await {
                 Ok(_) => recorded += 1,
                 Err(error) => refused.push(error),
             }
         }
-        crate::accounts::plans::refresh(&deployment, server.transport()).await;
+        crate::accounts::plans::refresh(&deployment, &transport).await;
         Ok(json!({ "recorded": recorded, "refused": refused }))
     }
 
     pub async fn send_unfinished(app: &AppHandle) {
         let device = app.state::<DeviceAccounts>();
-        let server = app.state::<SyncServer>();
-        let Ok(deployment) = device.active().await else {
+        let Ok((deployment, transport)) = device.active_with_transport().await else {
             return;
         };
         let sheet = store_sheet::of(app);
@@ -155,13 +147,13 @@ mod on_phone {
         };
         for transaction in &unfinished {
             if let Err(error) =
-                send_then_finish(app, &sheet, &deployment, &server, transaction).await
+                send_then_finish(app, &sheet, &deployment, &transport, transaction).await
             {
                 log::warn!("store transaction {} not sent: {error}", transaction.id);
             }
         }
         if !unfinished.is_empty() {
-            crate::accounts::plans::refresh(&deployment, server.transport()).await;
+            crate::accounts::plans::refresh(&deployment, &transport).await;
         }
     }
 
@@ -171,13 +163,12 @@ mod on_phone {
         app: &AppHandle,
         sheet: &impl StoreSheet,
         deployment: &Deployment,
-        server: &SyncServer,
+        transport: &Http,
         transaction: &StoreSheetTransaction,
     ) -> Result<Value, CommandError> {
-        let recorded =
-            online::store_transactions_create(deployment, server.transport(), &transaction.proof)
-                .await
-                .map_err(|error| online_error(app, error))?;
+        let recorded = online::store_transactions_create(deployment, transport, &transaction.proof)
+            .await
+            .map_err(|error| online_error(app, error))?;
         sheet.finish(transaction).await?;
         Ok(recorded)
     }
@@ -186,10 +177,10 @@ mod on_phone {
     async fn lookup_key_of(
         app: &AppHandle,
         deployment: &Deployment,
-        server: &SyncServer,
+        transport: &Http,
         price_id: Uuid,
     ) -> Result<String, CommandError> {
-        let products = online::products_list(deployment, server.transport())
+        let products = online::products_list(deployment, transport)
             .await
             .map_err(|error| online_error(app, error))?;
         let price_id = price_id.to_string();

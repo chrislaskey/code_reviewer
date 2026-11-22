@@ -15,16 +15,15 @@ use app_core::accounts::online;
 use crate::accounts::{plans, stripe_pages};
 use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
-use crate::sync::{self, SyncServer};
+use crate::sync;
 
 #[tauri::command]
 pub async fn accounts_subscriptions_list(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
-    server: State<'_, SyncServer>,
 ) -> Result<Value, CommandError> {
-    let deployment = device.active().await?;
-    online::subscriptions_list(&deployment, server.transport())
+    let (deployment, transport) = device.active_with_transport().await?;
+    online::subscriptions_list(&deployment, &transport)
         .await
         .map_err(|error| sync::online_error(&app, error))
 }
@@ -33,11 +32,10 @@ pub async fn accounts_subscriptions_list(
 pub async fn accounts_subscriptions_get(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
-    server: State<'_, SyncServer>,
     id: Uuid,
 ) -> Result<Value, CommandError> {
-    let deployment = device.active().await?;
-    online::subscriptions_get(&deployment, server.transport(), id)
+    let (deployment, transport) = device.active_with_transport().await?;
+    online::subscriptions_get(&deployment, &transport, id)
         .await
         .map_err(|error| sync::online_error(&app, error))
 }
@@ -47,16 +45,15 @@ pub async fn accounts_subscriptions_get(
 pub async fn accounts_subscriptions_update(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
-    server: State<'_, SyncServer>,
     id: Uuid,
     change: Value,
 ) -> Result<Value, CommandError> {
     stripe_pages::refused_on_a_phone()?;
-    let deployment = device.active().await?;
-    let changed = online::subscriptions_update(&deployment, server.transport(), id, &change)
+    let (deployment, transport) = device.active_with_transport().await?;
+    let changed = online::subscriptions_update(&deployment, &transport, id, &change)
         .await
         .map_err(|error| sync::online_error(&app, error))?;
-    plans::refresh(&deployment, server.transport()).await;
+    plans::refresh(&deployment, &transport).await;
     Ok(changed)
 }
 

@@ -33,7 +33,7 @@
   import AccountsSignInDialog from "./components/AccountsSignInDialog.svelte";
   import { Badge, Button, ErrorMessage, Heading, Page, Panel, Text } from "../lib/components/index.js";
 
-  /** @typedef {{user_id: string, email: string, signed_in: boolean, local: boolean, active: boolean, last_active_at: string}} DeviceAccount */
+  /** @typedef {{id: string, server_id: string | null, user_id: string, email: string, signed_in: boolean, local: boolean, active: boolean, last_active_at: string}} DeviceAccount */
 
   /** @type {DeviceAccount[]} */
   let accounts = $state([]);
@@ -79,7 +79,7 @@
   /** @param {DeviceAccount} account */
   function switchTo(account) {
     return doThen(async () => {
-      await deviceAccountsSwitch(account.user_id);
+      await deviceAccountsSwitch(account.id);
       currentUserForget();
       await navigateToUrl(postsIndexUrl());
     });
@@ -184,7 +184,7 @@
     const account = removing;
     if (!account) return;
     return doThen(async () => {
-      const answer = await deviceAccountsRemove(account.user_id, losingChanges);
+      const answer = await deviceAccountsRemove(account.id, losingChanges);
       if (answer.outcome === "changes_would_be_lost") {
         loss = { pending: answer.pending, conflicts: answer.conflicts };
         return;
@@ -212,7 +212,7 @@
   {/if}
 
   <ul class="flex flex-col gap-3">
-    {#each accounts as account (account.user_id)}
+    {#each accounts as account (account.id)}
       <Panel as="li" layout="row" class="flex-wrap">
         <span class="grow">{account.local ? "On this device only" : account.email}</span>
         {#if account.local}

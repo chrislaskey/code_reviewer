@@ -13,6 +13,7 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_oauth::OauthConfig;
 
+use crate::device_accounts::servers::DeviceServer;
 use crate::{MAIN_WINDOW, accounts, server_urls};
 
 const BACK_TO_APP_PATH: &str = "/accounts/back-to-app";
@@ -24,13 +25,14 @@ pub struct AccountsLoopback {
 }
 
 /// Starts a listener for the browser to return the code to, in place of
-/// any earlier one, and answers its port.
-pub fn start(app: &AppHandle) -> Result<u16, String> {
+/// any earlier one, and answers its port; the browser comes back to the
+/// "back to the app" page of the server signed in to.
+pub fn start(app: &AppHandle, server: &DeviceServer) -> Result<u16, String> {
     stop(app);
     let config = OauthConfig {
         ports: None,
         response: None,
-        redirect_uri: Some(server_urls::browser_page_url(app, BACK_TO_APP_PATH)?.into()),
+        redirect_uri: Some(server_urls::browser_page_url(app, server, BACK_TO_APP_PATH)?.into()),
     };
     let returned_to = app.clone();
     let port = tauri_plugin_oauth::start_with_config(config, move |url| {

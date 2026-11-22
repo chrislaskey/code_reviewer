@@ -237,8 +237,8 @@ export function deviceAccountsList() {
   return Promise.resolve([]);
 }
 
-/** @param {string} _userId */
-export function deviceAccountsSwitch(_userId) {
+/** @param {string} _id */
+export function deviceAccountsSwitch(_id) {
   return Promise.reject(new Error("no accounts are kept on the web"));
 }
 
@@ -246,8 +246,8 @@ export function deviceAccountsDeactivate() {
   return Promise.resolve(null);
 }
 
-/** @param {string} _userId @param {boolean} _losingChanges */
-export function deviceAccountsRemove(_userId, _losingChanges) {
+/** @param {string} _id @param {boolean} _losingChanges */
+export function deviceAccountsRemove(_id, _losingChanges) {
   return Promise.reject(new Error("no accounts are kept on the web"));
 }
 

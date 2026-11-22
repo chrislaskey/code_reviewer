@@ -9,19 +9,18 @@ use app_core::accounts::online;
 use crate::accounts::stripe_pages;
 use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
-use crate::sync::{self, SyncServer};
+use crate::sync;
 
 /// Stripe's Customer Portal, opened in the browser: answers no `url`.
 #[tauri::command]
 pub async fn accounts_subscriptions_portal_create(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
-    server: State<'_, SyncServer>,
     id: Uuid,
 ) -> Result<Value, CommandError> {
     stripe_pages::refused_on_a_phone()?;
-    let deployment = device.active().await?;
-    let portal = online::subscriptions_portal_create(&deployment, server.transport(), id)
+    let (deployment, transport) = device.active_with_transport().await?;
+    let portal = online::subscriptions_portal_create(&deployment, &transport, id)
         .await
         .map_err(|error| sync::online_error(&app, error))?;
     stripe_pages::open(&app, portal.get("url"))?;

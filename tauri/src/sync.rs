@@ -1,6 +1,6 @@
 //! Syncing the active account's database with the web server, see
 //! `docs/design/offline-sync.md`: `app_core::sync::run` over HTTP to the
-//! server at the URL `server_urls` resolves when the app starts. One
+//! active account's server, see `device_accounts::servers`. One
 //! sync runs at a time: when the app starts, when it comes
 //! to the foreground, after every write, from the Sync now button, and
 //! every half minute. Each one ends with a `synced` event to the pages,
@@ -32,12 +32,10 @@ use tauri::{App, AppHandle, Emitter, Manager, State};
 use tokio::sync::{Mutex, MutexGuard};
 
 use app_core::accounts::online;
-use app_core::services::web_server::Http;
 use app_core::sync::{self, Report, Status, SyncError};
 
 use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
-use crate::server_urls;
 
 const INTERVAL: Duration = Duration::from_secs(30);
 /// A foreground sync is skipped this soon after the last sync started: a
@@ -45,21 +43,15 @@ const INTERVAL: Duration = Duration::from_secs(30);
 /// window is not news.
 const FOREGROUND_GAP: Duration = Duration::from_secs(5);
 
-/// The server, the lock one sync at a time holds, whether a spawned
-/// sync is waiting for it, and when the last sync started.
+/// The lock one sync at a time holds, whether a spawned sync is waiting
+/// for it, and when the last sync started.
 pub struct SyncServer {
-    transport: Http,
     one_at_a_time: Mutex<()>,
     one_waiting: AtomicBool,
     last_started: SyncMutex<Option<Instant>>,
 }
 
 impl SyncServer {
-    /// The server, for the accounts commands to sign up, in and out through.
-    pub fn transport(&self) -> &Http {
-        &self.transport
-    }
-
     /// Keeps any sync from starting, and waits for one in flight to
     /// finish, while the guard is held: for the moments the active
     /// account's file changes under the commands.
@@ -69,10 +61,7 @@ impl SyncServer {
 }
 
 pub fn setup(app: &App) -> Result<(), Box<dyn std::error::Error>> {
-    let url = server_urls::sync_server_url(app.handle());
-    log::info!("sync server {url}");
     app.manage(SyncServer {
-        transport: Http::new(&url)?,
         one_at_a_time: Mutex::new(()),
         one_waiting: AtomicBool::new(false),
         last_started: SyncMutex::new(None),
@@ -150,8 +139,9 @@ async fn run_after_waiting(app: &AppHandle, spawned: bool) -> Result<Report, Str
         .last_started
         .lock()
         .unwrap_or_else(PoisonError::into_inner) = Some(Instant::now());
-    let result = match device.active().await {
-        Ok(deployment) => sync::run(&deployment, &server.transport).await,
+    let active = device.active_with_transport().await;
+    let result = match &active {
+        Ok((deployment, transport)) => sync::run(deployment, transport).await,
         Err(_) => Ok(Report {
             signed_out: true,
             ..Report::default()
@@ -164,19 +154,20 @@ async fn run_after_waiting(app: &AppHandle, spawned: bool) -> Result<Report, Str
         }
     }
     let account_deleted = matches!(&result, Err(SyncError::AccountDeleted));
-    if account_deleted && let Some(user_id) = device.active_user_id().await {
+    if account_deleted && let (Some(id), Ok((_, transport))) = (device.active_id().await, &active) {
         log::warn!("the account was deleted: removing it from the device");
-        if let Err(error) = device.remove(&server.transport, user_id, true).await {
+        if let Err(error) = device.remove(transport, id, true).await {
             log::warn!("could not remove the deleted account: {error}");
         }
     }
-    if let (Ok(report), Ok(deployment)) = (&result, device.active().await)
+    if let (Ok(report), Ok((deployment, transport))) =
+        (&result, device.active_with_transport().await)
         && !report.signed_out
         && !report.local
         && !report.offline
         && online::plan_is_stale(&deployment).await.unwrap_or(true)
     {
-        crate::accounts::plans::refresh(&deployment, &server.transport).await;
+        crate::accounts::plans::refresh(&deployment, &transport).await;
     }
     if result.as_ref().is_ok_and(Report::more_files_to_send) {
         spawn(app.clone());

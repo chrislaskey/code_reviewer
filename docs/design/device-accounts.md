@@ -103,9 +103,10 @@ A SQLite file next to the account files, with one table:
 
 | `device_accounts` | |
 | --- | --- |
-| `user_id` | the user's id on the server, the primary key |
+| `id` | made on the device, the primary key; names the account's folder, `accounts/<id>/`, since 2026-11-22, see `multi-server.md` |
+| `server_id` | the server the account is on, unique with `user_id`; none for a local user |
+| `user_id` | the user's id on the server |
 | `email` | shown in the account menu |
-| `file` | the account's database, under `accounts/`: `<user_id>/app.db`, in the account's folder, beside `files/`, the bytes of its files, see `offline-files-decisions.md` |
 | `signed_in` | whether the file holds a token, so the menu knows which accounts switch at once and which ask for the password |
 | `last_active_at` | for ordering the menu and picking the account to open at start |
 | `active` | the one account open now, at most one row |

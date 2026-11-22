@@ -1,21 +1,25 @@
-//! Where the web server is, for the sync, and where its sign-in page
-//! is, for the browser: from the environment, `SYNC_SERVER_URL` and
+//! Where the build's default web server is, for the sync, and where its
+//! sign-in page is, for the browser: from the environment, `SYNC_SERVER_URL` and
 //! `BROWSER_SIGN_IN_URL`, which reaches the desktop app started from a
 //! shell; else from `tauri.conf.json`, the `starter-pack` entry under
 //! `plugins`, which is compiled into every build and which `bin/dev`
 //! overrides with `--config` for the ports of the session, the only way
 //! a value reaches a phone build, since no environment does; else the
 //! dev server's port, and the sign-in page on the sync server itself,
-//! where the pages are in production.
+//! where the pages are in production. Another server the person added
+//! has its pages on itself, see `device_accounts::servers`.
 
 use std::env;
 
 use tauri::{AppHandle, Url};
 
+use crate::device_accounts::servers::DeviceServer;
+
 const CONFIG_ENTRY: &str = "starter-pack";
 const DEFAULT_SYNC_SERVER_URL: &str = "http://localhost:4000";
+const SIGN_IN_PATH: &str = "/accounts/sign-in";
 
-/// The web server the sync runs against.
+/// The build's default web server.
 pub fn sync_server_url(app: &AppHandle) -> String {
     pick(
         env::var("SYNC_SERVER_URL").ok(),
@@ -24,19 +28,26 @@ pub fn sync_server_url(app: &AppHandle) -> String {
     )
 }
 
-/// The web's sign-in page, which the app opens in the browser.
-pub fn browser_sign_in_url(app: &AppHandle) -> String {
-    pick(
-        env::var("BROWSER_SIGN_IN_URL").ok(),
-        configured(app, "browserSignInUrl"),
-        format!("{}/accounts/sign-in", sync_server_url(app)),
-    )
+/// The server's sign-in page, which the app opens in the browser.
+pub fn browser_sign_in_url(app: &AppHandle, server: &DeviceServer) -> String {
+    match &server.url {
+        Some(url) => format!("{url}{SIGN_IN_PATH}"),
+        None => pick(
+            env::var("BROWSER_SIGN_IN_URL").ok(),
+            configured(app, "browserSignInUrl"),
+            format!("{}{SIGN_IN_PATH}", sync_server_url(app)),
+        ),
+    }
 }
 
-/// A page of the web's, such as `/terms`, which the app opens in the
-/// browser: on the server of the sign-in page.
-pub fn browser_page_url(app: &AppHandle, path: &str) -> Result<String, String> {
-    page_beside(&browser_sign_in_url(app), path)
+/// A page of the server's, such as `/terms`, which the app opens in the
+/// browser: beside its sign-in page.
+pub fn browser_page_url(
+    app: &AppHandle,
+    server: &DeviceServer,
+    path: &str,
+) -> Result<String, String> {
+    page_beside(&browser_sign_in_url(app, server), path)
 }
 
 fn page_beside(sign_in_url: &str, path: &str) -> Result<String, String> {

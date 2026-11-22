@@ -1,13 +1,14 @@
 //! The accounts commands: signing in and out on this device. A sign-in
 //! happens in the system browser, on the web's own sign-in page, see
 //! `docs/design/accounts-sign-in.md`: `accounts_sign_in_start` makes
-//! the verifier, keeps it in `device.db`, and opens the browser at the
-//! sign-in page `server_urls` names with the verifier's challenge; the
+//! the verifier, keeps it in `device.db` with the server it is on, and
+//! opens the browser at that server's sign-in page, see `server_urls`,
+//! with the verifier's challenge; the
 //! page, done, shows a code the person pastes into the app, or returns
 //! it by itself: on a desktop to `sign_in_loopback`, on an iPhone
 //! through the sign-in sheet of `sign_in_sheet`; and
-//! `accounts_sign_in_finish` exchanges it with the verifier for the
-//! session, which goes into the account's own file, see
+//! `accounts_sign_in_finish` exchanges it with the verifier, on the same
+//! server, for the session, which goes into the account's own file, see
 //! `device_accounts`, which becomes the active one and syncs. The app
 //! sees no password at a sign-in. A signed-in person makes or changes
 //! theirs from the account page, which asks the server, so only when
@@ -42,6 +43,7 @@ use tauri::{AppHandle, Emitter, Manager, State, Url};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::command_error::CommandError;
+use crate::device_accounts::servers::DeviceServer;
 use crate::device_accounts::{DeviceAccounts, PendingSignIn, SignInFinished};
 use crate::server_urls;
 use crate::sync::{self, SyncServer};
@@ -92,13 +94,16 @@ pub async fn accounts_sign_in_start(
     device: State<'_, DeviceAccounts>,
     email: Option<String>,
 ) -> Result<SignInStarted, CommandError> {
+    let server = device.default_server().await?;
     let (verifier, challenge) = accounts::verifier_and_challenge();
-    device.sign_in_start(&verifier, email.as_deref()).await?;
+    device
+        .sign_in_start(server.id, &verifier, email.as_deref())
+        .await?;
     let url = sign_in_page_with(
-        &server_urls::browser_sign_in_url(&app),
+        &server_urls::browser_sign_in_url(&app, &server),
         &challenge,
         email.as_deref(),
-        app_return(&app),
+        app_return(&app, &server),
     );
     sign_in_page_open(&app, url, verifier)?;
     Ok(SignInStarted {
@@ -109,20 +114,20 @@ pub async fn accounts_sign_in_start(
 /// Where the page returns the code to; none on Android, or when the
 /// listener could not start, where the person pastes it.
 #[cfg(desktop)]
-fn app_return(app: &AppHandle) -> Option<AppReturn> {
-    crate::accounts::sign_in_loopback::start(app)
+fn app_return(app: &AppHandle, server: &DeviceServer) -> Option<AppReturn> {
+    crate::accounts::sign_in_loopback::start(app, server)
         .inspect_err(|error| log::warn!("{error}; the code is pasted instead"))
         .ok()
         .map(AppReturn::Port)
 }
 
 #[cfg(target_os = "ios")]
-fn app_return(app: &AppHandle) -> Option<AppReturn> {
+fn app_return(app: &AppHandle, _server: &DeviceServer) -> Option<AppReturn> {
     Some(AppReturn::Scheme(app.config().identifier.clone()))
 }
 
 #[cfg(target_os = "android")]
-fn app_return(_app: &AppHandle) -> Option<AppReturn> {
+fn app_return(_app: &AppHandle, _server: &DeviceServer) -> Option<AppReturn> {
     None
 }
 
@@ -166,19 +171,24 @@ pub async fn accounts_sign_in_finish(
 /// by itself, see `sign_in_finish_returned`.
 pub async fn sign_in_finish(app: &AppHandle, code: &str) -> Result<SignInFinished, String> {
     let device = app.state::<DeviceAccounts>();
-    let server = app.state::<SyncServer>();
-    let verifier = device
-        .sign_in_verifier()
+    let sync_server = app.state::<SyncServer>();
+    let waiting = device
+        .sign_in_waiting()
         .await
         .map_err(|error| error.to_string())?
         .ok_or("No sign-in is waiting; start again")?;
-    let session = accounts::sign_in_with_device_code_through(server.transport(), code, &verifier)
+    let transport = device
+        .server_get(waiting.server_id)
+        .await
+        .and_then(|server| device.transport_for(&server))
+        .map_err(|error| error.to_string())?;
+    let session = accounts::sign_in_with_device_code_through(&transport, code, &waiting.verifier)
         .await
         .map_err(|error| error.to_string())?;
     let finished = {
-        let _no_sync_meanwhile = server.hold().await;
+        let _no_sync_meanwhile = sync_server.hold().await;
         device
-            .sign_in_finished(session)
+            .sign_in_finished(waiting.server_id, session)
             .await
             .map_err(|error| error.to_string())?
     };
@@ -247,7 +257,8 @@ pub async fn accounts_sign_out(
     // account's file for the next sign-in.
     let _ = sync::run(&app).await;
     let _no_sync_meanwhile = server.hold().await;
-    Ok(device.sign_out(server.transport()).await?)
+    let (_, transport) = device.active_with_transport().await?;
+    Ok(device.sign_out(&transport).await?)
 }
 
 /// What the signed-in user's account asks for after the emailed code,
@@ -255,10 +266,9 @@ pub async fn accounts_sign_out(
 #[tauri::command]
 pub async fn accounts_second_factors(
     device: State<'_, DeviceAccounts>,
-    server: State<'_, SyncServer>,
 ) -> Result<Vec<SecondFactor>, CommandError> {
-    let deployment = device.active().await?;
-    Ok(accounts::second_factors_on_device(&deployment, server.transport()).await?)
+    let (deployment, transport) = device.active_with_transport().await?;
+    Ok(accounts::second_factors_on_device(&deployment, &transport).await?)
 }
 
 /// The sign-in page with the challenge, the email and where to return

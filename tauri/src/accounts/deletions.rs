@@ -24,12 +24,12 @@ pub async fn accounts_deletions_create(
     server: State<'_, SyncServer>,
     code: String,
 ) -> Result<(), CommandError> {
-    let deployment = device.active().await?;
-    let user_id = device.active_user_id().await.ok_or("Nobody is signed in")?;
-    online::deletions_create(&deployment, server.transport(), &code)
+    let (deployment, transport) = device.active_with_transport().await?;
+    let id = device.active_id().await.ok_or("Nobody is signed in")?;
+    online::deletions_create(&deployment, &transport, &code)
         .await
         .map_err(|error| crate::sync::online_error(&app, error))?;
     let _no_sync_meanwhile = server.hold().await;
-    device.remove(server.transport(), user_id, true).await?;
+    device.remove(&transport, id, true).await?;
     Ok(())
 }

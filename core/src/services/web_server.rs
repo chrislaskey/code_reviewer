@@ -249,8 +249,10 @@ fn refused(error: AccountError) -> SyncError {
     }
 }
 
-/// The server over HTTP, at its base URL, for the apps.
+/// The server over HTTP, at its base URL, for the apps; a clone shares
+/// its connections.
 #[cfg(feature = "sync-http")]
+#[derive(Clone)]
 pub struct Http {
     client: reqwest::Client,
     /// For a file's content, which the server answers by a redirect to

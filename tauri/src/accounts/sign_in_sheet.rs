@@ -40,8 +40,8 @@ pub fn open(app: &AppHandle, url: String, verifier: String) {
 /// not replaced by a newer sheet's, which cancels this one.
 async fn sign_in_forget(app: &AppHandle, verifier: &str) -> bool {
     let device = app.state::<DeviceAccounts>();
-    match device.sign_in_verifier().await {
-        Ok(Some(waiting)) if waiting == verifier => {
+    match device.sign_in_waiting().await {
+        Ok(Some(waiting)) if waiting.verifier == verifier => {
             if let Err(error) = device.sign_in_clear().await {
                 log::error!("could not forget the sign-in of the closed sheet: {error}");
             }

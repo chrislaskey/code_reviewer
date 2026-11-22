@@ -197,10 +197,10 @@ export function deviceAccountsList() {
 
 /**
  * Makes a signed-in account the active one, which then syncs.
- * @param {string} userId
+ * @param {string} id the account's id on this device
  */
-export function deviceAccountsSwitch(userId) {
-  return invoke("device_accounts_switch", { userId });
+export function deviceAccountsSwitch(id) {
+  return invoke("device_accounts_switch", { id });
 }
 
 /** Closes the active account, which stays signed in, before adding another. */
@@ -213,11 +213,11 @@ export function deviceAccountsDeactivate() {
  * `{outcome: "removed"}`, or, when a change would be lost and the person
  * has not chosen to lose it, `{outcome: "changes_would_be_lost", pending,
  * conflicts}` with nothing done.
- * @param {string} userId
+ * @param {string} id the account's id on this device
  * @param {boolean} losingChanges
  */
-export function deviceAccountsRemove(userId, losingChanges) {
-  return invoke("device_accounts_remove", { userId, losingChanges });
+export function deviceAccountsRemove(id, losingChanges) {
+  return invoke("device_accounts_remove", { id, losingChanges });
 }
 
 // Trial users are the web's; a device has a local user instead.

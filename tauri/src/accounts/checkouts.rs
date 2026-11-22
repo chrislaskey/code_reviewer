@@ -15,7 +15,7 @@ use app_core::accounts::online;
 use crate::accounts::{plans, stripe_pages};
 use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
-use crate::sync::{self, SyncServer};
+use crate::sync;
 
 /// A checkout, its Stripe page opened in the browser: answers the
 /// checkout with no `url`, as the app has nothing to go to.
@@ -23,12 +23,11 @@ use crate::sync::{self, SyncServer};
 pub async fn accounts_checkouts_create(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
-    server: State<'_, SyncServer>,
     price_id: Uuid,
 ) -> Result<Value, CommandError> {
     stripe_pages::refused_on_a_phone()?;
-    let deployment = device.active().await?;
-    let created = online::checkouts_create(&deployment, server.transport(), price_id)
+    let (deployment, transport) = device.active_with_transport().await?;
+    let created = online::checkouts_create(&deployment, &transport, price_id)
         .await
         .map_err(|error| sync::online_error(&app, error))?;
     stripe_pages::open(&app, created.get("url"))?;
@@ -41,15 +40,14 @@ pub async fn accounts_checkouts_create(
 pub async fn accounts_checkouts_get(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
-    server: State<'_, SyncServer>,
     id: Uuid,
 ) -> Result<Value, CommandError> {
-    let deployment = device.active().await?;
-    let checkout = online::checkouts_get(&deployment, server.transport(), id)
+    let (deployment, transport) = device.active_with_transport().await?;
+    let checkout = online::checkouts_get(&deployment, &transport, id)
         .await
         .map_err(|error| sync::online_error(&app, error))?;
     if checkout.get("status") == Some(&json!("paid")) {
-        plans::refresh(&deployment, server.transport()).await;
+        plans::refresh(&deployment, &transport).await;
     }
     Ok(checkout)
 }

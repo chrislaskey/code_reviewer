@@ -24,8 +24,8 @@ use app_core::helpers::content_type;
 
 use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
-use crate::sync::{self, SyncServer};
-use crate::user_auth::signed_in;
+use crate::sync;
+use crate::user_auth::{signed_in, signed_in_with_transport};
 
 /// How many names a download tries before giving up.
 const FREE_NAME_TRIES: u32 = 1000;
@@ -157,10 +157,9 @@ pub async fn files_copy(app: AppHandle, id: Uuid) -> Result<(), CommandError> {
 /// `files_copy`, for the quick picker too.
 pub async fn copy_to_clipboard(app: &AppHandle, id: Uuid) -> Result<(), CommandError> {
     let device = app.state::<DeviceAccounts>();
-    let server = app.state::<SyncServer>();
-    let (deployment, user) = signed_in(&device).await?;
+    let (deployment, transport, user) = signed_in_with_transport(&device).await?;
     let shown = files::get(&deployment, &user, id).await?;
-    let path = files::local_copy(&deployment, server.transport(), &user, id).await?;
+    let path = files::local_copy(&deployment, &transport, &user, id).await?;
     Ok(copy_image(app, &shown.file, path).await?)
 }
 
@@ -268,15 +267,14 @@ pub fn files_download_supported() -> bool {
 pub async fn files_download(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
-    server: State<'_, SyncServer>,
     id: Uuid,
 ) -> Result<String, CommandError> {
     if !cfg!(desktop) {
         return Err("Downloading is not available on this device yet".into());
     }
-    let (deployment, user) = signed_in(&device).await?;
+    let (deployment, transport, user) = signed_in_with_transport(&device).await?;
     let shown = files::get(&deployment, &user, id).await?;
-    let from = files::local_copy(&deployment, server.transport(), &user, id).await?;
+    let from = files::local_copy(&deployment, &transport, &user, id).await?;
     let downloads = app.path().download_dir()?;
     let to = tokio::task::spawn_blocking(move || {
         copy_under_a_free_name(&from, &downloads, &shown.file.name)
@@ -352,10 +350,9 @@ pub async fn content_response(app: &AppHandle, uri: &Uri) -> Response<Vec<u8>> {
 async fn content(app: &AppHandle, uri: &Uri) -> Option<(String, Vec<u8>)> {
     let id = Uuid::parse_str(uri.path().trim_start_matches('/')).ok()?;
     let device = app.state::<DeviceAccounts>();
-    let (deployment, user) = signed_in(&device).await.ok()?;
+    let (deployment, transport, user) = signed_in_with_transport(&device).await.ok()?;
     let shown = files::get(&deployment, &user, id).await.ok()?;
-    let server = app.state::<SyncServer>();
-    let path = files::local_copy(&deployment, server.transport(), &user, id)
+    let path = files::local_copy(&deployment, &transport, &user, id)
         .await
         .inspect_err(|error| log::info!("file {id} is not shown: {error}"))
         .ok()?;
