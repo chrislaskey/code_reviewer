@@ -14,25 +14,25 @@ use crate::sync;
 use crate::user_auth::signed_in;
 
 #[tauri::command]
-pub async fn memberships_join(
+pub async fn memberships_create(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     community_id: Uuid,
 ) -> Result<Membership, CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    let membership = memberships::join(&deployment, &user, community_id).await?;
+    let membership = memberships::create(&deployment, &user, community_id).await?;
     sync::spawn(app);
     Ok(membership)
 }
 
 #[tauri::command]
-pub async fn memberships_leave(
+pub async fn memberships_delete(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     community_id: Uuid,
 ) -> Result<(), CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    memberships::leave(&deployment, &user, community_id).await?;
+    memberships::delete(&deployment, &user, community_id).await?;
     sync::spawn(app);
     Ok(())
 }

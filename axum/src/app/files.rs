@@ -1,29 +1,27 @@
 //! The files API: `app_core::app::files` as JSON, for the request's user.
-//! `POST /api/files/upload` answers where to PUT a file's bytes, the
+//! `POST /api/files/uploads`, `uploads`, answers where to PUT a file's bytes, the
 //! page or a device sends them to the bucket, and `POST /api/files`
 //! writes the row once they are there. `GET /api/files/{id}/content`
 //! redirects to a URL the bytes are read from, for an `<img>` or a
 //! link. See `docs/design/offline-files-decisions.md`.
 
+pub mod duplicates;
+pub mod uploads;
+
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::http::header::{CACHE_CONTROL, LOCATION};
-use axum::response::{IntoResponse, Response};
+use axum::response::Response;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use app_core::app::files::{self, FileNew, FileSearch, FileSearchResults, FileWithState};
+use app_core::app::files::{self, FileFilter, FileList, FileNew, FileWithState};
 use app_core::data::app_files::File;
 use app_core::deployment::Deployment;
-use app_core::sync::bytes::{self, Upload, UploadNew};
 
 use crate::api_error::ApiError;
+use crate::sync;
 use crate::user_auth::CurrentUser;
-
-/// How long a browser may reuse the redirect to a file's bytes: a
-/// little less than the signed URL it points at works.
-const CONTENT_REDIRECT_SECONDS: u64 = bytes::DOWNLOAD_URL_LIFETIME.as_secs() - 5 * 60;
 
 #[derive(Deserialize)]
 pub struct FileFields {
@@ -31,10 +29,34 @@ pub struct FileFields {
     pub community_ids: Vec<Uuid>,
 }
 
+/// `FileFilter` in a URL's query, its content types joined by commas,
+/// as `image/png,image/jpeg`.
 #[derive(Deserialize)]
-pub struct DuplicatesQuery {
-    /// The checksums of the files a person picked.
-    pub sha256s: Vec<String>,
+pub struct FileListQuery {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub content_types: String,
+    #[serde(default)]
+    pub offset: u32,
+    pub limit: u32,
+}
+
+impl From<FileListQuery> for FileFilter {
+    fn from(query: FileListQuery) -> FileFilter {
+        FileFilter {
+            name: query.name,
+            content_types: query
+                .content_types
+                .split(',')
+                .map(str::trim)
+                .filter(|content_type| !content_type.is_empty())
+                .map(str::to_string)
+                .collect(),
+            offset: query.offset,
+            limit: query.limit,
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -43,26 +65,15 @@ pub struct ContentQuery {
     pub download: Option<String>,
 }
 
-/// A page of the files the user sees whose names contain `name`, and
-/// how many match in all.
-pub async fn search(
+/// `GET /api/files`: a page of the files the user sees that pass the
+/// filter, and how many pass in all.
+pub async fn list(
     State(deployment): State<Deployment>,
     CurrentUser(user): CurrentUser,
-    Query(search): Query<FileSearch>,
-) -> Result<Json<FileSearchResults>, ApiError> {
-    Ok(Json(files::search(&deployment, &user, &search).await?))
-}
-
-/// The files the user sees with any of these checksums, a POST since
-/// hundreds of them do not fit a URL.
-pub async fn list_duplicates(
-    State(deployment): State<Deployment>,
-    CurrentUser(user): CurrentUser,
-    Json(query): Json<DuplicatesQuery>,
-) -> Result<Json<Vec<FileWithState>>, ApiError> {
-    Ok(Json(
-        files::list_duplicates(&deployment, &user, &query.sha256s).await?,
-    ))
+    Query(query): Query<FileListQuery>,
+) -> Result<Json<FileList>, ApiError> {
+    let filter = FileFilter::from(query);
+    Ok(Json(files::list(&deployment, &user, &filter).await?))
 }
 
 pub async fn get(
@@ -71,16 +82,6 @@ pub async fn get(
     Path(id): Path<Uuid>,
 ) -> Result<Json<FileWithState>, ApiError> {
     Ok(Json(files::get(&deployment, &user, id).await?))
-}
-
-pub async fn create_upload(
-    State(deployment): State<Deployment>,
-    CurrentUser(user): CurrentUser,
-    Json(request): Json<UploadNew>,
-) -> Result<Json<Upload>, ApiError> {
-    Ok(Json(
-        files::create_upload(&deployment, &user, &request).await?,
-    ))
 }
 
 pub async fn create(
@@ -122,15 +123,5 @@ pub async fn content(
     Query(query): Query<ContentQuery>,
 ) -> Result<Response, ApiError> {
     let url = files::content_url(&deployment, &user, id, query.download.is_some()).await?;
-    Ok((
-        StatusCode::FOUND,
-        [
-            (LOCATION, url),
-            (
-                CACHE_CONTROL,
-                format!("private, max-age={CONTENT_REDIRECT_SECONDS}"),
-            ),
-        ],
-    )
-        .into_response())
+    Ok(sync::bytes::content_redirect(url))
 }

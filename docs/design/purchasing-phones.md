@@ -225,7 +225,7 @@ of the App Store's code by drawing the line where the stores differ:
 | Route | Does |
 |---|---|
 | `POST /api/accounts/store-transactions` | the app's proof, any store, M1 to M3; answers the purchase or subscription |
-| `POST /api/accounts/app-store-notifications` | Apple's notifications, no session, checked by Apple's signature against its root certificates; a 404 unless configured |
+| `POST /api/accounts/webhooks/app-store` | Apple's notifications, no session, checked by Apple's signature against its root certificates; a 404 unless configured |
 | `POST /api/accounts/play-store-notifications` | Pub/Sub push, no session, checked by its OIDC bearer token; a 404 unless configured |
 
 ### Settings
@@ -414,7 +414,7 @@ is ever committed; the repo holds only the placeholders.
    `APP_STORE_PRIVATE_KEY`.
 7. **Notifications**: App Information, App Store Server Notifications,
    Version 2, the same URL for production and sandbox:
-   `https://<the server>/api/accounts/app-store-notifications`. Then
+   `https://<the server>/api/accounts/webhooks/app-store`. Then
    from the server, Request a Test Notification (or the API's) and see
    `app store notification ... TEST: handled` in its log.
 8. **A sandbox tester**: Users and Access, Sandbox, Test Accounts. On

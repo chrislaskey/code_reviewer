@@ -4,7 +4,9 @@
 //! as the signed-in person, see `app_core::accounts::online`, and
 //! answers its JSON as it came.
 
-use serde_json::{Value, json};
+pub mod portal;
+
+use serde_json::Value;
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 
@@ -56,23 +58,6 @@ pub async fn accounts_subscriptions_update(
         .map_err(|error| sync::online_error(&app, error))?;
     plans::refresh(&deployment, server.transport()).await;
     Ok(changed)
-}
-
-/// Stripe's Customer Portal, opened in the browser: answers no `url`.
-#[tauri::command]
-pub async fn accounts_subscriptions_portal_create(
-    app: AppHandle,
-    device: State<'_, DeviceAccounts>,
-    server: State<'_, SyncServer>,
-    id: Uuid,
-) -> Result<Value, CommandError> {
-    stripe_pages::refused_on_a_phone()?;
-    let deployment = device.active().await?;
-    let portal = online::subscriptions_portal_create(&deployment, server.transport(), id)
-        .await
-        .map_err(|error| sync::online_error(&app, error))?;
-    stripe_pages::open(&app, portal.get("url"))?;
-    Ok(json!({ "url": null }))
 }
 
 /// The store's own page of subscriptions, where a plan bought there is

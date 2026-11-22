@@ -1286,13 +1286,15 @@ pub(crate) mod tests {
             self.server.sign_out(token).await
         }
 
-        async fn bytes_create_upload(
+        async fn bytes_uploads_create(
             &self,
             token: Option<&str>,
             table: &str,
             request: UploadNew,
         ) -> Result<Upload, SyncError> {
-            self.server.bytes_create_upload(token, table, request).await
+            self.server
+                .bytes_uploads_create(token, table, request)
+                .await
         }
 
         async fn bytes_upload(
@@ -1370,13 +1372,15 @@ pub(crate) mod tests {
             self.server.sign_out(token).await
         }
 
-        async fn bytes_create_upload(
+        async fn bytes_uploads_create(
             &self,
             token: Option<&str>,
             table: &str,
             request: UploadNew,
         ) -> Result<Upload, SyncError> {
-            self.server.bytes_create_upload(token, table, request).await
+            self.server
+                .bytes_uploads_create(token, table, request)
+                .await
         }
 
         async fn bytes_upload(
@@ -1675,13 +1679,15 @@ pub(crate) mod tests {
             self.server.sign_out(token).await
         }
 
-        async fn bytes_create_upload(
+        async fn bytes_uploads_create(
             &self,
             token: Option<&str>,
             table: &str,
             request: UploadNew,
         ) -> Result<Upload, SyncError> {
-            self.server.bytes_create_upload(token, table, request).await
+            self.server
+                .bytes_uploads_create(token, table, request)
+                .await
         }
 
         async fn bytes_upload(
@@ -1803,12 +1809,12 @@ pub(crate) mod tests {
             sync(&a, &server).await;
             sync(&b, &server).await;
             let conflict = conflicts::list(&b).await.expect("the conflicts").remove(0);
-            conflicts::let_go(&b, conflict.id).await.expect("let go");
+            conflicts::delete(&b, conflict.id).await.expect("let go");
             let report = sync(&b, &server).await;
             assert_eq!(report.pushed, 0);
             assert_eq!(bodies(&server, &alice).await, vec!["a again"]);
             assert_eq!(bodies(&b, &alice).await, vec!["a again"]);
-            let error = conflicts::let_go(&b, conflict.id).await.expect_err("gone");
+            let error = conflicts::delete(&b, conflict.id).await.expect_err("gone");
             assert!(matches!(error, conflicts::ConflictError::NotFound { .. }));
         })
         .await;
@@ -1933,7 +1939,7 @@ pub(crate) mod tests {
             panic!("the device is working offline and must not sign out")
         }
 
-        async fn bytes_create_upload(
+        async fn bytes_uploads_create(
             &self,
             _token: Option<&str>,
             _table: &str,
@@ -2117,7 +2123,7 @@ pub(crate) mod tests {
             assert_eq!(listed[0].community.name, "Gardening");
             assert!(listed[0].membership.is_none());
 
-            memberships::join(&server, &bob, gardening.id)
+            memberships::create(&server, &bob, gardening.id)
                 .await
                 .expect("joined");
             let report = sync(&b, &server).await;
@@ -2138,7 +2144,7 @@ pub(crate) mod tests {
             let report = sync(&b, &server).await;
             assert_eq!(report.backfilled, 0, "once is enough");
 
-            memberships::leave(&server, &bob, gardening.id)
+            memberships::delete(&server, &bob, gardening.id)
                 .await
                 .expect("left");
             let report = sync(&b, &server).await;
@@ -2159,7 +2165,7 @@ pub(crate) mod tests {
             let gardening = communities::create(&server, &alice, "Gardening")
                 .await
                 .expect("a community");
-            memberships::join(&server, &bob, gardening.id)
+            memberships::create(&server, &bob, gardening.id)
                 .await
                 .expect("joined");
             posts::create(&server, &alice, "roses", &[gardening.id])
@@ -2200,7 +2206,7 @@ pub(crate) mod tests {
             let gardening = communities::create(&server, &alice, "Gardening")
                 .await
                 .expect("a community");
-            memberships::join(&server, &bob, gardening.id)
+            memberships::create(&server, &bob, gardening.id)
                 .await
                 .expect("joined");
             let a = device_of(&alice, &alice_token).await;
@@ -2260,7 +2266,7 @@ pub(crate) mod tests {
             let gardening = communities::create(&server, &alice, "Gardening")
                 .await
                 .expect("a community");
-            memberships::join(&server, &bob, gardening.id)
+            memberships::create(&server, &bob, gardening.id)
                 .await
                 .expect("joined");
             let a = device_of(&alice, &alice_token).await;
@@ -2320,7 +2326,7 @@ pub(crate) mod tests {
             let b = device_of(&bob, &bob_token).await;
             sync(&b, &server).await;
 
-            let membership = memberships::join(&b, &bob, gardening.id)
+            let membership = memberships::create(&b, &bob, gardening.id)
                 .await
                 .expect("joined offline");
             assert_eq!(membership.version, 0);
@@ -2353,7 +2359,7 @@ pub(crate) mod tests {
             let gardening = communities::create(&server, &alice, "Gardening")
                 .await
                 .expect("a community");
-            memberships::join(&server, &bob, gardening.id)
+            memberships::create(&server, &bob, gardening.id)
                 .await
                 .expect("joined");
             let post = posts::create(&server, &alice, "roses", &[gardening.id])
@@ -2392,7 +2398,7 @@ pub(crate) mod tests {
                 .await
                 .expect("memberships")
                 .remove(0);
-            memberships::leave(&server, &alice, gardening.id)
+            memberships::delete(&server, &alice, gardening.id)
                 .await
                 .expect("left");
 
@@ -2408,7 +2414,7 @@ pub(crate) mod tests {
                 .expect("the community on a");
                 tx.commit().await.expect("committed");
             }
-            let made_on_a = memberships::join(&a, &alice, gardening.id)
+            let made_on_a = memberships::create(&a, &alice, gardening.id)
                 .await
                 .expect("joined offline");
             assert_ne!(made_on_a.id, first.id);
@@ -2440,7 +2446,7 @@ pub(crate) mod tests {
                 .expect("a community");
             let b = device_of(&bob, &bob_token).await;
             sync(&b, &server).await;
-            memberships::leave(&server, &bob, gardening.id)
+            memberships::delete(&server, &bob, gardening.id)
                 .await
                 .expect("left on the web");
 
@@ -2478,7 +2484,7 @@ pub(crate) mod tests {
             let gardening = communities::create(&server, &alice, "Gardening")
                 .await
                 .expect("a community");
-            memberships::join(&server, &bob, gardening.id)
+            memberships::create(&server, &bob, gardening.id)
                 .await
                 .expect("joined");
             let post = posts::create(&server, &alice, "roses", &[gardening.id])
@@ -2727,7 +2733,7 @@ pub(crate) mod tests {
                 .await
                 .expect_err("nothing to reapply to");
             assert!(matches!(error, conflicts::ConflictError::Gone));
-            conflicts::let_go(&a, conflicts[0].id)
+            conflicts::delete(&a, conflicts[0].id)
                 .await
                 .expect("let go");
             assert_eq!(status(&a).await.expect("the status").conflicts, 0);
@@ -2802,7 +2808,7 @@ pub(crate) mod tests {
             posts_communities::remove(&server, &alice, post.id, gardening.id)
                 .await
                 .expect("taken out of gardening");
-            memberships::join(&server, &bob, gardening.id)
+            memberships::create(&server, &bob, gardening.id)
                 .await
                 .expect("joined after");
 
@@ -3064,7 +3070,7 @@ pub(crate) mod tests {
                 .body,
             "a's edit"
         );
-        conflicts::let_go(&b, conflicts::list(&b).await.expect("one")[0].id)
+        conflicts::delete(&b, conflicts::list(&b).await.expect("one")[0].id)
             .await
             .expect("let go");
         accounts::sign_out_on_device(&b, &server)

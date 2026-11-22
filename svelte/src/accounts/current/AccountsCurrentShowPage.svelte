@@ -7,7 +7,7 @@
   import { currentUser } from "../../lib/current_user.svelte.js";
   import {
     accountsDeletionsNewUrl,
-    accountsPasswordEditUrl,
+    accountsCurrentPasswordEditUrl,
     accountsProductsIndexUrl,
     accountsPurchasesIndexUrl,
     accountsSubscriptionsIndexUrl,
@@ -27,7 +27,7 @@
     {#if currentUser.value}
       <Text>{currentUser.value.email}</Text>
     {/if}
-    <Text><Link href={accountsPasswordEditUrl()}>Password</Link></Text>
+    <Text><Link href={accountsCurrentPasswordEditUrl()}>Password</Link></Text>
     {#if currentUser.value?.plan}
       <Text>Your plan: {currentUser.value.plan.product_name}</Text>
     {/if}

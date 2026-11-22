@@ -713,10 +713,10 @@ mod tests {
             let woodwork = communities::create(&deployment, &dave, "Woodwork")
                 .await
                 .expect("a community");
-            memberships::join(&deployment, &bob, gardening.id)
+            memberships::create(&deployment, &bob, gardening.id)
                 .await
                 .expect("joined");
-            memberships::join(&deployment, &carol, cooking.id)
+            memberships::create(&deployment, &carol, cooking.id)
                 .await
                 .expect("joined");
             let shared = posts::create(&deployment, &alice, "shared", &[gardening.id, cooking.id])
@@ -812,10 +812,10 @@ mod tests {
             let cooking = communities::create(&deployment, &alice, "Cooking")
                 .await
                 .expect("a community");
-            memberships::join(&deployment, &bob, gardening.id)
+            memberships::create(&deployment, &bob, gardening.id)
                 .await
                 .expect("joined");
-            memberships::join(&deployment, &carol, cooking.id)
+            memberships::create(&deployment, &carol, cooking.id)
                 .await
                 .expect("joined");
             let post = posts::create(&deployment, &alice, "shared", &[gardening.id, cooking.id])
@@ -877,7 +877,7 @@ mod tests {
             let gardening = communities::create(&deployment, &alice, "Gardening")
                 .await
                 .expect("a community");
-            memberships::join(&deployment, &bob, gardening.id)
+            memberships::create(&deployment, &bob, gardening.id)
                 .await
                 .expect("joined");
             let post = posts::create(&deployment, &alice, "going", &[gardening.id])

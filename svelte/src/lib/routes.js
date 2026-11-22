@@ -13,7 +13,7 @@ export const ACCOUNTS_SIGN_UP_PATH = "/accounts/sign-up";
 export const ACCOUNTS_SIGN_IN_PATH = "/accounts/sign-in";
 export const ACCOUNTS_TRIAL_PATH = "/accounts/trial";
 export const ACCOUNTS_CURRENT_SHOW_PATH = "/accounts/current";
-export const ACCOUNTS_PASSWORD_EDIT_PATH = "/accounts/password/edit";
+export const ACCOUNTS_CURRENT_PASSWORD_EDIT_PATH = "/accounts/current/password/edit";
 export const ACCOUNTS_DELETIONS_NEW_PATH = "/accounts/deletions/new";
 export const ACCOUNTS_PRODUCTS_INDEX_PATH = "/accounts/products";
 export const ACCOUNTS_PRODUCTS_SHOW_PATH = "/accounts/products/:id";
@@ -209,8 +209,8 @@ export function accountsCurrentShowUrl() {
 }
 
 /** Where the signed-in person makes or changes their password. */
-export function accountsPasswordEditUrl() {
-  return ACCOUNTS_PASSWORD_EDIT_PATH;
+export function accountsCurrentPasswordEditUrl() {
+  return ACCOUNTS_CURRENT_PASSWORD_EDIT_PATH;
 }
 
 /** Where the signed-in person deletes their account. */

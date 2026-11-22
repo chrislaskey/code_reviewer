@@ -59,8 +59,8 @@ function errorOf(problem) {
  * @param {number} size in bytes
  * @returns {Promise<{upload_url: string, content_type: string, key: string}>}
  */
-export function avatarsCreateUpload(contentType, size) {
-  return invoke("avatars_create_upload", { contentType, size });
+export function avatarsUploadsCreate(contentType, size) {
+  return invoke("avatars_uploads_create", { contentType, size });
 }
 
 /**
@@ -338,24 +338,25 @@ export function postsUpdate(id, body, communityIds) {
 
 /**
  * A page of the files the user sees on this device whose names contain
- * `name` in any case, newest first: `{total, files}`, each file
+ * `name` in any case, of one of `content_types` (any for none), newest
+ * first: `{total, files}`, each file
  * `{file, creator, communities, shown_as, state, error}`.
- * @param {{name?: string, offset?: number, limit: number}} search at most 500 at once
+ * @param {{name?: string, content_types?: string[], offset?: number, limit: number}} filter at most 500 at once
  */
-export function filesSearch(search) {
-  return invoke("files_search", { search });
+export function filesList(filter) {
+  return invoke("files_list", { filter });
 }
 
-/** How long a search waits for a pause in typing: each a local read. */
-export const filesSearchWaitMs = 50;
+/** How long a list's name filter waits for a pause in typing: each a local read. */
+export const filesListWaitMs = 50;
 
 /**
  * The files the user sees on this device with any of these checksums,
  * up to 500 at once.
  * @param {string[]} sha256s
  */
-export function filesListDuplicates(sha256s) {
-  return invoke("files_list_duplicates", { sha256s });
+export function filesDuplicatesList(sha256s) {
+  return invoke("files_duplicates_list", { sha256s });
 }
 
 /** @param {string} id */
@@ -478,13 +479,13 @@ export function communitiesDelete(id) {
 }
 
 /** @param {string} communityId */
-export function membershipsJoin(communityId) {
-  return invoke("memberships_join", { communityId });
+export function membershipsCreate(communityId) {
+  return invoke("memberships_create", { communityId });
 }
 
 /** @param {string} communityId */
-export function membershipsLeave(communityId) {
-  return invoke("memberships_leave", { communityId });
+export function membershipsDelete(communityId) {
+  return invoke("memberships_delete", { communityId });
 }
 
 /** @param {string} id */
@@ -544,8 +545,8 @@ export function conflictsTryAgain(id) {
 }
 
 /** @param {string} id */
-export function conflictsLetGo(id) {
-  return invoke("conflicts_let_go", { id });
+export function conflictsDelete(id) {
+  return invoke("conflicts_delete", { id });
 }
 
 // The quick picker, the desktop app's second window (../../quick-picker/).
@@ -553,11 +554,11 @@ export function conflictsLetGo(id) {
 /**
  * A page of the signed-in person's images the clipboard takes whose
  * names contain `name` in any case, newest first: `{total, files}`, as
- * `filesSearch` answers.
- * @param {{name?: string, offset?: number, limit: number}} search at most 500 at once
+ * `filesList` answers.
+ * @param {{name?: string, offset?: number, limit: number}} filter at most 500 at once
  */
-export function quickPickerFilesSearch(search) {
-  return invoke("quick_picker_files_search", { search });
+export function quickPickerFilesList(filter) {
+  return invoke("quick_picker_files_list", { filter });
 }
 
 /**

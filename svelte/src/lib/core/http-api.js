@@ -50,7 +50,7 @@ const postPath = (id) => `/api/posts/${encodeURIComponent(id)}`;
 /** The user signed in, whom the server takes the request to be from; null when nobody is. */
 export async function currentUserGet() {
   try {
-    return await send("GET", "/api/current-user");
+    return await send("GET", "/api/users/current");
   } catch (problem) {
     // 410: the account of this browser's cookie was deleted
     if ([401, 410].includes(/** @type {{status?: number}} */ (problem).status ?? 0)) return null;
@@ -63,17 +63,17 @@ export async function currentUserGet() {
  * @param {string} name
  */
 export function currentUserUpdate(name) {
-  return send("PUT", "/api/current-user", { name });
+  return send("PUT", "/api/users/current", { name });
 }
 
 /** The community the person works in, kept by this browser; null when they are in none. */
 export function currentCommunityGet() {
-  return send("GET", "/api/current-community");
+  return send("GET", "/api/communities/current");
 }
 
 /** @param {string} communityId one the person is a member of */
 export function currentCommunityUpdate(communityId) {
-  return send("PUT", "/api/current-community", { community_id: communityId });
+  return send("PUT", "/api/communities/current", { community_id: communityId });
 }
 
 /**
@@ -82,8 +82,8 @@ export function currentCommunityUpdate(communityId) {
  * @param {number} size in bytes
  * @returns {Promise<{upload_url: string, content_type: string, key: string}>}
  */
-export function avatarsCreateUpload(contentType, size) {
-  return send("POST", "/api/avatars/uploads", { content_type: contentType, size });
+export function avatarsUploadsCreate(contentType, size) {
+  return send("POST", "/api/users/current/avatar/uploads", { content_type: contentType, size });
 }
 
 /**
@@ -91,7 +91,7 @@ export function avatarsCreateUpload(contentType, size) {
  * @param {string} key
  */
 export function avatarsUpdate(key) {
-  return send("PUT", "/api/avatars", { key });
+  return send("PUT", "/api/users/current/avatar", { key });
 }
 
 // A sign-up or a sign-in emails a code and answers `{pending}`. The code
@@ -185,7 +185,7 @@ export function accountsSecondFactors() {
  * @param {string} password
  */
 export function accountsPasswordUpdate(current, password) {
-  return send("PUT", "/api/accounts/password", { current, password });
+  return send("PUT", "/api/accounts/current/password", { current, password });
 }
 
 /**
@@ -391,23 +391,29 @@ const filePath = (id) => `/api/files/${encodeURIComponent(id)}`;
 
 /**
  * A page of the files the user sees whose names contain `name` in any
- * case, newest first: `{total, files}`, each file
+ * case, of one of `content_types` (any for none), newest first:
+ * `{total, files}`, each file
  * `{file, creator, communities, shown_as, state, error}`.
- * @param {{name?: string, offset?: number, limit: number}} search at most 500 at once
+ * @param {{name?: string, content_types?: string[], offset?: number, limit: number}} filter at most 500 at once
  */
-export function filesSearch({ name = "", offset = 0, limit }) {
-  const query = new URLSearchParams({ name, offset: String(offset), limit: String(limit) });
-  return send("GET", `/api/files/search?${query}`);
+export function filesList({ name = "", content_types = [], offset = 0, limit }) {
+  const query = new URLSearchParams({
+    name,
+    content_types: content_types.join(","),
+    offset: String(offset),
+    limit: String(limit),
+  });
+  return send("GET", `/api/files?${query}`);
 }
 
-/** How long a search waits for a pause in typing: each asks the server. */
-export const filesSearchWaitMs = 200;
+/** How long a list's name filter waits for a pause in typing: each asks the server. */
+export const filesListWaitMs = 200;
 
 /**
  * The files the user sees with any of these checksums, up to 500 at once.
  * @param {string[]} sha256s
  */
-export function filesListDuplicates(sha256s) {
+export function filesDuplicatesList(sha256s) {
   return send("POST", "/api/files/duplicates", { sha256s });
 }
 
@@ -559,13 +565,13 @@ export function communitiesDelete(id) {
 }
 
 /** @param {string} communityId */
-export function membershipsJoin(communityId) {
-  return send("PUT", `/api/memberships/${encodeURIComponent(communityId)}`);
+export function membershipsCreate(communityId) {
+  return send("POST", `${communityPath(communityId)}/membership`);
 }
 
 /** @param {string} communityId */
-export function membershipsLeave(communityId) {
-  return send("DELETE", `/api/memberships/${encodeURIComponent(communityId)}`);
+export function membershipsDelete(communityId) {
+  return send("DELETE", `${communityPath(communityId)}/membership`);
 }
 
 // The web has nothing to sync: it is the server. The nav shows no sync
@@ -611,14 +617,14 @@ export function conflictsTryAgain(_id) {
 }
 
 /** @param {string} _id */
-export function conflictsLetGo(_id) {
+export function conflictsDelete(_id) {
   return Promise.reject(new Error("nothing to let go on the web"));
 }
 
 // The quick picker is the desktop app's: a browser has none.
 
-/** @param {{name?: string, offset?: number, limit: number}} _search */
-export function quickPickerFilesSearch(_search) {
+/** @param {{name?: string, offset?: number, limit: number}} _filter */
+export function quickPickerFilesList(_filter) {
   return Promise.reject(new Error("the quick picker is the desktop app's"));
 }
 

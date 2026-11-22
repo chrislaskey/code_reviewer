@@ -34,13 +34,13 @@ see `offline-files-decisions.md`.
 | Step | Who | What |
 | --- | --- | --- |
 | 1 | page | the person picks a file; `accept` filters the picker, nothing else is checked here |
-| 2 | server, `avatars::create_upload` | `AvatarUploadNew {content_type, size}` checked with garde: a PNG, JPEG, GIF or WebP, 1 byte to 5 MB, else 422 with the fields' messages; answers `{upload_url, content_type, key}`, the URL good for 10 minutes |
+| 2 | server, `avatars::uploads::create` | `AvatarUploadNew {content_type, size}` checked with garde: a PNG, JPEG, GIF or WebP, 1 byte to 5 MB, else 422 with the fields' messages; answers `{upload_url, content_type, key}`, the URL good for 10 minutes |
 | 3 | page, `putFile` | PUT to `upload_url` with that `Content-Type`, through `XMLHttpRequest` for the progress bar |
 | 4 | server, `avatars::update` | `{key}`: the user's prefix, the file there, its size, its first bytes; then `avatar_url` set as an event in the server's log, the version up one |
 | 5 | devices | pull the user's row like any other |
 
 In the app, steps 2 and 4 are commands that ask the server over the sync
-transport's HTTP client (`avatars::create_upload_on_device`,
+transport's HTTP client (`avatars::uploads::create_on_device`,
 `update_on_device`); step 2 checks the fields on the device first, so a
 wrong file is told without the network, and step 4 writes the row the
 server answers at once instead of at the next pull.

@@ -177,7 +177,7 @@ transactions as plain values, so tests need no Apple-signed data.
       original transaction id, `store_transactions::apply_in`; `REFUND`
       through `purchases::refund_in`.
 - [x] Routes `POST /api/accounts/store-transactions` (signed in, full
-      user) and `POST /api/accounts/app-store-notifications` (no
+      user) and `POST /api/accounts/webhooks/app-store` (no
       session, 404 unless configured).
 - [x] The `AppStoreReconcile` job, `app_store_reconcile`, daily, when the
       deployment has the App Store: every live App Store subscription

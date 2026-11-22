@@ -120,7 +120,7 @@ svelte/src/
   its whole name, resource then action then `Page`.
 - **RESTful paths.** A collection's pages are `index`, `show`, `new`
   and `edit`; a singular resource has no id, so the person's profile is
-  `/profile/edit`, their password `/accounts/password/edit`, and their
+  `/profile/edit`, their password `/accounts/current/password/edit`, and their
   account, the signed-in one, `/accounts/current`. The
   sign-in pages keep the names Phoenix's own `gen.auth` gives them,
   `/accounts/sign-in` and `/accounts/sign-up`, as
@@ -137,14 +137,14 @@ svelte/src/
 ## API paths
 
 The API is RESTful by resource, as the pages are. A resource's upload
-URL is made by `POST .../uploads`: `/api/avatars/uploads` and
+URL is made by `POST .../uploads`: `/api/users/current/avatar/uploads` and
 `/api/files/uploads`.
 
 ## Steps
 
 1. Svelte: `lib/components` and `lib/layouts`; page folders with
    `components/`; the accounts subfolders and `home/`; the two
-   singular paths, `/profile/edit` and `/accounts/password/edit`.
+   singular paths, `/profile/edit` and `/accounts/current/password/edit`.
 2. Axum: `state`, `user_auth`, `config`, `command_line`; handlers into
    `app/`, `accounts/`, `ops/`; `/api/files/uploads`; the router's
    tests split by app.
@@ -156,7 +156,7 @@ URL is made by `POST .../uploads`: `/api/avatars/uploads` and
 ## As built
 
 - `axum`'s CurrentUser extractor and the browser's token cookie are
-  `user_auth`; the `GET`/`PUT /api/current-user` handlers are
+  `user_auth`; the `GET`/`PUT /api/users/current` handlers are
   `app::current_user`. "Try it now" is `accounts::trial_users`, as in
   core. The `StaffError` answer joined the others in `api_error`.
 - `tauri`'s `FormError` and every `From` for it are `command_error`, as

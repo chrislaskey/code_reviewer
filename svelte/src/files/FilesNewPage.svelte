@@ -13,7 +13,7 @@
     FormError,
     filesCreate,
     filesCreateAtOnce,
-    filesListDuplicates,
+    filesDuplicatesList,
     filesSha256,
     filesUpdate,
   } from "../lib/core/index.js";
@@ -178,7 +178,7 @@
     try {
       const unique = [...new Set(sha256s.values())];
       for (let index = 0; index < unique.length; index += CHECKSUMS_PER_REQUEST) {
-        const found = await filesListDuplicates(unique.slice(index, index + CHECKSUMS_PER_REQUEST));
+        const found = await filesDuplicatesList(unique.slice(index, index + CHECKSUMS_PER_REQUEST));
         for (const same of found) if (!newest.has(same.file.sha256)) newest.set(same.file.sha256, same);
       }
     } catch {

@@ -15,8 +15,8 @@ use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 
 use crate::accounts::{
-    app_store_notifications, checkouts, deletions, products, purchases, store_transactions,
-    stripe_events, subscriptions, trial_users,
+    app_store_notifications, checkouts, deletions, password, products, purchases,
+    store_transactions, stripe_events, subscriptions, trial_users,
 };
 use crate::api_error::ApiError;
 use crate::app::{
@@ -45,24 +45,27 @@ pub fn router(svelte_dist: &Path, ops_dist: &Path, state: AppState) -> Router {
 fn app_api() -> Router<AppState> {
     Router::new()
         .route(
-            "/api/current-user",
+            "/api/users/current",
             get(current_user::get).put(current_user::update),
         )
         .route(
-            "/api/current-community",
+            "/api/communities/current",
             get(current_community::get).put(current_community::update),
         )
-        .route("/api/avatars", put(avatars::update))
-        .route("/api/avatars/uploads", post(avatars::create_upload))
+        .route("/api/users/current/avatar", put(avatars::update))
+        .route(
+            "/api/users/current/avatar/uploads",
+            post(avatars::uploads::create),
+        )
         .route("/api/posts", get(posts::list).post(posts::create))
         .route(
             "/api/posts/{id}",
             get(posts::get).put(posts::update).delete(posts::delete),
         )
-        .route("/api/files", post(files::create))
-        .route("/api/files/search", get(files::search))
-        .route("/api/files/uploads", post(files::create_upload))
-        .route("/api/files/duplicates", post(files::list_duplicates))
+        .route("/api/files", get(files::list).post(files::create))
+        .route("/api/files/uploads", post(files::uploads::create))
+        // A read, but a POST: hundreds of checksums do not fit a URL.
+        .route("/api/files/duplicates", post(files::duplicates::list))
         .route(
             "/api/files/{id}",
             get(files::get).put(files::update).delete(files::delete),
@@ -79,8 +82,8 @@ fn app_api() -> Router<AppState> {
                 .delete(communities::delete),
         )
         .route(
-            "/api/memberships/{community_id}",
-            put(memberships::join).delete(memberships::leave),
+            "/api/communities/{community_id}/membership",
+            post(memberships::create).delete(memberships::delete),
         )
         .route(
             "/api/sync/push",
@@ -89,9 +92,12 @@ fn app_api() -> Router<AppState> {
         .route("/api/sync/pull", post(sync::pull))
         .route(
             "/api/sync/bytes/{table}/uploads",
-            post(sync::bytes::create_upload),
+            post(sync::bytes::uploads::create),
         )
-        .route("/api/sync/bytes/{table}/{id}", get(sync::bytes::content))
+        .route(
+            "/api/sync/bytes/{table}/{id}/content",
+            get(sync::bytes::content),
+        )
         .route("/api/sync/backfill", post(sync::backfill))
 }
 
@@ -119,10 +125,13 @@ fn accounts_api(state: &AppState) -> Router<AppState> {
             "/api/accounts/second-factors",
             get(accounts::second_factors),
         )
-        .route("/api/accounts/password", put(accounts::password_update))
+        .route("/api/accounts/current/password", put(password::update))
         .route("/api/accounts/device-token", post(accounts::device_token))
         .route("/api/accounts/sign-out", delete(accounts::sign_out))
-        .route("/api/accounts/deletions/code", post(deletions::code_create))
+        .route(
+            "/api/accounts/deletions/code",
+            post(deletions::code::create),
+        )
         .route("/api/accounts/deletions", post(deletions::create))
         .route(
             "/api/accounts/trial",
@@ -131,9 +140,9 @@ fn accounts_api(state: &AppState) -> Router<AppState> {
         .layer(rate_limits::per_ip_layer(state.trust_proxy_headers));
     Router::new()
         .merge(sign_in)
-        .route("/api/accounts/stripe-webhooks", post(stripe_events::create))
+        .route("/api/accounts/webhooks/stripe", post(stripe_events::create))
         .route(
-            "/api/accounts/app-store-notifications",
+            "/api/accounts/webhooks/app-store",
             post(app_store_notifications::create),
         )
         .route(
@@ -153,7 +162,7 @@ fn accounts_api(state: &AppState) -> Router<AppState> {
         )
         .route(
             "/api/accounts/subscriptions/{id}/portal",
-            post(subscriptions::portal_create),
+            post(subscriptions::portal::create),
         )
 }
 

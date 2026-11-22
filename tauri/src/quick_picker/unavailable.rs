@@ -1,6 +1,6 @@
 //! The quick picker where there is none: every platform but macOS.
 
-use app_core::app::files::{FileSearch, FileSearchResults};
+use app_core::app::files::{FileFilter, FileList};
 use tauri::AppHandle;
 use uuid::Uuid;
 
@@ -12,10 +12,7 @@ pub fn register(_app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub async fn files_search(
-    _app: &AppHandle,
-    _search: FileSearch,
-) -> Result<FileSearchResults, CommandError> {
+pub async fn files_list(_app: &AppHandle, _filter: FileFilter) -> Result<FileList, CommandError> {
     Err(UNAVAILABLE.into())
 }
 

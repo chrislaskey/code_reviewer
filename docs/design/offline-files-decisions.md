@@ -127,7 +127,7 @@ which the cleanup removes, and never a row without a file.
   the server holds the user to the key's prefix, their own: nobody else
   writes or claims a file before its row exists.
 - The `Transport` trait carries the asking, the sending and the
-  fetching (`bytes_create_upload`, `bytes_upload`, `bytes_download`),
+  fetching (`bytes_uploads_create`, `bytes_upload`, `bytes_download`),
   so tests run the exchange in one process against the in-memory
   bucket.
 - On the web there is no queue: the page asks for an upload without an

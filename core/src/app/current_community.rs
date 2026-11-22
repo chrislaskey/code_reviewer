@@ -178,7 +178,7 @@ mod tests {
                 Some(baking.clone())
             );
 
-            memberships::leave(&deployment, &alice, weeding.id)
+            memberships::delete(&deployment, &alice, weeding.id)
                 .await
                 .expect("left");
             assert_eq!(

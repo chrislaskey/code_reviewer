@@ -207,7 +207,7 @@ wait through `parents`, not through a check that names
   table's (`files` for files), and a device keeps bytes under the row's
   id in the account's folder. A device's sync asks
   `POST /api/sync/bytes/{table}/uploads` and fetches through
-  `GET /api/sync/bytes/{table}/{id}`; the web's Files pages keep
+  `GET /api/sync/bytes/{table}/{id}/content`; the web's Files pages keep
   `/api/files/uploads` and `/api/files/{id}/content`, which call the
   same functions. The checks of a content type and a SHA-256 are in
   `helpers/`, each table's largest size in `SyncedBytes::max_bytes`.

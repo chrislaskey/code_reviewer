@@ -72,25 +72,25 @@ pub async fn list_mine(
 
 /// Joins the community, or rejoins it, reviving the membership left
 /// behind and what left with it. The live membership either way.
-pub async fn join(
+pub async fn create(
     deployment: &Deployment,
     user: &User,
     community_id: Uuid,
 ) -> Result<Membership, MembershipError> {
     let mut tx = deployment.begin().await?;
-    let membership = join_in(&mut tx, deployment.role, user, community_id).await?;
+    let membership = create_in(&mut tx, deployment.role, user, community_id).await?;
     tx.commit().await?;
     Ok(membership)
 }
 
 /// Leaves the community, taking the user's own posts there along.
-pub async fn leave(
+pub async fn delete(
     deployment: &Deployment,
     user: &User,
     community_id: Uuid,
 ) -> Result<(), MembershipError> {
     let mut tx = deployment.begin().await?;
-    leave_in(&mut tx, deployment.role, user, community_id).await?;
+    delete_in(&mut tx, deployment.role, user, community_id).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -114,7 +114,7 @@ pub fn table_row(membership: &Membership) -> Result<TableRow, MembershipError> {
     })
 }
 
-pub(crate) async fn join_in(
+pub(crate) async fn create_in(
     tx: &mut Transaction,
     role: Role,
     user: &User,
@@ -148,7 +148,7 @@ pub(crate) async fn join_in(
     apply_in(tx, role, user, &event).await?.membership()
 }
 
-pub(crate) async fn leave_in(
+pub(crate) async fn delete_in(
     tx: &mut Transaction,
     role: Role,
     user: &User,
@@ -578,7 +578,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn memberships_leave_takes_own_posts_along_and_rejoin_brings_back_what_left() {
+    async fn memberships_delete_takes_own_posts_along_and_create_brings_back_what_left() {
         with_each_database(|database| async move {
             let deployment = server(database);
             let alice = users::create(&deployment, "alice@example.com", "Alice")
@@ -590,7 +590,9 @@ mod tests {
             let gardening = communities::create(&deployment, &alice, "Gardening")
                 .await
                 .expect("a community");
-            join(&deployment, &bob, gardening.id).await.expect("joined");
+            create(&deployment, &bob, gardening.id)
+                .await
+                .expect("joined");
             let roses = posts::create(&deployment, &alice, "roses", &[gardening.id])
                 .await
                 .expect("a post");
@@ -609,7 +611,7 @@ mod tests {
                 .await
                 .expect("memberships")
                 .remove(0);
-            leave(&deployment, &alice, gardening.id)
+            delete(&deployment, &alice, gardening.id)
                 .await
                 .expect("left");
             assert!(
@@ -645,12 +647,12 @@ mod tests {
             );
             assert_eq!(rows[0].post_id, roses.id);
             tx.commit().await.expect("committed");
-            let error = leave(&deployment, &alice, gardening.id)
+            let error = delete(&deployment, &alice, gardening.id)
                 .await
                 .expect_err("already left");
             assert!(matches!(error, MembershipError::NotFound { .. }));
 
-            let rejoined = join(&deployment, &alice, gardening.id)
+            let rejoined = create(&deployment, &alice, gardening.id)
                 .await
                 .expect("rejoined");
             assert_eq!(rejoined.id, membership.id, "the same row");
@@ -658,7 +660,7 @@ mod tests {
             assert!(rejoined.deleted_at.is_none());
             assert_eq!(bodies(&deployment, &bob).await, vec!["bob's", "roses"]);
             assert_eq!(
-                join(&deployment, &alice, gardening.id)
+                create(&deployment, &alice, gardening.id)
                     .await
                     .expect("joined again")
                     .version,
@@ -683,18 +685,20 @@ mod tests {
             let gardening = communities::create(&deployment, &alice, "Gardening")
                 .await
                 .expect("a community");
-            join(&deployment, &bob, gardening.id).await.expect("joined");
+            create(&deployment, &bob, gardening.id)
+                .await
+                .expect("joined");
             let roses = posts::create(&deployment, &alice, "roses", &[gardening.id])
                 .await
                 .expect("a post");
-            leave(&deployment, &alice, gardening.id)
+            delete(&deployment, &alice, gardening.id)
                 .await
                 .expect("left");
             posts::delete(&deployment, &alice, roses.id)
                 .await
                 .expect("deleted");
 
-            join(&deployment, &alice, gardening.id)
+            create(&deployment, &alice, gardening.id)
                 .await
                 .expect("rejoined");
             assert!(bodies(&deployment, &bob).await.is_empty());
@@ -720,13 +724,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn memberships_join_needs_a_community() {
+    async fn memberships_create_needs_a_community() {
         with_each_database(|database| async move {
             let deployment = server(database);
             let alice = users::create(&deployment, "alice@example.com", "Alice")
                 .await
                 .expect("a user");
-            let error = join(&deployment, &alice, Uuid::now_v7())
+            let error = create(&deployment, &alice, Uuid::now_v7())
                 .await
                 .expect_err("no such community");
             assert!(

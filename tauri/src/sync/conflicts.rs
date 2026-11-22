@@ -44,10 +44,10 @@ pub async fn conflicts_try_again(
 }
 
 #[tauri::command]
-pub async fn conflicts_let_go(
+pub async fn conflicts_delete(
     device: State<'_, DeviceAccounts>,
     id: Uuid,
 ) -> Result<(), CommandError> {
     let deployment = device.active().await?;
-    Ok(conflicts::let_go(&deployment, id).await?)
+    Ok(conflicts::delete(&deployment, id).await?)
 }

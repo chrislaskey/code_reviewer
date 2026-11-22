@@ -5,7 +5,9 @@
 //! lands here. Server only. Only an active subscription, or one in its
 //! free days, gives its plan, see `plans`. The person switches, cancels
 //! and resumes from its page, `update`, and changes their card on
-//! Stripe's Customer Portal, `portal_create`.
+//! Stripe's Customer Portal, `portal::create`.
+
+pub mod portal;
 
 use crate::data::accounts_prices;
 use crate::data::accounts_subscriptions::{self, Subscription, SubscriptionStatus};
@@ -15,8 +17,6 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::accounts::checkouts::BACK_TO_APP_PATH;
-use crate::accounts::online::ReturnTo;
 use crate::accounts::products::{self, ProductError, ProductKind};
 use crate::data::accounts_prices::{Price, PriceInterval};
 use crate::data::accounts_purchases::Store;
@@ -188,34 +188,6 @@ pub async fn update(
     upsert_from_stripe_in(&mut tx, &changed, now()).await?;
     tx.commit().await?;
     get(deployment, user, id).await
-}
-
-/// Stripe's Customer Portal for the plan's card and invoices: its page,
-/// which comes back to the plan's, `{server_url}/accounts/subscriptions/{id}`,
-/// or for the app to `checkouts::BACK_TO_APP_PATH`.
-pub async fn portal_create(
-    deployment: &Deployment,
-    stripe: &Stripe,
-    user: &User,
-    id: Uuid,
-    server_url: &str,
-    return_to: ReturnTo,
-) -> Result<String, SubscriptionError> {
-    let shown = get(deployment, user, id).await?;
-    if shown.subscription.store != Store::Stripe {
-        return Err(SubscriptionError::OtherStore);
-    }
-    let customer_id = stripe
-        .subscription_get(&shown.subscription.store_id)
-        .await?
-        .customer_id;
-    let return_url = match return_to {
-        ReturnTo::Web => format!("{server_url}/accounts/subscriptions/{id}"),
-        ReturnTo::App => format!("{server_url}{BACK_TO_APP_PATH}"),
-    };
-    Ok(stripe
-        .billing_portal_session_create(&customer_id, &return_url)
-        .await?)
 }
 
 /// Whether a switch from one price to the other waits for the end of

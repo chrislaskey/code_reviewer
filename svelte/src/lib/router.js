@@ -16,7 +16,7 @@ import { errorMessageOf } from "./error_message.js";
 import { pageLoadErrorClear, pageLoadErrorShow } from "./page_load_error.svelte.js";
 import {
   ACCOUNTS_INDEX_PATH,
-  ACCOUNTS_PASSWORD_EDIT_PATH,
+  ACCOUNTS_CURRENT_PASSWORD_EDIT_PATH,
   ACCOUNTS_DELETIONS_NEW_PATH,
   ACCOUNTS_PRODUCTS_INDEX_PATH,
   ACCOUNTS_PRODUCTS_SHOW_PATH,
@@ -103,7 +103,7 @@ const { navigate, route } = createRouter({
   [CONFLICTS_INDEX_PATH]: () => import("../conflicts/ConflictsIndexPage.svelte"),
   [PROFILE_EDIT_PATH]: () => import("../profile/ProfileEditPage.svelte"),
   [ACCOUNTS_CURRENT_SHOW_PATH]: () => import("../accounts/current/AccountsCurrentShowPage.svelte"),
-  [ACCOUNTS_PASSWORD_EDIT_PATH]: () => import("../accounts/password/AccountsPasswordEditPage.svelte"),
+  [ACCOUNTS_CURRENT_PASSWORD_EDIT_PATH]: () => import("../accounts/current/password/AccountsCurrentPasswordEditPage.svelte"),
   [ACCOUNTS_DELETIONS_NEW_PATH]: () => import("../accounts/deletions/AccountsDeletionsNewPage.svelte"),
   [ACCOUNTS_PRODUCTS_INDEX_PATH]: () => import("../accounts/products/AccountsProductsIndexPage.svelte"),
   [ACCOUNTS_PRODUCTS_SHOW_PATH]: () => import("../accounts/products/AccountsProductsShowPage.svelte"),

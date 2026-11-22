@@ -160,7 +160,7 @@ with no refund, and deletes the Stripe customer; built 2026-11-12, see
   copies every subscription not ended, for a webhook that never came.
   Every live subscription is fine for a small app; a big one would ask
   for those changed lately.
-- **The webhook route** is `POST /api/accounts/stripe-webhooks`, no
+- **The webhook route** is `POST /api/accounts/webhooks/stripe`, no
   session, checked by its `Stripe-Signature` against the raw body. A
   bad or missing signature, or one more than five minutes old, is a
   400; without `STRIPE_WEBHOOK_SECRET` the route is a 404. Built in
@@ -240,7 +240,7 @@ or none, from their one `active` or `trialing` subscription.
 not refunded. Everything that asks what a user may do asks these two,
 so a phone store later changes neither.
 
-- `GET /api/current-user` adds the plan, so the pages know it.
+- `GET /api/users/current` adds the plan, so the pages know it.
 - A device keeps the plan in `device_settings` from the last time it
   was online, and trusts it offline until `current_period_end`.
 - The sync needs no plan, which `accounts-local-and-trial-users.md`
@@ -275,7 +275,7 @@ Stripe's own "trial" is called **free days** here
    `/accounts/purchases/:id`, refunds: P2, P3, P5, P11. The receipt is
    Stripe's email; the purchase page says so.
 4. **Plans.** Built: `accounts_subscriptions`, `plans::current` and
-   `plans::payment_failed`, both on `GET /api/current-user`, the
+   `plans::payment_failed`, both on `GET /api/users/current`, the
    past-due banner, one plan at a time, `/accounts/subscriptions` and
    `/accounts/subscriptions/:id`: P4, P6, P10. Until step 5 the banner
    points to Stripe's email for a new card.
@@ -328,7 +328,7 @@ needs Stripe's review before it is on, so apply early.
    ```sh
    brew install stripe/stripe-cli/stripe
    stripe login
-   stripe listen --forward-to localhost:4000/api/accounts/stripe-webhooks
+   stripe listen --forward-to localhost:4000/api/accounts/webhooks/stripe
    ```
 
    `listen` prints a signing secret, `whsec_...`. Start the server with
@@ -339,7 +339,7 @@ needs Stripe's review before it is on, so apply early.
    `listen` runs on that machine.
 4. **The webhook in production**: in the Dashboard's Developers,
    Webhooks, add an endpoint at
-   `https://<the server>/api/accounts/stripe-webhooks` with the events
+   `https://<the server>/api/accounts/webhooks/stripe` with the events
    under The copy of Stripe, and give the server its signing secret as
    `STRIPE_WEBHOOK_SECRET`. A sandbox and the live account each have
    their own endpoint and secret.

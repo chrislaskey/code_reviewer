@@ -9,6 +9,8 @@
 //! fetched from the server the first time when this device did not add
 //! the file, so an `<img>` shows it with the network off from then on.
 
+pub mod duplicates;
+
 use percent_encoding::percent_decode_str;
 use tauri::http::header::{CONTENT_TYPE, HeaderValue, X_CONTENT_TYPE_OPTIONS};
 use tauri::http::{Response, StatusCode, Uri};
@@ -16,7 +18,7 @@ use tauri::ipc::{InvokeBody, Request};
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 
-use app_core::app::files::{self, FileSearch, FileSearchResults, FileWithState, FilesCache};
+use app_core::app::files::{self, FileFilter, FileList, FileWithState, FilesCache};
 use app_core::data::app_files::File;
 use app_core::helpers::content_type;
 
@@ -31,25 +33,15 @@ const FILE_NAME_HEADER: &str = "x-file-name";
 const FILE_CONTENT_TYPE_HEADER: &str = "x-file-content-type";
 const FILE_COMMUNITY_IDS_HEADER: &str = "x-file-community-ids";
 
-/// A page of the files the user sees on this device whose names contain
-/// the name searched for, and how many match in all.
+/// A page of the files the user sees on this device that pass the
+/// filter, and how many pass in all.
 #[tauri::command]
-pub async fn files_search(
+pub async fn files_list(
     device: State<'_, DeviceAccounts>,
-    search: FileSearch,
-) -> Result<FileSearchResults, CommandError> {
+    filter: FileFilter,
+) -> Result<FileList, CommandError> {
     let (deployment, user) = signed_in(&device).await?;
-    Ok(files::search(&deployment, &user, &search).await?)
-}
-
-/// The files the user sees on this device with any of these checksums.
-#[tauri::command]
-pub async fn files_list_duplicates(
-    device: State<'_, DeviceAccounts>,
-    sha256s: Vec<String>,
-) -> Result<Vec<FileWithState>, CommandError> {
-    let (deployment, user) = signed_in(&device).await?;
-    Ok(files::list_duplicates(&deployment, &user, &sha256s).await?)
+    Ok(files::list(&deployment, &user, &filter).await?)
 }
 
 #[tauri::command]

@@ -182,9 +182,9 @@ tell a file it already sees.
   `localhost` in dev.
 - **Duplicates are told only among files the user sees.** Once a file
   is picked, the New page works out its checksum, `filesSha256(file)`,
-  and asks `filesListDuplicates(sha256s)` for the files the user sees
+  and asks `filesDuplicatesList(sha256s)` for the files the user sees
   with any of the checksums, up to 500 at once,
-  `files::list_duplicates`, by the same predicate as every read:
+  `files::duplicates::list`, by the same predicate as every read:
   `POST /api/files/duplicates` on the web, the device's own rows in the
   app, offline as well. The server never answers whether a
   checksum exists anywhere else. The page shows the newest: when it is

@@ -11,7 +11,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use uuid::Uuid;
 
-use app_core::app::files::{self as core_files, FileSearch, FileSearchResults};
+use app_core::app::files::{self as core_files, FileFilter, FileList};
 
 use crate::MAIN_WINDOW;
 use crate::app::files;
@@ -83,17 +83,14 @@ pub fn register(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub async fn files_search(
-    app: &AppHandle,
-    search: FileSearch,
-) -> Result<FileSearchResults, CommandError> {
+pub async fn files_list(app: &AppHandle, filter: FileFilter) -> Result<FileList, CommandError> {
     let device = app.state::<DeviceAccounts>();
     let (deployment, user) = signed_in(&device).await?;
-    let images = FileSearch {
+    let images = FileFilter {
         content_types: clipboard::image_content_types(),
-        ..search
+        ..filter
     };
-    Ok(core_files::search(&deployment, &user, &images).await?)
+    Ok(core_files::list(&deployment, &user, &images).await?)
 }
 
 /// Opens the picker, or closes it when it's open. Main thread only.

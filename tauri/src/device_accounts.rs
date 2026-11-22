@@ -1286,7 +1286,7 @@ mod tests {
         .await
         .expect("a post");
         let mailer = Mailer::memory();
-        app_core::accounts::deletions::code_create(&server, &mailer, &session.user)
+        app_core::accounts::deletions::code::create(&server, &mailer, &session.user)
             .await
             .expect("a code");
         let code = mails::code_in(&mailer.last_sent_to("alice@example.com").expect("mailed"))

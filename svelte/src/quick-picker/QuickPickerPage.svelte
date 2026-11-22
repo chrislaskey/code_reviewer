@@ -12,11 +12,11 @@
   import {
     currentUserGet,
     filesContentUrl,
-    filesSearchWaitMs,
+    filesListWaitMs,
     onQuickPickerOpened,
     quickPickerAccessibilityRequest,
     quickPickerClose,
-    quickPickerFilesSearch,
+    quickPickerFilesList,
     quickPickerOpenApp,
     quickPickerPaste,
   } from "../lib/core/index.js";
@@ -39,7 +39,7 @@
   /** @type {TileGrid | undefined} */
   let grid = $state();
 
-  const search = new PagedSearch((offset, limit) => quickPickerFilesSearch({ name, offset, limit }));
+  const search = new PagedSearch((offset, limit) => quickPickerFilesList({ name, offset, limit }));
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let searchTimer;
 
@@ -79,7 +79,7 @@
     searchTimer = setTimeout(() => {
       toTop();
       search.startOverFromTop();
-    }, filesSearchWaitMs);
+    }, filesListWaitMs);
   }
 
   /** @param {{id: string} | undefined} file */

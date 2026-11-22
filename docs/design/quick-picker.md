@@ -21,7 +21,7 @@ rest is AppKit, Accessibility and Core Graphics calls made from Rust.
 
 ```
 svelte/src/quick-picker.html, quick-picker/   the window's page, an HTML entry of its own
-svelte/src/lib/core/                          quickPickerFilesSearch, quickPickerPaste, ... as every page's calls
+svelte/src/lib/core/                          quickPickerFilesList, quickPickerPaste, ... as every page's calls
 svelte/src/lib/components/TileGrid.svelte, paged_search.svelte.js   the grid and its pages, shared with the files index
 tauri/src/quick_picker/
   mod.rs          the commands
@@ -38,7 +38,7 @@ tauri/capabilities/quick-picker.json          lets the window listen for its ope
 ```
 
 The Rust side searches the images, decides where the window opens,
-copies and pastes. The search is `files::search` on the device's SQLite
+copies and pastes. The search is `files::list` on the device's SQLite
 with the clipboard's image types as its `content_types`, so the window
 holds only the pages it shows, 200 images a page, and draws only the
 tiles on screen. Each opening starts over with an empty search; a
@@ -47,7 +47,7 @@ and sends the pick.
 
 | Command | Does |
 | --- | --- |
-| `quick_picker_files_search` | a page of the images the user sees that the clipboard takes, named with the name searched for, newest first, and how many match; an error when nobody is signed in |
+| `quick_picker_files_list` | a page of the images the user sees that the clipboard takes, named with the name searched for, newest first, and how many match; an error when nobody is signed in |
 | `quick_picker_paste` | copies the file's image (`id`), closes the window, presses ⌘V |
 | `quick_picker_close` | Escape |
 | `quick_picker_open_app` | closes the window, shows the app's window on `/accounts` |

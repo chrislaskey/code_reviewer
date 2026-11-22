@@ -96,7 +96,7 @@ async fn accounts_sign_up_then_the_code_sign_in_and_sign_out_over_the_cookie() {
         None,
         Some(&cookie),
         Method::GET,
-        "/api/current-user",
+        "/api/users/current",
         None,
     )
     .await;
@@ -118,7 +118,7 @@ async fn accounts_sign_up_then_the_code_sign_in_and_sign_out_over_the_cookie() {
         None,
         Some(&cookie),
         Method::PUT,
-        "/api/accounts/password",
+        "/api/accounts/current/password",
         Some(json!({ "current": "wrong horse battery", "password": NEW_PASSWORD })),
     )
     .await;
@@ -129,7 +129,7 @@ async fn accounts_sign_up_then_the_code_sign_in_and_sign_out_over_the_cookie() {
         None,
         Some(&cookie),
         Method::PUT,
-        "/api/accounts/password",
+        "/api/accounts/current/password",
         Some(json!({ "current": PASSWORD, "password": NEW_PASSWORD })),
     )
     .await;
@@ -162,7 +162,7 @@ async fn accounts_sign_up_then_the_code_sign_in_and_sign_out_over_the_cookie() {
         None,
         Some(&cookie),
         Method::GET,
-        "/api/current-user",
+        "/api/users/current",
         None,
     )
     .await;
@@ -423,7 +423,7 @@ async fn accounts_trial_makes_a_user_whose_cookie_lasts_two_days_and_who_signs_u
         None,
         Some(&cookie),
         Method::GET,
-        "/api/current-user",
+        "/api/users/current",
         None,
     )
     .await;
@@ -463,7 +463,7 @@ async fn accounts_trial_makes_a_user_whose_cookie_lasts_two_days_and_who_signs_u
         None,
         Some(&cookie),
         Method::POST,
-        "/api/avatars/uploads",
+        "/api/users/current/avatar/uploads",
         Some(json!({ "content_type": "image/png", "size": 5 })),
     )
     .await;
@@ -510,7 +510,7 @@ async fn accounts_trial_makes_a_user_whose_cookie_lasts_two_days_and_who_signs_u
         None,
         Some(&signed_up),
         Method::GET,
-        "/api/current-user",
+        "/api/users/current",
         None,
     )
     .await;
@@ -523,7 +523,7 @@ async fn accounts_trial_makes_a_user_whose_cookie_lasts_two_days_and_who_signs_u
         None,
         Some(&cookie),
         Method::GET,
-        "/api/current-user",
+        "/api/users/current",
         None,
     )
     .await;
@@ -533,7 +533,7 @@ async fn accounts_trial_makes_a_user_whose_cookie_lasts_two_days_and_who_signs_u
         "the trial's session is gone"
     );
 
-    let (_, me) = get(&router, "/api/current-user").await;
+    let (_, me) = get(&router, "/api/users/current").await;
     assert_eq!(me["kind"], json!("full"), "anyone who signed up");
 }
 
@@ -778,7 +778,14 @@ async fn accounts_routes_are_rate_limited_per_address_per_sign_in_and_per_client
         body,
         json!({ "error": "Too many attempts; try again in a few minutes" })
     );
-    let (status, _) = send_as(&router.router, None, Method::GET, "/api/current-user", None).await;
+    let (status, _) = send_as(
+        &router.router,
+        None,
+        Method::GET,
+        "/api/users/current",
+        None,
+    )
+    .await;
     assert_eq!(
         status,
         StatusCode::UNAUTHORIZED,
@@ -843,7 +850,7 @@ async fn accounts_a_device_signs_in_through_the_browser_and_exchanges_its_code()
         &router.router,
         Some(token),
         Method::GET,
-        "/api/current-user",
+        "/api/users/current",
         None,
     )
     .await;
@@ -921,7 +928,7 @@ async fn app_store_routes_are_not_found_without_the_app_store() {
         None,
         None,
         Method::POST,
-        "/api/accounts/app-store-notifications",
+        "/api/accounts/webhooks/app-store",
         Some(json!({ "signedPayload": "a.b.c" })),
     )
     .await;
@@ -937,7 +944,7 @@ async fn stripe_webhook_send(
 ) -> (StatusCode, Value) {
     let mut request = Request::builder()
         .method(Method::POST)
-        .uri("/api/accounts/stripe-webhooks")
+        .uri("/api/accounts/webhooks/stripe")
         .header(header::CONTENT_TYPE, "application/json");
     if let Some(signature) = signature {
         request = request.header("stripe-signature", signature);
@@ -1189,7 +1196,7 @@ async fn accounts_subscriptions_and_the_plan_on_the_current_user() {
     app_core::accounts::products::sync(&router.deployment, &router.stripe)
         .await
         .expect("synced");
-    let (_, me) = get(&router, "/api/current-user").await;
+    let (_, me) = get(&router, "/api/users/current").await;
     assert_eq!(me["plan"], Value::Null);
 
     let (_, list) = get(&router, "/api/accounts/products").await;
@@ -1244,7 +1251,7 @@ async fn accounts_subscriptions_and_the_plan_on_the_current_user() {
     assert_eq!(shown["status"], json!("paid"));
     assert_eq!(shown["kind"], json!("plan"));
 
-    let (_, me) = get(&router, "/api/current-user").await;
+    let (_, me) = get(&router, "/api/users/current").await;
     assert_eq!(me["plan"]["grant"], json!("single_user_subscription"));
     let subscription_id = me["plan"]["subscription_id"].clone();
     let (status, subscriptions) = get(&router, "/api/accounts/subscriptions").await;
@@ -1321,7 +1328,7 @@ async fn accounts_subscriptions_and_the_plan_on_the_current_user() {
     let signature = stripe_signature(&body, STRIPE_SIGNING_SECRET);
     let (status, _) = stripe_webhook_send(&router.router, &body, Some(&signature)).await;
     assert_eq!(status, StatusCode::OK);
-    let (_, me) = get(&router, "/api/current-user").await;
+    let (_, me) = get(&router, "/api/users/current").await;
     assert_eq!(me["plan"], Value::Null);
     assert_eq!(me["payment_failed_subscription_id"], subscription_id);
 }

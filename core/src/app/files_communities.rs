@@ -762,7 +762,7 @@ mod tests {
     }
 
     async fn names(deployment: &Deployment, user: &User) -> Vec<String> {
-        files::list(deployment, user)
+        files::list_all(deployment, user)
             .await
             .expect("the files")
             .into_iter()
@@ -789,7 +789,7 @@ mod tests {
             let carol = user(&server, "Carol").await;
             let garden = community(&server, &alice, "Garden").await;
             let cooking = community(&server, &carol, "Cooking").await;
-            memberships::join(&server, &bob, garden)
+            memberships::create(&server, &bob, garden)
                 .await
                 .expect("joined");
             let file = file_in(&server, &storage, &alice, "notes.txt", &[garden]).await;
@@ -903,10 +903,10 @@ mod tests {
             let dave = user(&server, "Dave").await;
             let garden = community(&server, &alice, "Garden").await;
             let cooking = community(&server, &dave, "Cooking").await;
-            memberships::join(&server, &bob, garden)
+            memberships::create(&server, &bob, garden)
                 .await
                 .expect("joined");
-            memberships::join(&server, &bob, cooking)
+            memberships::create(&server, &bob, cooking)
                 .await
                 .expect("joined");
             let file = file_in(&server, &storage, &alice, "notes.txt", &[garden]).await;
@@ -931,7 +931,7 @@ mod tests {
                 ["Garden", "Cooking"]
             );
 
-            memberships::leave(&server, &alice, garden)
+            memberships::delete(&server, &alice, garden)
                 .await
                 .expect("left");
             assert!(
@@ -958,7 +958,7 @@ mod tests {
             let bob = user(&server, "Bob").await;
             let garden = community(&server, &alice, "Garden").await;
             let cooking = community(&server, &alice, "Cooking").await;
-            memberships::join(&server, &bob, garden)
+            memberships::create(&server, &bob, garden)
                 .await
                 .expect("joined");
             let file = file_in(&server, &storage, &alice, "notes.txt", &[garden, cooking]).await;
@@ -1033,10 +1033,10 @@ mod tests {
             let carol = user(&server, "Carol").await;
             let garden = community(&server, &alice, "Garden").await;
             let cooking = community(&server, &alice, "Cooking").await;
-            memberships::join(&server, &bob, garden)
+            memberships::create(&server, &bob, garden)
                 .await
                 .expect("joined");
-            memberships::join(&server, &carol, cooking)
+            memberships::create(&server, &carol, cooking)
                 .await
                 .expect("joined");
             let shared = file_in(&server, &storage, &alice, "shared.txt", &[garden, cooking]).await;
@@ -1102,7 +1102,7 @@ mod tests {
             let (alice, _) = user_with_token(&server, "alice@example.com").await;
             let (bob, bobs_token) = user_with_token(&server, "bob@example.com").await;
             let garden = community(&server, &alice, "Garden").await;
-            memberships::join(&server, &bob, garden)
+            memberships::create(&server, &bob, garden)
                 .await
                 .expect("joined");
             let file = file_in(&server, &storage, &alice, "notes.txt", &[garden]).await;
@@ -1113,7 +1113,7 @@ mod tests {
                 .await
                 .expect("fetched");
 
-            memberships::leave(&device, &bob, garden)
+            memberships::delete(&device, &bob, garden)
                 .await
                 .expect("left");
             let report = sync::run(&device, &transport).await.expect("a sync");
@@ -1135,7 +1135,7 @@ mod tests {
             );
             assert_eq!(names(&server, &alice).await, ["notes.txt"], "it stays");
 
-            memberships::join(&device, &bob, garden)
+            memberships::create(&device, &bob, garden)
                 .await
                 .expect("joined again");
             sync::run(&device, &transport).await.expect("a sync");
@@ -1156,7 +1156,7 @@ mod tests {
             delete(&server, &alice, file.id, garden)
                 .await
                 .expect("taken out of garden");
-            memberships::join(&server, &bob, garden)
+            memberships::create(&server, &bob, garden)
                 .await
                 .expect("joined after");
 
@@ -1218,7 +1218,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn files_list_duplicates_finds_the_same_bytes_among_the_files_a_user_sees_only() {
+    async fn files_duplicates_list_finds_the_same_bytes_among_the_files_a_user_sees_only() {
         with_each_database(|database| async move {
             let (server, storage) = server(database);
             let alice = user(&server, "Alice").await;
@@ -1230,30 +1230,30 @@ mod tests {
             assert_eq!(alices.sha256, bobs.sha256, "the same bytes");
             let other = crate::helpers::sha256::hex(b"other bytes");
 
-            let found = files::list_duplicates(&server, &alice, &[other.clone(), alices.sha256])
+            let found = files::duplicates::list(&server, &alice, &[other.clone(), alices.sha256])
                 .await
                 .expect("found");
             let names: Vec<&str> = found.iter().map(|shown| shown.file.name.as_str()).collect();
             assert_eq!(names, ["roses.jpg"], "nothing of bob's is told");
             assert_eq!(found[0].communities[0].id, garden);
             assert!(
-                files::list_duplicates(&server, &alice, std::slice::from_ref(&other))
+                files::duplicates::list(&server, &alice, std::slice::from_ref(&other))
                     .await
                     .expect("looked")
                     .is_empty()
             );
             assert!(
-                files::list_duplicates(&server, &alice, &[])
+                files::duplicates::list(&server, &alice, &[])
                     .await
                     .expect("looked")
                     .is_empty()
             );
-            let error = files::list_duplicates(&server, &alice, &["not a checksum".to_string()])
+            let error = files::duplicates::list(&server, &alice, &["not a checksum".to_string()])
                 .await
                 .expect_err("not a SHA-256");
             assert!(matches!(error, FileError::Invalid(_)));
-            let too_many = vec![other; files::MAX_DUPLICATES_CHECKED + 1];
-            let error = files::list_duplicates(&server, &alice, &too_many)
+            let too_many = vec![other; files::duplicates::MAX_DUPLICATES_CHECKED + 1];
+            let error = files::duplicates::list(&server, &alice, &too_many)
                 .await
                 .expect_err("too many");
             assert!(matches!(error, FileError::Invalid(_)));

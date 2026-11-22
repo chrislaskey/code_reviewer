@@ -13,21 +13,20 @@ use app_core::deployment::Deployment;
 use crate::api_error::ApiError;
 use crate::user_auth::CurrentUser;
 
-pub async fn join(
+pub async fn create(
     State(deployment): State<Deployment>,
     CurrentUser(user): CurrentUser,
     Path(community_id): Path<Uuid>,
-) -> Result<Json<Membership>, ApiError> {
-    Ok(Json(
-        memberships::join(&deployment, &user, community_id).await?,
-    ))
+) -> Result<(StatusCode, Json<Membership>), ApiError> {
+    let membership = memberships::create(&deployment, &user, community_id).await?;
+    Ok((StatusCode::CREATED, Json(membership)))
 }
 
-pub async fn leave(
+pub async fn delete(
     State(deployment): State<Deployment>,
     CurrentUser(user): CurrentUser,
     Path(community_id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
-    memberships::leave(&deployment, &user, community_id).await?;
+    memberships::delete(&deployment, &user, community_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

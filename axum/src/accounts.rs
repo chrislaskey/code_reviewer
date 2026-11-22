@@ -19,6 +19,7 @@
 pub mod app_store_notifications;
 pub mod checkouts;
 pub mod deletions;
+pub mod password;
 pub mod products;
 pub mod purchases;
 pub mod store_transactions;
@@ -34,7 +35,7 @@ use axum_extra::extract::CookieJar;
 use axum_extra::extract::cookie::Cookie;
 use serde::Deserialize;
 
-use app_core::accounts::{self, CodeSent, PasswordUpdate, SecondFactor, Session, SignInStep};
+use app_core::accounts::{self, CodeSent, SecondFactor, Session, SignInStep};
 use app_core::app::users;
 use app_core::data::accounts_tokens::Context;
 use app_core::data::app_users::User;
@@ -263,17 +264,6 @@ pub async fn second_factors(
     CurrentUser(user): CurrentUser,
 ) -> Result<Json<Vec<SecondFactor>>, ApiError> {
     Ok(Json(accounts::second_factors(&deployment, &user).await?))
-}
-
-/// `PUT /api/accounts/password`: the user's password, their first or a
-/// new one.
-pub async fn password_update(
-    State(deployment): State<Deployment>,
-    CurrentUser(user): CurrentUser,
-    Json(update): Json<PasswordUpdate>,
-) -> Result<StatusCode, ApiError> {
-    accounts::password_update(&deployment, &user, &update).await?;
-    Ok(StatusCode::NO_CONTENT)
 }
 
 fn challenge_of(challenge: &Option<String>) -> Option<&str> {

@@ -1,6 +1,6 @@
 //! Deleting an account, by the person whose it is, see
 //! `docs/design/accounts-delete.md`. A full user asks for a code,
-//! `code_create`, which is mailed as a sign-in's is, and gives it back
+//! `code::create`, which is mailed as a sign-in's is, and gives it back
 //! to `create`, which deletes everything of theirs in one transaction:
 //! their posts and memberships, and a community nobody else is in, each
 //! soft-deleted as an event in their name, so every device that pulled
@@ -16,6 +16,8 @@
 //!
 //! A trial user needs no code, having no real email, and goes outright,
 //! as their trial would. A local user has no account on the server.
+
+pub mod code;
 
 #[cfg(feature = "stripe")]
 use crate::data::accounts_subscriptions;
@@ -79,30 +81,7 @@ impl From<AccountError> for DeletionError {
     }
 }
 
-/// Mails the signed-in full user a code to confirm deleting their
-/// account, replacing any earlier one; ten minutes.
-pub async fn code_create(
-    deployment: &Deployment,
-    mailer: &Mailer,
-    user: &User,
-) -> Result<(), DeletionError> {
-    if deployment.role != Role::Server {
-        return Err(DeletionError::ServerOnly);
-    }
-    let mut tx = deployment.begin().await?;
-    let account = live_account_in(&mut tx, user.id).await?;
-    if account.trial_expires_at.is_some() {
-        return Err(DeletionError::TrialHasNoCode);
-    }
-    let code = accounts_tokens::create_delete_code(&mut tx, account.id).await?;
-    tx.commit().await?;
-    mailer
-        .send(mails::delete_code(&account.email, &code))
-        .await?;
-    Ok(())
-}
-
-/// Deletes the signed-in user's account, with the code `code_create`
+/// Deletes the signed-in user's account, with the code `code::create`
 /// mailed them, or none for a trial. A wrong code counts, as a
 /// sign-in's does, and is committed so it stays counted.
 pub async fn create(
@@ -162,7 +141,7 @@ async fn delete_in(tx: &mut Transaction, user: &User) -> Result<(), DeletionErro
         if members.iter().all(|member| member.user_id == user.id) {
             community_delete_in(tx, user, membership.community_id).await?;
         } else {
-            memberships::leave_in(tx, role, user, membership.community_id).await?;
+            memberships::delete_in(tx, role, user, membership.community_id).await?;
         }
     }
     users::delete_in(tx, user.id).await?;
@@ -321,7 +300,7 @@ mod tests {
 
     /// The code mailed to the address for deleting its account.
     async fn code_mailed(server: &Deployment, mailer: &Mailer, session: &Session) -> String {
-        code_create(server, mailer, &session.user)
+        code::create(server, mailer, &session.user)
             .await
             .expect("a code mailed");
         code_sent_to(mailer, &session.email)
@@ -353,7 +332,7 @@ mod tests {
             let shared = communities::create(&server, &alice.user, "Shared")
                 .await
                 .expect("a community");
-            memberships::join(&server, &bob.user, shared.id)
+            memberships::create(&server, &bob.user, shared.id)
                 .await
                 .expect("joined");
             posts::create(&server, &alice.user, "alice's", &[shared.id])
@@ -444,7 +423,7 @@ mod tests {
             let shared = communities::create(&server, &alice.user, "Shared")
                 .await
                 .expect("a community");
-            memberships::join(&server, &bob.user, shared.id)
+            memberships::create(&server, &bob.user, shared.id)
                 .await
                 .expect("joined");
             let personal = memberships::list_mine(&server, &alice.user)
@@ -556,7 +535,7 @@ mod tests {
             let server = server(database);
             let mailer = Mailer::memory();
             let trial = trial_users::create(&server, 10).await.expect("a trial");
-            let error = code_create(&server, &mailer, &trial.user)
+            let error = code::create(&server, &mailer, &trial.user)
                 .await
                 .expect_err("no code for a trial");
             assert!(matches!(error, DeletionError::TrialHasNoCode));

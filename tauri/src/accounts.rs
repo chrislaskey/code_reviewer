@@ -22,6 +22,7 @@
 
 pub mod checkouts;
 pub mod deletions;
+pub mod password;
 pub mod plans;
 pub mod products;
 pub mod purchases;
@@ -44,7 +45,7 @@ use crate::command_error::CommandError;
 use crate::device_accounts::{DeviceAccounts, PendingSignIn, SignInFinished};
 use crate::server_urls;
 use crate::sync::{self, SyncServer};
-use app_core::accounts::{self, PasswordUpdate, SecondFactor};
+use app_core::accounts::{self, SecondFactor};
 
 const SIGN_IN_RETURNED_EVENT: &str = "accounts-sign-in-returned";
 
@@ -258,20 +259,6 @@ pub async fn accounts_second_factors(
 ) -> Result<Vec<SecondFactor>, CommandError> {
     let deployment = device.active().await?;
     Ok(accounts::second_factors_on_device(&deployment, server.transport()).await?)
-}
-
-/// The signed-in user's password, their first or a new one, kept by
-/// the server.
-#[tauri::command]
-pub async fn accounts_password_update(
-    device: State<'_, DeviceAccounts>,
-    server: State<'_, SyncServer>,
-    current: Option<String>,
-    password: String,
-) -> Result<(), CommandError> {
-    let deployment = device.active().await?;
-    let update = PasswordUpdate { current, password };
-    Ok(accounts::password_update_on_device(&deployment, server.transport(), &update).await?)
 }
 
 /// The sign-in page with the challenge, the email and where to return

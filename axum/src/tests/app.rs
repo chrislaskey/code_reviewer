@@ -20,12 +20,18 @@ async fn posts_list_as_json() {
 #[tokio::test]
 async fn current_user_is_the_tokens_user_and_nobody_without_one() {
     let (router, _) = test_router().await;
-    let (status, body) = get(&router, "/api/current-user").await;
+    let (status, body) = get(&router, "/api/users/current").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["email"], json!("alice@example.com"));
 
-    let (status, body) =
-        send_as(&router.router, None, Method::GET, "/api/current-user", None).await;
+    let (status, body) = send_as(
+        &router.router,
+        None,
+        Method::GET,
+        "/api/users/current",
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     assert_eq!(body, json!({ "error": "Sign in first" }));
     let (status, _) = send_as(&router.router, None, Method::GET, "/api/posts", None).await;
@@ -36,7 +42,13 @@ async fn current_user_is_the_tokens_user_and_nobody_without_one() {
 async fn avatars_upload_then_update_with_field_errors_as_json() {
     let (router, _) = test_router().await;
     let wrong = json!({ "content_type": "text/html", "size": 0 });
-    let (status, body) = send(&router, Method::POST, "/api/avatars/uploads", Some(wrong)).await;
+    let (status, body) = send(
+        &router,
+        Method::POST,
+        "/api/users/current/avatar/uploads",
+        Some(wrong),
+    )
+    .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(
         body["errors"],
@@ -48,7 +60,13 @@ async fn avatars_upload_then_update_with_field_errors_as_json() {
 
     let png = b"\x89PNG\r\n\x1a\nthe rest".to_vec();
     let picked = json!({ "content_type": "image/png", "size": png.len() });
-    let (status, upload) = send(&router, Method::POST, "/api/avatars/uploads", Some(picked)).await;
+    let (status, upload) = send(
+        &router,
+        Method::POST,
+        "/api/users/current/avatar/uploads",
+        Some(picked),
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED);
     let key = upload["key"].as_str().expect("a key").to_string();
     assert_eq!(upload["content_type"], json!("image/png"));
@@ -57,13 +75,13 @@ async fn avatars_upload_then_update_with_field_errors_as_json() {
     let (status, user) = send(
         &router,
         Method::PUT,
-        "/api/avatars",
+        "/api/users/current/avatar",
         Some(json!({ "key": key })),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(user["avatar_url"], json!(format!("memory:///{key}")));
-    let (_, me) = get(&router, "/api/current-user").await;
+    let (_, me) = get(&router, "/api/users/current").await;
     assert_eq!(me["avatar_url"], user["avatar_url"]);
 }
 
@@ -118,7 +136,7 @@ async fn communities_create_join_leave_and_a_post_in_one() {
     .await;
     assert_eq!(shown["communities"][0]["name"], json!("Gardening"));
 
-    let path = format!("/api/memberships/{community_id}");
+    let path = format!("/api/communities/{community_id}/membership");
     let (status, _) = send(&router, Method::DELETE, &path, None).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
     let (_, listed) = get(&router, "/api/communities").await;
@@ -130,8 +148,8 @@ async fn communities_create_join_leave_and_a_post_in_one() {
     .await;
     assert_eq!(shown["communities"], json!([]), "left with the member");
 
-    let (status, membership) = send(&router, Method::PUT, &path, None).await;
-    assert_eq!(status, StatusCode::OK);
+    let (status, membership) = send(&router, Method::POST, &path, None).await;
+    assert_eq!(status, StatusCode::CREATED);
     assert_eq!(membership["community_id"], json!(community_id));
     let (_, shown) = get(
         &router,
@@ -167,7 +185,7 @@ async fn current_community_settles_on_the_first_and_keeps_a_choice_in_its_cookie
         token,
         None,
         Method::GET,
-        "/api/current-community",
+        "/api/communities/current",
         None,
     )
     .await;
@@ -193,7 +211,7 @@ async fn current_community_settles_on_the_first_and_keeps_a_choice_in_its_cookie
         token,
         None,
         Method::GET,
-        "/api/current-community",
+        "/api/communities/current",
         None,
     )
     .await;
@@ -209,7 +227,7 @@ async fn current_community_settles_on_the_first_and_keeps_a_choice_in_its_cookie
         token,
         None,
         Method::PUT,
-        "/api/current-community",
+        "/api/communities/current",
         Some(json!({ "community_id": weeding["id"] })),
     )
     .await;
@@ -227,7 +245,7 @@ async fn current_community_settles_on_the_first_and_keeps_a_choice_in_its_cookie
         token,
         Some(&cookie),
         Method::GET,
-        "/api/current-community",
+        "/api/communities/current",
         None,
     )
     .await;
@@ -242,7 +260,7 @@ async fn current_community_settles_on_the_first_and_keeps_a_choice_in_its_cookie
         token,
         None,
         Method::PUT,
-        "/api/current-community",
+        "/api/communities/current",
         Some(json!({ "community_id": MISSING_ID })),
     )
     .await;
@@ -390,7 +408,7 @@ async fn files_upload_create_show_rename_and_delete() {
     let sha256 = app_core::helpers::sha256::hex(&bytes);
     let picked = json!({ "content_type": "text/plain", "size": bytes.len(), "sha256": sha256 });
     let (status, upload) = send(&router, Method::POST, "/api/files/uploads", Some(picked)).await;
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(status, StatusCode::CREATED);
     assert_eq!(upload["uploaded"], json!(false));
     let id = upload["id"].as_str().expect("an id").to_string();
     let (_, communities) = get(&router, "/api/communities").await;
@@ -408,22 +426,30 @@ async fn files_upload_create_show_rename_and_delete() {
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(body["error"], json!("the file did not arrive; try again"));
 
-    let (_, me) = get(&router, "/api/current-user").await;
+    let (_, me) = get(&router, "/api/users/current").await;
     let key = format!("files/{}/{id}", me["id"].as_str().expect("an id"));
     router.storage.put(&key, bytes).await.expect("the upload");
     let (status, file) = send(&router, Method::POST, "/api/files", Some(new)).await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(file["name"], json!("notes.txt"));
 
-    let (status, found) = get(&router, "/api/files/search?name=NOTES&limit=10").await;
+    let (status, found) = get(&router, "/api/files?name=NOTES&limit=10").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(found["total"], json!(1));
     assert_eq!(found["files"][0]["file"], file);
     assert_eq!(found["files"][0]["state"], json!("synced"));
     assert_eq!(found["files"][0]["communities"][0]["id"], community_id);
-    let (_, found) = get(&router, "/api/files/search?name=other&limit=10").await;
+    let (_, found) = get(&router, "/api/files?name=other&limit=10").await;
     assert_eq!(found["total"], json!(0));
-    let (status, _) = get(&router, "/api/files/search?limit=501").await;
+    let (_, found) = get(
+        &router,
+        "/api/files?content_types=image/png,text/plain&limit=10",
+    )
+    .await;
+    assert_eq!(found["total"], json!(1));
+    let (_, found) = get(&router, "/api/files?content_types=image/png&limit=10").await;
+    assert_eq!(found["total"], json!(0));
+    let (status, _) = get(&router, "/api/files?limit=501").await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     let other = app_core::helpers::sha256::hex(b"other");
     let checked = json!({ "sha256s": [other, sha256] });
@@ -454,6 +480,28 @@ async fn files_upload_create_show_rename_and_delete() {
         None,
         Method::GET,
         &format!("{path}/content"),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::FOUND);
+    assert_eq!(headers[header::LOCATION], format!("memory:///{key}"));
+    assert_eq!(headers[header::CACHE_CONTROL], "private, max-age=3300");
+
+    let (status, synced) = send(
+        &router,
+        Method::POST,
+        "/api/sync/bytes/app_files/uploads",
+        Some(json!({ "id": id, "content_type": "text/plain", "size": 10, "sha256": sha256 })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(synced["uploaded"], json!(true));
+    let (status, headers, _) = send_with(
+        &router.router,
+        Some(&router.token),
+        None,
+        Method::GET,
+        &format!("/api/sync/bytes/app_files/{id}/content"),
         None,
     )
     .await;
@@ -589,7 +637,7 @@ async fn sync_push_rejects_a_malformed_request() {
 #[tokio::test]
 async fn current_user_get_shows_their_email_and_whether_they_are_staff() {
     let (router, _) = test_router().await;
-    let (status, me) = get(&router, "/api/current-user").await;
+    let (status, me) = get(&router, "/api/users/current").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(me["name"], json!("alice"));
     assert_eq!(me["email"], json!("alice@example.com"));
@@ -602,20 +650,20 @@ async fn current_user_update_changes_their_name() {
     let (status, me) = send(
         &router,
         Method::PUT,
-        "/api/current-user",
+        "/api/users/current",
         Some(json!({ "name": " Alice B " })),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(me["name"], json!("Alice B"));
     assert_eq!(me["email"], json!("alice@example.com"));
-    let (_, me) = get(&router, "/api/current-user").await;
+    let (_, me) = get(&router, "/api/users/current").await;
     assert_eq!(me["name"], json!("Alice B"));
 
     let (status, _) = send(
         &router,
         Method::PUT,
-        "/api/current-user",
+        "/api/users/current",
         Some(json!({ "name": " " })),
     )
     .await;

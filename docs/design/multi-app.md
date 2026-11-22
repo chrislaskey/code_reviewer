@@ -94,7 +94,7 @@ One id, two tables, written together at sign-up:
 - `accounts_tokens` and `accounts_credentials` reference
   `accounts_users`. A device has the `accounts_` tables and leaves them
   empty.
-- A person is shown their own email by `GET /api/current-user`, which
+- A person is shown their own email by `GET /api/users/current`, which
   adds it and `is_staff` to their user; a device adds it from its list
   of accounts, which a sign-in's answer fills.
 - The purge removes an unconfirmed sign-up's two rows after a day, and

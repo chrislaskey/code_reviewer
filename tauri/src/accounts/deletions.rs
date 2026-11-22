@@ -5,6 +5,8 @@
 //! device's list does. A local user has no account to delete. Another
 //! device of the same person learns from the server's 410, see `sync`.
 
+pub mod code;
+
 use tauri::{AppHandle, State};
 
 use app_core::accounts::online;
@@ -12,19 +14,6 @@ use app_core::accounts::online;
 use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
 use crate::sync::SyncServer;
-
-/// Has the server mail the code that confirms the delete.
-#[tauri::command]
-pub async fn accounts_deletions_code_create(
-    app: AppHandle,
-    device: State<'_, DeviceAccounts>,
-    server: State<'_, SyncServer>,
-) -> Result<(), CommandError> {
-    let deployment = device.active().await?;
-    online::deletions_code_create(&deployment, server.transport())
-        .await
-        .map_err(|error| crate::sync::online_error(&app, error))
-}
 
 /// Deletes the account with the mailed code, then removes it and its
 /// file from the device; nobody is active after.

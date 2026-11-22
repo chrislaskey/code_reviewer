@@ -19,6 +19,9 @@
 //! bytes after, on both sides: `delete_unreferenced` in the bucket,
 //! daily, and `delete_unreferenced_on_device` at the end of each sync.
 
+#[cfg(feature = "object-storage")]
+pub mod uploads;
+
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -36,8 +39,6 @@ use crate::data::app_users::User;
 use crate::data::device_settings::{self, WORK_OFFLINE};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, FileStore};
-#[cfg(feature = "object-storage")]
-use crate::helpers::content_type::content_type_or_unknown;
 use crate::helpers::content_type::is_content_type;
 use crate::helpers::field_errors::FieldErrors;
 use crate::helpers::sha256::is_sha256;
@@ -60,9 +61,6 @@ pub const UNREFERENCED_DAYS: i64 = 1;
 /// rest wait for the next, so a URL is used well within its lifetime
 /// and the sync lock is not held for thousands of files.
 pub const PER_SYNC: usize = 100;
-/// How long a signed upload URL works.
-#[cfg(feature = "object-storage")]
-const UPLOAD_URL_LIFETIME: std::time::Duration = std::time::Duration::from_secs(10 * 60);
 /// How long a signed download URL works.
 #[cfg(feature = "object-storage")]
 pub const DOWNLOAD_URL_LIFETIME: std::time::Duration = std::time::Duration::from_secs(60 * 60);
@@ -258,74 +256,6 @@ pub fn bucket(deployment: &Deployment) -> Result<&Storage, BytesError> {
     }
 }
 
-/// Answers where to PUT a row's bytes, or that the bucket already has
-/// them: on the server, which holds the bucket's keys. The row does not
-/// exist yet, so what holds an upload to its creator is the key's
-/// prefix: nobody else writes or claims a row before it exists.
-#[cfg(feature = "object-storage")]
-pub async fn create_upload(
-    deployment: &Deployment,
-    user: &User,
-    table: &str,
-    request: &UploadNew,
-) -> Result<Upload, BytesError> {
-    if crate::accounts::trial_users::is_trial(deployment, user).await? {
-        return Err(BytesError::Rejected(
-            "a trial has no files; sign up first".to_string(),
-        ));
-    }
-    let bytes = of_table(table)?;
-    let storage = bucket(deployment)?;
-    let content_type = content_type_or_unknown(&request.content_type);
-    let request = UploadNew {
-        content_type: content_type.clone(),
-        ..request.clone()
-    };
-    FieldErrors::check(&request)?;
-    checked_size(bytes, request.size)?;
-    let id = request.id.unwrap_or_else(Uuid::now_v7);
-    let key = storage_key(bytes, user.id, id);
-    let checksum_sha256 = base64_of_hex(&request.sha256)?;
-    if bucket_has(storage, &key, request.size, &checksum_sha256).await? {
-        return Ok(Upload {
-            id,
-            uploaded: true,
-            upload_url: None,
-            content_type,
-            checksum_sha256,
-        });
-    }
-    let upload_url = storage
-        .upload_url(
-            &key,
-            &content_type,
-            Some(&checksum_sha256),
-            UPLOAD_URL_LIFETIME,
-        )
-        .await?;
-    Ok(Upload {
-        id,
-        uploaded: false,
-        upload_url: Some(upload_url),
-        content_type,
-        checksum_sha256,
-    })
-}
-
-/// A size that is not empty and not more than the table takes.
-#[cfg(feature = "object-storage")]
-fn checked_size(bytes: &dyn SyncedBytes, size: u64) -> Result<(), BytesError> {
-    let max_bytes = bytes.max_bytes();
-    let message = if size == 0 {
-        "is empty".to_string()
-    } else if size > max_bytes {
-        format!("is larger than {} MB", max_bytes / (1024 * 1024))
-    } else {
-        return Ok(());
-    };
-    Err(BytesError::Invalid(FieldErrors::one("size", message)))
-}
-
 /// A URL the bytes of a row the user sees are read from for the next
 /// hour, signed by the server, with the `Content-Disposition` the
 /// bucket answers it with, if any.
@@ -491,7 +421,7 @@ pub async fn ask_about_waiting<T: Transport>(
         };
         if reachable && index < PER_SYNC {
             match transport
-                .bytes_create_upload(token, &event.table, request)
+                .bytes_uploads_create(token, &event.table, request)
                 .await
             {
                 Ok(upload) => row.upload = Some(upload),

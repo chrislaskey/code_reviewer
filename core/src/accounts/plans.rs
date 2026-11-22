@@ -461,7 +461,7 @@ mod tests {
                     .expect("resumed");
             assert!(!shown.subscription.cancel_at_period_end);
 
-            let url = subscriptions::portal_create(
+            let url = subscriptions::portal::create(
                 &deployment,
                 &stripe,
                 &alice,
@@ -493,7 +493,7 @@ mod tests {
             .await
             .expect_err("the card first");
             assert!(matches!(error, SubscriptionError::PaymentFailed));
-            subscriptions::portal_create(
+            subscriptions::portal::create(
                 &deployment,
                 &stripe,
                 &alice,

@@ -14,7 +14,7 @@
 //! What differs is the create: it carries the file's communities, and
 //! the server writes the rows only once the file is in its bucket, and
 //! answers `file_not_uploaded` until then.
-//! On the web the page asks `create_upload` where to PUT the bytes,
+//! On the web the page asks `uploads::create` where to PUT the bytes,
 //! sends them, then creates the row. A device keeps the bytes itself,
 //! `create_with_bytes`, and the file waits there, its create pending,
 //! until a sync has sent them. Another device gets the row by the pull
@@ -25,6 +25,10 @@
 //! rows point at now: `delete_unreferenced` in the bucket, daily, and
 //! `delete_unreferenced_on_device` in the account's folder, at the end
 //! of each sync.
+
+pub mod duplicates;
+#[cfg(feature = "object-storage")]
+pub mod uploads;
 
 use crate::data::app_files::{self, AcceptedFile, File, TABLE, is_file_name, is_file_size};
 use crate::data::app_files_communities;
@@ -69,10 +73,8 @@ const CREATE_FIELDS: &[&str] = &["name", "content_type", "size", "sha256", "comm
 const UPDATE_FIELDS: &[&str] = &["name"];
 /// Where files go in the bucket: `files/<creator id>/<file id>`.
 const KEY_PREFIX: &str = "files";
-/// The most checksums `list_duplicates` takes in one call.
-pub const MAX_DUPLICATES_CHECKED: usize = 500;
-/// The most files `search` answers in one call.
-pub const MAX_SEARCH_LIMIT: u32 = 500;
+/// The most files `list` answers in one call.
+pub const MAX_LIST_LIMIT: u32 = 500;
 
 /// Where a file stands between a device and the server.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -131,12 +133,12 @@ pub struct FileWithState {
     pub error: Option<String>,
 }
 
-/// What a search of the user's files asks: the files whose names
-/// contain `name` in any case, every file for an empty one, of one of
+/// Which of the user's files a list shows: those whose names contain
+/// `name` in any case, every file for an empty one, of one of
 /// `content_types`, any for none, `limit` of them from `offset`, newest
 /// first. See `docs/design/files-browsing.md`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FileSearch {
+pub struct FileFilter {
     #[serde(default)]
     pub name: String,
     /// Content types without parameters, as `image/png`.
@@ -147,10 +149,10 @@ pub struct FileSearch {
     pub limit: u32,
 }
 
-/// What a search answers: how many files match in all, and the page of
-/// them asked for.
+/// What a list answers: how many files pass the filter in all, and the
+/// page of them asked for.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FileSearchResults {
+pub struct FileList {
     pub total: u64,
     pub files: Vec<FileWithState>,
 }
@@ -237,7 +239,10 @@ impl From<serde_json::Error> for FileError {
 
 /// The files the user sees, not deleted, newest first, each with its
 /// state, creator and communities.
-pub async fn list(deployment: &Deployment, user: &User) -> Result<Vec<FileWithState>, FileError> {
+pub(crate) async fn list_all(
+    deployment: &Deployment,
+    user: &User,
+) -> Result<Vec<FileWithState>, FileError> {
     let mut tx = deployment.begin().await?;
     let files = app_files::list(&mut tx, user.id).await?;
     let listed = with_states(&mut tx, deployment.role, user, files).await?;
@@ -245,66 +250,33 @@ pub async fn list(deployment: &Deployment, user: &User) -> Result<Vec<FileWithSt
     Ok(listed)
 }
 
-/// The files the user sees whose bytes have any of these SHA-256s,
-/// newest first, each with its state, creator and communities: what a
-/// page offers in place of creating the same files again. Only rows the
-/// user already sees are compared, on the server and on a device,
-/// offline as well, so it tells nothing of files elsewhere. At most
-/// `MAX_DUPLICATES_CHECKED` checksums at once.
-pub async fn list_duplicates(
+/// The files the user sees that pass the filter, a page of them newest
+/// first, each with its state, creator and communities, and how many
+/// pass in all. At most `MAX_LIST_LIMIT` files at once.
+pub async fn list(
     deployment: &Deployment,
     user: &User,
-    sha256s: &[String],
-) -> Result<Vec<FileWithState>, FileError> {
-    if sha256s.len() > MAX_DUPLICATES_CHECKED {
-        return Err(FileError::Invalid(FieldErrors::one(
-            "sha256s",
-            format!("at most {MAX_DUPLICATES_CHECKED} checksums at once"),
-        )));
-    }
-    for sha256 in sha256s {
-        is_sha256(sha256, &()).map_err(|error| {
-            FileError::Invalid(FieldErrors::one("sha256s", error.message().to_string()))
-        })?;
-    }
-    if sha256s.is_empty() {
-        return Ok(Vec::new());
-    }
-    let mut tx = deployment.begin().await?;
-    let files = app_files::list_with_sha256s(&mut tx, user.id, sha256s).await?;
-    let listed = with_states(&mut tx, deployment.role, user, files).await?;
-    tx.commit().await?;
-    Ok(listed)
-}
-
-/// The files the user sees whose names contain the name searched for,
-/// of the content types searched for, a page of them newest first, each with its state, creator and
-/// communities, and how many match in all. At most `MAX_SEARCH_LIMIT`
-/// files at once.
-pub async fn search(
-    deployment: &Deployment,
-    user: &User,
-    search: &FileSearch,
-) -> Result<FileSearchResults, FileError> {
-    if search.limit > MAX_SEARCH_LIMIT {
+    filter: &FileFilter,
+) -> Result<FileList, FileError> {
+    if filter.limit > MAX_LIST_LIMIT {
         return Err(FileError::Invalid(FieldErrors::one(
             "limit",
-            format!("at most {MAX_SEARCH_LIMIT} files at once"),
+            format!("at most {MAX_LIST_LIMIT} files at once"),
         )));
     }
     let mut tx = deployment.begin().await?;
     let (total, files) = app_files::search(
         &mut tx,
         user.id,
-        &search.name,
-        &search.content_types,
-        i64::from(search.offset),
-        i64::from(search.limit),
+        &filter.name,
+        &filter.content_types,
+        i64::from(filter.offset),
+        i64::from(filter.limit),
     )
     .await?;
     let files = with_states(&mut tx, deployment.role, user, files).await?;
     tx.commit().await?;
-    Ok(FileSearchResults { total, files })
+    Ok(FileList { total, files })
 }
 
 /// One file the user sees, by its id, unless deleted, with its state,
@@ -459,17 +431,6 @@ pub async fn apply_event(
     Ok(apply(deployment, user, event).await?.answer)
 }
 
-/// Answers where to PUT a file's bytes, or that the bucket already has
-/// them, see `bytes::create_upload`.
-#[cfg(feature = "object-storage")]
-pub async fn create_upload(
-    deployment: &Deployment,
-    user: &User,
-    request: &bytes::UploadNew,
-) -> Result<bytes::Upload, FileError> {
-    Ok(bytes::create_upload(deployment, user, TABLE, request).await?)
-}
-
 /// A URL a file the user sees is read from for the next hour, signed by
 /// the server; as an attachment, the bucket answers it to be saved under
 /// the file's name instead of shown.
@@ -530,7 +491,7 @@ pub async fn cache_delete(deployment: &Deployment, user: &User) -> Result<FilesC
 /// size, for those that are.
 async fn cached(deployment: &Deployment, user: &User) -> Result<Vec<(PathBuf, u64)>, FileError> {
     let mut cached = Vec::new();
-    for shown in list(deployment, user).await? {
+    for shown in list_all(deployment, user).await? {
         if shown.state != FileState::Synced {
             continue;
         }
@@ -1477,7 +1438,7 @@ pub(crate) mod tests {
         assert_eq!(file.version, 0);
         let path = bytes::local_path(&device, file.id).expect("a path");
         assert_eq!(std::fs::read(&path).expect("the bytes"), b"some notes");
-        let listed = list(&device, &alice).await.expect("the files");
+        let listed = list_all(&device, &alice).await.expect("the files");
         assert_eq!(listed[0].file, file);
         assert_eq!(listed[0].state, FileState::Waiting);
 
@@ -1506,7 +1467,12 @@ pub(crate) mod tests {
             .expect("renamed while waiting");
 
         delete(&device, &alice, file.id).await.expect("deleted");
-        assert!(list(&device, &alice).await.expect("the files").is_empty());
+        assert!(
+            list_all(&device, &alice)
+                .await
+                .expect("the files")
+                .is_empty()
+        );
         let mut tx = device.begin().await.expect("a transaction");
         assert!(get_in(&mut tx, file.id).await.expect("looked").is_none());
         assert!(
@@ -1590,7 +1556,7 @@ pub(crate) mod tests {
             self.server.sign_out(token).await
         }
 
-        async fn bytes_create_upload(
+        async fn bytes_uploads_create(
             &self,
             token: Option<&str>,
             table: &str,
@@ -1604,7 +1570,7 @@ pub(crate) mod tests {
             }
             let upload = self
                 .server
-                .bytes_create_upload(token, table, request)
+                .bytes_uploads_create(token, table, request)
                 .await?;
             Ok(Upload {
                 uploaded: upload.uploaded || self.says_uploaded,
@@ -1850,7 +1816,7 @@ pub(crate) mod tests {
             assert_eq!(report.pending, 1, "its rename, held back with it");
             assert_eq!(in_bucket(&storage, &alice, kept.id).await, Some(4));
             assert_eq!(in_bucket(&storage, &alice, lost.id).await, None);
-            let on_server: Vec<String> = list(&server, &alice)
+            let on_server: Vec<String> = list_all(&server, &alice)
                 .await
                 .expect("the files")
                 .into_iter()
@@ -2153,8 +2119,8 @@ pub(crate) mod tests {
             );
 
             let listed = conflicts::list(&a).await.expect("the conflicts");
-            conflicts::let_go(&a, listed[0].id).await.expect("let go");
-            assert!(list(&a, &alice).await.expect("the files").is_empty());
+            conflicts::delete(&a, listed[0].id).await.expect("let go");
+            assert!(list_all(&a, &alice).await.expect("the files").is_empty());
             assert_eq!(sync::status(&a).await.expect("the status").pending, 0);
             assert_eq!(
                 std::fs::read_dir(folder.path())
@@ -2366,7 +2332,7 @@ pub(crate) mod tests {
                 .expect_err("no bytes yet");
             assert!(matches!(error, FileError::NotUploaded));
             assert!(
-                list(&deployment, &alice)
+                list_all(&deployment, &alice)
                     .await
                     .expect("the files")
                     .is_empty()
@@ -2408,7 +2374,7 @@ pub(crate) mod tests {
             assert_eq!(file.created_by_id, alice.id);
             assert_eq!(file.size, 10);
             assert_eq!(file.version, 1);
-            let listed = list(&deployment, &alice).await.expect("the files");
+            let listed = list_all(&deployment, &alice).await.expect("the files");
             assert_eq!(listed.len(), 1);
             assert_eq!(listed[0].file, file);
             assert_eq!(listed[0].state, FileState::Synced);
@@ -2469,7 +2435,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn files_search_finds_names_in_any_case_a_page_at_a_time() {
+    async fn files_list_finds_names_in_any_case_a_page_at_a_time() {
         with_each_database(|database| async move {
             let (deployment, storage) = server(database);
             let alice = users::create(&deployment, "alice@example.com", "Alice")
@@ -2489,14 +2455,14 @@ pub(crate) mod tests {
             let found = |name: &str, offset: u32, limit: u32| {
                 let deployment = deployment.clone();
                 let alice = alice.clone();
-                let asked = FileSearch {
+                let asked = FileFilter {
                     name: name.to_string(),
                     offset,
                     limit,
-                    ..FileSearch::default()
+                    ..FileFilter::default()
                 };
                 async move {
-                    let results = search(&deployment, &alice, &asked).await.expect("a search");
+                    let results = list(&deployment, &alice, &asked).await.expect("a search");
                     let names: Vec<String> = results
                         .files
                         .into_iter()
@@ -2536,18 +2502,18 @@ pub(crate) mod tests {
                 (1, vec!["100%_done.txt".to_string()])
             );
 
-            let theirs = FileSearch {
+            let theirs = FileFilter {
                 limit: 10,
-                ..FileSearch::default()
+                ..FileFilter::default()
             };
-            let results = search(&deployment, &bob, &theirs).await.expect("a search");
+            let results = list(&deployment, &bob, &theirs).await.expect("a search");
             assert_eq!((results.total, results.files.len()), (0, 0));
 
-            let too_many = FileSearch {
-                limit: MAX_SEARCH_LIMIT + 1,
-                ..FileSearch::default()
+            let too_many = FileFilter {
+                limit: MAX_LIST_LIMIT + 1,
+                ..FileFilter::default()
             };
-            let error = search(&deployment, &alice, &too_many)
+            let error = list(&deployment, &alice, &too_many)
                 .await
                 .expect_err("over the limit");
             let FileError::Invalid(errors) = error else {
@@ -2559,7 +2525,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn files_search_keeps_to_the_content_types_asked_for() {
+    async fn files_list_keeps_to_the_content_types_asked_for() {
         with_each_database(|database| async move {
             let (deployment, storage) = server(database);
             let alice = users::create(&deployment, "alice@example.com", "Alice")
@@ -2588,14 +2554,14 @@ pub(crate) mod tests {
             let found = |content_types: &[&str]| {
                 let deployment = deployment.clone();
                 let alice = alice.clone();
-                let asked = FileSearch {
+                let asked = FileFilter {
                     name: "CAT".to_string(),
                     content_types: content_types.iter().map(ToString::to_string).collect(),
                     offset: 0,
                     limit: 10,
                 };
                 async move {
-                    let results = search(&deployment, &alice, &asked).await.expect("a search");
+                    let results = list(&deployment, &alice, &asked).await.expect("a search");
                     let names: Vec<String> = results
                         .files
                         .into_iter()
@@ -2628,7 +2594,7 @@ pub(crate) mod tests {
             let first = uploaded(&deployment, &storage, &alice, "first.txt", b"1").await;
             let second = uploaded(&deployment, &storage, &alice, "second.txt", b"2").await;
 
-            let names: Vec<String> = list(&deployment, &alice)
+            let names: Vec<String> = list_all(&deployment, &alice)
                 .await
                 .expect("the files")
                 .into_iter()
@@ -2639,7 +2605,12 @@ pub(crate) mod tests {
                 get(&deployment, &alice, first.id).await.expect("hers").file,
                 first
             );
-            assert!(list(&deployment, &bob).await.expect("the files").is_empty());
+            assert!(
+                list_all(&deployment, &bob)
+                    .await
+                    .expect("the files")
+                    .is_empty()
+            );
             for error in [
                 get(&deployment, &bob, second.id)
                     .await
@@ -2714,7 +2685,7 @@ pub(crate) mod tests {
             let error = get(&deployment, &alice, file.id).await.expect_err("gone");
             assert!(matches!(error, FileError::NotFound { .. }));
             assert!(
-                list(&deployment, &alice)
+                list_all(&deployment, &alice)
                     .await
                     .expect("the files")
                     .is_empty()
@@ -2739,7 +2710,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn files_create_upload_signs_a_url_until_the_bytes_are_there() {
+    async fn files_uploads_create_signs_a_url_until_the_bytes_are_there() {
         with_each_database(|database| async move {
             let (deployment, storage) = server(database);
             let alice = users::create(&deployment, "alice@example.com", "Alice")
@@ -2752,7 +2723,7 @@ pub(crate) mod tests {
                 sha256: sha256::hex(b"GIF"),
             };
 
-            let upload = create_upload(&deployment, &alice, &request)
+            let upload = uploads::create(&deployment, &alice, &request)
                 .await
                 .expect("where to upload");
             assert!(!upload.uploaded);
@@ -2772,7 +2743,7 @@ pub(crate) mod tests {
                 id: Some(upload.id),
                 ..request.clone()
             };
-            let upload = create_upload(&deployment, &alice, &again)
+            let upload = uploads::create(&deployment, &alice, &again)
                 .await
                 .expect("already there");
             assert!(upload.uploaded);
@@ -2782,7 +2753,7 @@ pub(crate) mod tests {
                 size: app_files::MAX_BYTES + 1,
                 ..request
             };
-            let error = create_upload(&deployment, &alice, &too_large)
+            let error = uploads::create(&deployment, &alice, &too_large)
                 .await
                 .expect_err("too large");
             assert!(matches!(error, FileError::Invalid(_)));

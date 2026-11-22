@@ -45,10 +45,10 @@ Inside the Tauri app each is a command of the same name
 | `communitiesCreate(name)` | `POST /api/communities` with `{"name": "..."}`, 201, the maker a member |
 | `communitiesUpdate(id, name)` | `PUT /api/communities/:id` with the same; a member only, else 403 |
 | `communitiesDelete(id)` | `DELETE /api/communities/:id`, 204; a member only, and every membership goes with it |
-| `membershipsJoin(communityId)` | `PUT /api/memberships/:community_id` |
-| `membershipsLeave(communityId)` | `DELETE /api/memberships/:community_id`, 204 |
-| `filesSearch({name, offset, limit})`, `filesGet(id)` | `GET /api/files/search?name=...&offset=...&limit=...`, a page of the files whose names contain `name`, newest first, up to 500, with `total`, how many match; `GET /api/files/:id`. Each file with how it is shown and where it stands |
-| `filesSha256(file)`, `filesListDuplicates(sha256s)` | the picked file's SHA-256, worked out in the page; `POST /api/files/duplicates` with `{"sha256s": [...]}`, up to 500, the files the user sees with any of them |
+| `membershipsCreate(communityId)` | `POST /api/communities/:id/membership`, 201 |
+| `membershipsDelete(communityId)` | `DELETE /api/communities/:id/membership`, 204 |
+| `filesList({name, content_types, offset, limit})`, `filesGet(id)` | `GET /api/files?name=...&content_types=image/png,image/jpeg&offset=...&limit=...`, a page of the files whose names contain `name`, of those content types (any for none), newest first, up to 500, with `total`, how many match; `GET /api/files/:id`. Each file with how it is shown and where it stands |
+| `filesSha256(file)`, `filesDuplicatesList(sha256s)` | the picked file's SHA-256, worked out in the page; `POST /api/files/duplicates` with `{"sha256s": [...]}`, up to 500, the files the user sees with any of them; a read, but a POST, since 500 checksums do not fit a URL |
 | `filesCreate(file, name, communityIds, onProgress?, sha256?)`, `filesCreateAtOnce` | `POST /api/files/uploads` for where to PUT the bytes, the PUT to the bucket, then `POST /api/files`, 201; in the app one command, the bytes kept on the device and sent by the next sync. A page creates `filesCreateAtOnce` files at a time, 3 on the web and 1 in the app |
 | `filesUpdate(id, name, communityIds)` | `PUT /api/files/:id` with `{"name": "...", "community_ids": [...]}`, its communities among the user's |
 | `filesDelete(id)` | `DELETE /api/files/:id`, 204: out of the user's communities, deleted when those were its last |
@@ -56,13 +56,13 @@ Inside the Tauri app each is a command of the same name
 | `filesDownload(id)`, `filesDownloadSupported()` | the same URL with `?download=1`; in the desktop app a copy into Downloads |
 | `filesCopy(id)`, `filesCopySupported()` | the image onto the clipboard: on the web as a PNG, in the macOS and iOS apps with its own bytes too |
 | `filesCacheGet()`, `filesCacheDelete()` | the app only: the copies of synced files kept on the device, and removing them |
-| `conflictsList()`, `conflictsReapply(id)`, `conflictsTryAgain(id)`, `conflictsLetGo(id)` | none: the web has nothing to resolve |
-| `currentUserGet()` | `GET /api/current-user`; null when nobody is signed in, which the server answers 401 |
-| `currentUserUpdate(name)` | `PUT /api/current-user`, their new name; in the app written on the device and synced |
-| `currentCommunityGet()` | `GET /api/current-community`, the community the person works in, or null when they are in none |
-| `currentCommunityUpdate(communityId)` | `PUT /api/current-community` with `{"community_id": "..."}`; a member only, else 403 |
-| `avatarsCreateUpload(contentType, size)` | `POST /api/avatars/uploads`, 201 with where to PUT the picture; 422 with `"errors"` for a wrong file |
-| `avatarsUpdate(key)` | `PUT /api/avatars` with `{"key": "..."}`, the user with their `avatar_url` |
+| `conflictsList()`, `conflictsReapply(id)`, `conflictsTryAgain(id)`, `conflictsDelete(id)` | none: the web has nothing to resolve |
+| `currentUserGet()` | `GET /api/users/current`; null when nobody is signed in, which the server answers 401 |
+| `currentUserUpdate(name)` | `PUT /api/users/current`, their new name; in the app written on the device and synced |
+| `currentCommunityGet()` | `GET /api/communities/current`, the community the person works in, or null when they are in none |
+| `currentCommunityUpdate(communityId)` | `PUT /api/communities/current` with `{"community_id": "..."}`; a member only, else 403 |
+| `avatarsUploadsCreate(contentType, size)` | `POST /api/users/current/avatar/uploads`, 201 with where to PUT the picture; 422 with `"errors"` for a wrong file |
+| `avatarsUpdate(key)` | `PUT /api/users/current/avatar` with `{"key": "..."}`, the user with their `avatar_url` |
 | `avatarsUpload(file, onProgress?)` | both, with the file PUT straight to the bucket between them, see [Forms and uploads](#forms-and-uploads) |
 | `accountsSignUp(email, name)` | `POST /api/accounts/sign-up`, 202 with the pending token, a code emailed |
 | `accountsSignIn(email)` | `POST /api/accounts/sign-in`, the same |
@@ -71,7 +71,7 @@ Inside the Tauri app each is a command of the same name
 | `accountsSignInResetPassword(pending, password, challenge?)` | `POST /api/accounts/sign-in/reset-password`, a new password in place of a forgotten one; answers as a finished code, 403 when the app locks out |
 | `accountsSignInNewPassword(pending, password, challenge?)` | `POST /api/accounts/sign-in/new-password`, the password a new account makes, or null to skip; answers as a finished code |
 | `accountsSecondFactors()` | `GET /api/accounts/second-factors`, `["password"]` or `[]` |
-| `accountsPasswordUpdate(current, password)` | `PUT /api/accounts/password`, 204; the current one when there is one |
+| `accountsPasswordUpdate(current, password)` | `PUT /api/accounts/current/password`, 204; the current one when there is one |
 | `accountsCodeResend(pending)` | `POST /api/accounts/code/resend`, 202, a new code emailed |
 | `accountsSignOut()` | `DELETE /api/accounts/sign-out`, 204 |
 | `accountsSignInStart(email?)`, `accountsSignInPending()`, `accountsSignInFinish(code)`, `accountsSignInCancel()` | none: the web signs in on its own page; the app's `POST /api/accounts/device-token` is what `accountsSignInFinish` calls, see "Accounts on a device" |
@@ -131,7 +131,7 @@ pending token. The code, five wrong tries at most, confirms the email
 the first time. A password is optional, a second factor: an account
 that has one is asked for it after the code, a new account is offered
 to make one or skip, and a signed-in person makes or changes theirs at
-`/accounts/password/edit`. A forgotten one is reset at the password step,
+`/accounts/current/password/edit`. A forgotten one is reset at the password step,
 unless `accounts::FORGOTTEN_PASSWORD` is changed to lock out. The last step makes the token; a sign-out deletes it. Emails are
 lowercased, and a sign-up with an email that has an account is answered
 as a new one, its owner emailed instead. Where the email goes is
@@ -425,7 +425,7 @@ shows the page at the path, swapped in place:
 | `/home` | `home/HomePage.svelte` |
 | `/accounts/sign-up` | `accounts/AccountsSignUpPage.svelte`, on the web: the name and email, then the code, then a password to make or skip |
 | `/accounts/current` | `accounts/current/AccountsCurrentShowPage.svelte`, the signed-in person's own account: their email and the way to their password |
-| `/accounts/password/edit` | `accounts/password/AccountsPasswordEditPage.svelte`, their first password or a new one; asks the server, so online only in the apps |
+| `/accounts/current/password/edit` | `accounts/current/password/AccountsCurrentPasswordEditPage.svelte`, their first password or a new one; asks the server, so online only in the apps |
 | `/support` | `support/SupportIndexPage.svelte`, the support app: a placeholder |
 | `/forum` | `forum/ForumIndexPage.svelte`, the forum app: a placeholder |
 | `/ops` | not the router's: the ops app, a build of its own (`svelte/dist-ops`) with `ops/OpsHomePage.svelte`, for staff and a 404 to anyone else: a placeholder. `cargo run -p app_web -- ops staff create <email>` makes an account staff |

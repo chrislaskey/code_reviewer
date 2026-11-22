@@ -271,7 +271,7 @@ mod on_server {
         deployment: &Deployment,
         server: &Http,
     ) -> Result<PlanKept, OnlineError> {
-        let current_user = ask(deployment, server, Method::GET, "/api/current-user", None).await?;
+        let current_user = ask(deployment, server, Method::GET, "/api/users/current", None).await?;
         let kept = PlanKept {
             plan: current_user.get("plan").cloned().unwrap_or(Value::Null),
             payment_failed_subscription_id: current_user

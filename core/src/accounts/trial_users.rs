@@ -10,8 +10,8 @@
 //!   nobody else's (`data::app_communities`, `memberships`), so nothing
 //!   of theirs ever reaches a device or another person;
 //! - they see only their own communities (`data::app_communities`);
-//! - they have no files and no picture (`files::create_upload`,
-//!   `avatars::create_upload`);
+//! - they have no files and no picture (`files::uploads::create`,
+//!   `avatars::uploads::create`);
 //! - they make `MAX_WRITES` writes and no more (`events::record`);
 //! - `delete_expired`, an hourly job, removes them outright with
 //!   everything of theirs once the trial ended `KEPT_AFTER_HOURS` ago.
@@ -313,13 +313,15 @@ mod tests {
                 Err(CommunityError::NotFound { .. })
             ));
             assert!(
-                memberships::join(&server, &alice, trial_community.id)
+                memberships::create(&server, &alice, trial_community.id)
                     .await
                     .is_err(),
                 "nobody joins a trial user's community"
             );
             assert!(
-                memberships::join(&server, &trial, baking.id).await.is_err(),
+                memberships::create(&server, &trial, baking.id)
+                    .await
+                    .is_err(),
                 "and a trial user joins nobody's"
             );
             let pulled = tables_pulled_by(&server, &alice).await;

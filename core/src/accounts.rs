@@ -31,6 +31,7 @@ pub mod app_store_reconcile;
 pub mod checkouts;
 pub mod deletions;
 pub mod online;
+pub mod password;
 #[cfg(feature = "stripe")]
 pub mod plans;
 #[cfg(feature = "stripe")]
@@ -135,14 +136,6 @@ pub struct Session {
     pub user: User,
     pub email: String,
     pub token: String,
-}
-
-/// A password for the signed-in user, with the one they have now when
-/// they have one.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PasswordUpdate {
-    pub current: Option<String>,
-    pub password: String,
 }
 
 /// What a sign-up or a sign-in answers: the pending token the page
@@ -489,28 +482,6 @@ pub async fn second_factors(
     Ok(factors)
 }
 
-/// Keeps the password as the signed-in user's, their first or in place
-/// of the one they had, which `current` must then be.
-pub async fn password_update(
-    deployment: &Deployment,
-    user: &User,
-    update: &PasswordUpdate,
-) -> Result<(), AccountError> {
-    if deployment.role != Role::Server {
-        return Err(AccountError::ServerOnly);
-    }
-    let mut tx = deployment.begin().await?;
-    let current = update.current.as_deref().unwrap_or_default();
-    if accounts_credentials::is_set(&mut tx, user.id).await?
-        && !accounts_credentials::verify(&mut tx, Some(user.id), current).await?
-    {
-        return Err(AccountError::PasswordDoesNotMatch);
-    }
-    accounts_credentials::set(&mut tx, user.id, &update.password).await?;
-    tx.commit().await?;
-    Ok(())
-}
-
 /// `second_factors` asked of the server by the user signed in on this
 /// device.
 #[cfg(feature = "sync-http")]
@@ -520,18 +491,6 @@ pub async fn second_factors_on_device(
 ) -> Result<Vec<SecondFactor>, AccountError> {
     let (_user, token) = crate::app::users::signed_in_with_token(deployment).await?;
     Ok(server.accounts_second_factors(&token).await?)
-}
-
-/// `password_update` asked of the server by the user signed in on this
-/// device.
-#[cfg(feature = "sync-http")]
-pub async fn password_update_on_device(
-    deployment: &Deployment,
-    server: &crate::services::web_server::Http,
-    update: &PasswordUpdate,
-) -> Result<(), AccountError> {
-    let (_user, token) = crate::app::users::signed_in_with_token(deployment).await?;
-    Ok(server.accounts_password_update(&token, update).await?)
 }
 
 /// Exchanges the device code, with the verifier the device kept, for
@@ -952,6 +911,7 @@ async fn live_user_in(tx: &mut Transaction, id: Uuid) -> Result<Option<User>, Ac
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::accounts::password::{self, PasswordUpdate};
     use crate::app::{posts, users};
     use crate::database::with_each_database;
     use crate::services::web_server::InProcess;
@@ -1238,7 +1198,7 @@ pub(crate) mod tests {
                 current: None,
                 password: PASSWORD.to_string(),
             };
-            password_update(&server, &alice, &first)
+            password::update(&server, &alice, &first)
                 .await
                 .expect("a password");
             let sent = sign_in(&server, &mailer, "alice@example.com")
@@ -1319,10 +1279,10 @@ pub(crate) mod tests {
                 password: "short".to_string(),
             };
             assert!(matches!(
-                password_update(&server, &alice, &short).await,
+                password::update(&server, &alice, &short).await,
                 Err(AccountError::Credential(CredentialError::PasswordTooShort))
             ));
-            password_update(&server, &alice, &first)
+            password::update(&server, &alice, &first)
                 .await
                 .expect("their first password");
             assert_eq!(
@@ -1337,7 +1297,7 @@ pub(crate) mod tests {
                     password: another.clone(),
                 };
                 assert!(matches!(
-                    password_update(&server, &alice, &update).await,
+                    password::update(&server, &alice, &update).await,
                     Err(AccountError::PasswordDoesNotMatch)
                 ));
             }
@@ -1345,7 +1305,7 @@ pub(crate) mod tests {
                 current: Some(PASSWORD.to_string()),
                 password: another.clone(),
             };
-            password_update(&server, &alice, &update)
+            password::update(&server, &alice, &update)
                 .await
                 .expect("changed");
 

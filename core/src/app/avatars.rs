@@ -1,7 +1,7 @@
 //! A user's picture, uploaded from the person's device straight to object
 //! storage, see `storage`, never through the server:
 //!
-//! 1. `create_upload`: the server checks what the person picked, its
+//! 1. `uploads::create`: the server checks what the person picked, its
 //!    content type and size, and answers a signed URL to PUT that one
 //!    file to, at a key under the user's own prefix.
 //! 2. The page PUTs the file to the URL.
@@ -10,10 +10,13 @@
 //!    an event in its log the devices pull like any change.
 //!
 //! Online only for now: a device asks the server for both steps, see
-//! `create_upload_on_device` and `update_on_device`. A file nobody points
+//! `uploads::create_on_device` and `update_on_device`. A file nobody points
 //! at, an upload never confirmed, a picture since replaced or one whose
 //! user the purge removed, stays in the bucket until
 //! `delete_unreferenced`, see `docs/design/uploads.md`.
+
+#[cfg(any(feature = "object-storage", feature = "sync-http"))]
+pub mod uploads;
 
 use garde::Validate;
 use serde::{Deserialize, Serialize};
@@ -34,9 +37,6 @@ use crate::{
 
 /// The largest picture, 5 MB.
 pub const MAX_BYTES: u64 = 5 * 1024 * 1024;
-/// How long a signed upload URL works.
-#[cfg(feature = "object-storage")]
-const UPLOAD_URL_LIFETIME: std::time::Duration = std::time::Duration::from_secs(10 * 60);
 /// How long after its key was made an upload may still be confirmed;
 /// the sweep leaves files far younger than that, so it never deletes
 /// one that could still become someone's picture.
@@ -135,38 +135,6 @@ pub enum AvatarError {
     User(#[from] UserError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
-}
-
-/// Answers where to upload the file the person picked, once it is a
-/// picture this app takes: on the server, which holds the bucket's keys.
-#[cfg(feature = "object-storage")]
-pub async fn create_upload(
-    deployment: &Deployment,
-    user: &User,
-    request: &AvatarUploadNew,
-) -> Result<AvatarUpload, AvatarError> {
-    FieldErrors::check(request).map_err(AvatarError::Invalid)?;
-    if crate::accounts::trial_users::is_trial(deployment, user).await? {
-        return Err(AvatarError::TrialUser);
-    }
-    let storage = bucket(deployment)?;
-    let image_type = image_type_of(&request.content_type).ok_or_else(|| {
-        AvatarError::Invalid(FieldErrors::one("content_type", "is not a picture"))
-    })?;
-    let key = format!(
-        "{KEY_PREFIX}/{}/{}.{}",
-        user.id,
-        uuid::Uuid::now_v7(),
-        image_type.extension
-    );
-    let upload_url = storage
-        .upload_url(&key, image_type.content_type, None, UPLOAD_URL_LIFETIME)
-        .await?;
-    Ok(AvatarUpload {
-        upload_url,
-        content_type: image_type.content_type.to_string(),
-        key,
-    })
 }
 
 /// Makes the uploaded file the user's picture, on the server, once it
@@ -268,19 +236,6 @@ pub async fn delete_unreferenced(
         report.deleted += 1;
     }
     Ok(report)
-}
-
-/// `create_upload` asked of the server by the user signed in on this
-/// device, after the same checks here, so a wrong file is told at once.
-#[cfg(feature = "sync-http")]
-pub async fn create_upload_on_device(
-    deployment: &Deployment,
-    server: &Http,
-    request: &AvatarUploadNew,
-) -> Result<AvatarUpload, AvatarError> {
-    FieldErrors::check(request).map_err(AvatarError::Invalid)?;
-    let (_user, token) = users::signed_in_with_token(deployment).await?;
-    Ok(server.avatars_create_upload(&token, request).await?)
 }
 
 /// `update` asked of the server by the user signed in on this device,
@@ -394,10 +349,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn avatars_create_upload_answers_field_errors_for_a_wrong_file() {
+    async fn avatars_uploads_create_answers_field_errors_for_a_wrong_file() {
         let deployment = server().await;
         let alice = users::tests::alice();
-        let error = create_upload(&deployment, &alice, &upload("text/html", MAX_BYTES + 1))
+        let error = uploads::create(&deployment, &alice, &upload("text/html", MAX_BYTES + 1))
             .await
             .expect_err("neither field is right");
         let AvatarError::Invalid(errors) = error else {
@@ -409,17 +364,17 @@ mod tests {
         );
         assert_eq!(errors.0["size"], ["must be 5 MB or smaller"]);
 
-        let error = create_upload(&deployment, &alice, &upload("image/png", 0))
+        let error = uploads::create(&deployment, &alice, &upload("image/png", 0))
             .await
             .expect_err("empty");
         assert!(matches!(error, AvatarError::Invalid(errors) if errors.0["size"] == ["is empty"]));
     }
 
     #[tokio::test]
-    async fn avatars_create_upload_signs_a_key_under_the_users_prefix() {
+    async fn avatars_uploads_create_signs_a_key_under_the_users_prefix() {
         let deployment = server().await;
         let alice = users::tests::alice();
-        let answer = create_upload(&deployment, &alice, &upload("image/jpeg", 1000))
+        let answer = uploads::create(&deployment, &alice, &upload("image/jpeg", 1000))
             .await
             .expect("an upload");
         assert!(
@@ -436,9 +391,10 @@ mod tests {
     async fn avatars_update_sets_the_url_as_an_event_once_the_file_is_there() {
         with_each_database(|database| async move {
             let (deployment, storage, alice) = server_with_alice(database).await;
-            let answer = create_upload(&deployment, &alice, &upload("image/png", PNG.len() as u64))
-                .await
-                .expect("an upload");
+            let answer =
+                uploads::create(&deployment, &alice, &upload("image/png", PNG.len() as u64))
+                    .await
+                    .expect("an upload");
             let request = AvatarUpdate {
                 key: answer.key.clone(),
             };
@@ -482,7 +438,7 @@ mod tests {
                 .await
                 .expect("bob");
 
-            let bobs = create_upload(&deployment, &bob, &upload("image/png", PNG.len() as u64))
+            let bobs = uploads::create(&deployment, &bob, &upload("image/png", PNG.len() as u64))
                 .await
                 .expect("bob's upload");
             storage.put(&bobs.key, PNG.to_vec()).await.expect("put");
@@ -491,9 +447,10 @@ mod tests {
                 .expect_err("bob's");
             assert!(matches!(error, AvatarError::NotYours));
 
-            let answer = create_upload(&deployment, &alice, &upload("image/png", PNG.len() as u64))
-                .await
-                .expect("an upload");
+            let answer =
+                uploads::create(&deployment, &alice, &upload("image/png", PNG.len() as u64))
+                    .await
+                    .expect("an upload");
             let mut huge = PNG.to_vec();
             huge.resize(MAX_BYTES as usize + 1, 0);
             storage.put(&answer.key, huge).await.expect("put");
@@ -508,7 +465,7 @@ mod tests {
 
             let html = b"<html><script>alert(1)</script></html>".to_vec();
             let answer =
-                create_upload(&deployment, &alice, &upload("image/png", html.len() as u64))
+                uploads::create(&deployment, &alice, &upload("image/png", html.len() as u64))
                     .await
                     .expect("an upload");
             storage.put(&answer.key, html).await.expect("put");
@@ -553,7 +510,7 @@ mod tests {
         alice: &User,
         confirmed: bool,
     ) -> String {
-        let answer = create_upload(deployment, alice, &upload("image/png", PNG.len() as u64))
+        let answer = uploads::create(deployment, alice, &upload("image/png", PNG.len() as u64))
             .await
             .expect("an upload");
         storage.put(&answer.key, PNG.to_vec()).await.expect("put");

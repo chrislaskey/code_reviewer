@@ -144,7 +144,7 @@ pub(crate) async fn create_in(
         now(),
     );
     let community = apply_in(tx, role, user, &event).await?.community()?;
-    memberships::join_in(tx, role, user, community.id).await?;
+    memberships::create_in(tx, role, user, community.id).await?;
     Ok(community)
 }
 
@@ -796,7 +796,7 @@ mod tests {
                 .expect_err("not a member");
             assert!(matches!(error, CommunityError::NotAMember));
 
-            memberships::join(&deployment, &bob, gardening.id)
+            memberships::create(&deployment, &bob, gardening.id)
                 .await
                 .expect("joined");
             let renamed = update(&deployment, &bob, gardening.id, "Bob's")
@@ -857,7 +857,7 @@ mod tests {
             let gardening = create(&deployment, &alice, "Gardening")
                 .await
                 .expect("a community");
-            memberships::join(&deployment, &bob, gardening.id)
+            memberships::create(&deployment, &bob, gardening.id)
                 .await
                 .expect("joined");
             posts::create(&deployment, &alice, "roses", &[gardening.id])
@@ -908,7 +908,7 @@ mod tests {
             }
             tx.commit().await.expect("committed");
 
-            let error = memberships::join(&deployment, &alice, gardening.id)
+            let error = memberships::create(&deployment, &alice, gardening.id)
                 .await
                 .expect_err("nothing to rejoin");
             assert!(

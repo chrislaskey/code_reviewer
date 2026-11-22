@@ -47,7 +47,7 @@ pub fn no_account(to: &str) -> Mail {
 }
 
 /// The code that confirms deleting an account, see
-/// `accounts::deletions::code_create`.
+/// `accounts::deletions::code::create`.
 pub fn delete_code(to: &str, code: &str) -> Mail {
     Mail {
         to: to.to_string(),

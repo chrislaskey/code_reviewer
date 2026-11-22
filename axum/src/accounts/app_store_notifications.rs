@@ -20,7 +20,7 @@ pub struct Delivery {
     pub signed_payload: String,
 }
 
-/// `POST /api/accounts/app-store-notifications`.
+/// `POST /api/accounts/webhooks/app-store`.
 pub async fn create(
     State(deployment): State<Deployment>,
     Json(delivery): Json<Delivery>,

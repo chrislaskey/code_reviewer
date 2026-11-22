@@ -1,12 +1,13 @@
-<!-- The signed-in person's password, at /accounts/password/edit: their first,
-     or a new one in place of the current one. A password is optional,
-     asked for after the emailed code at a sign-in once the account has
-     one. The server keeps it, so in the app this needs a connection. -->
+<!-- The signed-in person's password, at /accounts/current/password/edit:
+     their first, or a new one in place of the current one. A password is
+     optional, asked for after the emailed code at a sign-in once the
+     account has one. The server keeps it, so in the app this needs a
+     connection. -->
 <script>
-  import { accountsPasswordUpdate, accountsSecondFactors } from "../../lib/core/index.js";
-  import { errorMessageOf } from "../../lib/error_message.js";
-  import { accountsCurrentShowUrl } from "../../lib/routes.js";
-  import { Button, ErrorMessage, Heading, Input, Link, Page, Text } from "../../lib/components/index.js";
+  import { accountsPasswordUpdate, accountsSecondFactors } from "../../../lib/core/index.js";
+  import { errorMessageOf } from "../../../lib/error_message.js";
+  import { accountsCurrentShowUrl } from "../../../lib/routes.js";
+  import { Button, ErrorMessage, Heading, Input, Link, Page, Text } from "../../../lib/components/index.js";
 
   /** Whether the account has a password; null until the server answered. */
   let hasPassword = $state(/** @type {boolean | null} */ (null));

@@ -43,7 +43,7 @@ async fn ops_answers_staff_with_its_api_its_pages_and_its_files() {
     let (status, body) = get(&router, "/api/ops/current-staff").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["user_id"], json!(staff.user_id));
-    let (_, me) = get(&router, "/api/current-user").await;
+    let (_, me) = get(&router, "/api/users/current").await;
     assert_eq!(me["is_staff"], json!(true));
 
     let cookie = format!("token={}", router.token);

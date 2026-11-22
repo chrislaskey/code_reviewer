@@ -16,7 +16,7 @@ mod popup;
 #[path = "unavailable.rs"]
 mod popup;
 
-use app_core::app::files::{FileSearch, FileSearchResults};
+use app_core::app::files::{FileFilter, FileList};
 use tauri::AppHandle;
 use uuid::Uuid;
 
@@ -24,15 +24,15 @@ use crate::command_error::CommandError;
 
 pub use popup::register;
 
-/// A page of the user's images the clipboard takes whose names contain
-/// the name searched for, newest first, and how many match in all; an
-/// error when nobody is signed in.
+/// A page of the user's images the clipboard takes that pass the
+/// filter, newest first, and how many pass in all; an error when nobody
+/// is signed in.
 #[tauri::command]
-pub async fn quick_picker_files_search(
+pub async fn quick_picker_files_list(
     app: AppHandle,
-    search: FileSearch,
-) -> Result<FileSearchResults, CommandError> {
-    popup::files_search(&app, search).await
+    filter: FileFilter,
+) -> Result<FileList, CommandError> {
+    popup::files_list(&app, filter).await
 }
 
 /// Copies the file's image, closes the picker and pastes into the app it

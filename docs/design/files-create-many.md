@@ -7,7 +7,7 @@ create of `files-communities.md` and `offline-files-decisions.md`,
 which stays as it is: many files are many creates.
 
 Built in `svelte/src/files/FilesNewPage.svelte` and `components/FilesNewRow.svelte`,
-on `files::list_duplicates` and the sync's `bytes::PER_SYNC`.
+on `files::duplicates::list` and the sync's `bytes::PER_SYNC`.
 Meant for a library at once, thousands of small images
 say: up to 5,000 files in a list, each up to the 25 MB of one file. A
 list of large files takes as long as it takes; splitting it is the
@@ -58,9 +58,9 @@ ones, are at the top. Each row has:
 Each file's checksum is worked out once picked, as now, and kept for
 the create, so the bytes are read for it once. The page asks for the
 files the person sees with any of the list's checksums at once,
-`filesListDuplicates`, 500 checksums a request: on the web
-`POST /api/files/duplicates`, by `files::list_duplicates` and the same
-predicate as every read; in the app `files_list_duplicates`, the
+`filesDuplicatesList`, 500 checksums a request: on the web
+`POST /api/files/duplicates`, by `files::duplicates::list` and the same
+predicate as every read; in the app `files_duplicates_list`, the
 device's own rows. A row is a duplicate of either:
 
 - **a file the person sees** with its checksum, the newest shown as on

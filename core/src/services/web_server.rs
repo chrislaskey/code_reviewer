@@ -49,8 +49,8 @@ pub trait Transport {
     ) -> impl Future<Output = Result<Session, SyncError>> + Send;
     fn sign_out(&self, token: &str) -> impl Future<Output = Result<(), SyncError>> + Send;
     /// Asks whether the bucket has a row's bytes, and where to send
-    /// them when it has not, see `bytes::create_upload`.
-    fn bytes_create_upload(
+    /// them when it has not, see `bytes::uploads::create`.
+    fn bytes_uploads_create(
         &self,
         token: Option<&str>,
         table: &str,
@@ -135,14 +135,14 @@ impl Transport for InProcess<'_> {
     }
 
     #[cfg(feature = "object-storage")]
-    async fn bytes_create_upload(
+    async fn bytes_uploads_create(
         &self,
         token: Option<&str>,
         table: &str,
         request: UploadNew,
     ) -> Result<Upload, SyncError> {
         let user = self.user(token).await?;
-        bytes::create_upload(self.server, &user, table, &request)
+        bytes::uploads::create(self.server, &user, table, &request)
             .await
             .map_err(refused_bytes)
     }
@@ -186,7 +186,7 @@ impl Transport for InProcess<'_> {
     }
 
     #[cfg(not(feature = "object-storage"))]
-    async fn bytes_create_upload(
+    async fn bytes_uploads_create(
         &self,
         _token: Option<&str>,
         _table: &str,
@@ -284,13 +284,13 @@ impl Http {
         })
     }
 
-    /// `avatars::create_upload` on the server, as the token's user.
-    pub async fn avatars_create_upload(
+    /// `avatars::uploads::create` on the server, as the token's user.
+    pub async fn avatars_uploads_create(
         &self,
         token: &str,
         request: &AvatarUploadNew,
     ) -> Result<AvatarUpload, SyncError> {
-        self.post(Some(token), "/api/avatars/uploads", request)
+        self.post(Some(token), "/api/users/current/avatar/uploads", request)
             .await
     }
 
@@ -300,8 +300,13 @@ impl Http {
         token: &str,
         request: &AvatarUpdate,
     ) -> Result<User, SyncError> {
-        self.send(reqwest::Method::PUT, Some(token), "/api/avatars", request)
-            .await
+        self.send(
+            reqwest::Method::PUT,
+            Some(token),
+            "/api/users/current/avatar",
+            request,
+        )
+        .await
     }
 
     /// `accounts::second_factors` on the server, of the token's user.
@@ -330,13 +335,13 @@ impl Http {
         }
     }
 
-    /// `accounts::password_update` on the server, as the token's user.
+    /// `accounts::password::update` on the server, as the token's user.
     pub async fn accounts_password_update(
         &self,
         token: &str,
-        request: &accounts::PasswordUpdate,
+        request: &accounts::password::PasswordUpdate,
     ) -> Result<(), SyncError> {
-        let path = "/api/accounts/password";
+        let path = "/api/accounts/current/password";
         self.send(reqwest::Method::PUT, Some(token), path, request)
             .await
     }
@@ -476,7 +481,7 @@ impl Transport for Http {
         self.delete(token, "/api/accounts/sign-out").await
     }
 
-    async fn bytes_create_upload(
+    async fn bytes_uploads_create(
         &self,
         token: Option<&str>,
         table: &str,
@@ -543,7 +548,7 @@ impl Transport for Http {
     ) -> Result<(), SyncError> {
         use tokio::io::AsyncWriteExt;
 
-        let asked = format!("{}/api/sync/bytes/{table}/{id}", self.base_url);
+        let asked = format!("{}/api/sync/bytes/{table}/{id}/content", self.base_url);
         let mut request = self.not_following_redirects.get(&asked);
         if let Some(token) = token {
             request = request.bearer_auth(token);

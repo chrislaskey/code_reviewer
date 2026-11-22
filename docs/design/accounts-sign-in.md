@@ -49,10 +49,10 @@ code, or made at sign-up (items 4, 5 and 22), read it as moved here.
   password and no session, and the next sign-in is the code alone.
 - **A device's sign-in** is the same pages with its challenge; whichever
   step finishes answers the device code.
-- **Later**, signed in, `/accounts/password/edit`
-  (`AccountsPasswordEditPage.svelte`) makes the first password or
+- **Later**, signed in, `/accounts/current/password/edit`
+  (`AccountsCurrentPasswordEditPage.svelte`) makes the first password or
   changes it, the current one required when there is one,
-  `accounts::password_update`. In the apps the page asks the server
+  `accounts::password::update`. In the apps the page asks the server
   through `accounts_second_factors` and `accounts_password_update`, so
   it needs a connection, and it is the one place a password passes
   through an app.
@@ -594,7 +594,7 @@ and over is the per-address limit, see "Rate limits".
 | `POST /api/accounts/sign-in/reset-password` | `pending`, `password`, `challenge?` | 200 as a finished code, the old password replaced and its owner emailed; 403 when the app locks out; 422 a password too short or long; 401 expired |
 | `POST /api/accounts/sign-in/new-password` | `pending`, `password` or null to skip, `challenge?` | 200 as a finished code; 422 a password too short or long; 401 expired |
 | `GET /api/accounts/second-factors` | | 200 `["password"]` or `[]`, of the signed-in user |
-| `PUT /api/accounts/password` | `current` or null, `password` | 204; 422 wrong current password, or one too short or long |
+| `PUT /api/accounts/current/password` | `current` or null, `password` | 204; 422 wrong current password, or one too short or long |
 | `POST /api/accounts/code/resend` | `pending` | 202, a new code mailed; 429 within a minute of the last, see "Rate limits" |
 | `POST /api/accounts/device-token` | `code`, `verifier` | 200 session, no cookie; 401 |
 | `DELETE /api/accounts/sign-out` | | 204, unchanged |

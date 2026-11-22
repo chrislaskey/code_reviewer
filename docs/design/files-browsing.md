@@ -7,8 +7,8 @@ a time, and the grid draws only the tiles on screen. Most people have
 a few thousand files at most; a collector with tens of thousands is
 served by the same design, a little slower, not by another one.
 
-Built in `files::search`, `GET /api/files/search`, the `files_search`
-command, `filesSearch` in `svelte/src/lib/core/`, and
+Built in `files::list`, `GET /api/files`, the `files_list`
+command, `filesList` in `svelte/src/lib/core/`, and
 `svelte/src/files/FilesIndexPage.svelte` with `components/FilesGrid.svelte`. The
 grid is `svelte/src/lib/components/TileGrid.svelte` and the pages it asks for
 `lib/paged_search.svelte.js`, which the desktop quick picker shares
@@ -22,13 +22,14 @@ grid is `svelte/src/lib/components/TileGrid.svelte` and the pages it asks for
   filters or sorts files itself, so a filter added later is a field of
   the query and a condition in its SQL, in one place, under the same
   visibility as every read.
-- **A search answers the total and one page.** `FileSearch` is the
+- **A list answers the total and one page.** `FileFilter` is the
   name searched for, the content types (any when none), an offset and a
-  limit; `FileSearchResults` is how
+  limit; on the web it is the URL's query, the content types joined by
+  commas. `FileList` is how
   many files match and the files at that offset, each with its state,
   creator and communities as the list had them. Only that page's
   states and communities are worked out. A limit is at most
-  `files::MAX_SEARCH_LIMIT`, 500.
+  `files::MAX_LIST_LIMIT`, 500.
 - **An empty name matches every file** the person sees: browsing is
   a search for "".
 - **The name matches when it contains the text, in any case.** No
@@ -69,7 +70,7 @@ grid is `svelte/src/lib/components/TileGrid.svelte` and the pages it asks for
   page at a time.
 - **A search waits for a pause in typing**, then starts over from the
   top: 50 ms in the app, where it reads the device's SQLite, and 200 ms
-  on the web, where each asks the server (`filesSearchWaitMs` in
+  on the web, where each asks the server (`filesListWaitMs` in
   `svelte/src/lib/core/`). An answer to an older search or an older sync is
   dropped.
 - **A sync starts the pages over**: rows come and go with it, and
@@ -78,7 +79,7 @@ grid is `svelte/src/lib/components/TileGrid.svelte` and the pages it asks for
 ## Left for later
 
 - **Filters beside the name**: a file's community, and tags once files
-  have them, each a field of `FileSearch` as `content_types` is, and a
+  have them, each a field of `FileFilter` as `content_types` is, and a
   menu on the page.
 - **Other orders** than newest first.
 - **A cap on the count**: past some number, "10,000+", if counting a

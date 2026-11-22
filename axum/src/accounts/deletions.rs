@@ -4,6 +4,8 @@
 //! trial deletes with no code. Rate limited with the other accounts
 //! routes, see `rate_limits`.
 
+pub mod code;
+
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -20,18 +22,8 @@ use crate::user_auth::{CurrentUser, TOKEN_COOKIE};
 
 #[derive(Deserialize)]
 pub struct DeletionNew {
-    /// The code mailed by `code_create`; none for a trial.
+    /// The code mailed by `code::create`; none for a trial.
     pub code: Option<String>,
-}
-
-/// `POST /api/accounts/deletions/code`: mails the code, 204.
-pub async fn code_create(
-    State(deployment): State<Deployment>,
-    State(mailer): State<Mailer>,
-    CurrentUser(user): CurrentUser,
-) -> Result<StatusCode, ApiError> {
-    deletions::code_create(&deployment, &mailer, &user).await?;
-    Ok(StatusCode::NO_CONTENT)
 }
 
 /// `POST /api/accounts/deletions`: deletes the account, 204, and clears

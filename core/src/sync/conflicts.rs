@@ -145,10 +145,11 @@ pub async fn try_again(deployment: &Deployment, id: Uuid) -> Result<(), Conflict
     Ok(())
 }
 
-/// Drops the conflict; nothing is sent. A file the server refused goes
-/// from the device with it, its row, its other events and its bytes,
-/// since nothing of it ever reached the server.
-pub async fn let_go(deployment: &Deployment, id: Uuid) -> Result<(), ConflictError> {
+/// Deletes the conflict, which the page calls letting it go; nothing is
+/// sent. A file the server refused goes from the device with it, its
+/// row, its other events and its bytes, since nothing of it ever reached
+/// the server.
+pub async fn delete(deployment: &Deployment, id: Uuid) -> Result<(), ConflictError> {
     let mut tx = deployment.begin().await?;
     let stored = get(&mut tx, id).await?;
     let refused_with_bytes =

@@ -12,7 +12,7 @@
   import AnimationsToggle from "../lib/AnimationsToggle.svelte";
   import FileImage from "../lib/FileImage.svelte";
   import FilesGrid from "./components/FilesGrid.svelte";
-  import { filesCacheDelete, filesCacheGet, filesContentUrl, filesSearch, filesSearchWaitMs, onSynced } from "../lib/core/index.js";
+  import { filesCacheDelete, filesCacheGet, filesContentUrl, filesList, filesListWaitMs, onSynced } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
   import { filesNewUrl, filesShowUrl } from "../lib/routes.js";
   import { fileSize } from "../lib/file_size.js";
@@ -32,7 +32,7 @@
   let cacheError = $state("");
   let view = $state(filesView());
 
-  const search = new PagedSearch((offset, limit) => filesSearch({ name, offset, limit }));
+  const search = new PagedSearch((offset, limit) => filesList({ name, offset, limit }));
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let searchTimer;
 
@@ -53,7 +53,7 @@
 
   function searchAfterPause() {
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => search.startOverFromTop(), filesSearchWaitMs);
+    searchTimer = setTimeout(() => search.startOverFromTop(), filesListWaitMs);
   }
 
   /** @param {import("./files_view.js").FilesView} chosen */

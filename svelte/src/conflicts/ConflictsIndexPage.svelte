@@ -4,7 +4,7 @@
      refused it outright, or let go -->
 <script>
   import {
-    conflictsLetGo,
+    conflictsDelete,
     conflictsList,
     conflictsReapply,
     conflictsTryAgain,
@@ -95,7 +95,7 @@
               Try again
             </Button>
           {/if}
-          <Button size="sm" variant="ghost" onclick={() => resolveThen(() => conflictsLetGo(conflict.id))}>
+          <Button size="sm" variant="ghost" onclick={() => resolveThen(() => conflictsDelete(conflict.id))}>
             Let it go
           </Button>
         </div>

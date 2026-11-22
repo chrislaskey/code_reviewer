@@ -1,4 +1,4 @@
-//! Stripe's webhook, `POST /api/accounts/stripe-webhooks`: the events
+//! Stripe's webhook, `POST /api/accounts/webhooks/stripe`: the events
 //! Stripe sends, signed with `STRIPE_WEBHOOK_SECRET`, see
 //! `app_core::accounts::stripe_events`. No session: the signature is
 //! what proves Stripe sent it. Without the secret, or without Stripe,
@@ -17,7 +17,7 @@ use app_core::services::stripe::Stripe;
 use crate::api_error::ApiError;
 use crate::config::stripe::StripeSigningSecret;
 
-/// `POST /api/accounts/stripe-webhooks`: 200 for an event recorded or a
+/// `POST /api/accounts/webhooks/stripe`: 200 for an event recorded or a
 /// repeat, so Stripe stops sending it; 400 for a bad signature; 502
 /// when Stripe could not be asked for the object, and 500 for any other
 /// failure, which Stripe sends again.
@@ -31,7 +31,7 @@ pub async fn create(
     let (Some(secret), Some(stripe)) = (secret, stripe) else {
         return Err(ApiError::new(
             StatusCode::NOT_FOUND,
-            "The server has no API route POST /api/accounts/stripe-webhooks",
+            "The server has no API route POST /api/accounts/webhooks/stripe",
         ));
     };
     let signature = headers

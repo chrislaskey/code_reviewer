@@ -1,4 +1,4 @@
-//! The current user's own routes, `GET` and `PUT /api/current-user`:
+//! The current user's own routes, `GET` and `PUT /api/users/current`:
 //! who the request is from, as their own pages show them, and their new
 //! name, see `app_core::app::users`.
 
@@ -33,7 +33,7 @@ pub struct CurrentUserShown {
     pub payment_failed_subscription_id: Option<Uuid>,
 }
 
-/// `GET /api/current-user`: the user the request is from.
+/// `GET /api/users/current`: the user the request is from.
 pub async fn get(
     State(deployment): State<Deployment>,
     CurrentUser(user): CurrentUser,
@@ -46,7 +46,7 @@ pub struct CurrentUserUpdate {
     pub name: String,
 }
 
-/// `PUT /api/current-user`: the user's new name.
+/// `PUT /api/users/current`: the user's new name.
 pub async fn update(
     State(deployment): State<Deployment>,
     CurrentUser(user): CurrentUser,
