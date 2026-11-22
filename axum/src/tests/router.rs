@@ -19,34 +19,16 @@ async fn a_bearer_token_names_the_user_and_an_unknown_one_is_401() {
         json!({ "error": "The server did not accept this token" })
     );
 
+    let matched = code_matched(&router, "bob@example.com").await;
     let (status, body) = send_as(
         &router.router,
         None,
         Method::POST,
-        "/api/accounts/sign-up",
-        Some(json!({ "email": "bob@example.com" })),
+        "/api/accounts/sign-in/confirm",
+        Some(json!({ "pending": matched["pending"] })),
     )
     .await;
-    assert_eq!(status, StatusCode::ACCEPTED);
-    let code = code_sent_to(&router.mailer, "bob@example.com");
-    let (status, body) = send_as(
-        &router.router,
-        None,
-        Method::POST,
-        "/api/accounts/code",
-        Some(json!({ "pending": body["pending"], "code": code })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK);
-    let (status, body) = send_as(
-        &router.router,
-        None,
-        Method::POST,
-        "/api/accounts/sign-in/new-password",
-        Some(json!({ "pending": body["pending"], "password": null })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK, "skipped making a password");
+    assert_eq!(status, StatusCode::OK, "signed up");
     let token = body["token"].as_str().unwrap();
     let (status, created) = send_as(
         &router.router,

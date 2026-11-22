@@ -5,11 +5,18 @@
 --
 -- A trial user, see src/trial_users.rs, is an account made on the web
 -- with no sign-up; `trial_expires_at` says until when, null otherwise.
+--
+-- `terms_version` is the version of the terms of service and privacy
+-- policy the person last accepted, `accounts::TERMS_VERSION` when they
+-- did, and `terms_accepted_at` when; both null until their first
+-- sign-in's last step.
 CREATE TABLE accounts_users (
   id uuid PRIMARY KEY,
   email text NOT NULL,
   confirmed_at timestamptz,
   trial_expires_at timestamptz,
+  terms_version text,
+  terms_accepted_at timestamptz,
   stripe_customer_id text,
   inserted_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,

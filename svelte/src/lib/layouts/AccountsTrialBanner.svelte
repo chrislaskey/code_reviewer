@@ -3,7 +3,7 @@
      up still keeps what they made, see
      docs/design/accounts-local-and-trial-users.md. -->
 <script>
-  import { accountsSignUpUrl } from "../routes.js";
+  import { accountsSignInUrl } from "../routes.js";
   import { Alert, Button } from "../components/index.js";
 
   /**
@@ -46,5 +46,5 @@
       what you made.
     </span>
   {/if}
-  <Button size="sm" href={accountsSignUpUrl("")}>Sign up</Button>
+  <Button size="sm" href={accountsSignInUrl("")}>Sign up</Button>
 </Alert>

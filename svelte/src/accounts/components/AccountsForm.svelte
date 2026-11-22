@@ -1,4 +1,4 @@
-<!-- The email field, for the Sign up and Sign in pages, with the choice to stay signed in on this browser, and
+<!-- The email field, for the Sign in page, with the choice to stay signed in on this browser, and
      the error the attempt came back with. -->
 <script>
   import { Button, Checkbox, ErrorMessage, Input, Text } from "../../lib/components/index.js";

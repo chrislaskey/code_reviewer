@@ -5,7 +5,7 @@
 //! the token the browser's cookie holds, which the server resolves to a
 //! user, `users::get_by_token`; the pending sign-in that waits for its
 //! emailed code, which carries the code's hash and the wrong attempts
-//! so far; the one whose code matched and that waits for a password;
+//! so far; the one whose code matched and that waits for its last step;
 //! and the device code a finished
 //! browser sign-in leaves for the device to collect, see `accounts`;
 //! and the emailed code that confirms deleting an account, see
@@ -51,8 +51,8 @@ pub enum Context {
     Session,
     /// A sign-in that waits for its emailed code, ten minutes.
     SignInCode,
-    /// A sign-in whose code matched and that waits for a password, or
-    /// for one to be made or skipped, ten minutes.
+    /// A sign-in whose code matched and that waits for its last step,
+    /// with the password when the account has one, ten minutes.
     SignInPassword,
     /// A finished browser sign-in waiting for the device to collect it,
     /// five minutes.
@@ -122,7 +122,7 @@ pub struct Token {
     /// Wrong codes so far, for a pending sign-in.
     pub attempts: i64,
     /// The address the code went to when it is not yet the account's:
-    /// a trial user signing up, see `accounts::sign_up_from_trial`.
+    /// a trial user signing up, see `accounts::sign_in_from_trial`.
     pub sent_to: Option<String>,
     pub inserted_at: DateTime<Utc>,
 }
@@ -164,13 +164,26 @@ pub async fn create_sign_in_code(
 }
 
 /// Makes the pending token of the user's sign-in whose code matched,
-/// replacing any earlier one, for its password step.
+/// replacing any earlier one, for its last step, which takes the
+/// password when the account has one; with the address the code went
+/// to when it is not the account's own.
 pub async fn create_sign_in_password(
     tx: &mut Transaction,
     user_id: Uuid,
+    sent_to: Option<&str>,
 ) -> Result<String, sqlx::Error> {
     delete_of_user(tx, user_id, Context::SignInPassword).await?;
-    create(tx, user_id, Context::SignInPassword).await
+    let pending = random::hex(32);
+    insert(
+        tx,
+        user_id,
+        Context::SignInPassword,
+        hash(&pending),
+        None,
+        sent_to,
+    )
+    .await?;
+    Ok(pending)
 }
 
 /// Makes the device code for the user's finished browser sign-in: 16

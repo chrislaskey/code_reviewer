@@ -2777,9 +2777,9 @@ pub(crate) mod tests {
         .await;
     }
 
-    /// A sign-up, or a sign-in once the email has an account, finished
-    /// on the server's own database with the code the memory mailer
-    /// caught, as a device: its code exchanged over HTTP.
+    /// A sign-in, a sign-up the first time, finished on the server's own
+    /// database with the code the memory mailer caught, as a device: its
+    /// code exchanged over HTTP.
     #[cfg(feature = "sync-http")]
     async fn device_session_over(
         server: &Http,
@@ -2787,40 +2787,22 @@ pub(crate) mod tests {
         email: &str,
     ) -> Session {
         let mailer = crate::services::mailer::Mailer::memory();
-        let sent = accounts::sign_up(servers_database, &mailer, email)
+        let sent = accounts::sign_in(servers_database, &mailer, email, true)
             .await
-            .expect("signed up");
-        let sent = match crate::services::mailer::mails::code_in(
-            &mailer.last_sent_to(email).expect("mailed"),
-        ) {
-            Some(_) => sent,
-            None => accounts::sign_in(servers_database, &mailer, email)
-                .await
-                .expect("signed in instead"),
-        };
+            .expect("signed in");
         let code = crate::accounts::tests::code_sent_to(&mailer, email);
         let (verifier, challenge) = accounts::verifier_and_challenge();
-        let step = accounts::sign_in_with_code_for_device(
+        let matched = accounts::sign_in_with_code(servers_database, &sent.pending, &code)
+            .await
+            .expect("the code matched");
+        let device_code = accounts::sign_in_confirm_for_device(
             servers_database,
-            &sent.pending,
-            &code,
+            &matched.pending,
+            None,
             &challenge,
         )
         .await
-        .expect("the code matched");
-        let device_code = match step {
-            accounts::SignInStep::Finished(device_code) => device_code,
-            accounts::SignInStep::Next { pending, .. } => {
-                accounts::sign_in_with_new_password_for_device(
-                    servers_database,
-                    &pending,
-                    None,
-                    &challenge,
-                )
-                .await
-                .expect("skipped making a password")
-            }
-        };
+        .expect("finished");
         accounts::sign_in_with_device_code_through(server, &device_code.code, &verifier)
             .await
             .expect("exchanged over HTTP")

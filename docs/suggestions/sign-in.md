@@ -94,3 +94,28 @@ person changes it on their profile. Still to plan:
   social sites do; it needs a way to tell a first sign-in apart.
 - Whether names should be unique everywhere: the profile's name edit
   takes any name today, so two users can still pick the same one.
+- `CodeMatched.new_account` now tells a first sign-in apart, at the
+  last step, which such a step could use.
+
+## Later: accepting new terms
+
+Since 2026-11-22 the sign-in's last step says "By continuing, you
+accept the Terms of Service and Privacy Policy" to everyone, new or
+not, and records the version accepted and when on `accounts_users`
+(`accounts::TERMS_VERSION`, `terms_version`, `terms_accepted_at`).
+Still to plan:
+
+- when an account's version is older than `TERMS_VERSION`, the
+  signed-in pages show a blocking "We updated our terms" with an
+  explicit Accept, so someone who stays signed in for months is asked
+  too;
+- a log of acceptances, every version with its time, for a business
+  that needs to show who agreed to what and when; the columns keep only
+  the latest.
+
+## Later: a trial signing in to an account it already has
+
+A trial user who types the address of an account they already have
+signs in to that account (since 2026-11-22), and what they made on the
+trial stays with the trial, gone in two days. Moving it into the
+account, or asking first, is still to plan.

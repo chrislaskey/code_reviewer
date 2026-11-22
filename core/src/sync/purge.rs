@@ -184,13 +184,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn purge_removes_a_sign_up_that_never_entered_its_code_after_a_day() {
+    async fn purge_removes_a_sign_up_that_never_finished_after_a_day() {
         with_each_database(|database| async move {
             let deployment = Deployment::new(database, Role::Server);
             let mailer = crate::services::mailer::Mailer::memory();
-            crate::accounts::sign_up(&deployment, &mailer, "bob@example.com")
+            crate::accounts::sign_in(&deployment, &mailer, "bob@example.com", true)
                 .await
-                .expect("bob signed up and stopped there");
+                .expect("bob started a sign-up and stopped there");
             let mut tx = deployment.begin().await.expect("a transaction");
             let bob = crate::data::accounts_users::get_by_email(&mut tx, "bob@example.com")
                 .await
@@ -234,7 +234,7 @@ mod tests {
             );
             tx.commit().await.expect("committed");
             assert!(
-                crate::accounts::sign_up(&deployment, &mailer, "bob@example.com")
+                crate::accounts::sign_in(&deployment, &mailer, "bob@example.com", true)
                     .await
                     .is_ok(),
                 "and the email is free again"

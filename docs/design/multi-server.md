@@ -218,11 +218,12 @@ features on or off are uses of it, not the design.
   that needs its own ships its own build.
 
 The first key, `features.accounts_sign_up`, true by default: off, the
-server refuses `POST /api/accounts/sign-up` and a trial user with a
-403, "This server takes no new sign-ups", and answers no trial
-available; accounts sign in as before. The pages offer no Sign up: the
-sign-in page drops its link, the sign-up page says so in place of its
-form, and the app's accounts page says "Sign in".
+server's sign-in registers no new email, answering it as any other and
+mailing it that it has no account, refuses a trial user with a 403,
+"This server takes no new sign-ups", and answers no trial available;
+accounts sign in as before. The pages offer no Sign up: the sign-in
+page is headed "Sign in" and says the server takes no new sign-ups,
+and the app's accounts page says "Sign in".
 
 Later, for settings: files a document names, a logo, fetched when their
 content hash changes and kept under `servers/<id>/`, with limits on

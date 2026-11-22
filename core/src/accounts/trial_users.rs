@@ -16,7 +16,7 @@
 //! - `delete_expired`, an hourly job, removes them outright with
 //!   everything of theirs once the trial ended `KEPT_AFTER_HOURS` ago.
 //!
-//! Signing up, `accounts::sign_up_from_trial`, makes the same user a
+//! Signing up, `accounts::sign_in_from_trial`, makes the same user a
 //! full one: nothing moves, since every row is already theirs.
 
 use crate::data::trial_users;
@@ -183,7 +183,7 @@ pub(crate) async fn show_communities_in(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::accounts::{self, NextStep, SignInStep};
+    use crate::accounts::{self, CodeMatched};
     use crate::app::{memberships, posts};
     use crate::data::app_communities;
     use crate::data::app_posts;
@@ -417,7 +417,10 @@ mod tests {
             );
             assert_eq!(names_seen_by(&server, &trial).await, ["Trial"]);
 
-            signed_up(&server, &trial, "bob@example.com").await;
+            let matched = signed_up(&server, &trial, "bob@example.com").await;
+            accounts::sign_in_confirm(&server, &matched.pending, None)
+                .await
+                .expect("signed up");
             let bob = users::get(&server, trial.id).await.expect("the same user");
             posts::create(&server, &bob, "signed up", &[])
                 .await
@@ -426,11 +429,10 @@ mod tests {
         .await;
     }
 
-    /// The trial user signed up with the email, to the step after the
-    /// code.
-    async fn signed_up(server: &Deployment, trial: &User, email: &str) -> SignInStep<Session> {
+    /// The trial user signed up with the email, to the last step.
+    async fn signed_up(server: &Deployment, trial: &User, email: &str) -> CodeMatched {
         let mailer = Mailer::memory();
-        let sent = accounts::sign_up_from_trial(server, &mailer, trial, email)
+        let sent = accounts::sign_in_from_trial(server, &mailer, trial, email)
             .await
             .expect("a code sent");
         let sent_to = email.trim().to_lowercase();
@@ -463,14 +465,15 @@ mod tests {
                 .await
                 .expect("a post");
 
-            let step = signed_up(&server, &trial, " Bob@Example.com ").await;
-            let SignInStep::Next { next, pending, .. } = step else {
-                panic!("a new account is offered a password");
-            };
-            assert_eq!(next, NextStep::NewPassword);
-            let signed_up = accounts::sign_in_with_new_password(&server, &pending, None)
+            let matched = signed_up(&server, &trial, " Bob@Example.com ").await;
+            assert!(matched.new_account, "a sign-up");
+            assert!(
+                is_trial(&server, &trial).await.expect("asked"),
+                "a trial until the last step"
+            );
+            let signed_up = accounts::sign_in_confirm(&server, &matched.pending, None)
                 .await
-                .expect("skipped");
+                .expect("signed up");
             assert_eq!(signed_up.user.id, trial.id, "the same user");
             assert_eq!(signed_up.user.name, "bob", "named from the address");
             assert_eq!(signed_up.email, "bob@example.com");
@@ -521,27 +524,27 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn trial_users_sign_up_with_a_taken_email_is_answered_quietly_and_changes_nothing() {
+    async fn trial_users_sign_in_with_a_taken_email_signs_in_to_it_and_leaves_the_trial() {
         with_each_database(|database| async move {
             let server = server(database);
-            full_user(&server, "alice@example.com").await;
+            let alice = full_user(&server, "alice@example.com").await;
             let trial = create(&server, 10).await.expect("a trial").user;
-            let mailer = Mailer::memory();
-            let sent = accounts::sign_up_from_trial(&server, &mailer, &trial, "alice@example.com")
+            let matched = signed_up(&server, &trial, "alice@example.com").await;
+            assert!(!matched.new_account, "a sign-in");
+            let session = accounts::sign_in_confirm(&server, &matched.pending, None)
                 .await
-                .expect("answered as any sign-up");
-            assert_eq!(sent.pending.len(), 64);
-            let mail = mailer.last_sent_to("alice@example.com").expect("mailed");
-            assert_eq!(mail.subject, "You already have an account");
+                .expect("signed in");
+            assert_eq!(session.user.id, alice.id);
             assert!(is_trial(&server, &trial).await.expect("asked"));
             assert_eq!(
                 users::get(&server, trial.id).await.expect("the trial").name,
                 trial.name
             );
 
-            let alice = full_user(&server, "carol@example.com").await;
+            let mailer = Mailer::memory();
+            let carol = full_user(&server, "carol@example.com").await;
             assert!(matches!(
-                accounts::sign_up_from_trial(&server, &mailer, &alice, "new@example.com").await,
+                accounts::sign_in_from_trial(&server, &mailer, &carol, "new@example.com").await,
                 Err(AccountError::NotATrial)
             ));
         })
@@ -552,12 +555,14 @@ mod tests {
     async fn trial_users_sign_up_takes_an_email_a_sign_up_never_proved() {
         with_each_database(|database| async move {
             let server = server(database);
-            accounts::sign_up(&server, &Mailer::memory(), "bob@example.com")
+            accounts::sign_in(&server, &Mailer::memory(), "bob@example.com", true)
                 .await
                 .expect("signed up and stopped there");
             let trial = create(&server, 10).await.expect("a trial").user;
-            let step = signed_up(&server, &trial, "bob@example.com").await;
-            assert!(matches!(step, SignInStep::Next { .. }));
+            let matched = signed_up(&server, &trial, "bob@example.com").await;
+            accounts::sign_in_confirm(&server, &matched.pending, None)
+                .await
+                .expect("signed up");
             let account = crate::accounts::users::get(&server, trial.id)
                 .await
                 .expect("theirs");
@@ -655,7 +660,7 @@ mod tests {
             let server = server(database);
             let session = create(&server, 10).await.expect("a trial");
             let mailer = Mailer::memory();
-            let sent = accounts::sign_in(&server, &mailer, &session.email)
+            let sent = accounts::sign_in(&server, &mailer, &session.email, true)
                 .await
                 .expect("answered as any sign-in");
             assert_eq!(sent.pending.len(), 64);

@@ -398,7 +398,7 @@ mod tests {
                 .expect_err("refused");
             assert!(matches!(error, sync::SyncError::AccountDeleted));
 
-            accounts::sign_in(&server, &mailer, "alice@example.com")
+            accounts::sign_in(&server, &mailer, "alice@example.com", false)
                 .await
                 .expect("answered");
             let mail = mailer.last_sent_to("alice@example.com").expect("a mail");

@@ -5,7 +5,7 @@ use crate::services::mailer::Mail;
 
 pub const APP_NAME: &str = "Starter Pack";
 
-/// The code a sign-in or a sign-up is finished with.
+/// The code a sign-in is finished with.
 pub fn sign_in_code(to: &str, code: &str) -> Mail {
     Mail {
         to: to.to_string(),
@@ -17,30 +17,17 @@ pub fn sign_in_code(to: &str, code: &str) -> Mail {
     }
 }
 
-/// To someone who signed up with the email of an account they already
-/// have; the sign-up answered as if it were new, see `accounts::sign_up`.
-pub fn already_signed_up(to: &str) -> Mail {
-    Mail {
-        to: to.to_string(),
-        subject: "You already have an account".to_string(),
-        text: format!(
-            "Someone, likely you, tried to sign up for {APP_NAME} with this email. \
-             You already have an account: sign in with this email.\n\n\
-             If this was not you, ignore this email."
-        ),
-    }
-}
-
-/// To an email someone signed in with that has no account; the sign-in
-/// answered as if it had one, see `accounts::sign_in`.
+/// To an email with no account someone signed in with on a server that
+/// takes no new sign-ups; the sign-in answered as if it had one, see
+/// `accounts::sign_in`.
 pub fn no_account(to: &str) -> Mail {
     Mail {
         to: to.to_string(),
         subject: format!("No {APP_NAME} account for this email"),
         text: format!(
             "Someone, likely you, tried to sign in to {APP_NAME} with this email. \
-             There is no account for it: sign up to make one, or sign in with \
-             the email you signed up with.\n\n\
+             There is no account for it, and {APP_NAME} is not taking new sign-ups \
+             right now: sign in with the email you signed up with.\n\n\
              If this was not you, ignore this email."
         ),
     }
@@ -109,6 +96,6 @@ mod tests {
         assert_eq!(mail.to, "alice@example.com");
         assert!(mail.subject.contains(APP_NAME));
         assert_eq!(code_in(&mail), Some("042137".to_string()));
-        assert_eq!(code_in(&already_signed_up("alice@example.com")), None);
+        assert_eq!(code_in(&no_account("alice@example.com")), None);
     }
 }

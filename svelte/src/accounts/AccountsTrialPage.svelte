@@ -7,7 +7,7 @@
   import { errorMessageOf } from "../lib/error_message.js";
   import { currentUserForget } from "../lib/current_user.svelte.js";
   import { navigateToUrl } from "../lib/router.js";
-  import { accountsSignInUrl, accountsSignUpUrl, postsIndexUrl } from "../lib/routes.js";
+  import { accountsSignInUrl, postsIndexUrl } from "../lib/routes.js";
   import { Button, ErrorMessage, Heading, Link, Page, Text } from "../lib/components/index.js";
 
   /** Whether a trial can start; null until the server answered. */
@@ -39,7 +39,7 @@
   <Heading level={1}>Try it now</Heading>
   {#if available === false}
     <Text>Trials are not available right now.</Text>
-    <Text><Button variant="primary" href={accountsSignUpUrl()}>Sign up</Button></Text>
+    <Text><Button variant="primary" href={accountsSignInUrl()}>Sign in or create an account</Button></Text>
   {:else}
     <Text>
       Use the app for 24 hours with no account. What you make is deleted after that, unless you sign up, which
@@ -51,8 +51,7 @@
       <Button variant="primary" onclick={start} disabled={busy || available === null} data-trial>
         Start a trial
       </Button>
-      <Link size="sm" href={accountsSignUpUrl()}>Sign up</Link>
-      <Link size="sm" href={accountsSignInUrl()}>Sign in</Link>
+      <Link size="sm" href={accountsSignInUrl()}>Sign in or create an account</Link>
     </div>
   {/if}
 </Page>

@@ -28,7 +28,6 @@ import {
   ACCOUNTS_SUBSCRIPTIONS_SHOW_PATH,
   ACCOUNTS_CURRENT_SHOW_PATH,
   ACCOUNTS_SIGN_IN_PATH,
-  ACCOUNTS_SIGN_UP_PATH,
   ACCOUNTS_TRIAL_PATH,
   COMMUNITIES_EDIT_PATH,
   COMMUNITIES_INDEX_PATH,
@@ -62,7 +61,7 @@ const { navigate, route } = createRouter({
       // `/` is the public website's on the web; the app's home is its own path
       if (pathname === PUBLIC_HOME_PATH) throw navigateToUrl(homeUrl());
       // In the app a sign-in happens in the browser, from the accounts page
-      const webOnly = [ACCOUNTS_SIGN_IN_PATH, ACCOUNTS_SIGN_UP_PATH, ACCOUNTS_TRIAL_PATH];
+      const webOnly = [ACCOUNTS_SIGN_IN_PATH, ACCOUNTS_TRIAL_PATH];
       if (hasDeviceAccounts && webOnly.includes(pathname)) {
         throw navigateToUrl(accountsIndexUrl());
       }
@@ -85,7 +84,6 @@ const { navigate, route } = createRouter({
   [PUBLIC_HOME_PATH]: () => import("../home/HomePage.svelte"),
   [HOME_PATH]: () => import("../home/HomePage.svelte"),
   [ACCOUNTS_INDEX_PATH]: () => import("../accounts/AccountsIndexPage.svelte"),
-  [ACCOUNTS_SIGN_UP_PATH]: () => import("../accounts/AccountsSignUpPage.svelte"),
   [ACCOUNTS_SIGN_IN_PATH]: () => import("../accounts/AccountsSignInPage.svelte"),
   [ACCOUNTS_TRIAL_PATH]: () => import("../accounts/AccountsTrialPage.svelte"),
   [POSTS_INDEX_PATH]: () => import("../posts/PostsIndexPage.svelte"),

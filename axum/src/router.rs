@@ -133,17 +133,12 @@ fn servers_api(state: &AppState) -> Router<AppState> {
 /// per client IP, then the account and what it buys.
 fn accounts_api(state: &AppState) -> Router<AppState> {
     let sign_in = Router::new()
-        .route("/api/accounts/sign-up", post(accounts::sign_up))
         .route("/api/accounts/sign-in", post(accounts::sign_in))
         .route("/api/accounts/code", post(accounts::code))
         .route("/api/accounts/code/resend", post(accounts::code_resend))
         .route(
-            "/api/accounts/sign-in/password",
-            post(accounts::sign_in_password),
-        )
-        .route(
-            "/api/accounts/sign-in/new-password",
-            post(accounts::sign_in_new_password),
+            "/api/accounts/sign-in/confirm",
+            post(accounts::sign_in_confirm),
         )
         .route(
             "/api/accounts/sign-in/reset-password",

@@ -1,6 +1,6 @@
 //! "Try it now": a trial user with no sign-up, see
 //! `app_core::accounts::trial_users`, whose cookie lasts until their rows
-//! go; a sign-up from that browser is theirs, see `accounts::sign_up`.
+//! go; a sign-up from that browser is theirs, see `accounts::sign_in`.
 //! None on a server that takes no new sign-ups.
 
 use std::sync::Arc;

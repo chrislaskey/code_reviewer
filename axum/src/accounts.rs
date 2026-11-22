@@ -1,22 +1,22 @@
-//! The accounts API: sign up, sign in, the code and a new one, the
-//! password after it, and sign out, see `app_core::accounts` and
-//! `docs/design/accounts-sign-in.md`. A sign-up or a sign-in answers 202
-//! with the pending token, the code having been emailed; the code
-//! answers the session and sets the token as a cookie, which a browser
-//! sends from then on: only HTTP sees it, only this site gets it, and
-//! only over TLS away from localhost; it lasts until the browser closes,
-//! or, when the person chose to stay signed in, as long as the token. When the account has a password,
-//! or is new and may make one, the code answers that next step instead,
-//! and the password finishes as the code would have. A step with a
-//! device's challenge answers the device code instead and sets no
-//! cookie; the device exchanges it with its verifier for its session,
-//! which it keeps and sends as a bearer token. A sign-out deletes the
-//! token and clears the cookie. Each route is rate limited, see
-//! `rate_limits`. A sign-up from a trial user's browser is theirs, see
+//! The accounts API: one sign-in for signing up and signing in, the
+//! code and a new one, the last step, and sign out, see
+//! `app_core::accounts` and `docs/design/accounts-sign-in.md`. A sign-in
+//! answers 202 with the pending token, the code having been emailed;
+//! the code answers whether the last step makes the account and asks
+//! for its password, and that step answers the session and sets the
+//! token as a cookie, which a browser sends from then on: only HTTP sees
+//! it, only this site gets it, and only over TLS away from localhost; it
+//! lasts until the browser closes, or, when the person chose to stay
+//! signed in, as long as the token. A last step with a device's
+//! challenge answers the device code instead and sets no cookie; the
+//! device exchanges it with its verifier for its session, which it
+//! keeps and sends as a bearer token. A sign-out deletes the token and
+//! clears the cookie. Each route is rate limited, see `rate_limits`. A
+//! sign-in from a trial user's browser may be theirs signing up, see
 //! `trial_users`. A server whose settings turn sign-ups off,
-//! `features.accounts_sign_up`, refuses both, `sign_up_offered`. The
-//! accounts app's other routes are its submodules,
-//! each at the path of the core module it calls.
+//! `features.accounts_sign_up`, makes no account for a new email,
+//! `sign_up_offered`. The accounts app's other routes are its
+//! submodules, each at the path of the core module it calls.
 
 pub mod app_store_notifications;
 pub mod checkouts;
@@ -39,7 +39,7 @@ use axum_extra::extract::CookieJar;
 use axum_extra::extract::cookie::Cookie;
 use serde::Deserialize;
 
-use app_core::accounts::{self, CodeSent, SecondFactor, Session, SignInStep};
+use app_core::accounts::{self, CodeMatched, CodeSent, SecondFactor, Session};
 use app_core::app::users;
 use app_core::data::accounts_tokens::Context;
 use app_core::data::app_users::User;
@@ -57,6 +57,24 @@ pub struct SignIn {
 }
 
 #[derive(Deserialize)]
+pub struct Code {
+    pub pending: String,
+    pub code: String,
+}
+
+#[derive(Deserialize)]
+pub struct Confirm {
+    pub pending: String,
+    /// The account's password, when it has one.
+    pub password: Option<String>,
+    /// A device's challenge, when the sign-in was started by one.
+    pub challenge: Option<String>,
+    /// Whether the browser stays signed in after it closes.
+    #[serde(default)]
+    pub keep_signed_in: bool,
+}
+
+#[derive(Deserialize)]
 pub struct Password {
     pub pending: String,
     pub password: String,
@@ -68,37 +86,9 @@ pub struct Password {
 }
 
 #[derive(Deserialize)]
-pub struct NewPassword {
-    pub pending: String,
-    /// None when the person skipped making one.
-    pub password: Option<String>,
-    /// A device's challenge, when the sign-in was started by one.
-    pub challenge: Option<String>,
-    /// Whether the browser stays signed in after it closes.
-    #[serde(default)]
-    pub keep_signed_in: bool,
-}
-
-#[derive(Deserialize)]
-pub struct Code {
-    pub pending: String,
-    pub code: String,
-    /// A device's challenge, when the sign-in was started by one.
-    pub challenge: Option<String>,
-    /// Whether the browser stays signed in after it closes.
-    #[serde(default)]
-    pub keep_signed_in: bool,
-}
-
-#[derive(Deserialize)]
 pub struct DeviceCodeExchange {
     pub code: String,
     pub verifier: String,
-}
-
-#[derive(Deserialize)]
-pub struct SignUp {
-    pub email: String,
 }
 
 /// Whether the server takes new sign-ups, trial users included; a 403
@@ -114,23 +104,29 @@ pub(crate) fn sign_up_offered(document: &SettingsDocument) -> Result<(), ApiErro
     }
 }
 
-/// A sign-up; from a trial user's browser, that trial user signing up,
+/// A sign-in, a sign-up for an email with no account when the server
+/// takes them; from a trial user's browser, that trial user signing up,
 /// who keeps what they made.
-pub async fn sign_up(
+pub async fn sign_in(
     State(deployment): State<Deployment>,
     State(mailer): State<Mailer>,
     State(limits): State<RateLimits>,
     State(settings): State<Arc<SettingsDocument>>,
     jar: CookieJar,
-    Json(sign_up): Json<SignUp>,
+    Json(sign_in): Json<SignIn>,
 ) -> Result<(StatusCode, Json<CodeSent>), ApiError> {
-    sign_up_offered(&settings)?;
-    limits.check_email(&sign_up.email)?;
-    let sent = match trial_user_of(&deployment, &jar).await? {
+    limits.check_email(&sign_in.email)?;
+    let offered = sign_up_offered(&settings).is_ok();
+    let trial = if offered {
+        trial_user_of(&deployment, &jar).await?
+    } else {
+        None
+    };
+    let sent = match trial {
         Some(trial) => {
-            accounts::sign_up_from_trial(&deployment, &mailer, &trial, &sign_up.email).await?
+            accounts::sign_in_from_trial(&deployment, &mailer, &trial, &sign_in.email).await?
         }
-        None => accounts::sign_up(&deployment, &mailer, &sign_up.email).await?,
+        None => accounts::sign_in(&deployment, &mailer, &sign_in.email, offered).await?,
     };
     Ok((StatusCode::ACCEPTED, Json(sent)))
 }
@@ -144,17 +140,6 @@ async fn trial_user_of(deployment: &Deployment, jar: &CookieJar) -> Result<Optio
         .await
         .map_err(users::UserError::from)?;
     Ok(is_trial.then_some(user))
-}
-
-pub async fn sign_in(
-    State(deployment): State<Deployment>,
-    State(mailer): State<Mailer>,
-    State(limits): State<RateLimits>,
-    Json(sign_in): Json<SignIn>,
-) -> Result<(StatusCode, Json<CodeSent>), ApiError> {
-    limits.check_email(&sign_in.email)?;
-    let sent = accounts::sign_in(&deployment, &mailer, &sign_in.email).await?;
-    Ok((StatusCode::ACCEPTED, Json(sent)))
 }
 
 #[derive(Deserialize)]
@@ -176,75 +161,38 @@ pub async fn code_resend(
     Ok(StatusCode::ACCEPTED)
 }
 
-/// The emailed code: the session with the cookie, or, with a device's
-/// challenge, the device code and no cookie; or the step still to take.
+/// The emailed code: whether the last step makes the account and asks
+/// for its password, and its pending token. Nobody is signed in yet.
 pub async fn code(
     State(deployment): State<Deployment>,
-    headers: HeaderMap,
-    jar: CookieJar,
     Json(code): Json<Code>,
-) -> Result<Response, ApiError> {
-    if let Some(challenge) = challenge_of(&code.challenge) {
-        let step = accounts::sign_in_with_code_for_device(
-            &deployment,
-            &code.pending,
-            &code.code,
-            challenge,
-        )
-        .await?;
-        return Ok(Json(step).into_response());
-    }
-    match accounts::sign_in_with_code(&deployment, &code.pending, &code.code).await? {
-        SignInStep::Finished(session) => {
-            Ok(with_cookie(jar, &headers, session, code.keep_signed_in))
-        }
-        next => Ok(Json(next).into_response()),
-    }
+) -> Result<Json<CodeMatched>, ApiError> {
+    let matched = accounts::sign_in_with_code(&deployment, &code.pending, &code.code).await?;
+    Ok(Json(matched))
 }
 
-/// The account's password, after the code: answers as the code does
-/// when nothing else is asked.
-pub async fn sign_in_password(
+/// The last step, with the account's password when it has one: the
+/// session with the cookie, or, with a device's challenge, the device
+/// code and no cookie.
+pub async fn sign_in_confirm(
     State(deployment): State<Deployment>,
     headers: HeaderMap,
     jar: CookieJar,
-    Json(password): Json<Password>,
+    Json(confirm): Json<Confirm>,
 ) -> Result<Response, ApiError> {
-    if let Some(challenge) = challenge_of(&password.challenge) {
-        let device_code = accounts::sign_in_with_password_for_device(
+    let password = confirm.password.as_deref();
+    if let Some(challenge) = challenge_of(&confirm.challenge) {
+        let device_code = accounts::sign_in_confirm_for_device(
             &deployment,
-            &password.pending,
-            &password.password,
-            challenge,
-        )
-        .await?;
-        return Ok(Json(device_code).into_response());
-    }
-    let session =
-        accounts::sign_in_with_password(&deployment, &password.pending, &password.password).await?;
-    Ok(with_cookie(jar, &headers, session, password.keep_signed_in))
-}
-
-/// The password a new account makes, or skips, after its first code.
-pub async fn sign_in_new_password(
-    State(deployment): State<Deployment>,
-    headers: HeaderMap,
-    jar: CookieJar,
-    Json(new): Json<NewPassword>,
-) -> Result<Response, ApiError> {
-    let password = new.password.as_deref();
-    if let Some(challenge) = challenge_of(&new.challenge) {
-        let device_code = accounts::sign_in_with_new_password_for_device(
-            &deployment,
-            &new.pending,
+            &confirm.pending,
             password,
             challenge,
         )
         .await?;
         return Ok(Json(device_code).into_response());
     }
-    let session = accounts::sign_in_with_new_password(&deployment, &new.pending, password).await?;
-    Ok(with_cookie(jar, &headers, session, new.keep_signed_in))
+    let session = accounts::sign_in_confirm(&deployment, &confirm.pending, password).await?;
+    Ok(with_cookie(jar, &headers, session, confirm.keep_signed_in))
 }
 
 /// A new password in place of a forgotten one, after the code; 403

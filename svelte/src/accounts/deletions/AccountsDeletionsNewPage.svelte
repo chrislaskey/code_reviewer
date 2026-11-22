@@ -11,7 +11,7 @@
   import { currentUser, currentUserForget, currentUserLoad } from "../../lib/current_user.svelte.js";
   import { navigateToUrl } from "../../lib/router.js";
   import { PUBLIC_HOME_PATH, accountsIndexUrl, accountsCurrentShowUrl } from "../../lib/routes.js";
-  import { Button, ErrorMessage, Heading, Input, Link, Page, Text } from "../../lib/components/index.js";
+  import { Button, CodeInput, ErrorMessage, Heading, Link, Page, Text } from "../../lib/components/index.js";
 
   /** Where each store's own subscriptions page is, to cancel a plan there. */
   const STORE_SUBSCRIPTIONS_URLS = {
@@ -89,20 +89,15 @@
         </div>
         {#if codeSent}
           <Text tone="muted">A code is on its way to {currentUser.value.email}. It expires in ten minutes.</Text>
-          <Input
-            bind:value={code}
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            aria-label="Code"
-            placeholder="The code from the email"
-            required
-          />
+          <CodeInput bind:value={code} disabled={busy} />
         {/if}
       {/if}
       <ErrorMessage message={error} />
       <div class="flex flex-wrap items-center gap-3">
         {#if currentUser.value.kind === "trial" || codeSent}
-          <Button variant="danger" type="submit" disabled={busy}>Delete my account</Button>
+          <Button variant="danger" type="submit" disabled={busy || (currentUser.value.kind === "full" && code.length < 6)}>
+            Delete my account
+          </Button>
         {/if}
         <Link size="sm" href={accountsCurrentShowUrl()}>Back to account</Link>
       </div>

@@ -1,14 +1,15 @@
-<!-- Signing in, at /accounts/sign-in, on the web: the email, then the
-     code that was emailed and the password if the account has one, see
-     AccountsSignInSteps. Opened by a device with ?challenge=, it ends in
-     a code for the device instead, see docs/design/accounts-sign-in.md.
-     The email is filled in from ?email=. Sign up is offered only where
-     the server takes new sign-ups. -->
+<!-- Signing in or up, at /accounts/sign-in, on the web, one flow for
+     both: the email, then the code that was emailed and the button that
+     makes the account or signs in to it, see AccountsSignInSteps; the
+     server knows which, and the email step looks the same either way.
+     Opened by a device with ?challenge=, it ends in a code for the device
+     instead, see docs/design/accounts-sign-in.md. The email is filled in
+     from ?email=. A trial is offered where the server has room for one. -->
 <script>
   import { accountsSignIn, accountsTrialGet } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
   import { currentServer, currentServerLoad } from "../lib/current_server.svelte.js";
-  import { accountsSignUpUrl, accountsTrialUrl } from "../lib/routes.js";
+  import { accountsTrialUrl } from "../lib/routes.js";
   import AccountsForm from "./components/AccountsForm.svelte";
   import AccountsSignInSteps from "./components/AccountsSignInSteps.svelte";
   import { KEEP_SIGNED_IN_CHECKED } from "./keep_signed_in.js";
@@ -44,16 +45,16 @@
 </script>
 
 <Page>
-  <Heading level={1}>Sign in</Heading>
+  <Heading level={1}>{signUpOffered ? "Sign in or create an account" : "Sign in"}</Heading>
   {#if challenge}
     <Text tone="muted">Signing in for the app on your device.</Text>
   {/if}
   {#if pending}
     <AccountsSignInSteps {email} {pending} {challenge} {appReturn} {keepSignedIn} onstartover={() => (pending = "")} />
   {:else}
-    <AccountsForm bind:email bind:keepSignedIn withKeepSignedIn={!challenge} submitText="Sign in" {error} {busy} onsubmit={signIn} />
-    {#if signUpOffered}
-      <Text tone="muted">New here? <Link href={accountsSignUpUrl(email || undefined)}>Sign up</Link></Text>
+    <AccountsForm bind:email bind:keepSignedIn withKeepSignedIn={!challenge} submitText="Continue" {error} {busy} onsubmit={signIn} />
+    {#if !signUpOffered}
+      <Text tone="muted">This server takes no new sign-ups.</Text>
     {/if}
     {#if trialAvailable}
       <Text tone="muted">Just looking? <Link href={accountsTrialUrl()}>Try it without an account</Link></Text>

@@ -94,12 +94,11 @@ export function avatarsUpdate(key) {
   return send("PUT", "/api/users/current/avatar", { key });
 }
 
-// A sign-up or a sign-in emails a code and answers `{pending}`. The code
-// answers the user and sets the cookie the browser sends from then on, or,
-// with a device's challenge, `{code}` for the device and no cookie; or
-// `{next, pending}` when a password is asked for first ("password") or a
-// new account may make one ("new_password"), which then answers as the
-// code would have. A sign-out clears the cookie.
+// A sign-in, a sign-up for an email with no account, emails a code and
+// answers `{pending}`. The code answers what the last step is, and that
+// step answers the user and sets the cookie the browser sends from then
+// on, or, with a device's challenge, `{code}` for the device and no
+// cookie. A sign-out clears the cookie.
 
 /**
  * What finishes a sign-in: the session, or a device's code.
@@ -107,12 +106,10 @@ export function avatarsUpdate(key) {
  */
 
 /**
- * @param {string} email
- * @returns {Promise<{pending: string}>}
+ * What a matched code answers: the last step's pending token, whether
+ * it makes the account, and whether the account's password finishes it.
+ * @typedef {{pending: string, new_account: boolean, needs_password: boolean, can_reset_password: boolean}} CodeMatched
  */
-export function accountsSignUp(email) {
-  return send("POST", "/api/accounts/sign-up", { email });
-}
 
 /**
  * @param {string} email
@@ -125,24 +122,22 @@ export function accountsSignIn(email) {
 /**
  * @param {string} pending
  * @param {string} code the six digits emailed
- * @param {string} [challenge] the device's, when it opened this page
- * @param {boolean} [keepSignedIn] whether the browser stays signed in after it closes
- * @returns {Promise<SignInFinished | {next: "password" | "new_password", pending: string, can_reset_password: boolean}>}
+ * @returns {Promise<CodeMatched>}
  */
-export function accountsCode(pending, code, challenge, keepSignedIn = false) {
-  return send("POST", "/api/accounts/code", { pending, code, challenge: challenge || null, keep_signed_in: keepSignedIn });
+export function accountsCode(pending, code) {
+  return send("POST", "/api/accounts/code", { pending, code });
 }
 
 /**
- * The account's password, after the code.
+ * The last step: makes a new account, or signs in to one.
  * @param {string} pending the one the code answered
- * @param {string} password
- * @param {string} [challenge]
- * @param {boolean} [keepSignedIn]
+ * @param {string | null} password the account's, when it has one
+ * @param {string} [challenge] the device's, when it opened this page
+ * @param {boolean} [keepSignedIn] whether the browser stays signed in after it closes
  * @returns {Promise<SignInFinished>}
  */
-export function accountsSignInPassword(pending, password, challenge, keepSignedIn = false) {
-  return send("POST", "/api/accounts/sign-in/password", { pending, password, challenge: challenge || null, keep_signed_in: keepSignedIn });
+export function accountsSignInConfirm(pending, password, challenge, keepSignedIn = false) {
+  return send("POST", "/api/accounts/sign-in/confirm", { pending, password, challenge: challenge || null, keep_signed_in: keepSignedIn });
 }
 
 /**
@@ -156,18 +151,6 @@ export function accountsSignInPassword(pending, password, challenge, keepSignedI
  */
 export function accountsSignInResetPassword(pending, password, challenge, keepSignedIn = false) {
   return send("POST", "/api/accounts/sign-in/reset-password", { pending, password, challenge: challenge || null, keep_signed_in: keepSignedIn });
-}
-
-/**
- * The password a new account makes after its first code, or null to skip.
- * @param {string} pending the one the code answered
- * @param {string | null} password
- * @param {string} [challenge]
- * @param {boolean} [keepSignedIn]
- * @returns {Promise<SignInFinished>}
- */
-export function accountsSignInNewPassword(pending, password, challenge, keepSignedIn = false) {
-  return send("POST", "/api/accounts/sign-in/new-password", { pending, password, challenge: challenge || null, keep_signed_in: keepSignedIn });
 }
 
 /**

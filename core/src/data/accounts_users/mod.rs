@@ -43,6 +43,12 @@ pub struct AccountUser {
     /// When a trial user's 24 hours end; none for every other account,
     /// and again once a trial signs up, see `crate::accounts::trial_users`.
     pub trial_expires_at: Option<DateTime<Utc>>,
+    /// The version of the terms the person last accepted,
+    /// `crate::accounts::TERMS_VERSION` when they did; none until their
+    /// first sign-in's last step.
+    pub terms_version: Option<String>,
+    /// When they accepted that version.
+    pub terms_accepted_at: Option<DateTime<Utc>>,
     pub inserted_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
@@ -107,6 +113,8 @@ async fn create_with_trial(
         email: checked_email(email)?,
         confirmed_at: confirmed.then_some(now),
         trial_expires_at,
+        terms_version: None,
+        terms_accepted_at: None,
         inserted_at: now,
         updated_at: now,
         deleted_at: None,
@@ -118,6 +126,16 @@ async fn create_with_trial(
 /// Marks the account's email as proved, now.
 pub async fn confirm(tx: &mut Transaction, id: Uuid) -> Result<(), AccountUserError> {
     Ok(query!(tx, set_confirmed_at(id, now()))?)
+}
+
+/// Records that the person accepted the terms of the version, now; the
+/// time stays that of their first acceptance of it.
+pub async fn accept_terms(
+    tx: &mut Transaction,
+    id: Uuid,
+    version: &str,
+) -> Result<(), AccountUserError> {
+    Ok(query!(tx, set_terms_accepted(id, version, now()))?)
 }
 
 /// Makes a trial user's account the person's own, with the email they

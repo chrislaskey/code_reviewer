@@ -77,32 +77,22 @@ export function avatarsUpdate(key) {
 // person pastes into the app, see accountsSignInStart.
 
 /** @param {string} _email */
-export function accountsSignUp(_email) {
-  return Promise.reject(new Error("in the app, sign in from the accounts page"));
-}
-
-/** @param {string} _email */
 export function accountsSignIn(_email) {
   return Promise.reject(new Error("in the app, sign in from the accounts page"));
 }
 
-/** @param {string} _pending @param {string} _code @param {string} [_challenge] */
-export function accountsCode(_pending, _code, _challenge) {
+/** @param {string} _pending @param {string} _code */
+export function accountsCode(_pending, _code) {
   return Promise.reject(new Error("in the app, sign in from the accounts page"));
 }
 
-/** @param {string} _pending @param {string} _password @param {string} [_challenge] */
-export function accountsSignInPassword(_pending, _password, _challenge) {
+/** @param {string} _pending @param {string | null} _password @param {string} [_challenge] */
+export function accountsSignInConfirm(_pending, _password, _challenge) {
   return Promise.reject(new Error("in the app, sign in from the accounts page"));
 }
 
 /** @param {string} _pending @param {string} _password @param {string} [_challenge] */
 export function accountsSignInResetPassword(_pending, _password, _challenge) {
-  return Promise.reject(new Error("in the app, sign in from the accounts page"));
-}
-
-/** @param {string} _pending @param {string | null} _password @param {string} [_challenge] */
-export function accountsSignInNewPassword(_pending, _password, _challenge) {
   return Promise.reject(new Error("in the app, sign in from the accounts page"));
 }
 

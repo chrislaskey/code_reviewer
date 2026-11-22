@@ -2,7 +2,7 @@
      who has none yet: a local user, in the app, or a trial user, on the
      web. See docs/design/accounts-local-and-trial-users.md. -->
 <script>
-  import { accountsIndexUrl, accountsSignUpUrl } from "./routes.js";
+  import { accountsIndexUrl, accountsSignInUrl } from "./routes.js";
   import { Button, Text } from "./components/index.js";
 
   /**
@@ -19,5 +19,5 @@
   <Text><Button size="sm" variant="primary" href={accountsIndexUrl()}>Sign up or sign in</Button></Text>
 {:else}
   <Text>This needs an account, and you are on a trial.</Text>
-  <Text><Button size="sm" variant="primary" href={accountsSignUpUrl()}>Sign up</Button></Text>
+  <Text><Button size="sm" variant="primary" href={accountsSignInUrl()}>Sign up</Button></Text>
 {/if}

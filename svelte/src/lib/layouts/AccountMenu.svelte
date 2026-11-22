@@ -18,7 +18,6 @@
     accountsIndexUrl,
     accountsCurrentShowUrl,
     accountsSignInUrl,
-    accountsSignUpUrl,
     profileEditUrl,
   } from "../routes.js";
   import { Button, ErrorMessage, Icon, Link } from "../components/index.js";
@@ -74,7 +73,7 @@
       </div>
       {#if currentUser.value.kind === "trial"}
         <div class="px-3 py-1">
-          <Button variant="primary" size="sm" class="w-full" href={accountsSignUpUrl("")} onclick={close}>
+          <Button variant="primary" size="sm" class="w-full" href={accountsSignInUrl("")} onclick={close}>
             {t`Sign up`}
           </Button>
         </div>
@@ -108,5 +107,5 @@
   <Button variant="primary" size="sm" href={accountsIndexUrl()}>{t`Sign in`}</Button>
 {:else}
   <Link href={accountsSignInUrl()}>{t`Sign in`}</Link>
-  <Button variant="primary" size="sm" href={accountsSignUpUrl()}>{t`Sign up`}</Button>
+  <Button variant="primary" size="sm" href={accountsSignInUrl()}>{t`Sign up`}</Button>
 {/if}

@@ -17,7 +17,7 @@ the file as it is; nothing is drawn by a script.
 - **The header and footer** are written once, in
   `svelte/src/public/partials/`, and the build puts them where a page has
   `<!-- public-header -->` and `<!-- public-footer -->`.
-- **Links to the app** are plain paths, `/accounts/sign-up`: a full page
+- **Links to the app** are plain paths, `/accounts/sign-in`: a full page
   load, answered by the app's `index.html`.
 
 - **Signed in**, the header shows "Open the app" in place of Sign in

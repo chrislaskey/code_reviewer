@@ -891,34 +891,23 @@ mod tests {
         Deployment::new(database, Role::Server)
     }
 
-    /// A user signed up on the server and finished with the code the
-    /// memory mailer caught, as a device: the session its exchange
-    /// answered. Once the email has an account, a sign-in instead.
+    /// A user signed in on the server, signed up the first time, and
+    /// finished with the code the memory mailer caught, as a device: the
+    /// session its exchange answered.
     async fn signed_up(server: &Deployment, email: &str) -> Session {
         let mailer = Mailer::memory();
-        let sent = accounts::sign_up(server, &mailer, email)
+        let sent = accounts::sign_in(server, &mailer, email, true)
             .await
-            .expect("signed up");
-        let mail = mailer.last_sent_to(email).expect("mailed");
-        let sent = match mails::code_in(&mail) {
-            Some(_) => sent,
-            None => accounts::sign_in(server, &mailer, email)
-                .await
-                .expect("signed in"),
-        };
+            .expect("signed in");
         let code = mails::code_in(&mailer.last_sent_to(email).expect("mailed")).expect("a code");
         let (verifier, challenge) = accounts::verifier_and_challenge();
-        let step = accounts::sign_in_with_code_for_device(server, &sent.pending, &code, &challenge)
+        let matched = accounts::sign_in_with_code(server, &sent.pending, &code)
             .await
             .expect("the code matched");
-        let device_code = match step {
-            accounts::SignInStep::Finished(device_code) => device_code,
-            accounts::SignInStep::Next { pending, .. } => {
-                accounts::sign_in_with_new_password_for_device(server, &pending, None, &challenge)
-                    .await
-                    .expect("skipped making a password")
-            }
-        };
+        let device_code =
+            accounts::sign_in_confirm_for_device(server, &matched.pending, None, &challenge)
+                .await
+                .expect("finished");
         accounts::sign_in_with_device_code(server, &device_code.code, &verifier)
             .await
             .expect("exchanged")

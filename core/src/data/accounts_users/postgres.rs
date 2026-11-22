@@ -12,6 +12,8 @@ struct AccountUserRow {
     email: String,
     confirmed_at: Option<DateTime<Utc>>,
     trial_expires_at: Option<DateTime<Utc>>,
+    terms_version: Option<String>,
+    terms_accepted_at: Option<DateTime<Utc>>,
     inserted_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
     deleted_at: Option<DateTime<Utc>>,
@@ -24,6 +26,8 @@ impl From<AccountUserRow> for AccountUser {
             email: row.email,
             confirmed_at: row.confirmed_at,
             trial_expires_at: row.trial_expires_at,
+            terms_version: row.terms_version,
+            terms_accepted_at: row.terms_accepted_at,
             inserted_at: row.inserted_at,
             updated_at: row.updated_at,
             deleted_at: row.deleted_at,
@@ -34,7 +38,7 @@ impl From<AccountUserRow> for AccountUser {
 macro_rules! select {
     ($rest:expr) => {
         concat!(
-            "SELECT id, email, confirmed_at, trial_expires_at, inserted_at, updated_at, deleted_at FROM accounts_users ",
+            "SELECT id, email, confirmed_at, trial_expires_at, terms_version, terms_accepted_at, inserted_at, updated_at, deleted_at FROM accounts_users ",
             $rest
         )
     };
@@ -70,13 +74,15 @@ pub async fn insert(
     account: &AccountUser,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO accounts_users (id, email, confirmed_at, trial_expires_at, inserted_at, updated_at, deleted_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        "INSERT INTO accounts_users (id, email, confirmed_at, trial_expires_at, terms_version, terms_accepted_at, inserted_at, updated_at, deleted_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
     )
     .bind(account.id)
     .bind(&account.email)
     .bind(account.confirmed_at)
     .bind(account.trial_expires_at)
+    .bind(&account.terms_version)
+    .bind(account.terms_accepted_at)
     .bind(account.inserted_at)
     .bind(account.updated_at)
     .bind(account.deleted_at)
@@ -96,6 +102,26 @@ pub async fn set_confirmed_at(
         .bind(now)
         .execute(connection)
         .await?;
+    Ok(())
+}
+
+/// Records the terms version the person accepted, now, unless it is the
+/// one they already accepted.
+pub async fn set_terms_accepted(
+    connection: &mut PgConnection,
+    id: Uuid,
+    version: &str,
+    now: DateTime<Utc>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE accounts_users SET terms_version = $2, terms_accepted_at = $3, updated_at = $3
+         WHERE id = $1 AND (terms_version IS NULL OR terms_version <> $2)",
+    )
+    .bind(id)
+    .bind(version)
+    .bind(now)
+    .execute(connection)
+    .await?;
     Ok(())
 }
 

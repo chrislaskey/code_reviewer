@@ -8,6 +8,7 @@ export { default as Alert } from "./Alert.svelte";
 export { default as Badge } from "./Badge.svelte";
 export { default as Button } from "./Button.svelte";
 export { default as Checkbox } from "./Checkbox.svelte";
+export { default as CodeInput } from "./CodeInput.svelte";
 export { default as Dialog } from "./Dialog.svelte";
 export { default as DialogActions } from "./DialogActions.svelte";
 export { default as ErrorMessage } from "./ErrorMessage.svelte";

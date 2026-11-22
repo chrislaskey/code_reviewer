@@ -122,8 +122,8 @@ svelte/src/
   and `edit`; a singular resource has no id, so the person's profile is
   `/profile/edit`, their password `/accounts/current/password/edit`, and their
   account, the signed-in one, `/accounts/current`. The
-  sign-in pages keep the names Phoenix's own `gen.auth` gives them,
-  `/accounts/sign-in` and `/accounts/sign-up`, as
+  sign-in page keeps the name Phoenix's own `gen.auth` gives it,
+  `/accounts/sign-in`, signing up too, as
   do `/accounts/trial` and `/accounts/back-to-app`, which are no
   resource's.
 - **`components/` beside the pages** holds a folder's pieces that more

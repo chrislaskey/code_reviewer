@@ -1,7 +1,8 @@
 # Signing in: the emailed code, and devices through the browser
 
 **Status: built, 2026-11-08, steps 1 to 6 of the build order; the
-later returns are not.** Since `multi-app.md` the email and
+later returns are not. One sign-in for both since 2026-11-22, see the
+first section.** Since `multi-app.md` the email and
 `confirmed_at` are on `accounts_users`, a server-only row with the
 user's id, and a sign-up's name, from the email since 2026-11-20, is the only thing of a person that
 `app_users` syncs besides their picture; read `app_users` below as
@@ -13,6 +14,57 @@ that pair. The code is `core/src/accounts.rs`,
 under `svelte/src/accounts/`. Every item under "To decide" is
 **Agreed**; each carries the recommendation and what else was weighed; the sections after it describe the design as recommended, so
 it can be read whole, and change where a decision goes the other way.
+
+## Since 2026-11-22: one sign-in for signing up and signing in
+
+There is one page, `/accounts/sign-in`, and one route,
+`POST /api/accounts/sign-in`, for both; `/accounts/sign-up`, its
+route and `AccountsSignUpPage` are gone, and every Sign up link opens
+the sign-in page. Where the sections below speak of a sign-up page or
+route, or of a password made or skipped at the first sign-in, read
+this.
+
+- **The email**: the person types it and presses Continue.
+  `accounts::sign_in` mails a code to an email with an account,
+  confirmed or not; registers an email with none, unconfirmed and named
+  from the email, and mails it a code, when the server takes sign-ups;
+  and, when it does not, answers the same and mails that address that
+  it has no account. Every answer is the same 202 `{ pending }`, so the
+  page tells nobody whether an email has an account. From a trial
+  user's browser, `accounts::sign_in_from_trial`: an address with a
+  confirmed account gets a code for that account, and the trial is
+  left as it is; any other is the trial signing up, the code going to
+  it as `sent_to`.
+- **The code** is typed one digit to a box (`CodeInput`, which also
+  takes a pasted or autofilled code whole) and checked as soon as the
+  sixth digit is in, `accounts::sign_in_with_code`. It signs nobody in
+  and makes no account: it answers `CodeMatched { pending,
+  new_account, needs_password, can_reset_password }`, the pending
+  token being a `sign_in_password` row, ten minutes, which keeps the
+  code's `sent_to`.
+- **The button** is disabled until the code matched, then reads
+  "Create account" for a new account or "Sign in" for one that
+  exists, with the account's password above it when it has one, and
+  "Forgot your password?" when it may be reset. It sends
+  `POST /api/accounts/sign-in/confirm`, `accounts::sign_in_confirm`
+  (`sign_in_confirm_for_device` with a challenge), which checks the
+  password, a wrong or missing one counting as a wrong code does, and
+  only then makes a new account: the email confirmed and the first
+  community made, or a trial's account given the address. A new
+  account that never presses the button stays unconfirmed, and the
+  purge removes it after a day.
+- **The terms**: "By continuing, you accept the Terms of Service and
+  Privacy Policy" sits beside the button for both, so it is in front
+  of everyone each time they sign in. The button records it:
+  `accounts_users.terms_version` takes `accounts::TERMS_VERSION`, the
+  terms' effective date, a constant changed with `terms.html` and
+  `privacy.html`, and `terms_accepted_at` when that version was first
+  accepted; a later sign-in with the same version leaves the time as
+  it was. Asking someone signed in to accept a newer version is not
+  built; see `docs/suggestions/sign-in.md`.
+- **No password at sign-up**: the "Create a password" step after the
+  first code is gone. A password is made later, signed in, at
+  `/accounts/current/password/edit`.
 
 ## Since 2026-11-11: the code first, a password optional
 
@@ -587,12 +639,10 @@ and over is the per-address limit, see "Rate limits".
 
 | route | body | answers |
 | --- | --- | --- |
-| `POST /api/accounts/sign-up` | `email` | 202 `{ pending }` whether the email is new or not, 422 bad email |
-| `POST /api/accounts/sign-in` | `email` | 202 `{ pending }` whether the email has an account or not, 422 bad email |
-| `POST /api/accounts/code` | `pending`, `code`, `challenge?` | 200 session with the cookie, or with `challenge` 200 `{ code }` and no cookie; or 200 `{ next, pending }`, `next` being `password` or `new_password`; 401 wrong, expired, or too many |
-| `POST /api/accounts/sign-in/password` | `pending`, `password`, `challenge?` | 200 as a finished code; 422 wrong password; 401 expired or too many |
-| `POST /api/accounts/sign-in/reset-password` | `pending`, `password`, `challenge?` | 200 as a finished code, the old password replaced and its owner emailed; 403 when the app locks out; 422 a password too short or long; 401 expired |
-| `POST /api/accounts/sign-in/new-password` | `pending`, `password` or null to skip, `challenge?` | 200 as a finished code; 422 a password too short or long; 401 expired |
+| `POST /api/accounts/sign-in` | `email` | 202 `{ pending }` whether the email has an account or not, a new one registered when the server takes sign-ups; 422 bad email |
+| `POST /api/accounts/code` | `pending`, `code` | 200 `{ pending, new_account, needs_password, can_reset_password }`, nobody signed in yet; 401 wrong, expired, or too many |
+| `POST /api/accounts/sign-in/confirm` | `pending`, `password?`, `challenge?`, `keep_signed_in?` | 200 session with the cookie, the account made if new, or with `challenge` 200 `{ code }` and no cookie; 422 wrong password; 401 expired or too many |
+| `POST /api/accounts/sign-in/reset-password` | `pending`, `password`, `challenge?`, `keep_signed_in?` | 200 as the confirm, the old password replaced and its owner emailed; 403 when the app locks out; 422 a password too short or long; 401 expired |
 | `GET /api/accounts/second-factors` | | 200 `["password"]` or `[]`, of the signed-in user |
 | `PUT /api/accounts/current/password` | `current` or null, `password` | 204; 422 wrong current password, or one too short or long |
 | `POST /api/accounts/code/resend` | `pending` | 202, a new code mailed; 429 within a minute of the last, see "Rate limits" |

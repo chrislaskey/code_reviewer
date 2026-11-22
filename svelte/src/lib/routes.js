@@ -9,7 +9,6 @@
 export const PUBLIC_HOME_PATH = "/";
 export const HOME_PATH = "/home";
 export const ACCOUNTS_INDEX_PATH = "/accounts";
-export const ACCOUNTS_SIGN_UP_PATH = "/accounts/sign-up";
 export const ACCOUNTS_SIGN_IN_PATH = "/accounts/sign-in";
 export const ACCOUNTS_TRIAL_PATH = "/accounts/trial";
 export const ACCOUNTS_CURRENT_SHOW_PATH = "/accounts/current";
@@ -48,7 +47,6 @@ export const OPS_HOME_PATH = "/ops";
 export const OPEN_PATHS = [
   HOME_PATH,
   ACCOUNTS_INDEX_PATH,
-  ACCOUNTS_SIGN_UP_PATH,
   ACCOUNTS_SIGN_IN_PATH,
   ACCOUNTS_TRIAL_PATH,
   ACCOUNTS_BACK_TO_APP_PATH,
@@ -75,16 +73,8 @@ export function accountsIndexUrl({ accountDeleted = false } = {}) {
 // between them keeps unless the caller says otherwise: a device's
 // challenge, when it opened the page in the browser to sign in, where
 // to return the code to, the desktop app's port or the iPhone app's
-// scheme, and the email to fill in. So the nav's Sign in and Sign up, and the pages'
+// scheme, and the email to fill in. So the nav's Sign in, and the pages'
 // own links, all stay a device's sign-in.
-
-/**
- * @param {string} [email] to fill in, else the current address's
- * @param {string} [challenge] a device's, else the current address's
- */
-export function accountsSignUpUrl(email = currentQuery("email"), challenge = currentQuery("challenge")) {
-  return withQuery(ACCOUNTS_SIGN_UP_PATH, { email, challenge, ...appReturnQuery() });
-}
 
 /**
  * @param {string} [email] to fill in, for an account signed out on this device, else the current address's

@@ -16,7 +16,7 @@ use http_body_util::BodyExt;
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
-use app_core::accounts::{Session, SignInStep};
+use app_core::accounts::Session;
 use app_core::servers::settings::{ServerSettings, SettingsDocument};
 use app_core::services::storage::Storage;
 
@@ -133,19 +133,17 @@ fn test_listed_servers() -> app_core::servers::ListedServers {
 
 /// A user signed up on the server and finished with their code.
 async fn signed_up(deployment: &Deployment, mailer: &Mailer, email: &str) -> Session {
-    let sent = app_core::accounts::sign_up(deployment, mailer, email)
+    let sent = app_core::accounts::sign_in(deployment, mailer, email, true)
         .await
-        .expect("signed up");
+        .expect("signed in");
     let code = code_sent_to(mailer, email);
-    let step = app_core::accounts::sign_in_with_code(deployment, &sent.pending, &code)
+    let matched = app_core::accounts::sign_in_with_code(deployment, &sent.pending, &code)
         .await
         .expect("the code matched");
-    let SignInStep::Next { pending, .. } = step else {
-        panic!("a new account is offered a password");
-    };
-    app_core::accounts::sign_in_with_new_password(deployment, &pending, None)
+    assert!(matched.new_account);
+    app_core::accounts::sign_in_confirm(deployment, &matched.pending, None)
         .await
-        .expect("skipped making a password")
+        .expect("signed up")
 }
 
 /// The code the last email to the address carried.
@@ -235,8 +233,8 @@ async fn set_cookie_of(router: &Router, path: &str, body: Value) -> Option<Strin
         .map(|cookie| cookie.to_str().expect("a cookie").to_string())
 }
 
-/// A sign-in of the email up to its password step: the pending token.
-async fn signed_in_to_the_password(router: &TestRouter, email: &str) -> Value {
+/// A sign-in of the email up to its last step: what the code answered.
+async fn code_matched(router: &TestRouter, email: &str) -> Value {
     let (_, body) = send_as(
         &router.router,
         None,
@@ -254,5 +252,5 @@ async fn signed_in_to_the_password(router: &TestRouter, email: &str) -> Value {
         Some(json!({ "pending": body["pending"], "code": code })),
     )
     .await;
-    body["pending"].clone()
+    body
 }
