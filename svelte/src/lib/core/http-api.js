@@ -251,6 +251,15 @@ export function deviceAccountsRemove(_id, _losingChanges) {
   return Promise.reject(new Error("no accounts are kept on the web"));
 }
 
+/**
+ * The server the pages are on, which on the web is the one they came from.
+ * @returns {Promise<{display_name: string, host: string, default: boolean}>}
+ */
+export async function serversCurrentGet() {
+  const server = await send("GET", "/api/servers/current");
+  return { display_name: server.display_name, host: window.location.host, default: true };
+}
+
 /** @returns {Promise<"none" | "listed_only" | "any">} */
 export function multiServerGet() {
   return Promise.resolve("none");

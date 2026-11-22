@@ -1515,6 +1515,7 @@ mod tests {
         let other = DeviceServer {
             id: Uuid::now_v7(),
             url: Some("https://staging.example.com".to_string()),
+            display_name: None,
         };
         sqlx::query("INSERT INTO device_servers (id, url, listed) VALUES ($1, $2, 'unlisted')")
             .bind(other.id.hyphenated())
@@ -1587,7 +1588,8 @@ mod tests {
             })
             .await
             .expect("kept again");
-        assert_eq!(again, acme, "one row per origin");
+        assert_eq!(again.id, acme.id, "one row per origin");
+        assert_eq!(again.display_name.as_deref(), Some("Acme Corp"));
         let default = device
             .server_keep(&ServerChecked {
                 listing: Listing::Default,
@@ -1598,11 +1600,23 @@ mod tests {
         assert_eq!(default, device.default_server().await.expect("the default"));
 
         assert!(device.active_on_default_server().await, "nobody active");
+        let current = device.current_server().await.expect("current");
+        assert!(current.default);
+        assert_eq!(current.host, "localhost:4000");
         device
             .keep_signed_in(acme.id, signed_up(&server, "alice@example.com").await)
             .await
             .expect("on acme");
         assert!(!device.active_on_default_server().await);
+        let current = device.current_server().await.expect("current");
+        assert_eq!(
+            (
+                current.display_name.as_str(),
+                current.host.as_str(),
+                current.default
+            ),
+            ("Acme Corp", "acme.example.com:8443", false)
+        );
         let on_acme = device.list().await.expect("listed");
         assert_eq!(
             on_acme[0].server_host.as_deref(),

@@ -43,6 +43,7 @@ export const deviceAccountsDeactivate = core.deviceAccountsDeactivate;
 export const deviceAccountsRemove = core.deviceAccountsRemove;
 export const multiServerGet = core.multiServerGet;
 export const deviceServersCreate = core.deviceServersCreate;
+export const serversCurrentGet = core.serversCurrentGet;
 export const serversGet = core.serversGet;
 export const accountsTrialGet = core.accountsTrialGet;
 export const accountsTrialCreate = core.accountsTrialCreate;

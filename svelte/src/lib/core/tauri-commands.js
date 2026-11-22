@@ -222,6 +222,15 @@ export function deviceAccountsRemove(id, losingChanges) {
 }
 
 /**
+ * The server the pages are on: the active account's, else the app's own.
+ * `default` is whether it is the app's own, the only one that sells.
+ * @returns {Promise<{display_name: string, host: string, default: boolean}>}
+ */
+export function serversCurrentGet() {
+  return invoke("servers_current_get");
+}
+
+/**
  * Which servers other than the build's default the app may sign in to:
  * "none", "listed_only" or "any".
  * @returns {Promise<"none" | "listed_only" | "any">}
@@ -655,10 +664,7 @@ export function accountsDeletionsCreate(code) {
 // sheet, then the server records the proof, then the store's
 // transaction is finished.
 
-/**
- * The store this app sells through: `app_store`, `play_store`, or `stripe`
- * on the desktop; `none` on an account of a server other than the app's own.
- */
+/** The store this app sells through: `app_store`, `play_store`, or `stripe` on the desktop. */
 export function accountsStoreGet() {
   return invoke("accounts_store_get");
 }

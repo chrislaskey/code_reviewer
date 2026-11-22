@@ -55,3 +55,26 @@ async fn servers_get_answers_only_the_name_and_the_origin_together() {
     let (no_url, _, _) = ask("/api/servers/acme").await;
     assert_eq!(no_url, StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn sync_routes_refuse_another_protocol_version_426() {
+    let (router, _) = test_router().await;
+    let pull = |version: Option<&str>| {
+        let mut request = Request::builder()
+            .method(Method::POST)
+            .uri("/api/sync/pull")
+            .header(header::AUTHORIZATION, format!("Bearer {}", router.token))
+            .header(header::CONTENT_TYPE, "application/json");
+        if let Some(version) = version {
+            request = request.header(app_core::sync::PROTOCOL_VERSION_HEADER, version);
+        }
+        let request = request.body(Body::from("{}")).expect("a request");
+        let router = router.router.clone();
+        async move { router.oneshot(request).await.expect("a response").status() }
+    };
+    let own = app_core::sync::PROTOCOL_VERSION.to_string();
+    assert_eq!(pull(Some(&own)).await, StatusCode::OK);
+    assert_eq!(pull(None).await, StatusCode::UPGRADE_REQUIRED);
+    let newer = (app_core::sync::PROTOCOL_VERSION + 1).to_string();
+    assert_eq!(pull(Some(&newer)).await, StatusCode::UPGRADE_REQUIRED);
+}

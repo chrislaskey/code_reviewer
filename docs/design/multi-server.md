@@ -142,13 +142,28 @@ both are the app's own; on another, they are not. The app:
 
 ## The protocol version
 
-The app syncs with a server whose protocol version is its own. A
-server too old or too new is refused when adding the account and, for
-one already added, reported by the sync as an error the account page
-shows. What changes the protocol version, and whether a range is ever
-accepted, is decided at the first change that breaks it. It starts at
-`1`, one constant in core's sync module, which the server describes
-itself with and the app checks against.
+The app syncs with a server whose protocol version is its own,
+`sync::PROTOCOL_VERSION`, which starts at `1`. A server of another
+version is refused when it is added, by its description. After that,
+every request of the device carries its version, in the
+`x-protocol-version` header, and the server's sync routes refuse
+another, or none, with a 426 whose words name the side to update. The
+device reports it as the sync's error, `SyncError::ProtocolVersion`,
+on every sync until one side is updated, while the person goes on on
+the device as when offline: their changes wait, and the first sync
+after the versions match pushes them. What changes the version, and
+whether a range is ever accepted, is decided at its first change.
+
+## The current server
+
+The pages read the server they are on as they read the current user:
+`serversCurrentGet`, `{display_name, host, default}`. On the web it is
+`GET /api/servers/current` of the server the pages came from; in the
+app, `servers_current_get`, the active account's server, else the
+default one. The account page shows purchasing only where `default` is
+true; the Rust buy commands refuse elsewhere all the same. Only that
+page reads it so far, through `loaded()`; it becomes a shared `$state`
+module once a second component, such as the nav, does.
 
 ## The details
 
@@ -184,6 +199,9 @@ itself with and the app checks against.
 - Push notifications, which hit the same wall as purchases: the APNs
   and FCM keys are the app's.
 - Self-signed certificates for servers on a business's own network.
+- Refreshing what a kept server said of itself, its display name and
+  its listing, after a sync when the last check is a day old. Left out
+  while nothing acts on the listing after a server is added.
 - Apps with no default server, where every server is the person's own,
   as Code Reviewer's phone app pairs with a Mac today: `multiServer =
   any` with no default configured skips the listing, shows no warning
@@ -211,16 +229,12 @@ Each step leaves every check green and the app working.
    the host, the display name and the listing with its warning, and on
    confirmation keeps the server, `device_servers_create`, which checks
    it again, and signs in there, `accounts_sign_in_start` with its
-   server; the host on each account row; `accounts_store_get` answering
-   `none` on another server's account, which hides the account page's
-   purchasing, and the buying commands refusing there.
+   server; the host on each account row; purchasing hidden on another
+   server's account, by the current server, and the buying commands
+   refusing there.
 
 ## Not built yet
 
-- **A server's protocol version after it was added.** It is checked
-  when the server is added; a sync with a server that later moved to
-  another version is not refused by the app, only by whatever the
-  server answers. To build with the first change of the version.
 - **Opening only the account's server's URLs in the browser.** The
   URLs a server hands the app to open are Stripe's checkout and portal
   pages, both refused on another server's account, where nothing is

@@ -16,6 +16,8 @@ use crate::sync::bytes::{self, BytesError};
 use crate::sync::bytes::{Upload, UploadNew};
 use crate::sync::{self, BackfillRequest, Page, PullRequest, PushRequest, PushResponse, SyncError};
 #[cfg(feature = "sync-http")]
+use crate::sync::{PROTOCOL_VERSION, PROTOCOL_VERSION_HEADER};
+#[cfg(feature = "sync-http")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "sync-http")]
 use serde_json::Value;
@@ -405,7 +407,8 @@ impl Http {
     ) -> Result<Response, SyncError> {
         let mut builder = self
             .client
-            .request(method, format!("{}{path}", self.base_url));
+            .request(method, format!("{}{path}", self.base_url))
+            .header(PROTOCOL_VERSION_HEADER, PROTOCOL_VERSION.to_string());
         if let Some(token) = token {
             builder = builder.bearer_auth(token);
         }
@@ -420,6 +423,9 @@ impl Http {
         }
         if status == reqwest::StatusCode::GONE {
             return Err(SyncError::AccountDeleted);
+        }
+        if status == reqwest::StatusCode::UPGRADE_REQUIRED {
+            return Err(protocol_version_error(response).await);
         }
         if !status.is_success() {
             let answer: Option<ErrorAnswer> = response.json().await.ok();
@@ -460,6 +466,16 @@ impl Http {
         }
         Ok(())
     }
+}
+
+/// A 426's error, in the server's words.
+#[cfg(feature = "sync-http")]
+async fn protocol_version_error(response: reqwest::Response) -> SyncError {
+    let answer: Option<ErrorAnswer> = response.json().await.ok();
+    SyncError::ProtocolVersion(answer.map_or_else(
+        || "This server syncs with another version of the app".to_string(),
+        ErrorAnswer::message,
+    ))
 }
 
 /// The web server's error answer, `{"error": "..."}`, with the fields
@@ -590,7 +606,10 @@ impl Transport for Http {
         use tokio::io::AsyncWriteExt;
 
         let asked = format!("{}/api/sync/bytes/{table}/{id}/content", self.base_url);
-        let mut request = self.not_following_redirects.get(&asked);
+        let mut request = self
+            .not_following_redirects
+            .get(&asked)
+            .header(PROTOCOL_VERSION_HEADER, PROTOCOL_VERSION.to_string());
         if let Some(token) = token {
             request = request.bearer_auth(token);
         }
@@ -604,6 +623,9 @@ impl Transport for Http {
         }
         if status == reqwest::StatusCode::GONE {
             return Err(SyncError::AccountDeleted);
+        }
+        if status == reqwest::StatusCode::UPGRADE_REQUIRED {
+            return Err(protocol_version_error(response).await);
         }
         if status.is_client_error() {
             return Err(SyncError::Refused(format!(

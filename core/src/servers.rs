@@ -172,9 +172,7 @@ pub enum ServerError {
     Entry { entry: String },
     #[error("That server runs another app, {app_identifier}")]
     OtherApp { app_identifier: String },
-    #[error(
-        "That server syncs with version {server}, and this app with version {app}; update the older one"
-    )]
+    #[error("{}", crate::sync::protocol_version_mismatch(*server, *app))]
     OtherProtocolVersion { server: u32, app: u32 },
 }
 

@@ -183,7 +183,13 @@ async fn send_with(
 ) -> (StatusCode, header::HeaderMap, Value) {
     let mut request = Request::builder().method(method).uri(path);
     if let Some(token) = token {
-        request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
+        // A device's request, which carries its protocol version
+        request = request
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .header(
+                app_core::sync::PROTOCOL_VERSION_HEADER,
+                app_core::sync::PROTOCOL_VERSION.to_string(),
+            );
     }
     if let Some(cookie) = cookie {
         request = request.header(header::COOKIE, cookie);

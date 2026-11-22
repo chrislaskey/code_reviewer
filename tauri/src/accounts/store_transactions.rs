@@ -14,21 +14,12 @@ use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
 
 /// The store this app sells through, for the pages to word Buy and
-/// Manage by: `app_store`, `play_store`, or `stripe` on the desktop; or
-/// `none` for an account on a server other than the default one, where
-/// nothing is sold, see `docs/design/multi-server.md`.
+/// Manage by: `app_store`, `play_store`, or `stripe` on the desktop.
 #[tauri::command]
-pub async fn accounts_store_get(
-    app: AppHandle,
-    device: State<'_, DeviceAccounts>,
-) -> Result<&'static str, CommandError> {
-    if !device.active_on_default_server().await {
-        return Ok(STORE_NONE);
-    }
-    Ok(store_of(&app))
+pub fn accounts_store_get(app: AppHandle) -> &'static str {
+    store_of(&app)
 }
 
-/// The store this build sells through.
 fn store_of(app: &AppHandle) -> &'static str {
     #[cfg(mobile)]
     {
@@ -41,9 +32,6 @@ fn store_of(app: &AppHandle) -> &'static str {
         "stripe"
     }
 }
-
-/// What `accounts_store_get` answers where nothing is sold.
-const STORE_NONE: &str = "none";
 
 /// Refused on an account of a server other than the default one, where
 /// nothing is sold.

@@ -14,6 +14,7 @@ use uuid::fmt::Hyphenated;
 
 use app_core::deployment::now;
 use app_core::servers::{self, ListedServer, ServerName};
+use app_core::services::mailer::mails::APP_NAME;
 use app_core::services::web_server::Http;
 use app_core::sync::SyncError;
 
@@ -54,12 +55,27 @@ pub struct DeviceServer {
     pub id: Uuid,
     /// The server's origin; `None` for the build's default server.
     pub url: Option<String>,
+    /// What the server called itself when it was kept; `None` for the
+    /// default server, which is never asked.
+    pub display_name: Option<String>,
+}
+
+/// The server the pages are on, as they show it: the active account's,
+/// else the default one.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct CurrentServer {
+    pub display_name: String,
+    /// Its host and port.
+    pub host: String,
+    /// The build's default server, the only one purchases go to.
+    pub default: bool,
 }
 
 #[derive(sqlx::FromRow)]
 struct ServerRow {
     id: Hyphenated,
     url: Option<String>,
+    display_name: Option<String>,
 }
 
 impl From<ServerRow> for DeviceServer {
@@ -67,6 +83,7 @@ impl From<ServerRow> for DeviceServer {
         DeviceServer {
             id: row.id.into_uuid(),
             url: row.url,
+            display_name: row.display_name,
         }
     }
 }
@@ -74,17 +91,18 @@ impl From<ServerRow> for DeviceServer {
 impl DeviceAccounts {
     /// The build's default server.
     pub async fn default_server(&self) -> Result<DeviceServer, DeviceAccountsError> {
-        let row: ServerRow =
-            sqlx::query_as("SELECT id, url FROM device_servers WHERE listed = 'default'")
-                .fetch_one(&self.list)
-                .await?;
+        let row: ServerRow = sqlx::query_as(
+            "SELECT id, url, display_name FROM device_servers WHERE listed = 'default'",
+        )
+        .fetch_one(&self.list)
+        .await?;
         Ok(row.into())
     }
 
     /// A server this device knows, by its id.
     pub async fn server_get(&self, id: Uuid) -> Result<DeviceServer, DeviceAccountsError> {
         let row: Option<ServerRow> =
-            sqlx::query_as("SELECT id, url FROM device_servers WHERE id = $1")
+            sqlx::query_as("SELECT id, url, display_name FROM device_servers WHERE id = $1")
                 .bind(id.hyphenated())
                 .fetch_optional(&self.list)
                 .await?;
@@ -102,6 +120,24 @@ impl DeviceAccounts {
             Some(id) => self.server_get(id).await,
             None => self.default_server().await,
         }
+    }
+
+    /// The server the pages are on: the active account's, else the
+    /// default one, named for the app.
+    pub async fn current_server(&self) -> Result<CurrentServer, DeviceAccountsError> {
+        let server = self.active_or_default_server().await?;
+        Ok(match &server.url {
+            None => CurrentServer {
+                display_name: APP_NAME.to_string(),
+                host: super::host_of(&self.default_server_url),
+                default: true,
+            },
+            Some(url) => CurrentServer {
+                host: super::host_of(url),
+                display_name: server.display_name.unwrap_or_else(|| super::host_of(url)),
+                default: false,
+            },
+        })
     }
 
     /// The transport to a server.
@@ -173,7 +209,7 @@ impl DeviceAccounts {
                display_name = excluded.display_name, app_identifier = excluded.app_identifier,
                protocol_version = excluded.protocol_version, listed = excluded.listed,
                checked_at = excluded.checked_at
-             RETURNING id, url",
+             RETURNING id, url, display_name",
         )
         .bind(Uuid::now_v7().hyphenated())
         .bind(&checked.url)

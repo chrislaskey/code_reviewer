@@ -10,7 +10,7 @@ use tauri::{AppHandle, State};
 
 use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
-use crate::device_accounts::servers::{Listing, ServerChecked};
+use crate::device_accounts::servers::{CurrentServer, Listing, ServerChecked};
 use crate::server_urls;
 
 const OWN_SERVER_ONLY: &str = "This app signs in to its own server alone";
@@ -80,6 +80,15 @@ pub async fn checked_and_allowed(
 #[tauri::command]
 pub fn multi_server_get(app: AppHandle) -> MultiServer {
     multi_server(&app)
+}
+
+/// The server the pages are on, as `/api/servers/current` is on the
+/// web: the active account's, else the default one.
+#[tauri::command]
+pub async fn servers_current_get(
+    device: State<'_, DeviceAccounts>,
+) -> Result<CurrentServer, CommandError> {
+    Ok(device.current_server().await?)
 }
 
 /// What the server at the URL says it is, and whether the default

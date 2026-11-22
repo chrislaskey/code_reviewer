@@ -398,6 +398,9 @@ impl From<SyncError> for ApiError {
             SyncError::Unauthorized => ApiError::new(StatusCode::UNAUTHORIZED, error.to_string()),
             SyncError::AccountDeleted => ApiError::account_deleted(),
             SyncError::NotAMember { .. } => ApiError::new(StatusCode::FORBIDDEN, error.to_string()),
+            SyncError::ProtocolVersion(_) => {
+                ApiError::new(StatusCode::UPGRADE_REQUIRED, error.to_string())
+            }
             SyncError::Transport(_) | SyncError::Refused(_) | SyncError::Malformed(_) => {
                 ApiError::new(StatusCode::BAD_REQUEST, error.to_string())
             }

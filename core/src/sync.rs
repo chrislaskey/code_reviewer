@@ -55,6 +55,32 @@ use synced_table::{SyncedTable, TableError};
 /// sync through.
 pub const PROTOCOL_VERSION: u32 = 1;
 
+/// The header a device sends `PROTOCOL_VERSION` in with every request,
+/// which the server's sync routes require to be its own.
+pub const PROTOCOL_VERSION_HEADER: &str = "x-protocol-version";
+
+/// Why the server refuses a sync from a device that sent this protocol
+/// version, or none; nothing when it is the server's own.
+pub fn protocol_version_refusal(sent: Option<&str>) -> Option<String> {
+    let sent = sent.and_then(|sent| sent.trim().parse::<u32>().ok());
+    match sent {
+        Some(version) if version == PROTOCOL_VERSION => None,
+        Some(version) => Some(protocol_version_mismatch(PROTOCOL_VERSION, version)),
+        None => Some("This app is too old to sync with this server; update the app".to_string()),
+    }
+}
+
+/// The words for a server and an app on different protocol versions,
+/// naming the one to update.
+pub fn protocol_version_mismatch(server: u32, app: u32) -> String {
+    let older = if server > app {
+        "update the app"
+    } else {
+        "the server needs updating"
+    };
+    format!("This server syncs with version {server}, and this app with version {app}; {older}")
+}
+
 /// How far back from its cursor's time a pull starts, so a row written
 /// in a transaction that committed after a later one is not missed.
 pub const OVERLAP_SECONDS: i64 = 60;
@@ -176,6 +202,10 @@ pub enum SyncError {
     /// the log.
     #[error("Could not reach the server")]
     Transport(String),
+    /// The server syncs with another protocol version: a 426, with its
+    /// words, until one side is updated.
+    #[error("{0}")]
+    ProtocolVersion(String),
     /// The server refused the request and said why, in words for the
     /// person: a sign-up with a taken email, say.
     #[error("{0}")]
@@ -3085,5 +3115,21 @@ pub(crate) mod tests {
         accounts::sign_out_on_device(&a, &server)
             .await
             .expect("signed out on a");
+    }
+
+    #[test]
+    fn sync_protocol_version_refusal_names_the_side_to_update() {
+        let own = PROTOCOL_VERSION.to_string();
+        assert_eq!(protocol_version_refusal(Some(&own)), None);
+        let older = protocol_version_refusal(Some("0")).expect("refused");
+        assert!(older.ends_with("update the app"), "{older}");
+        let newer = (PROTOCOL_VERSION + 1).to_string();
+        let newer = protocol_version_refusal(Some(&newer)).expect("refused");
+        assert!(newer.ends_with("the server needs updating"), "{newer}");
+        assert!(protocol_version_refusal(None).is_some(), "none sent");
+        assert!(
+            protocol_version_refusal(Some("one")).is_some(),
+            "not a number"
+        );
     }
 }

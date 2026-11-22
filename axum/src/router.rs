@@ -11,6 +11,7 @@ use std::path::Path;
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::http::{Method, StatusCode, Uri};
+use axum::middleware;
 use axum::routing::{any, delete, get, post, put};
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
@@ -31,6 +32,7 @@ pub fn router(svelte_dist: &Path, ops_dist: &Path, state: AppState) -> Router {
     let pages = ServeDir::new(svelte_dist).fallback(ServeFile::new(svelte_dist.join("index.html")));
     Router::new()
         .merge(app_api())
+        .merge(sync_api())
         .merge(accounts_api(&state))
         .merge(servers_api(&state))
         .merge(ops::api(state.clone()))
@@ -87,6 +89,12 @@ fn app_api() -> Router<AppState> {
             "/api/communities/{community_id}/membership",
             post(memberships::create).delete(memberships::delete),
         )
+}
+
+/// The sync API, `sync`, for the devices: every route requires the
+/// device's protocol version to be this server's.
+fn sync_api() -> Router<AppState> {
+    Router::new()
         .route(
             "/api/sync/push",
             post(sync::push).layer(DefaultBodyLimit::max(app_core::sync::MAX_PUSH_BYTES)),
@@ -101,6 +109,7 @@ fn app_api() -> Router<AppState> {
             get(sync::bytes::content),
         )
         .route("/api/sync/backfill", post(sync::backfill))
+        .route_layer(middleware::from_fn(sync::protocol_version_required))
 }
 
 /// What this server says it is, and the servers it lists, rate limited
