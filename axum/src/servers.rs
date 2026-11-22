@@ -1,12 +1,15 @@
 //! What this server says it is and which other servers it lists, for a
 //! device signing in to a server other than its build's default, see
 //! `app_core::servers` and `docs/design/multi-server.md`: `GET
-//! /api/servers/current` describes this server, see `current`, and `GET
+//! /api/servers/current` describes this server, see `current`, `GET
+//! /api/servers/current/settings` answers what it offers, see
+//! `settings`, and `GET
 //! /api/servers/:name?url=` answers the listed server with both that name
 //! and that origin, or a 404, the same for an unknown name as for a wrong
 //! origin, so the list is never published. Neither needs a user.
 
 pub mod current;
+pub mod settings;
 
 use std::sync::Arc;
 

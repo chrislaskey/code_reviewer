@@ -2,7 +2,9 @@
 -- docs/design/multi-server.md: the build's default server, whose URL is
 -- found at runtime and never stored, and any other the person added.
 -- What a server said of itself and whether the default server lists it
--- are kept for display.
+-- are kept for display. Its settings, the JSON document it answered, and
+-- their version are shared by its accounts and kept through a sign-out;
+-- NULL until first fetched, which means the build's defaults.
 CREATE TABLE device_servers (
   id TEXT PRIMARY KEY NOT NULL,
   url TEXT UNIQUE,
@@ -12,6 +14,8 @@ CREATE TABLE device_servers (
   protocol_version INTEGER,
   listed TEXT NOT NULL CHECK (listed IN ('default', 'listed', 'unlisted')),
   checked_at TEXT,
+  settings TEXT,
+  settings_version TEXT,
   CHECK ((url IS NULL) = (listed = 'default'))
 );
 

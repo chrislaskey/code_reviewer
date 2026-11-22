@@ -17,6 +17,7 @@ use serde_json::{Value, json};
 use tower::ServiceExt;
 
 use app_core::accounts::{Session, SignInStep};
+use app_core::servers::settings::{ServerSettings, SettingsDocument};
 use app_core::services::storage::Storage;
 
 use app_core::deployment::Deployment;
@@ -50,14 +51,15 @@ struct TestRouter {
 }
 
 async fn test_router() -> (TestRouter, Value) {
-    test_router_with(TrialUsersMax(2), false).await
+    test_router_with(TrialUsersMax(2), false, ServerSettings::default()).await
 }
 
-/// `test_router` holding so many trial users, and behind a reverse
-/// proxy or not.
+/// `test_router` holding so many trial users, behind a reverse proxy or
+/// not, with these settings.
 async fn test_router_with(
     trial_users_max: TrialUsersMax,
     trust_proxy_headers: bool,
+    settings: ServerSettings,
 ) -> (TestRouter, Value) {
     let dist = std::env::temp_dir().join(format!("app_web_test_{}", std::process::id()));
     fs::create_dir_all(&dist).expect("a temp dir");
@@ -103,7 +105,8 @@ async fn test_router_with(
         ))),
         stripe: Some(stripe.clone()),
         server_url: ServerUrl("http://server.test".to_string()),
-        server_description: test_server_description(),
+        server_description: test_server_description(&settings),
+        server_settings: std::sync::Arc::new(SettingsDocument::of(settings)),
         listed_servers: std::sync::Arc::new(test_listed_servers()),
     };
     let test_router = TestRouter {
@@ -118,9 +121,9 @@ async fn test_router_with(
 }
 
 /// The server the tests describe: `test`, "Test Server".
-fn test_server_description() -> app_core::servers::ServerDescription {
+fn test_server_description(settings: &ServerSettings) -> app_core::servers::ServerDescription {
     let name = app_core::servers::ServerName::parse("test").expect("a name");
-    app_core::servers::ServerDescription::current(name, "Test Server")
+    app_core::servers::ServerDescription::current(name, "Test Server", settings)
 }
 
 /// The one server the tests list, `acme` at `https://acme.example.com`.

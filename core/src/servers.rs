@@ -5,13 +5,16 @@
 //! another, `ListedServers`, from a static list in its config, answering
 //! an entry only when both its name and its origin match. Trust rests on
 //! the origin a device connects to, `origin_of`, never on what a server
-//! says of itself.
+//! says of itself. What a server offers is its settings, `settings`.
+
+pub mod settings;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::Url;
 
 use crate::app::identity::APP_IDENTIFIER;
+use crate::servers::settings::ServerSettings;
 use crate::sync::PROTOCOL_VERSION;
 
 /// The name no server may have: `/api/servers/current` is the server
@@ -29,16 +32,24 @@ pub struct ServerDescription {
     pub name: String,
     /// For display only.
     pub display_name: String,
+    /// The version of its settings, see `settings`.
+    pub settings_version: String,
 }
 
 impl ServerDescription {
-    /// This server's description, with its name and display name.
-    pub fn current(name: ServerName, display_name: &str) -> ServerDescription {
+    /// This server's description, with its name, display name and
+    /// settings.
+    pub fn current(
+        name: ServerName,
+        display_name: &str,
+        settings: &ServerSettings,
+    ) -> ServerDescription {
         ServerDescription {
             app_identifier: APP_IDENTIFIER.to_string(),
             protocol_version: PROTOCOL_VERSION,
             name: name.0,
             display_name: display_name.to_string(),
+            settings_version: settings.version(),
         }
     }
 
@@ -280,7 +291,7 @@ mod tests {
     #[test]
     fn servers_description_is_compatible_with_this_app_and_version_alone() {
         let name = ServerName::parse("acme").expect("a name");
-        let current = ServerDescription::current(name, "Acme");
+        let current = ServerDescription::current(name, "Acme", &ServerSettings::default());
         assert_eq!(current.compatible(), Ok(()));
         let other_app = ServerDescription {
             app_identifier: "com.example.other".to_string(),

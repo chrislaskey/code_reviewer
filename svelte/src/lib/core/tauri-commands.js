@@ -223,11 +223,25 @@ export function deviceAccountsRemove(id, losingChanges) {
 
 /**
  * The server the pages are on: the active account's, else the app's own.
- * `default` is whether it is the app's own, the only one that sells.
- * @returns {Promise<{display_name: string, host: string, default: boolean}>}
+ * `default` is whether it is the app's own, the only one that sells;
+ * `settings` what it offers, as the device last fetched them.
+ * @returns {Promise<{display_name: string, host: string, default: boolean, settings: {features: {accounts_sign_up: boolean}}}>}
  */
 export function serversCurrentGet() {
   return invoke("servers_current_get");
+}
+
+/**
+ * Calls back when the current server's settings changed, fetched after a
+ * sync whose answers carried another version.
+ * @param {() => void} callback
+ * @returns {() => void} stops listening
+ */
+export function onServersCurrentChanged(callback) {
+  const stopping = listen("servers-current-changed", () => callback());
+  return () => {
+    stopping.then((stop) => stop());
+  };
 }
 
 /**

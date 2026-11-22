@@ -1,13 +1,15 @@
 //! What every handler may take from the server, `AppState`, each part
 //! its own extractor through `FromRef`: the database with its buckets,
 //! where its email goes, the rate limits, and the settings read at start,
-//! see `config`, among them what it says it is and the servers it lists.
+//! see `config`, among them what it says it is, what it offers and the
+//! servers it lists.
 
 use std::sync::Arc;
 
 use axum::extract::FromRef;
 
 use app_core::deployment::Deployment;
+use app_core::servers::settings::SettingsDocument;
 use app_core::servers::{ListedServers, ServerDescription};
 use app_core::services::mailer::Mailer;
 use app_core::services::stripe::Stripe;
@@ -29,7 +31,14 @@ pub struct AppState {
     pub stripe: Option<Stripe>,
     pub server_url: ServerUrl,
     pub server_description: ServerDescription,
+    pub server_settings: Arc<SettingsDocument>,
     pub listed_servers: Arc<ListedServers>,
+}
+
+impl FromRef<AppState> for Arc<SettingsDocument> {
+    fn from_ref(state: &AppState) -> Arc<SettingsDocument> {
+        state.server_settings.clone()
+    }
 }
 
 impl FromRef<AppState> for ServerDescription {

@@ -7,7 +7,8 @@
      returns it, with no dialog behind it. On a device with no account,
      Skip makes a local user, on this device only; when they later sign
      up or in, they are asked whether what they made moves into the
-     account, see docs/design/accounts-local-and-trial-users.md. -->
+     account, see docs/design/accounts-local-and-trial-users.md. Sign up
+     is offered only where the server takes new sign-ups. -->
 <script>
   import {
     accountsSignInCancel,
@@ -27,6 +28,7 @@
   } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
   import { currentUserForget } from "../lib/current_user.svelte.js";
+  import { currentServer, currentServerLoad } from "../lib/current_server.svelte.js";
   import { navigateToUrl } from "../lib/router.js";
   import { postsIndexUrl } from "../lib/routes.js";
   import AccountsCustomServer from "./components/AccountsCustomServer.svelte";
@@ -54,6 +56,10 @@
   let moveError = $state("");
   let busy = $state(false);
   let error = $state("");
+  currentServerLoad().catch(() => {});
+  /** Whether the server takes new sign-ups, as its settings say. */
+  let signUpOffered = $derived(currentServer.value?.settings.features.accounts_sign_up ?? true);
+  let signUpOrSignIn = $derived(signUpOffered ? "Sign up or sign in" : "Sign in");
   /** Whether the page was opened just after an account was deleted. */
   const accountDeleted = new URLSearchParams(window.location.search).has("account_deleted");
 
@@ -229,7 +235,7 @@
         </span>
         {#if account.local}
           <Button size="sm" variant="primary" onclick={() => openBrowser(null)} disabled={busy}>
-            Sign up or sign in
+            {signUpOrSignIn}
           </Button>
         {/if}
         {#if account.active}
@@ -249,7 +255,7 @@
 
   <div class="flex flex-wrap items-center gap-3">
     <Button size="sm" onclick={() => openBrowser(null)} disabled={busy}>
-      {accounts.length === 0 ? "Sign up or sign in" : "Add account"}
+      {accounts.length === 0 ? signUpOrSignIn : "Add account"}
     </Button>
     {#if canSkip}
       <Button size="sm" variant="ghost" onclick={skip} disabled={busy} data-skip>Skip</Button>

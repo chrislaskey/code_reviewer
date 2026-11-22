@@ -1,7 +1,7 @@
 # Signing in to another server from the app
 
-**Status: agreed and built, 2026-11-22, but for what "Not built yet"
-lists.** The design as discussed; where the code differs in a name, the
+**Status: agreed and built, 2026-11-22, server settings included, but
+for what "Not built yet" lists.** The design as discussed; where the code differs in a name, the
 code is right.
 
 Most apps built from the template have one web server, compiled into
@@ -69,6 +69,7 @@ The web is unaffected: a browser tab is on one server by nature.
 | `app_identifier`, `protocol_version` | as `/api/servers/current` gave them |
 | `listed` | `default`, `listed` or `unlisted` |
 | `checked_at` | when `/api/servers/current` and the listing were asked |
+| `settings`, `settings_version` | the server's settings as last fetched, and their version; NULL until then, the build's defaults, see "Server settings" |
 
 The default server's `url` is NULL and found at runtime, from
 `server_urls` as today, never stored: `bin/dev` changes its ports each
@@ -157,13 +158,75 @@ whether a range is ever accepted, is decided at its first change.
 ## The current server
 
 The pages read the server they are on as they read the current user:
-`serversCurrentGet`, `{display_name, host, default}`. On the web it is
-`GET /api/servers/current` of the server the pages came from; in the
-app, `servers_current_get`, the active account's server, else the
+`currentServer.value`, `{display_name, host, default, settings}`, from
+`svelte/src/lib/current_server.svelte.js`, a shared `$state` module,
+asked once and again when the account changes or the app fetched the
+server's settings anew, the `servers-current-changed` event. It asks
+`serversCurrentGet`: on the web `GET /api/servers/current` and
+`/api/servers/current/settings` of the server the pages came from; in
+the app, `servers_current_get`, the active account's server, else the
 default one. The account page shows purchasing only where `default` is
-true; the Rust buy commands refuse elsewhere all the same. Only that
-page reads it so far, through `loaded()`; it becomes a shared `$state`
-module once a second component, such as the nav, does.
+true; the Rust buy commands refuse elsewhere all the same.
+
+## Server settings
+
+Built 2026-11-22. A server publishes one small document of keys and
+values about what it offers, `app_core::servers::settings`; branding or
+features on or off are uses of it, not the design.
+
+```json
+{ "features": { "accounts_sign_up": false } }
+```
+
+- **Keys over values.** Mostly keys that turn on code the app already
+  has; direct values only for small checked ones. Never code, markup or
+  styles.
+- **One typed struct**, `ServerSettings`, of the known keys, each with
+  its default. The features are `Features` in `core/src/app/features.rs`,
+  a seam: one field per feature, named for the app whose code it turns
+  on, `accounts_sign_up`, `forum_posting`. A key never changes type; a
+  new meaning is a new key. Anything that is not a feature on or off is
+  a top-level key of its own beside `features`.
+- **A device reads leniently**: an unknown key ignored, a missing one
+  defaulted, so a new setting needs no protocol version. The protocol
+  version says whether two sides can talk at all, settings what a server
+  offers. A document a device cannot read keeps the copy it has.
+- **The server reads strictly**, its own `SERVER_SETTINGS`, JSON: an
+  unknown key or a wrong type stops it at start, so a typo is caught.
+  Unset, the defaults.
+- **The server is the gatekeeper.** Its API and sync refuse what is off;
+  the device's copy only decides what the app offers, offline too.
+- **Travel.** `GET /api/servers/current/settings` answers
+  `{settings_version, settings}`, the version a hash of the settings;
+  `/api/servers/current` carries `settings_version`, and every sync
+  answer, a 426 too, carries it in the `x-settings-version` header. The
+  device keeps the settings when it keeps a server, and after a sync
+  whose answers carried another version than the kept one, fetches them
+  again in the background and tells the pages. So a change reaches a
+  device on its next sync, with no timer and no request on a quiet day,
+  and only the active account's server is asked. Not through the synced
+  tables: they are per user and need a token, and settings are the
+  server's and needed before sign-in.
+- **On the device**, on the server's `device_servers` row: shared by
+  its accounts, kept through a sign-out, there before a sign-in. The
+  default server's are the build's defaults until its first sync.
+- **What no setting reaches.** The host, and the mark of a server that
+  is not the app's own, are drawn by the app from the `device_servers`
+  row, never from settings, so a server cannot dress as the app's own;
+  the display name stays for display, beside the host. The app's icon
+  and store listing are compiled into the build and the stores; a server
+  that needs its own ships its own build.
+
+The first key, `features.accounts_sign_up`, true by default: off, the
+server refuses `POST /api/accounts/sign-up` and a trial user with a
+403, "This server takes no new sign-ups", and answers no trial
+available; accounts sign in as before. The pages offer no Sign up: the
+sign-in page drops its link, the sign-up page says so in place of its
+form, and the app's accounts page says "Sign in".
+
+Later, for settings: files a document names, a logo, fetched when their
+content hash changes and kept under `servers/<id>/`, with limits on
+their size and type settled when the first one is needed.
 
 ## The details
 
@@ -174,6 +237,7 @@ module once a second component, such as the nav, does.
 - **A server's own name**: `SERVER_NAME`, a slug, and
   `SERVER_DISPLAY_NAME`, read in `axum/src/config.rs`; unset, `default`
   and the product name, so a deployment of today needs no change.
+- **Its settings**: `SERVER_SETTINGS`, see "Server settings".
 - **The list**: `LISTED_SERVERS`, entries of a name and an origin,
   `acme=https://acme.example,beta=https://beta.example`, on the default
   server, set as a Fly secret where it runs there. A malformed entry, or
@@ -199,44 +263,6 @@ module once a second component, such as the nav, does.
 - Push notifications, which hit the same wall as purchases: the APNs
   and FCM keys are the app's.
 - Self-signed certificates for servers on a business's own network.
-- **Server settings**, discussed 2026-11-22, for when servers differ in
-  more than their address: one small document of keys and values a
-  server publishes about itself, of which branding and features on or
-  off by default are uses, not the design.
-  - **Keys over values.** Mostly keys that turn on code the app already
-    has, `features.files: true`, `branding.theme: "acme"`; direct values
-    only for small checked ones, a color. Never code, markup or styles.
-  - **The server is the gatekeeper.** It holds the truth, in its config
-    to start with, and its API and sync refuse what is off. The device's
-    copy only decides what the app offers, offline too; changing it on a
-    device shows what the server then refuses.
-  - **Travel.** `GET /api/servers/current/settings` answers the document;
-    `/api/servers/current` and every sync response carry its
-    `settings_version`, a hash; a device whose stored hash differs
-    fetches it in the background, then any file it names, a logo, whose
-    content hash changed. So a change reaches a device on its next sync,
-    with no timer and no request on a quiet day, and only the active
-    account's server is asked. Not through the synced tables: they are
-    per user and need a token, and settings are the server's and needed
-    before sign-in.
-  - **On the device**, on the server's `device_servers` row, a
-    `settings` column with its version, and files under
-    `servers/<id>/`: shared by the server's accounts, kept through a
-    sign-out, there before a sign-in. The default server starts from the
-    build's defaults.
-  - **In code**, one typed Rust struct of the known keys, each with a
-    default; an unknown key ignored, a missing one defaulted, so a new
-    setting needs no protocol version: the protocol version says whether
-    two sides can talk at all, settings what a server offers. The pages
-    read it through the current server, which becomes a shared `$state`
-    module then.
-  - **To settle then:** a server dressing as the app's own to phish, so
-    the host and a "not the app's own server" mark stay outside its
-    settings; images limited in size and type; the app's icon and store
-    listing cannot change at runtime.
-
-  It replaces refreshing a kept server's display name and listing on a
-  timer, and a branding-only design.
 - Apps with no default server, where every server is the person's own,
   as Code Reviewer's phone app pairs with a Mac today: `multiServer =
   any` with no default configured skips the listing, shows no warning
@@ -267,6 +293,11 @@ Each step leaves every check green and the app working.
    server; the host on each account row; purchasing hidden on another
    server's account, by the current server, and the buying commands
    refusing there.
+4. **Server settings.** Built: `ServerSettings` and `SERVER_SETTINGS`,
+   `/api/servers/current/settings` and the version on every sync answer;
+   the settings on `device_servers`, fetched again after a sync that
+   carried another version; `current_server.svelte.js`; and the first
+   key, `features.accounts_sign_up`.
 
 ## Not built yet
 

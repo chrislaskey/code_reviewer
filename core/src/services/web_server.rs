@@ -10,6 +10,8 @@ use crate::app::users::{self, UserError};
 use crate::data::app_users::User;
 use crate::deployment::Deployment;
 #[cfg(feature = "sync-http")]
+use crate::servers::settings::{SETTINGS_VERSION_HEADER, SettingsDocument};
+#[cfg(feature = "sync-http")]
 use crate::servers::{ListedServer, ServerDescription};
 #[cfg(feature = "object-storage")]
 use crate::sync::bytes::{self, BytesError};
@@ -263,6 +265,9 @@ pub struct Http {
     /// the bucket: the bucket is asked without the device's token.
     not_following_redirects: reqwest::Client,
     base_url: String,
+    /// The settings version the server's last answer carried, shared by
+    /// the clones.
+    settings_version_seen: std::sync::Arc<std::sync::Mutex<Option<String>>>,
 }
 
 /// How long a file's bytes may take to send or fetch, far longer than
@@ -287,7 +292,32 @@ impl Http {
             client,
             not_following_redirects,
             base_url: base_url.trim_end_matches('/').to_string(),
+            settings_version_seen: std::sync::Arc::default(),
         })
+    }
+
+    /// The settings version the server's last answer carried, if any
+    /// did: every sync answer does, see `servers::settings`.
+    pub fn settings_version_seen(&self) -> Option<String> {
+        self.settings_version_seen
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Keeps the settings version an answer carried.
+    fn settings_version_keep(&self, response: &reqwest::Response) {
+        let Some(version) = response
+            .headers()
+            .get(SETTINGS_VERSION_HEADER)
+            .and_then(|value| value.to_str().ok())
+        else {
+            return;
+        };
+        *self
+            .settings_version_seen
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(version.to_string());
     }
 
     /// `avatars::uploads::create` on the server, as the token's user.
@@ -359,6 +389,13 @@ impl Http {
             .await
     }
 
+    /// What the server offers, `/api/servers/current/settings`, with
+    /// their version.
+    pub async fn servers_current_settings_get(&self) -> Result<SettingsDocument, SyncError> {
+        let path = "/api/servers/current/settings";
+        self.send(reqwest::Method::GET, None, path, &()).await
+    }
+
     /// The server this server lists by the name at the origin, or none,
     /// `/api/servers/:name?url=`, asked of the default server.
     pub async fn servers_get(
@@ -417,6 +454,7 @@ impl Http {
             .send()
             .await
             .map_err(|error| SyncError::Transport(error.to_string()))?;
+        self.settings_version_keep(&response);
         let status = response.status();
         if status == reqwest::StatusCode::UNAUTHORIZED {
             return Err(SyncError::Unauthorized);

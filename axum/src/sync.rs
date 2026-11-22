@@ -2,17 +2,23 @@
 //! what a device calls to converge with this server, as the user its
 //! token stands for, see `docs/design/offline-sync.md`. Every route of
 //! it requires the device's protocol version, `protocol_version_required`,
-//! and answers another version 426 until one side is updated.
+//! and answers another version 426 until one side is updated; every
+//! answer carries the server's settings version,
+//! `settings_version_sent`, so a device fetches them again when they
+//! changed.
 
 pub mod bytes;
 
+use std::sync::Arc;
+
 use axum::Json;
 use axum::extract::{Request, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderValue, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 
 use app_core::deployment::Deployment;
+use app_core::servers::settings::{SETTINGS_VERSION_HEADER, SettingsDocument};
 use app_core::sync::{self, BackfillRequest, Page, PullRequest, PushRequest, PushResponse};
 
 use crate::api_error::ApiError;
@@ -30,6 +36,22 @@ pub async fn protocol_version_required(request: Request, next: Next) -> Response
         Some(refusal) => ApiError::new(StatusCode::UPGRADE_REQUIRED, refusal).into_response(),
         None => next.run(request).await,
     }
+}
+
+/// The layer on the sync routes: every answer, a refusal too, carries
+/// the server's settings version.
+pub async fn settings_version_sent(
+    State(document): State<Arc<SettingsDocument>>,
+    request: Request,
+    next: Next,
+) -> Response {
+    let mut response = next.run(request).await;
+    if let Ok(version) = HeaderValue::from_str(&document.settings_version) {
+        response
+            .headers_mut()
+            .insert(SETTINGS_VERSION_HEADER, version);
+    }
+    response
 }
 
 pub async fn push(

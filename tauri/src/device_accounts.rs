@@ -131,6 +131,8 @@ pub enum DeviceAccountsError {
     NoMoveOffered,
     #[error("Could not reach {url}: {reason}")]
     ServerUnreachable { url: String, reason: String },
+    #[error("could not keep the server's settings: {0}")]
+    Settings(#[from] serde_json::Error),
     #[error(transparent)]
     Server(#[from] ServerError),
     #[error(transparent)]
@@ -1516,6 +1518,8 @@ mod tests {
             id: Uuid::now_v7(),
             url: Some("https://staging.example.com".to_string()),
             display_name: None,
+            settings: Default::default(),
+            settings_version: None,
         };
         sqlx::query("INSERT INTO device_servers (id, url, listed) VALUES ($1, $2, 'unlisted')")
             .bind(other.id.hyphenated())
@@ -1563,7 +1567,14 @@ mod tests {
 
     #[tokio::test]
     async fn device_accounts_a_kept_server_names_its_accounts_and_keeps_purchases_off() {
+        use app_core::app::features::Features;
+        use app_core::servers::settings::{ServerSettings, SettingsDocument};
         use servers::{Listing, ServerChecked};
+        let closed = ServerSettings {
+            features: Features {
+                accounts_sign_up: false,
+            },
+        };
         let directory = tempfile::tempdir().expect("a directory");
         let server = server().await;
         let device = DeviceAccounts::open(directory.path(), SERVER_URL)
@@ -1577,9 +1588,18 @@ mod tests {
             app_identifier: app_core::app::identity::APP_IDENTIFIER.to_string(),
             protocol_version: sync::PROTOCOL_VERSION,
             listing: Listing::Unlisted,
+            settings: SettingsDocument::of(closed.clone()),
         };
+        let fresh = device.default_server().await.expect("the default");
+        assert_eq!(
+            (fresh.settings, fresh.settings_version),
+            (ServerSettings::default(), None),
+            "the build's defaults until first fetched"
+        );
         let acme = device.server_keep(&checked).await.expect("kept");
         assert_eq!(acme.url.as_deref(), Some("https://acme.example.com:8443"));
+        assert_eq!(acme.settings, closed, "kept with its settings");
+        assert_eq!(acme.settings_version, Some(closed.version()));
         let again = device
             .server_keep(&ServerChecked {
                 display_name: "Acme Corp".to_string(),
@@ -1602,6 +1622,10 @@ mod tests {
         assert!(device.active_on_default_server().await, "nobody active");
         let current = device.current_server().await.expect("current");
         assert!(current.default);
+        assert_eq!(
+            current.settings, closed,
+            "the default server's, kept when it was checked"
+        );
         assert_eq!(current.host, "localhost:4000");
         device
             .keep_signed_in(acme.id, signed_up(&server, "alice@example.com").await)
@@ -1616,6 +1640,26 @@ mod tests {
                 current.default
             ),
             ("Acme Corp", "acme.example.com:8443", false)
+        );
+        assert_eq!(current.settings, closed);
+        let opened = SettingsDocument::of(ServerSettings::default());
+        device
+            .server_settings_keep(acme.id, &opened)
+            .await
+            .expect("kept");
+        let current = device.current_server().await.expect("current");
+        assert_eq!(
+            current.settings,
+            ServerSettings::default(),
+            "the active account's server's settings, kept again"
+        );
+        assert_eq!(
+            device
+                .server_get(acme.id)
+                .await
+                .expect("acme")
+                .settings_version,
+            Some(opened.settings_version)
         );
         let on_acme = device.list().await.expect("listed");
         assert_eq!(

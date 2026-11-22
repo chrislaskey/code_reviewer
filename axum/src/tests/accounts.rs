@@ -538,6 +538,38 @@ async fn accounts_trial_makes_a_user_whose_cookie_lasts_two_days_and_who_signs_u
 }
 
 #[tokio::test]
+async fn accounts_sign_up_and_trials_are_refused_when_the_settings_turn_sign_ups_off() {
+    let closed = ServerSettings {
+        features: app_core::app::features::Features {
+            accounts_sign_up: false,
+        },
+    };
+    let (router, _) = test_router_with(TrialUsersMax(2), false, closed).await;
+    let ask = |method: Method, path: &'static str, body: Option<Value>| {
+        let router = router.router.clone();
+        async move { send_as(&router, None, method, path, body).await }
+    };
+    let bob = json!({ "email": "bob@example.com" });
+    let (status, body) = ask(Method::POST, "/api/accounts/sign-up", Some(bob.clone())).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        body,
+        json!({ "error": "This server takes no new sign-ups" })
+    );
+    let (status, _) = ask(Method::POST, "/api/accounts/trial", None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (_, available) = ask(Method::GET, "/api/accounts/trial", None).await;
+    assert_eq!(available, json!({ "available": false }));
+    let alice = json!({ "email": "alice@example.com" });
+    let (status, _) = ask(Method::POST, "/api/accounts/sign-in", Some(alice)).await;
+    assert_eq!(
+        status,
+        StatusCode::ACCEPTED,
+        "an account signs in all the same"
+    );
+}
+
+#[tokio::test]
 async fn accounts_trial_is_refused_at_the_cap() {
     let (router, _) = test_router().await;
     for _ in 0..2 {
@@ -594,7 +626,7 @@ async fn trial_create_forwarded_for(router: &TestRouter, forwarded_for: &str) ->
 
 #[tokio::test]
 async fn accounts_trial_is_limited_per_client_by_the_address_the_proxy_wrote() {
-    let (router, _) = test_router_with(TrialUsersMax(100), true).await;
+    let (router, _) = test_router_with(TrialUsersMax(100), true, ServerSettings::default()).await;
     for _ in 0..rate_limits::TRIAL_USERS_PER_HOUR_PER_IP {
         let status = trial_create_forwarded_for(&router, "203.0.113.9").await;
         assert_eq!(status, StatusCode::CREATED);
@@ -1028,7 +1060,8 @@ async fn stripe_webhooks_create_is_not_found_without_a_secret() {
         stripe_signing_secret: StripeSigningSecret(None),
         stripe: Some(router.stripe.clone()),
         server_url: ServerUrl("http://server.test".to_string()),
-        server_description: test_server_description(),
+        server_description: test_server_description(&ServerSettings::default()),
+        server_settings: std::sync::Arc::new(SettingsDocument::of(ServerSettings::default())),
         listed_servers: std::sync::Arc::new(test_listed_servers()),
     };
     let dist = std::env::temp_dir().join(format!("app_web_test_{}", std::process::id()));

@@ -252,12 +252,30 @@ export function deviceAccountsRemove(_id, _losingChanges) {
 }
 
 /**
- * The server the pages are on, which on the web is the one they came from.
- * @returns {Promise<{display_name: string, host: string, default: boolean}>}
+ * The server the pages are on, which on the web is the one they came from,
+ * with what it offers.
+ * @returns {Promise<{display_name: string, host: string, default: boolean, settings: {features: {accounts_sign_up: boolean}}}>}
  */
 export async function serversCurrentGet() {
-  const server = await send("GET", "/api/servers/current");
-  return { display_name: server.display_name, host: window.location.host, default: true };
+  const [server, document] = await Promise.all([
+    send("GET", "/api/servers/current"),
+    send("GET", "/api/servers/current/settings"),
+  ]);
+  return {
+    display_name: server.display_name,
+    host: window.location.host,
+    default: true,
+    settings: document.settings,
+  };
+}
+
+/**
+ * The web's server never changes under its pages.
+ * @param {() => void} _callback
+ * @returns {() => void} stops listening
+ */
+export function onServersCurrentChanged(_callback) {
+  return () => {};
 }
 
 /** @returns {Promise<"none" | "listed_only" | "any">} */

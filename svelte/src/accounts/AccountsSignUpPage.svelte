@@ -3,11 +3,13 @@
      make or skip, see AccountsSignInSteps. The name comes from the
      email, changed later on the profile. Opened by a
      device with ?challenge=, it ends in a code for the device instead;
-     the email is filled in from ?email=. -->
+     the email is filled in from ?email=. A server that takes no new
+     sign-ups says so in place of the form. -->
 <script>
   import PublicPagesLinks from "../lib/PublicPagesLinks.svelte";
   import { accountsSignUp, accountsTrialGet } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
+  import { currentServer, currentServerLoad } from "../lib/current_server.svelte.js";
   import { accountsSignInUrl, accountsTrialUrl } from "../lib/routes.js";
   import AccountsForm from "./components/AccountsForm.svelte";
   import AccountsSignInSteps from "./components/AccountsSignInSteps.svelte";
@@ -23,6 +25,9 @@
   /** Whether to offer a trial: on the web, when the server has room for one. */
   let trialAvailable = $state(false);
   if (!challenge) accountsTrialGet().then((available) => (trialAvailable = available), () => {});
+  currentServerLoad().catch(() => {});
+  /** Whether the server takes new sign-ups, as its settings say. */
+  let signUpOffered = $derived(currentServer.value?.settings.features.accounts_sign_up ?? true);
   let pending = $state("");
   let error = $state("");
   let busy = $state(false);
@@ -47,6 +52,9 @@
   {/if}
   {#if pending}
     <AccountsSignInSteps {email} {pending} {challenge} {appReturn} {keepSignedIn} onstartover={() => (pending = "")} />
+  {:else if !signUpOffered}
+    <Text>This server takes no new sign-ups.</Text>
+    <Text tone="muted">Already have an account? <Link href={accountsSignInUrl(email || undefined)}>Sign in</Link></Text>
   {:else}
     <AccountsForm bind:email bind:keepSignedIn withKeepSignedIn={!challenge} submitText="Sign up" {error} {busy} onsubmit={signUp} />
     <Text tone="muted">By signing up you accept the <PublicPagesLinks />.</Text>

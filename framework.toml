@@ -18,6 +18,7 @@ framework = [
     "core/src/database.rs",
     "core/src/deployment.rs",
     "core/src/servers.rs",
+    "core/src/servers/**",
     "core/src/jobs.rs",
     "core/src/sync.rs",
     "core/src/sync/**",
@@ -74,6 +75,7 @@ seams = [
     "core/src/app/identity.rs",
     "core/src/app/synced_tables.rs",
     "core/src/app/jobs.rs",
+    "core/src/app/features.rs",
 
     "axum/src/app.rs",
     "axum/src/router.rs",

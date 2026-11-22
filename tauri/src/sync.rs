@@ -18,7 +18,9 @@
 //! pending events: see "How a sync is started and run" in the design.
 //! One spawned sync waits at most: a write while one waits starts none,
 //! since the waiting one sees it. A sync that left files for the next
-//! starts the next.
+//! starts the next. A sync whose answers carried another settings
+//! version than the server's kept one fetches its settings again in the
+//! background, and tells the pages, `servers-current-changed`.
 
 pub mod conflicts;
 pub mod pending_changes;
@@ -185,7 +187,28 @@ async fn run_after_waiting(app: &AppHandle, spawned: bool) -> Result<Report, Str
     if let Err(error) = app.emit("synced", event) {
         log::warn!("could not report the sync: {error}");
     }
+    spawn_server_settings_refresh(app.clone());
     result
+}
+
+/// Fetches the active account's server's settings again in the
+/// background when they changed, and tells the pages.
+fn spawn_server_settings_refresh(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        match app
+            .state::<DeviceAccounts>()
+            .server_settings_refresh()
+            .await
+        {
+            Ok(true) => {
+                if let Err(error) = app.emit("servers-current-changed", ()) {
+                    log::warn!("could not report the server's settings: {error}");
+                }
+            }
+            Ok(false) => {}
+            Err(error) => log::warn!("could not fetch the server's settings: {error}"),
+        }
+    });
 }
 
 #[tauri::command]

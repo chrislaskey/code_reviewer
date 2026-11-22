@@ -2,10 +2,12 @@
      code that was emailed and the password if the account has one, see
      AccountsSignInSteps. Opened by a device with ?challenge=, it ends in
      a code for the device instead, see docs/design/accounts-sign-in.md.
-     The email is filled in from ?email=. -->
+     The email is filled in from ?email=. Sign up is offered only where
+     the server takes new sign-ups. -->
 <script>
   import { accountsSignIn, accountsTrialGet } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
+  import { currentServer, currentServerLoad } from "../lib/current_server.svelte.js";
   import { accountsSignUpUrl, accountsTrialUrl } from "../lib/routes.js";
   import AccountsForm from "./components/AccountsForm.svelte";
   import AccountsSignInSteps from "./components/AccountsSignInSteps.svelte";
@@ -21,6 +23,9 @@
   /** Whether to offer a trial: on the web, when the server has room for one. */
   let trialAvailable = $state(false);
   if (!challenge) accountsTrialGet().then((available) => (trialAvailable = available), () => {});
+  currentServerLoad().catch(() => {});
+  /** Whether the server takes new sign-ups, as its settings say. */
+  let signUpOffered = $derived(currentServer.value?.settings.features.accounts_sign_up ?? true);
   let pending = $state("");
   let error = $state("");
   let busy = $state(false);
@@ -47,7 +52,9 @@
     <AccountsSignInSteps {email} {pending} {challenge} {appReturn} {keepSignedIn} onstartover={() => (pending = "")} />
   {:else}
     <AccountsForm bind:email bind:keepSignedIn withKeepSignedIn={!challenge} submitText="Sign in" {error} {busy} onsubmit={signIn} />
-    <Text tone="muted">New here? <Link href={accountsSignUpUrl(email || undefined)}>Sign up</Link></Text>
+    {#if signUpOffered}
+      <Text tone="muted">New here? <Link href={accountsSignUpUrl(email || undefined)}>Sign up</Link></Text>
+    {/if}
     {#if trialAvailable}
       <Text tone="muted">Just looking? <Link href={accountsTrialUrl()}>Try it without an account</Link></Text>
     {/if}

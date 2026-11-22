@@ -1,8 +1,9 @@
 //! The server's settings, read from the environment at start: where it
 //! listens, where the built pages are, whether it is behind a proxy, how
 //! many trial users it holds, its address as people reach it, its name
-//! for the apps and the other servers it lists; and, one module each,
-//! its database, mailer, buckets, Stripe and App Store.
+//! for the apps, what it offers them and the other servers it lists;
+//! and, one module each, its database, mailer, buckets, Stripe and App
+//! Store.
 
 pub mod app_store;
 pub mod database;
@@ -14,6 +15,7 @@ use std::env;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
 
+use app_core::servers::settings::ServerSettings;
 use app_core::servers::{ListedServers, ServerDescription, ServerName};
 use app_core::services::mailer::mails::APP_NAME;
 
@@ -106,8 +108,8 @@ impl ServerUrl {
 
 /// What this server says it is, see `app_core::servers`: `SERVER_NAME`,
 /// a slug, `default` when unset, and `SERVER_DISPLAY_NAME`, the app's
-/// name when unset.
-pub fn server_description() -> Result<ServerDescription, String> {
+/// name when unset, with its settings' version.
+pub fn server_description(settings: &ServerSettings) -> Result<ServerDescription, String> {
     let name = env::var("SERVER_NAME").unwrap_or_else(|_| DEFAULT_SERVER_NAME.to_string());
     let name = ServerName::parse(name.trim()).map_err(|error| format!("SERVER_NAME: {error}"))?;
     let display_name = env::var("SERVER_DISPLAY_NAME")
@@ -115,7 +117,16 @@ pub fn server_description() -> Result<ServerDescription, String> {
         .map(|display_name| display_name.trim().to_string())
         .filter(|display_name| !display_name.is_empty())
         .unwrap_or_else(|| APP_NAME.to_string());
-    Ok(ServerDescription::current(name, &display_name))
+    Ok(ServerDescription::current(name, &display_name, settings))
+}
+
+/// What this server offers, see `app_core::servers::settings`:
+/// `SERVER_SETTINGS`, a JSON document of known keys,
+/// `{"features": {"accounts_sign_up": false}}`; the defaults when
+/// unset. An unknown key or a wrong type stops the server at start.
+pub fn server_settings() -> Result<ServerSettings, String> {
+    let json = env::var("SERVER_SETTINGS").unwrap_or_default();
+    ServerSettings::parse_strict(&json).map_err(|error| format!("SERVER_SETTINGS: {error}"))
 }
 
 /// The other servers this one lists, `LISTED_SERVERS`, entries of a name

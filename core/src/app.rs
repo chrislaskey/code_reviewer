@@ -4,6 +4,7 @@
 pub mod avatars;
 pub mod communities;
 pub mod current_community;
+pub mod features;
 pub mod files;
 pub mod files_communities;
 pub mod identity;

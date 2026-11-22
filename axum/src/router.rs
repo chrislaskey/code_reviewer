@@ -32,7 +32,7 @@ pub fn router(svelte_dist: &Path, ops_dist: &Path, state: AppState) -> Router {
     let pages = ServeDir::new(svelte_dist).fallback(ServeFile::new(svelte_dist.join("index.html")));
     Router::new()
         .merge(app_api())
-        .merge(sync_api())
+        .merge(sync_api(&state))
         .merge(accounts_api(&state))
         .merge(servers_api(&state))
         .merge(ops::api(state.clone()))
@@ -92,8 +92,9 @@ fn app_api() -> Router<AppState> {
 }
 
 /// The sync API, `sync`, for the devices: every route requires the
-/// device's protocol version to be this server's.
-fn sync_api() -> Router<AppState> {
+/// device's protocol version to be this server's, and every answer
+/// carries this server's settings version.
+fn sync_api(state: &AppState) -> Router<AppState> {
     Router::new()
         .route(
             "/api/sync/push",
@@ -110,6 +111,10 @@ fn sync_api() -> Router<AppState> {
         )
         .route("/api/sync/backfill", post(sync::backfill))
         .route_layer(middleware::from_fn(sync::protocol_version_required))
+        .layer(middleware::from_fn_with_state(
+            state.server_settings.clone(),
+            sync::settings_version_sent,
+        ))
 }
 
 /// What this server says it is, and the servers it lists, rate limited
@@ -120,6 +125,7 @@ fn servers_api(state: &AppState) -> Router<AppState> {
         .layer(rate_limits::per_ip_layer(state.trust_proxy_headers));
     Router::new()
         .route("/api/servers/current", get(servers::current::get))
+        .route("/api/servers/current/settings", get(servers::settings::get))
         .merge(listed)
 }
 

@@ -342,7 +342,9 @@ cursor's time; `after` continues a paged pull exactly, with no overlap.
 what to store once the page is applied, and on the last page it is the
 server's time, which the device now has everything up to, so a quiet
 stretch never makes a device look stale. Deleted rows are sent like any
-other.
+other. Every answer of the sync routes carries the server's
+settings version in the `x-settings-version` header, and every request
+the device's protocol version, see `multi-server.md`.
 
 ## One sync on a device, `sync::run`
 

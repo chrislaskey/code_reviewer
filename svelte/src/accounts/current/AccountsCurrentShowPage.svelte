@@ -6,8 +6,8 @@
   import PublicPagesLinks from "../../lib/PublicPagesLinks.svelte";
   import AccountsNeeded from "../../lib/AccountsNeeded.svelte";
   import { currentUser } from "../../lib/current_user.svelte.js";
-  import { serversCurrentGet } from "../../lib/core/index.js";
-  import { loaded } from "../../lib/loaded.svelte.js";
+  import { currentServer, currentServerLoad } from "../../lib/current_server.svelte.js";
+  import { errorMessageOf } from "../../lib/error_message.js";
   import {
     accountsDeletionsNewUrl,
     accountsCurrentPasswordEditUrl,
@@ -15,15 +15,17 @@
     accountsPurchasesIndexUrl,
     accountsSubscriptionsIndexUrl,
   } from "../../lib/routes.js";
-  import { Heading, Link, Page, Text } from "../../lib/components/index.js";
+  import { ErrorMessage, Heading, Link, Page, Text } from "../../lib/components/index.js";
 
-  const server = loaded(serversCurrentGet);
+  let error = $state("");
+  currentServerLoad().catch((problem) => (error = errorMessageOf(problem)));
   /** Whether this account buys anywhere: on the app's own server alone. */
-  let sells = $derived(server.value?.default ?? false);
+  let sells = $derived(currentServer.value?.default ?? false);
 </script>
 
 <Page>
   <Heading level={1}>Account</Heading>
+  <ErrorMessage message={error} />
   {#if currentUser.value && currentUser.value.kind !== "full"}
     <AccountsNeeded kind={currentUser.value.kind} />
     {#if currentUser.value.kind === "trial"}

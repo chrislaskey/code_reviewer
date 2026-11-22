@@ -10,6 +10,7 @@
 // which has no way to ask: it shows "Open the app" in place of Sign in
 // and Sign up. Only a hint, so a stale one costs a click.
 import { currentUserGet } from "./core/index.js";
+import { currentServerForget } from "./current_server.svelte.js";
 
 /**
  * The user with what only they are shown: their account's email, on the
@@ -67,4 +68,5 @@ export function currentUserForget() {
   current = null;
   currentUser.value = null;
   rememberSignedIn(false);
+  currentServerForget();
 }

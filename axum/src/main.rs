@@ -48,6 +48,7 @@ use std::net::SocketAddr;
 use std::time::Duration;
 
 use app_core::deployment::FileStore;
+use app_core::servers::settings::SettingsDocument;
 
 use crate::config::{ServerUrl, TrialUsersMax};
 use crate::rate_limits::RateLimits;
@@ -95,6 +96,7 @@ async fn main() -> Result<(), String> {
         }
     });
     jobs::spawn(deployment.clone());
+    let server_settings = config::server_settings()?;
     let state = AppState {
         deployment,
         mailer,
@@ -104,7 +106,8 @@ async fn main() -> Result<(), String> {
         stripe_signing_secret: config::stripe::open_signing_secret(),
         stripe,
         server_url: ServerUrl::open()?,
-        server_description: config::server_description()?,
+        server_description: config::server_description(&server_settings)?,
+        server_settings: std::sync::Arc::new(SettingsDocument::of(server_settings)),
         listed_servers: std::sync::Arc::new(config::listed_servers()?),
     };
 

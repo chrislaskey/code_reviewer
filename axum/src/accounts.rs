@@ -13,7 +13,9 @@
 //! which it keeps and sends as a bearer token. A sign-out deletes the
 //! token and clears the cookie. Each route is rate limited, see
 //! `rate_limits`. A sign-up from a trial user's browser is theirs, see
-//! `trial_users`. The accounts app's other routes are its submodules,
+//! `trial_users`. A server whose settings turn sign-ups off,
+//! `features.accounts_sign_up`, refuses both, `sign_up_offered`. The
+//! accounts app's other routes are its submodules,
 //! each at the path of the core module it calls.
 
 pub mod app_store_notifications;
@@ -26,6 +28,8 @@ pub mod store_transactions;
 pub mod stripe_events;
 pub mod subscriptions;
 pub mod trial_users;
+
+use std::sync::Arc;
 
 use axum::Json;
 use axum::extract::State;
@@ -40,6 +44,7 @@ use app_core::app::users;
 use app_core::data::accounts_tokens::Context;
 use app_core::data::app_users::User;
 use app_core::deployment::Deployment;
+use app_core::servers::settings::SettingsDocument;
 use app_core::services::mailer::Mailer;
 
 use crate::api_error::ApiError;
@@ -96,15 +101,30 @@ pub struct SignUp {
     pub email: String,
 }
 
+/// Whether the server takes new sign-ups, trial users included; a 403
+/// when its settings say not.
+pub(crate) fn sign_up_offered(document: &SettingsDocument) -> Result<(), ApiError> {
+    if document.settings.features.accounts_sign_up {
+        Ok(())
+    } else {
+        Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "This server takes no new sign-ups",
+        ))
+    }
+}
+
 /// A sign-up; from a trial user's browser, that trial user signing up,
 /// who keeps what they made.
 pub async fn sign_up(
     State(deployment): State<Deployment>,
     State(mailer): State<Mailer>,
     State(limits): State<RateLimits>,
+    State(settings): State<Arc<SettingsDocument>>,
     jar: CookieJar,
     Json(sign_up): Json<SignUp>,
 ) -> Result<(StatusCode, Json<CodeSent>), ApiError> {
+    sign_up_offered(&settings)?;
     limits.check_email(&sign_up.email)?;
     let sent = match trial_user_of(&deployment, &jar).await? {
         Some(trial) => {
