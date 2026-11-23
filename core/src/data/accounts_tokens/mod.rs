@@ -52,8 +52,8 @@ pub enum Context {
     /// A sign-in that waits for its emailed code, ten minutes.
     SignInCode,
     /// A sign-in whose code matched and that waits for its last step,
-    /// with the password when the account has one, ten minutes.
-    SignInPassword,
+    /// ten minutes.
+    SignInConfirm,
     /// A finished browser sign-in waiting for the device to collect it,
     /// five minutes.
     DeviceCode,
@@ -67,7 +67,7 @@ impl Context {
         Context::Api,
         Context::Session,
         Context::SignInCode,
-        Context::SignInPassword,
+        Context::SignInConfirm,
         Context::DeviceCode,
         Context::DeleteCode,
     ];
@@ -78,7 +78,7 @@ impl Context {
             Context::Api => "api",
             Context::Session => "session",
             Context::SignInCode => "sign_in_code",
-            Context::SignInPassword => "sign_in_password",
+            Context::SignInConfirm => "sign_in_confirm",
             Context::DeviceCode => "device_code",
             Context::DeleteCode => "delete_code",
         }
@@ -96,7 +96,7 @@ impl Context {
         match self {
             Context::Api => Duration::days(API_VALIDITY_DAYS),
             Context::Session => Duration::days(SESSION_VALIDITY_DAYS),
-            Context::SignInCode | Context::SignInPassword | Context::DeleteCode => {
+            Context::SignInCode | Context::SignInConfirm | Context::DeleteCode => {
                 Duration::minutes(SIGN_IN_CODE_VALIDITY_MINUTES)
             }
             Context::DeviceCode => Duration::minutes(DEVICE_CODE_VALIDITY_MINUTES),
@@ -164,20 +164,19 @@ pub async fn create_sign_in_code(
 }
 
 /// Makes the pending token of the user's sign-in whose code matched,
-/// replacing any earlier one, for its last step, which takes the
-/// password when the account has one; with the address the code went
-/// to when it is not the account's own.
-pub async fn create_sign_in_password(
+/// replacing any earlier one, for its last step; with the address the
+/// code went to when it is not the account's own.
+pub async fn create_sign_in_confirm(
     tx: &mut Transaction,
     user_id: Uuid,
     sent_to: Option<&str>,
 ) -> Result<String, sqlx::Error> {
-    delete_of_user(tx, user_id, Context::SignInPassword).await?;
+    delete_of_user(tx, user_id, Context::SignInConfirm).await?;
     let pending = random::hex(32);
     insert(
         tx,
         user_id,
-        Context::SignInPassword,
+        Context::SignInConfirm,
         hash(&pending),
         None,
         sent_to,
@@ -379,7 +378,7 @@ mod tests {
             assert_eq!(reset.code_hash, Some(hash(&code)));
             assert!(reset.inserted_at >= original.inserted_at);
             assert!(
-                get_valid(&mut tx, &hash(&pending), Context::SignInPassword, now())
+                get_valid(&mut tx, &hash(&pending), Context::SignInConfirm, now())
                     .await
                     .expect("other context")
                     .is_none()

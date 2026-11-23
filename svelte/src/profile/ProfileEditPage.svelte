@@ -9,9 +9,10 @@
   import { errorMessageOf } from "../lib/error_message.js";
   import { currentUserForget } from "../lib/current_user.svelte.js";
   import { accountsIndexUrl } from "../lib/routes.js";
+  import AccountsGuestNotice from "../lib/AccountsGuestNotice.svelte";
   import { Alert, Button, ErrorMessage, FieldErrors, FileInput, Heading, Input, Label, Page, Text } from "../lib/components/index.js";
 
-  /** @type {{name: string, kind?: string, avatar_url?: string | null} | null} */
+  /** @type {{name: string, kind?: string, avatar_url?: string | null, trial_expires_at?: string | null} | null} */
   let currentUser = $state(null);
   /** @type {File | null} */
   let file = $state(null);
@@ -86,10 +87,14 @@
       <Alert tone="warning" class="flex flex-col items-start gap-2" data-local-user>
         <Text>
           <strong>This account is only on this device.</strong> Nothing is backed up: if the device is lost or reset,
-          or the app is removed, what you made is gone. Sign up or sign in to keep it safe and use it on your other
+          or the app is removed, what you made is gone. Sign up or log in to keep it safe and use it on your other
           devices.
         </Text>
-        <Button size="sm" href={accountsIndexUrl()}>Sign up or sign in</Button>
+        <Button size="sm" href={accountsIndexUrl()}>Sign up or log in</Button>
+      </Alert>
+    {:else if currentUser.kind === "trial" && currentUser.trial_expires_at}
+      <Alert tone="warning">
+        <AccountsGuestNotice trialExpiresAt={currentUser.trial_expires_at} />
       </Alert>
     {/if}
     <div class="flex items-center gap-4">

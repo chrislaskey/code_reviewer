@@ -2795,14 +2795,10 @@ pub(crate) mod tests {
         let matched = accounts::sign_in_with_code(servers_database, &sent.pending, &code)
             .await
             .expect("the code matched");
-        let device_code = accounts::sign_in_confirm_for_device(
-            servers_database,
-            &matched.pending,
-            None,
-            &challenge,
-        )
-        .await
-        .expect("finished");
+        let device_code =
+            accounts::sign_in_confirm_for_device(servers_database, &matched.pending, &challenge)
+                .await
+                .expect("finished");
         accounts::sign_in_with_device_code_through(server, &device_code.code, &verifier)
             .await
             .expect("exchanged over HTTP")

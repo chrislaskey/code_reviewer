@@ -50,10 +50,19 @@ code.
 - Server: a WebAuthn library, `webauthn-rs` the likely one, to ask
   about before choosing. A table of each user's passkeys, server only,
   not synced, a migration to ask about.
-- Where it sits: a way to sign in beside the emailed code, the email
-  first and then "Use a passkey" when the account has one, and made
-  from the account page after a sign-in. Whether it also counts as a
-  second factor, `accounts::SecondFactor`, to decide.
+- Where it sits, agreed 2026-11-22 (mockup L2 in the Code Reviewer
+  artifact `starter_pack/cr-Passwordflow/sign-in-concepts-6.html`): no
+  email first, since a passkey names its user. On the sign-in page,
+  after "Use my password", an "or" and then full-width buttons, "Log
+  in with a passkey", "Continue with Apple", "Continue with Google";
+  and the email field offers the passkey in its autofill
+  (`autocomplete="username webauthn"`). Asking for the email first and
+  then the account's passkeys would tell anyone which emails have one.
+  Made from the account page after a sign-in, or offered once after a
+  code ("Log in with Face ID next time?"). These log in on the tap and
+  keep the person logged in, having no step for the checkbox. The terms
+  line, last on the page, falls below a small phone's screen with them;
+  to look at again then.
 
 ## 3. Sign in with Apple
 
@@ -69,6 +78,10 @@ challenge carried in the OAuth `state`, so the apps change nothing.
   Apple sign-in to an account with the same email is to decide.
 - Apple's rule: an iPhone app that offers another provider, Google,
   must offer Sign in with Apple too, so it comes first.
+- The button reads "Continue with Apple", though the pages say "Log
+  in": Apple's guidelines allow only "Sign in", "Sign up" or "Continue"
+  with Apple. It sits with the passkey button, see "Where it sits"
+  under Passkeys.
 
 ## 4. Magic links
 

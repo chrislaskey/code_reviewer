@@ -69,6 +69,39 @@ msgstr ""
 msgid "In"
 msgstr ""
 
+#: src/lib/AccountsGuestNotice.svelte:35
+msgid "1 hour"
+msgstr ""
+
+#: src/lib/AccountsGuestNotice.svelte:35
+#, javascript-format
+msgid "${ hours } hours"
+msgstr ""
+
+#: src/lib/AccountsGuestNotice.svelte:37
+msgid "1 minute"
+msgstr ""
+
+#: src/lib/AccountsGuestNotice.svelte:37
+#, javascript-format
+msgid "${ minutes } minutes"
+msgstr ""
+
+#: src/lib/AccountsGuestNotice.svelte:40
+#, javascript-format
+msgid "You're a guest. Sign up within ${ remaining } to keep what you make."
+msgstr ""
+
+#: src/lib/AccountsGuestNotice.svelte:41
+#, javascript-format
+msgid "Your guest visit ended. Sign up before ${ deletedAt } to keep what you made."
+msgstr ""
+
+#: src/lib/AccountsGuestNotice.svelte:44
+#: src/lib/layouts/AccountMenu.svelte:71
+msgid "Sign up"
+msgstr ""
+
 #: src/lib/layouts/ThemeMenu.svelte:21
 #, javascript-format
 msgid "Theme: ${ current }"
@@ -191,46 +224,41 @@ msgstr ""
 msgid "Ops"
 msgstr ""
 
-#: src/lib/layouts/AccountMenu.svelte:44
+#: src/lib/layouts/AccountMenu.svelte:45
+msgid "Account, as a guest"
+msgstr ""
+
+#: src/lib/layouts/AccountMenu.svelte:45
 msgid "Account"
 msgstr ""
 
-#: src/lib/layouts/AccountMenu.svelte:47
-msgid "Trial"
-msgstr ""
-
 #: src/lib/layouts/AccountMenu.svelte:48
-msgid "Sign up to keep what you make."
+msgid "Guest"
 msgstr ""
 
-#: src/lib/layouts/AccountMenu.svelte:50
+#: src/lib/layouts/AccountMenu.svelte:52
 msgid "On this device only"
 msgstr ""
 
-#: src/lib/layouts/AccountMenu.svelte:53
-#: src/lib/layouts/AccountMenu.svelte:72
-msgid "Sign up"
-msgstr ""
-
-#: src/lib/layouts/AccountMenu.svelte:56
+#: src/lib/layouts/AccountMenu.svelte:55
 msgid "Profile"
 msgstr ""
 
-#: src/lib/layouts/AccountMenu.svelte:59
+#: src/lib/layouts/AccountMenu.svelte:58
 msgid "Account settings"
 msgstr ""
 
-#: src/lib/layouts/AccountMenu.svelte:62
+#: src/lib/layouts/AccountMenu.svelte:61
 msgid "Switch account"
 msgstr ""
 
-#: src/lib/layouts/AccountMenu.svelte:65
-msgid "Sign out"
+#: src/lib/layouts/AccountMenu.svelte:64
+msgid "Log out"
 msgstr ""
 
-#: src/lib/layouts/AccountMenu.svelte:68
-#: src/lib/layouts/AccountMenu.svelte:70
-msgid "Sign in"
+#: src/lib/layouts/AccountMenu.svelte:67
+#: src/lib/layouts/AccountMenu.svelte:69
+msgid "Log in"
 msgstr ""
 
 #: src/posts/PostsNewPage.svelte:29

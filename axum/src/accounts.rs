@@ -2,8 +2,8 @@
 //! code and a new one, the last step, and sign out, see
 //! `app_core::accounts` and `docs/design/accounts-sign-in.md`. A sign-in
 //! answers 202 with the pending token, the code having been emailed;
-//! the code answers whether the last step makes the account and asks
-//! for its password, and that step answers the session and sets the
+//! the code answers whether the last step makes the account, and that
+//! step answers the session and sets the
 //! token as a cookie, which a browser sends from then on: only HTTP sees
 //! it, only this site gets it, and only over TLS away from localhost; it
 //! lasts until the browser closes, or, when the person chose to stay
@@ -11,7 +11,9 @@
 //! challenge answers the device code instead and sets no cookie; the
 //! device exchanges it with its verifier for its session, which it
 //! keeps and sends as a bearer token. A sign-out deletes the token and
-//! clears the cookie. Each route is rate limited, see `rate_limits`. A
+//! clears the cookie. A password signs in in one request, in place of
+//! the code, and ends the same way. Each route is rate limited, see
+//! `rate_limits`. A
 //! sign-in from a trial user's browser may be theirs signing up, see
 //! `trial_users`. A server whose settings turn sign-ups off,
 //! `features.accounts_sign_up`, makes no account for a new email,
@@ -39,7 +41,7 @@ use axum_extra::extract::CookieJar;
 use axum_extra::extract::cookie::Cookie;
 use serde::Deserialize;
 
-use app_core::accounts::{self, CodeMatched, CodeSent, SecondFactor, Session};
+use app_core::accounts::{self, CodeMatched, CodeSent, Session};
 use app_core::app::users;
 use app_core::data::accounts_tokens::Context;
 use app_core::data::app_users::User;
@@ -65,8 +67,6 @@ pub struct Code {
 #[derive(Deserialize)]
 pub struct Confirm {
     pub pending: String,
-    /// The account's password, when it has one.
-    pub password: Option<String>,
     /// A device's challenge, when the sign-in was started by one.
     pub challenge: Option<String>,
     /// Whether the browser stays signed in after it closes.
@@ -76,7 +76,7 @@ pub struct Confirm {
 
 #[derive(Deserialize)]
 pub struct Password {
-    pub pending: String,
+    pub email: String,
     pub password: String,
     /// A device's challenge, when the sign-in was started by one.
     pub challenge: Option<String>,
@@ -161,8 +161,8 @@ pub async fn code_resend(
     Ok(StatusCode::ACCEPTED)
 }
 
-/// The emailed code: whether the last step makes the account and asks
-/// for its password, and its pending token. Nobody is signed in yet.
+/// The emailed code: whether the last step makes the account, and its
+/// pending token. Nobody is signed in yet.
 pub async fn code(
     State(deployment): State<Deployment>,
     Json(code): Json<Code>,
@@ -171,67 +171,49 @@ pub async fn code(
     Ok(Json(matched))
 }
 
-/// The last step, with the account's password when it has one: the
-/// session with the cookie, or, with a device's challenge, the device
-/// code and no cookie.
+/// The last step: the session with the cookie, or, with a device's
+/// challenge, the device code and no cookie.
 pub async fn sign_in_confirm(
     State(deployment): State<Deployment>,
     headers: HeaderMap,
     jar: CookieJar,
     Json(confirm): Json<Confirm>,
 ) -> Result<Response, ApiError> {
-    let password = confirm.password.as_deref();
     if let Some(challenge) = challenge_of(&confirm.challenge) {
-        let device_code = accounts::sign_in_confirm_for_device(
-            &deployment,
-            &confirm.pending,
-            password,
-            challenge,
-        )
-        .await?;
+        let device_code =
+            accounts::sign_in_confirm_for_device(&deployment, &confirm.pending, challenge).await?;
         return Ok(Json(device_code).into_response());
     }
-    let session = accounts::sign_in_confirm(&deployment, &confirm.pending, password).await?;
+    let session = accounts::sign_in_confirm(&deployment, &confirm.pending).await?;
     Ok(with_cookie(jar, &headers, session, confirm.keep_signed_in))
 }
 
-/// A new password in place of a forgotten one, after the code; 403
-/// when the app does not let one be reset.
-pub async fn sign_in_reset_password(
+/// A sign-in with the account's password in place of the code, as many
+/// tries an address gets as `rate_limits` allows: the session with the
+/// cookie, or, with a device's challenge, the device code and no cookie.
+/// From a trial user's browser it signs in to the account, and the trial
+/// is left as it is.
+pub async fn sign_in_password(
     State(deployment): State<Deployment>,
-    State(mailer): State<Mailer>,
+    State(limits): State<RateLimits>,
     headers: HeaderMap,
     jar: CookieJar,
     Json(password): Json<Password>,
 ) -> Result<Response, ApiError> {
+    limits.check_password(&password.email)?;
     if let Some(challenge) = challenge_of(&password.challenge) {
-        let device_code = accounts::sign_in_with_reset_password_for_device(
+        let device_code = accounts::sign_in_with_password_for_device(
             &deployment,
-            &mailer,
-            &password.pending,
+            &password.email,
             &password.password,
             challenge,
         )
         .await?;
         return Ok(Json(device_code).into_response());
     }
-    let session = accounts::sign_in_with_reset_password(
-        &deployment,
-        &mailer,
-        &password.pending,
-        &password.password,
-    )
-    .await?;
+    let session =
+        accounts::sign_in_with_password(&deployment, &password.email, &password.password).await?;
     Ok(with_cookie(jar, &headers, session, password.keep_signed_in))
-}
-
-/// `GET /api/accounts/second-factors`: what the user's account asks for
-/// after the emailed code.
-pub async fn second_factors(
-    State(deployment): State<Deployment>,
-    CurrentUser(user): CurrentUser,
-) -> Result<Json<Vec<SecondFactor>>, ApiError> {
-    Ok(Json(accounts::second_factors(&deployment, &user).await?))
 }
 
 fn challenge_of(challenge: &Option<String>) -> Option<&str> {

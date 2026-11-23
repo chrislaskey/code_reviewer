@@ -48,7 +48,7 @@ use crate::device_accounts::servers::DeviceServer;
 use crate::device_accounts::{DeviceAccounts, PendingSignIn, SignInFinished};
 use crate::server_urls;
 use crate::sync::{self, SyncServer};
-use app_core::accounts::{self, SecondFactor};
+use app_core::accounts;
 
 const SIGN_IN_RETURNED_EVENT: &str = "accounts-sign-in-returned";
 
@@ -265,16 +265,6 @@ pub async fn accounts_sign_out(
     let _no_sync_meanwhile = server.hold().await;
     let (_, transport) = device.active_with_transport().await?;
     Ok(device.sign_out(&transport).await?)
-}
-
-/// What the signed-in user's account asks for after the emailed code,
-/// asked of the server.
-#[tauri::command]
-pub async fn accounts_second_factors(
-    device: State<'_, DeviceAccounts>,
-) -> Result<Vec<SecondFactor>, CommandError> {
-    let (deployment, transport) = device.active_with_transport().await?;
-    Ok(accounts::second_factors_on_device(&deployment, &transport).await?)
 }
 
 /// The sign-in page with the challenge, the email and where to return

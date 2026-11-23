@@ -58,7 +58,6 @@ async fn accounts_sign_in_of_a_new_email_the_code_and_the_last_step_then_sign_ou
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["new_account"], json!(true), "a sign-up");
-    assert_eq!(body["needs_password"], json!(false));
     assert!(headers.get(header::SET_COOKIE).is_none(), "not finished");
     let pending = body["pending"].as_str().expect("the pending token");
     let (status, headers, body) = send_with(
@@ -97,7 +96,7 @@ async fn accounts_sign_in_of_a_new_email_the_code_and_the_last_step_then_sign_ou
         Some(&cookie),
         Method::PUT,
         "/api/accounts/current/password",
-        Some(json!({ "current": null, "password": "short" })),
+        Some(json!({ "password": "short" })),
     )
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
@@ -107,42 +106,39 @@ async fn accounts_sign_in_of_a_new_email_the_code_and_the_last_step_then_sign_ou
         Some(&cookie),
         Method::PUT,
         "/api/accounts/current/password",
-        Some(json!({ "current": null, "password": PASSWORD })),
+        Some(json!({ "password": PASSWORD })),
     )
     .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
-    let (status, _, factors) = send_with(
+    let (status, _, password) = send_with(
         &router.router,
         None,
         Some(&cookie),
         Method::GET,
-        "/api/accounts/second-factors",
+        "/api/accounts/current/password",
         None,
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(factors, json!(["password"]));
-    let (status, _, body) = send_with(
-        &router.router,
-        None,
-        Some(&cookie),
-        Method::PUT,
-        "/api/accounts/current/password",
-        Some(json!({ "current": "wrong horse battery", "password": NEW_PASSWORD })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-    assert_eq!(body, json!({ "error": "That password is wrong" }));
+    assert_eq!(password, json!({ "is_set": true }));
     let (status, _, _) = send_with(
         &router.router,
         None,
         Some(&cookie),
         Method::PUT,
         "/api/accounts/current/password",
-        Some(json!({ "current": PASSWORD, "password": NEW_PASSWORD })),
+        Some(json!({ "password": NEW_PASSWORD })),
     )
     .await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(status, StatusCode::NO_CONTENT, "no current one asked");
+    assert_eq!(
+        router
+            .mailer
+            .last_sent_to("bob@example.com")
+            .unwrap()
+            .subject,
+        "Your password was changed"
+    );
     let (_, _, posts) = send_with(
         &router.router,
         None,
@@ -179,53 +175,71 @@ async fn accounts_sign_in_of_a_new_email_the_code_and_the_last_step_then_sign_ou
 
     let body = code_matched(&router, "bob@example.com").await;
     assert_eq!(body["new_account"], json!(false), "a sign-in now");
-    assert_eq!(body["needs_password"], json!(true), "bob has a password");
-    assert_eq!(body["can_reset_password"], json!(true));
     assert!(body.get("token").is_none());
-    let pending = body["pending"].clone();
-    let (status, body) = send_as(
-        &router.router,
-        None,
-        Method::POST,
-        "/api/accounts/sign-in/confirm",
-        Some(json!({ "pending": pending, "password": PASSWORD })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "the old one");
-    assert_eq!(body, json!({ "error": "That password is wrong" }));
+
+    for (email, password) in [
+        ("bob@example.com", PASSWORD),
+        ("nobody@example.com", NEW_PASSWORD),
+    ] {
+        let (status, body) = send_as(
+            &router.router,
+            None,
+            Method::POST,
+            "/api/accounts/sign-in/password",
+            Some(json!({ "email": email, "password": password })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED, "{email}");
+        assert_eq!(
+            body,
+            json!({ "error": "That email and password don't match" })
+        );
+    }
     let (status, headers, body) = send_with(
         &router.router,
         None,
         None,
         Method::POST,
-        "/api/accounts/sign-in/reset-password",
-        Some(json!({ "pending": pending, "password": PASSWORD })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK, "forgotten, so reset");
-    assert_eq!(body["email"], json!("bob@example.com"));
-    assert!(headers.get(header::SET_COOKIE).is_some());
-    assert_eq!(
-        router
-            .mailer
-            .last_sent_to("bob@example.com")
-            .unwrap()
-            .subject,
-        "Your password was changed"
-    );
-    let body = code_matched(&router, "bob@example.com").await;
-    let (status, headers, body) = send_with(
-        &router.router,
-        None,
-        None,
-        Method::POST,
-        "/api/accounts/sign-in/confirm",
-        Some(json!({ "pending": body["pending"], "password": PASSWORD })),
+        "/api/accounts/sign-in/password",
+        Some(json!({ "email": "Bob@example.com", "password": NEW_PASSWORD })),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["email"], json!("bob@example.com"));
     assert!(headers.get(header::SET_COOKIE).is_some());
+}
+
+#[tokio::test]
+async fn accounts_password_tries_are_limited_per_address_and_the_code_still_works() {
+    let (router, _) = test_router().await;
+    for _ in 0..rate_limits::PASSWORD_TRIES_PER_ADDRESS {
+        let (status, _) = send_as(
+            &router.router,
+            None,
+            Method::POST,
+            "/api/accounts/sign-in/password",
+            Some(json!({ "email": "bob@example.com", "password": PASSWORD })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+    let (status, body) = send_as(
+        &router.router,
+        None,
+        Method::POST,
+        "/api/accounts/sign-in/password",
+        Some(json!({ "email": "bob@example.com", "password": PASSWORD })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert!(
+        body["error"]
+            .as_str()
+            .unwrap()
+            .contains("log in with an emailed code")
+    );
+    let body = code_matched(&router, "bob@example.com").await;
+    assert!(body["pending"].is_string(), "the code is not limited by it");
 }
 
 #[tokio::test]
@@ -250,40 +264,37 @@ async fn accounts_keep_signed_in_makes_the_cookie_outlast_the_browser_on_every_l
         Some(&session),
         Method::PUT,
         "/api/accounts/current/password",
-        Some(json!({ "current": null, "password": PASSWORD })),
+        Some(json!({ "password": PASSWORD })),
     )
     .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
 
-    let body = code_matched(&router, "bob@example.com").await;
     let cookie = set_cookie_of(
         &router.router,
-        "/api/accounts/sign-in/confirm",
-        json!({ "pending": body["pending"], "password": PASSWORD, "keep_signed_in": true }),
+        "/api/accounts/sign-in/password",
+        json!({ "email": "bob@example.com", "password": PASSWORD, "keep_signed_in": true }),
     )
     .await
     .expect("a cookie");
     assert!(cookie.contains(sixty_days), "{cookie}");
 
-    let body = code_matched(&router, "bob@example.com").await;
     let cookie = set_cookie_of(
         &router.router,
-        "/api/accounts/sign-in/reset-password",
-        json!({ "pending": body["pending"], "password": NEW_PASSWORD, "keep_signed_in": true }),
-    )
-    .await
-    .expect("a cookie");
-    assert!(cookie.contains(sixty_days), "{cookie}");
-
-    let body = code_matched(&router, "bob@example.com").await;
-    let cookie = set_cookie_of(
-        &router.router,
-        "/api/accounts/sign-in/confirm",
-        json!({ "pending": body["pending"], "password": NEW_PASSWORD }),
+        "/api/accounts/sign-in/password",
+        json!({ "email": "bob@example.com", "password": PASSWORD }),
     )
     .await
     .expect("a cookie");
     assert!(!cookie.contains("Max-Age"), "until the browser closes");
+
+    let (_verifier, challenge) = app_core::accounts::verifier_and_challenge();
+    let cookie = set_cookie_of(
+        &router.router,
+        "/api/accounts/sign-in/password",
+        json!({ "email": "bob@example.com", "password": PASSWORD, "challenge": challenge }),
+    )
+    .await;
+    assert!(cookie.is_none(), "a device's sign-in sets no cookie");
 
     let (_verifier, challenge) = app_core::accounts::verifier_and_challenge();
     let body = code_matched(&router, "alice@example.com").await;
@@ -324,7 +335,7 @@ async fn accounts_trial_makes_a_user_whose_cookie_lasts_two_days_and_who_signs_u
         trial["user"]["name"]
             .as_str()
             .unwrap()
-            .starts_with("trial_")
+            .starts_with("guest_")
     );
     let set_cookie = headers[header::SET_COOKIE].to_str().expect("a cookie");
     assert!(set_cookie.contains("Max-Age=172800"), "{set_cookie}");
@@ -584,7 +595,7 @@ async fn trial_users_are_refused_past_their_writes_and_see_only_their_communitie
         .iter()
         .map(|listed| &listed["community"]["name"])
         .collect();
-    assert_eq!(names, [&json!("Trial")], "not Alice's Personal");
+    assert_eq!(names, [&json!("Guest")], "not Alice's Personal");
 
     for number in 2..app_core::accounts::trial_users::MAX_WRITES {
         app_core::app::posts::create(

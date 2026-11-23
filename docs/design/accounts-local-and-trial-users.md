@@ -1,6 +1,12 @@
 # Using the app before signing up: local users and trial users
 
-**Status: agreed and built 2026-11-11, see the build plan.** This document keeps the scenarios and the reasons.
+**Status: agreed and built 2026-11-11, see the build plan.** Since
+2026-11-22 the pages call a trial user a **guest**: "Continue as guest"
+on the Log in page starts one at once, and in place of the banner on
+every page a dot on the avatar points to the account menu, which says
+how long is left with Sign up (`svelte/src/lib/AccountsGuestNotice.svelte`,
+on the profile page too); where the scenarios below speak of the
+banner, read this. See `accounts-sign-in.md`. This document keeps the scenarios and the reasons.
 What to build, as steps with what each must do, is
 `accounts-local-and-trial-users-build.md`, and where the two differ
 that one is right.
@@ -100,7 +106,7 @@ kind of user. See To decide 9.
 ## Scenarios: the trial user
 
 **T1. "Try it now" on the public website.** One click, and the person
-is in the app as `trial_85a3ycZae3b`. A banner on every page: "This is
+is in the app as `guest_85a3ycZae3b`. A banner on every page: "This is
 a trial. Sign up within 23 hours to keep what you make."
 
 **T2. They close the browser and come back after lunch.** Today's

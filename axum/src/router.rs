@@ -141,14 +141,13 @@ fn accounts_api(state: &AppState) -> Router<AppState> {
             post(accounts::sign_in_confirm),
         )
         .route(
-            "/api/accounts/sign-in/reset-password",
-            post(accounts::sign_in_reset_password),
+            "/api/accounts/sign-in/password",
+            post(accounts::sign_in_password),
         )
         .route(
-            "/api/accounts/second-factors",
-            get(accounts::second_factors),
+            "/api/accounts/current/password",
+            get(password::get).put(password::update),
         )
-        .route("/api/accounts/current/password", put(password::update))
         .route("/api/accounts/device-token", post(accounts::device_token))
         .route("/api/accounts/sign-out", delete(accounts::sign_out))
         .route(

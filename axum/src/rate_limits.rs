@@ -1,8 +1,10 @@
 //! Rate limits on the accounts routes, with `governor`, each a bucket per
 //! key in this process's memory, see "Rate limits" in
 //! `docs/design/accounts-sign-in.md`: the emails sent per address, so
-//! nobody has the server mail an address over and over; the new codes
-//! per pending sign-in; the trial users made per client IP; and, as a
+//! nobody has the server mail an address over and over; the password
+//! tries per address, so nobody guesses one, while the emailed code
+//! stays a way in; the new codes per pending sign-in; the trial users
+//! made per client IP; and, as a
 //! layer on the routes, the requests per client IP. The buckets are
 //! forgotten on a restart, which is fine for these; `forget_old` keeps
 //! the maps from growing with every address ever tried. Behind a
@@ -37,6 +39,10 @@ use crate::state::AppState;
 
 /// Emails an address is sent in an hour, codes and the rest.
 pub const EMAILS_PER_HOUR_PER_ADDRESS: u32 = 5;
+/// Password tries an address gets in `PASSWORD_TRIES_MINUTES`.
+pub const PASSWORD_TRIES_PER_ADDRESS: u32 = 5;
+/// The minutes the password tries of an address come back over.
+pub const PASSWORD_TRIES_MINUTES: u64 = 15;
 /// New codes a pending sign-in gets in a minute.
 pub const RESENDS_PER_MINUTE_PER_SIGN_IN: u32 = 1;
 /// Trial users a client IP makes in an hour: enough for a classroom
@@ -46,6 +52,8 @@ pub const TRIAL_USERS_PER_HOUR_PER_IP: u32 = 10;
 pub const ACCOUNT_REQUESTS_PER_MINUTE_PER_IP: u32 = 30;
 
 const TOO_MANY: &str = "Too many attempts; try again in a few minutes";
+const TOO_MANY_PASSWORDS: &str =
+    "Too many tries. Try your password again in a few minutes, or log in with an emailed code now.";
 
 /// The limits the accounts handlers check before calling core.
 #[derive(Clone)]
@@ -55,6 +63,7 @@ pub struct RateLimits {
 
 struct Limiters {
     emails: DefaultKeyedRateLimiter<String>,
+    passwords: DefaultKeyedRateLimiter<String>,
     resends: DefaultKeyedRateLimiter<String>,
     trial_users: DefaultKeyedRateLimiter<IpAddr>,
 }
@@ -64,6 +73,7 @@ impl RateLimits {
         RateLimits {
             limiters: Arc::new(Limiters {
                 emails: RateLimiter::keyed(Quota::per_hour(nonzero(EMAILS_PER_HOUR_PER_ADDRESS))),
+                passwords: RateLimiter::keyed(password_quota()),
                 resends: RateLimiter::keyed(Quota::per_minute(nonzero(
                     RESENDS_PER_MINUTE_PER_SIGN_IN,
                 ))),
@@ -81,6 +91,15 @@ impl RateLimits {
             .emails
             .check_key(&key)
             .map_err(|_| ApiError::new(StatusCode::TOO_MANY_REQUESTS, TOO_MANY))
+    }
+
+    /// One more password try for the address, or 429.
+    pub fn check_password(&self, email: &str) -> Result<(), ApiError> {
+        let key = email.trim().to_lowercase();
+        self.limiters
+            .passwords
+            .check_key(&key)
+            .map_err(|_| ApiError::new(StatusCode::TOO_MANY_REQUESTS, TOO_MANY_PASSWORDS))
     }
 
     /// One more code for the pending sign-in, or 429.
@@ -102,6 +121,7 @@ impl RateLimits {
     /// Drops the buckets that are full again, for a task once an hour.
     pub fn forget_old(&self) {
         self.limiters.emails.retain_recent();
+        self.limiters.passwords.retain_recent();
         self.limiters.resends.retain_recent();
         self.limiters.trial_users.retain_recent();
     }
@@ -207,6 +227,15 @@ fn client_ip(trust_proxy_headers: bool, headers: &HeaderMap, extensions: &Extens
         .map_or(IpAddr::from([0, 0, 0, 0]), |info| info.0.ip())
 }
 
+/// `PASSWORD_TRIES_PER_ADDRESS` at once, each coming back over its share
+/// of `PASSWORD_TRIES_MINUTES`.
+fn password_quota() -> Quota {
+    let every = Duration::from_secs(PASSWORD_TRIES_MINUTES * 60) / PASSWORD_TRIES_PER_ADDRESS;
+    Quota::with_period(every)
+        .unwrap_or_else(|| unreachable!("a period of minutes is not zero"))
+        .allow_burst(nonzero(PASSWORD_TRIES_PER_ADDRESS))
+}
+
 fn nonzero(count: u32) -> NonZeroU32 {
     NonZeroU32::new(count).unwrap_or(NonZeroU32::MIN)
 }
@@ -216,7 +245,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn rate_limits_count_emails_per_address_resends_per_sign_in_and_trial_users_per_client() {
+    fn rate_limits_count_emails_and_passwords_per_address_resends_per_sign_in_and_trial_users_per_client()
+     {
         let limits = RateLimits::new();
         for _ in 0..EMAILS_PER_HOUR_PER_ADDRESS {
             limits
@@ -229,6 +259,18 @@ mod tests {
         );
         limits
             .check_email("bob@example.com")
+            .expect("another address");
+        for _ in 0..PASSWORD_TRIES_PER_ADDRESS {
+            limits
+                .check_password(" Alice@Example.com ")
+                .expect("within the address's tries");
+        }
+        assert!(
+            limits.check_password("alice@example.com").is_err(),
+            "the same address"
+        );
+        limits
+            .check_password("bob@example.com")
             .expect("another address");
         limits.check_resend("pending-1").expect("the first");
         assert!(

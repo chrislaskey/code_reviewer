@@ -44,10 +44,11 @@ pub const KEPT_AFTER_HOURS: i64 = 24;
 /// next. With the cap on trial users and the lengths a row may have,
 /// this bounds what trials can make the server hold.
 pub const MAX_WRITES: i64 = 500;
-/// The community a trial user starts with.
-pub const COMMUNITY_NAME: &str = "Trial";
+/// The community a trial user starts with, named as the pages call
+/// them: a guest.
+pub const COMMUNITY_NAME: &str = "Guest";
 
-const NAME_PREFIX: &str = "trial_";
+const NAME_PREFIX: &str = "guest_";
 const EMAIL_DOMAIN: &str = "example.com";
 
 /// What `delete_expired` removed.
@@ -236,7 +237,7 @@ mod tests {
             let server = server(database);
             let before = now();
             let session = create(&server, 10).await.expect("a trial");
-            assert!(session.user.name.starts_with("trial_"));
+            assert!(session.user.name.starts_with("guest_"));
             assert_eq!(
                 session.email,
                 format!("{}@example.com", session.user.name.to_lowercase())
@@ -252,7 +253,7 @@ mod tests {
             assert_eq!(account.confirmed_at, None);
             let expires = account.trial_expires_at.expect("a trial");
             assert!(expires >= before + Duration::hours(SHOWN_HOURS));
-            assert_eq!(names_seen_by(&server, &user).await, ["Trial"]);
+            assert_eq!(names_seen_by(&server, &user).await, ["Guest"]);
             assert_eq!(
                 memberships::list_mine(&server, &user)
                     .await
@@ -299,7 +300,7 @@ mod tests {
             let theirs = communities::list(&server, &trial).await.expect("listed");
             let trial_community = theirs
                 .iter()
-                .find(|listed| listed.community.name == "Trial")
+                .find(|listed| listed.community.name == "Guest")
                 .expect("their own")
                 .community
                 .clone();
@@ -335,7 +336,7 @@ mod tests {
 
             assert_eq!(
                 names_seen_by(&server, &trial).await,
-                ["Trial"],
+                ["Guest"],
                 "a trial user sees only their own"
             );
             assert!(matches!(
@@ -415,10 +416,10 @@ mod tests {
                 posts::list(&server, &trial).await.expect("theirs").len(),
                 posts_made
             );
-            assert_eq!(names_seen_by(&server, &trial).await, ["Trial"]);
+            assert_eq!(names_seen_by(&server, &trial).await, ["Guest"]);
 
             let matched = signed_up(&server, &trial, "bob@example.com").await;
-            accounts::sign_in_confirm(&server, &matched.pending, None)
+            accounts::sign_in_confirm(&server, &matched.pending)
                 .await
                 .expect("signed up");
             let bob = users::get(&server, trial.id).await.expect("the same user");
@@ -471,7 +472,7 @@ mod tests {
                 is_trial(&server, &trial).await.expect("asked"),
                 "a trial until the last step"
             );
-            let signed_up = accounts::sign_in_confirm(&server, &matched.pending, None)
+            let signed_up = accounts::sign_in_confirm(&server, &matched.pending)
                 .await
                 .expect("signed up");
             assert_eq!(signed_up.user.id, trial.id, "the same user");
@@ -494,10 +495,10 @@ mod tests {
             assert_eq!(kept.post, post);
             assert_eq!(
                 names_seen_by(&server, &signed_up.user).await,
-                ["Personal", "Trial"],
-                "alice's, and their own, still called Trial, with no Personal of their own"
+                ["Guest", "Personal"],
+                "alice's, and their own, still called Guest, with no Personal of their own"
             );
-            assert_eq!(names_seen_by(&server, &alice).await, ["Personal", "Trial"]);
+            assert_eq!(names_seen_by(&server, &alice).await, ["Guest", "Personal"]);
             let page = sync::pull(
                 &server,
                 &alice,
@@ -531,7 +532,7 @@ mod tests {
             let trial = create(&server, 10).await.expect("a trial").user;
             let matched = signed_up(&server, &trial, "alice@example.com").await;
             assert!(!matched.new_account, "a sign-in");
-            let session = accounts::sign_in_confirm(&server, &matched.pending, None)
+            let session = accounts::sign_in_confirm(&server, &matched.pending)
                 .await
                 .expect("signed in");
             assert_eq!(session.user.id, alice.id);
@@ -560,7 +561,7 @@ mod tests {
                 .expect("signed up and stopped there");
             let trial = create(&server, 10).await.expect("a trial").user;
             let matched = signed_up(&server, &trial, "bob@example.com").await;
-            accounts::sign_in_confirm(&server, &matched.pending, None)
+            accounts::sign_in_confirm(&server, &matched.pending)
                 .await
                 .expect("signed up");
             let account = crate::accounts::users::get(&server, trial.id)

@@ -86,32 +86,31 @@ export function accountsCode(_pending, _code) {
   return Promise.reject(new Error("in the app, sign in from the accounts page"));
 }
 
-/** @param {string} _pending @param {string | null} _password @param {string} [_challenge] */
-export function accountsSignInConfirm(_pending, _password, _challenge) {
+/** @param {string} _pending @param {string} [_challenge] */
+export function accountsSignInConfirm(_pending, _challenge) {
   return Promise.reject(new Error("in the app, sign in from the accounts page"));
 }
 
-/** @param {string} _pending @param {string} _password @param {string} [_challenge] */
-export function accountsSignInResetPassword(_pending, _password, _challenge) {
+/** @param {string} _email @param {string} _password @param {string} [_challenge] */
+export function accountsSignInPassword(_email, _password, _challenge) {
   return Promise.reject(new Error("in the app, sign in from the accounts page"));
 }
 
 /**
- * What the signed-in person's account asks for after the emailed code,
- * asked of the server, so only when online.
- * @returns {Promise<Array<"password">>}
+ * Whether the signed-in person has a password, asked of the server, so
+ * only when online.
+ * @returns {Promise<{is_set: boolean}>}
  */
-export function accountsSecondFactors() {
-  return invoke("accounts_second_factors");
+export function accountsPasswordGet() {
+  return invoke("accounts_password_get");
 }
 
 /**
  * The signed-in person's password, kept by the server, so only when online.
- * @param {string | null} current
  * @param {string} password
  */
-export function accountsPasswordUpdate(current, password) {
-  return invoke("accounts_password_update", { current, password });
+export function accountsPasswordUpdate(password) {
+  return invoke("accounts_password_update", { password });
 }
 
 /** @param {string} _pending */

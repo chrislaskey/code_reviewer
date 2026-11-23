@@ -106,9 +106,9 @@ export function avatarsUpdate(key) {
  */
 
 /**
- * What a matched code answers: the last step's pending token, whether
- * it makes the account, and whether the account's password finishes it.
- * @typedef {{pending: string, new_account: boolean, needs_password: boolean, can_reset_password: boolean}} CodeMatched
+ * What a matched code answers: the last step's pending token, and
+ * whether it makes the account.
+ * @typedef {{pending: string, new_account: boolean}} CodeMatched
  */
 
 /**
@@ -131,44 +131,41 @@ export function accountsCode(pending, code) {
 /**
  * The last step: makes a new account, or signs in to one.
  * @param {string} pending the one the code answered
- * @param {string | null} password the account's, when it has one
  * @param {string} [challenge] the device's, when it opened this page
  * @param {boolean} [keepSignedIn] whether the browser stays signed in after it closes
  * @returns {Promise<SignInFinished>}
  */
-export function accountsSignInConfirm(pending, password, challenge, keepSignedIn = false) {
-  return send("POST", "/api/accounts/sign-in/confirm", { pending, password, challenge: challenge || null, keep_signed_in: keepSignedIn });
+export function accountsSignInConfirm(pending, challenge, keepSignedIn = false) {
+  return send("POST", "/api/accounts/sign-in/confirm", { pending, challenge: challenge || null, keep_signed_in: keepSignedIn });
 }
 
 /**
- * A new password in place of a forgotten one, after the code; refused
- * when the app does not let one be reset.
- * @param {string} pending the one the code answered
+ * A sign-in with the account's password in place of an emailed code.
+ * @param {string} email
  * @param {string} password
- * @param {string} [challenge]
- * @param {boolean} [keepSignedIn]
+ * @param {string} [challenge] the device's, when it opened this page
+ * @param {boolean} [keepSignedIn] whether the browser stays signed in after it closes
  * @returns {Promise<SignInFinished>}
  */
-export function accountsSignInResetPassword(pending, password, challenge, keepSignedIn = false) {
-  return send("POST", "/api/accounts/sign-in/reset-password", { pending, password, challenge: challenge || null, keep_signed_in: keepSignedIn });
+export function accountsSignInPassword(email, password, challenge, keepSignedIn = false) {
+  return send("POST", "/api/accounts/sign-in/password", { email, password, challenge: challenge || null, keep_signed_in: keepSignedIn });
 }
 
 /**
- * What the signed-in person's account asks for after the emailed code.
- * @returns {Promise<Array<"password">>}
+ * Whether the signed-in person has a password.
+ * @returns {Promise<{is_set: boolean}>}
  */
-export function accountsSecondFactors() {
-  return send("GET", "/api/accounts/second-factors");
+export function accountsPasswordGet() {
+  return send("GET", "/api/accounts/current/password");
 }
 
 /**
- * The signed-in person's password: their first, or a new one in place of
- * the current one.
- * @param {string | null} current
+ * The signed-in person's password, their first or a new one; their
+ * email is told.
  * @param {string} password
  */
-export function accountsPasswordUpdate(current, password) {
-  return send("PUT", "/api/accounts/current/password", { current, password });
+export function accountsPasswordUpdate(password) {
+  return send("PUT", "/api/accounts/current/password", { password });
 }
 
 /**

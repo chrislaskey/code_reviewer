@@ -38,20 +38,20 @@
 <Page>
   <Heading level={1}>Try it now</Heading>
   {#if available === false}
-    <Text>Trials are not available right now.</Text>
-    <Text><Button variant="primary" href={accountsSignInUrl()}>Sign in or create an account</Button></Text>
+    <Text>Guest visits are not available right now.</Text>
+    <Text><Button variant="primary" href={accountsSignInUrl()}>Log in or sign up</Button></Text>
   {:else}
     <Text>
       Use the app for 24 hours with no account. What you make is deleted after that, unless you sign up, which
       keeps all of it.
     </Text>
-    <Text tone="muted" size="sm">A trial stays in this browser, and has no files or picture until you sign up.</Text>
+    <Text tone="muted" size="sm">A guest stays in this browser, and has no files or picture until they sign up.</Text>
     <ErrorMessage message={error} />
     <div class="flex flex-wrap items-center gap-3">
       <Button variant="primary" onclick={start} disabled={busy || available === null} data-trial>
-        Start a trial
+        Continue as guest
       </Button>
-      <Link size="sm" href={accountsSignInUrl()}>Sign in or create an account</Link>
+      <Link size="sm" href={accountsSignInUrl()}>Log in or sign up</Link>
     </div>
   {/if}
 </Page>

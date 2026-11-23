@@ -7,7 +7,7 @@
  */
 export async function opsCurrentStaffGet() {
   const response = await fetch("/api/ops/current-staff");
-  if (response.status === 404) throw new Error("Sign in again as staff to use ops");
+  if (response.status === 404) throw new Error("Log in again as staff to use ops");
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
   return response.json();
 }

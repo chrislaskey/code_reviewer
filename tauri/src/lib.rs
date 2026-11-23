@@ -71,7 +71,7 @@ pub fn run() {
             accounts::accounts_sign_in_finish,
             accounts::accounts_sign_in_cancel,
             accounts::accounts_sign_out,
-            accounts::accounts_second_factors,
+            accounts::password::accounts_password_get,
             accounts::password::accounts_password_update,
             accounts::deletions::code::accounts_deletions_code_create,
             accounts::deletions::accounts_deletions_create,

@@ -92,9 +92,9 @@
           The app's own server could not be reached to check this one. Go on only if you trust whoever runs it.
         </Alert>
       {/if}
-      <Text tone="muted" size="sm">You sign in on that server's own page, in the browser.</Text>
+      <Text tone="muted" size="sm">You log in on that server's own page, in the browser.</Text>
       <div>
-        <Button size="sm" variant="primary" onclick={signIn} disabled={busy || checking}>Sign up or sign in there</Button>
+        <Button size="sm" variant="primary" onclick={signIn} disabled={busy || checking}>Sign up or log in there</Button>
       </div>
     {/if}
   </Panel>

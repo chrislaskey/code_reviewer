@@ -25,10 +25,10 @@
 
 <div class="flex flex-col gap-3">
   {#if returnUrl}
-    <Text>You are signed in. Returning you to the app…</Text>
+    <Text>You are logged in. Returning you to the app…</Text>
     <Text tone="muted" size="sm">If the app does not open, paste this code into it.</Text>
   {:else}
-    <Text>You are signed in. Paste this code into the app to finish there, then you can close this tab.</Text>
+    <Text>You are logged in. Paste this code into the app to finish there, then you can close this tab.</Text>
   {/if}
   <div class="flex flex-wrap items-center gap-3">
     <code class="rounded bg-base-200 px-3 py-2 text-lg break-all select-all" data-device-code>{code}</code>

@@ -905,7 +905,7 @@ mod tests {
             .await
             .expect("the code matched");
         let device_code =
-            accounts::sign_in_confirm_for_device(server, &matched.pending, None, &challenge)
+            accounts::sign_in_confirm_for_device(server, &matched.pending, &challenge)
                 .await
                 .expect("finished");
         accounts::sign_in_with_device_code(server, &device_code.code, &verifier)

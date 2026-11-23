@@ -37,12 +37,12 @@
 
 <Dialog bind:element={dialog} onclose={() => pending && oncancel()}>
   {#if pending}
-    <Heading>Finish signing in in your browser</Heading>
+    <Heading>Finish logging in in your browser</Heading>
     <Text>
       {#if pending.email}
-        The sign-in page for <strong>{pending.email}</strong> opened in your browser.
+        The page to log in as <strong>{pending.email}</strong> opened in your browser.
       {:else}
-        The sign-in page opened in your browser.
+        The page to log in opened in your browser.
       {/if}
       When it shows a code, paste it here.
     </Text>

@@ -59,7 +59,7 @@
   currentServerLoad().catch(() => {});
   /** Whether the server takes new sign-ups, as its settings say. */
   let signUpOffered = $derived(currentServer.value?.settings.features.accounts_sign_up ?? true);
-  let signUpOrSignIn = $derived(signUpOffered ? "Sign up or sign in" : "Sign in");
+  let signUpOrSignIn = $derived(signUpOffered ? "Sign up or log in" : "Log in");
   /** Whether the page was opened just after an account was deleted. */
   const accountDeleted = new URLSearchParams(window.location.search).has("account_deleted");
 
@@ -243,8 +243,8 @@
         {:else if account.signed_in}
           <Button size="sm" onclick={() => switchTo(account)} disabled={busy}>Switch</Button>
         {:else}
-          <Badge tone="ghost">Signed out</Badge>
-          <Button size="sm" onclick={() => openBrowser(account.email, account.server_id)} disabled={busy}>Sign in</Button>
+          <Badge tone="ghost">Logged out</Badge>
+          <Button size="sm" onclick={() => openBrowser(account.email, account.server_id)} disabled={busy}>Log in</Button>
         {/if}
         <Button size="sm" variant="ghost" onclick={() => ((loss = null), (removing = account))} disabled={busy}>
           Remove from device

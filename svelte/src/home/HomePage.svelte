@@ -8,6 +8,6 @@
   <Heading level={1}>Starter Pack</Heading>
   <Text>
     The same pages on the web, on the desktop and on a phone, over the same Rust application.
-    Sign in, then start with the <Link href={postsIndexUrl()}>posts</Link>.
+    Log in, then start with the <Link href={postsIndexUrl()}>posts</Link>.
   </Text>
 </Page>

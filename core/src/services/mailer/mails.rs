@@ -25,9 +25,9 @@ pub fn no_account(to: &str) -> Mail {
         to: to.to_string(),
         subject: format!("No {APP_NAME} account for this email"),
         text: format!(
-            "Someone, likely you, tried to sign in to {APP_NAME} with this email. \
+            "Someone, likely you, tried to log in to {APP_NAME} with this email. \
              There is no account for it, and {APP_NAME} is not taking new sign-ups \
-             right now: sign in with the email you signed up with.\n\n\
+             right now: log in with the email you signed up with.\n\n\
              If this was not you, ignore this email."
         ),
     }
@@ -42,8 +42,8 @@ pub fn delete_code(to: &str, code: &str) -> Mail {
         text: format!(
             "Your code is {code}. It expires in ten minutes. Entering it deletes \
              your account and everything in it, and cannot be undone.\n\n\
-             If you did not ask for it, someone is signed in to your account: \
-             sign in and change your password."
+             If you did not ask for it, someone is logged in to your account: \
+             log in and change your password."
         ),
     }
 }
@@ -62,17 +62,16 @@ pub fn account_deleted(to: &str) -> Mail {
     }
 }
 
-/// To an account whose forgotten password was replaced at a sign-in,
-/// see `accounts::sign_in_with_reset_password`.
-pub fn password_reset(to: &str) -> Mail {
+/// To an account whose password was made or changed, see
+/// `accounts::password::update`.
+pub fn password_changed(to: &str) -> Mail {
     Mail {
         to: to.to_string(),
         subject: "Your password was changed".to_string(),
         text: format!(
-            "The password of your {APP_NAME} account was just reset after signing in \
-             with a code sent to this email.\n\n\
-             If this was not you, someone can read your email: secure it, then \
-             sign in and change the password."
+            "The password of your {APP_NAME} account was just set.\n\n\
+             If this was not you, log in with a code sent to this email and \
+             change it, then check who else can read your email."
         ),
     }
 }

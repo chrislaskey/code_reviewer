@@ -141,7 +141,7 @@ async fn signed_up(deployment: &Deployment, mailer: &Mailer, email: &str) -> Ses
         .await
         .expect("the code matched");
     assert!(matched.new_account);
-    app_core::accounts::sign_in_confirm(deployment, &matched.pending, None)
+    app_core::accounts::sign_in_confirm(deployment, &matched.pending)
         .await
         .expect("signed up")
 }

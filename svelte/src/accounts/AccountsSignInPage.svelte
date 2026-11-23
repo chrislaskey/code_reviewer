@@ -1,25 +1,34 @@
-<!-- Signing in or up, at /accounts/sign-in, on the web, one flow for
-     both: the email, then the code that was emailed and the button that
-     makes the account or signs in to it, see AccountsSignInSteps; the
-     server knows which, and the email step looks the same either way.
-     Opened by a device with ?challenge=, it ends in a code for the device
-     instead, see docs/design/accounts-sign-in.md. The email is filled in
-     from ?email=. A trial is offered where the server has room for one. -->
+<!-- Logging in or signing up, at /accounts/sign-in, on the web, one page
+     for both: "Continue as guest" where the server has room for a trial;
+     the email, then "Email a code", which goes on to the code and the
+     button that makes the account or logs in to it, see
+     AccountsSignInSteps, or "Use my password", which shows the password
+     on this page; and the terms last, for every way in. Opened by a
+     device with ?challenge=, it ends in a code for the device instead,
+     see docs/design/accounts-sign-in.md. The email is filled in from
+     ?email=. -->
 <script>
-  import { accountsSignIn, accountsTrialGet } from "../lib/core/index.js";
+  import PublicPagesLinks from "../lib/PublicPagesLinks.svelte";
+  import { accountsSignIn, accountsSignInPassword, accountsTrialGet } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
   import { currentServer, currentServerLoad } from "../lib/current_server.svelte.js";
-  import { accountsTrialUrl } from "../lib/routes.js";
-  import AccountsForm from "./components/AccountsForm.svelte";
+  import { currentUser, currentUserForget } from "../lib/current_user.svelte.js";
+  import { navigateToUrl } from "../lib/router.js";
+  import { postsIndexUrl } from "../lib/routes.js";
+  import AccountsDeviceCode from "./components/AccountsDeviceCode.svelte";
+  import AccountsGuestRow from "./components/AccountsGuestRow.svelte";
   import AccountsSignInSteps from "./components/AccountsSignInSteps.svelte";
   import { KEEP_SIGNED_IN_CHECKED } from "./keep_signed_in.js";
-  import { Heading, Link, Page, Text } from "../lib/components/index.js";
+  import { Button, Checkbox, ErrorMessage, Heading, Input, Label, Page, Text } from "../lib/components/index.js";
 
   const query = new URLSearchParams(window.location.search);
   const challenge = query.get("challenge") ?? "";
   const appReturn = { appPort: query.get("app_port") ?? "", appScheme: query.get("app_scheme") ?? "" };
 
   let email = $state(query.get("email") ?? "");
+  let password = $state("");
+  /** Whether the person chose "Use my password". */
+  let withPassword = $state(false);
   let keepSignedIn = $state(KEEP_SIGNED_IN_CHECKED);
   /** Whether to offer a trial: on the web, when the server has room for one. */
   let trialAvailable = $state(false);
@@ -27,37 +36,103 @@
   currentServerLoad().catch(() => {});
   /** Whether the server takes new sign-ups, as its settings say. */
   let signUpOffered = $derived(currentServer.value?.settings.features.accounts_sign_up ?? true);
+  /** A guest already is one, and comes here to sign up. */
+  let guestOffered = $derived(trialAvailable && currentUser.value?.kind !== "trial");
   let pending = $state("");
+  let deviceCode = $state("");
   let error = $state("");
   let busy = $state(false);
 
-  async function signIn() {
+  /** @param {() => Promise<void>} action */
+  async function attempt(action) {
     busy = true;
     error = "";
     try {
-      pending = (await accountsSignIn(email)).pending;
+      await action();
     } catch (problem) {
       error = errorMessageOf(problem);
     } finally {
       busy = false;
     }
   }
+
+  function emailCode() {
+    return attempt(async () => {
+      pending = (await accountsSignIn(email)).pending;
+      withPassword = false;
+      password = "";
+    });
+  }
+
+  function logIn() {
+    return attempt(async () => finish(await accountsSignInPassword(email, password, challenge, keepSignedIn)));
+  }
+
+  /** @param {import("../lib/core/http-api.js").SignInFinished} finished */
+  async function finish(finished) {
+    if ("code" in finished) {
+      deviceCode = finished.code;
+      return;
+    }
+    currentUserForget();
+    await navigateToUrl(postsIndexUrl());
+  }
+
+  /** @param {SubmitEvent} event */
+  function submit(event) {
+    event.preventDefault();
+    return withPassword ? logIn() : emailCode();
+  }
+
+  function usePassword() {
+    withPassword = true;
+    error = "";
+  }
 </script>
 
 <Page>
-  <Heading level={1}>{signUpOffered ? "Sign in or create an account" : "Sign in"}</Heading>
-  {#if challenge}
-    <Text tone="muted">Signing in for the app on your device.</Text>
-  {/if}
-  {#if pending}
-    <AccountsSignInSteps {email} {pending} {challenge} {appReturn} {keepSignedIn} onstartover={() => (pending = "")} />
+  {#if deviceCode}
+    <AccountsDeviceCode code={deviceCode} {appReturn} />
   {:else}
-    <AccountsForm bind:email bind:keepSignedIn withKeepSignedIn={!challenge} submitText="Continue" {error} {busy} onsubmit={signIn} />
-    {#if !signUpOffered}
-      <Text tone="muted">This server takes no new sign-ups.</Text>
+    <Heading level={1}>{pending ? "Check your email" : signUpOffered ? "Log in or sign up" : "Log in"}</Heading>
+    {#if challenge}
+      <Text tone="muted">Logging in for the app on your device.</Text>
     {/if}
-    {#if trialAvailable}
-      <Text tone="muted">Just looking? <Link href={accountsTrialUrl()}>Try it without an account</Link></Text>
+    {#if pending}
+      <AccountsSignInSteps {email} {pending} {challenge} bind:keepSignedIn onfinish={finish} onstartover={() => (pending = "")} />
+    {:else}
+      {#if guestOffered && !withPassword}
+        <AccountsGuestRow />
+        <div class="divider muted my-0 text-sm">or</div>
+      {/if}
+      <form onsubmit={submit} class="flex flex-col gap-3">
+        {#if withPassword}
+          <Label text="Email">
+            <Input bind:value={email} type="email" autocomplete="username" required />
+          </Label>
+          <Label text="Password">
+            <Input bind:value={password} type="password" autocomplete="current-password" required />
+          </Label>
+          <ErrorMessage message={error} />
+          <Button variant="primary" type="submit" disabled={busy}>Log in</Button>
+          <Button onclick={emailCode} disabled={busy}>Email a code instead</Button>
+          {#if !challenge}
+            <Checkbox bind:checked={keepSignedIn} size="sm" tone="muted">Keep me logged in</Checkbox>
+          {/if}
+          <Text tone="muted" size="sm">Forgot your password? Use a code, then change it in Account settings.</Text>
+        {:else}
+          <Input bind:value={email} type="email" autocomplete="username" aria-label="Email" placeholder="Email" required />
+          <ErrorMessage message={error} />
+          <Button variant="primary" type="submit" disabled={busy}>Email a code</Button>
+          <Button onclick={usePassword} disabled={busy}>Use my password</Button>
+          {#if !signUpOffered}
+            <Text tone="muted" size="sm">This server takes no new sign-ups.</Text>
+          {/if}
+        {/if}
+      </form>
     {/if}
+    <div class="border-base-300 border-t pt-3 text-center">
+      <Text tone="muted" size="sm">By continuing, you accept the <PublicPagesLinks />.</Text>
+    </div>
   {/if}
 </Page>

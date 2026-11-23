@@ -16,8 +16,8 @@
 
 {#if kind === "local"}
   <Text>This is online only, and your account is only on this device.</Text>
-  <Text><Button size="sm" variant="primary" href={accountsIndexUrl()}>Sign up or sign in</Button></Text>
+  <Text><Button size="sm" variant="primary" href={accountsIndexUrl()}>Sign up or log in</Button></Text>
 {:else}
-  <Text>This needs an account, and you are on a trial.</Text>
+  <Text>This needs an account, and you are a guest.</Text>
   <Text><Button size="sm" variant="primary" href={accountsSignInUrl()}>Sign up</Button></Text>
 {/if}

@@ -345,12 +345,12 @@ impl Http {
         .await
     }
 
-    /// `accounts::second_factors` on the server, of the token's user.
-    pub async fn accounts_second_factors(
+    /// `accounts::password::get` on the server, of the token's user.
+    pub async fn accounts_password_get(
         &self,
         token: &str,
-    ) -> Result<Vec<accounts::SecondFactor>, SyncError> {
-        let path = "/api/accounts/second-factors";
+    ) -> Result<accounts::password::PasswordStatus, SyncError> {
+        let path = "/api/accounts/current/password";
         self.send(reqwest::Method::GET, Some(token), path, &())
             .await
     }

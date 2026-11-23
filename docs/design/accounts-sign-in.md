@@ -2,7 +2,8 @@
 
 **Status: built, 2026-11-08, steps 1 to 6 of the build order; the
 later returns are not. One sign-in for both since 2026-11-22, see the
-first section.** Since `multi-app.md` the email and
+first section; a password as a way in of its own, the "Log in" and
+"guest" words, the second.** Since `multi-app.md` the email and
 `confirmed_at` are on `accounts_users`, a server-only row with the
 user's id, and a sign-up's name, from the email since 2026-11-20, is the only thing of a person that
 `app_users` syncs besides their picture; read `app_users` below as
@@ -65,6 +66,81 @@ this.
 - **No password at sign-up**: the "Create a password" step after the
   first code is gone. A password is made later, signed in, at
   `/accounts/current/password/edit`.
+
+## Since 2026-11-22: a password is a way in, not a second step
+
+A password asked after a matching code guarded nothing, since "Forgot
+your password?" sat on the same step behind the same code. A password
+becomes a way in beside the code instead, and a forgotten one is
+changed by logging in with a code. Where the sections below speak of a
+password step after the code, second factors, or a forgotten password,
+read this. The mockups are the Code Reviewer artifacts
+`starter_pack/cr-Passwordflow/sign-in-concepts*.html`, round 6 the
+chosen one.
+
+- **Words on the pages only**: the pages say "Log in" and "Sign up",
+  "Keep me logged in", "Log out"; and a trial user is a "guest" ("You're
+  a guest. Sign up within 23 hours to keep what you make.", "Guest" in
+  the account menu). Routes, functions, tables, the `trial` kind and
+  these docs keep their sign-in, sign-up and trial names. A local user
+  in the apps stays "On this device only", not a guest. A guest sees no
+  banner: a dot on the avatar points to the account menu, where
+  `AccountsGuestNotice` says how long is left with Sign up; the profile
+  page shows it too.
+- **The page**, `/accounts/sign-in`, top to bottom: "Log in or sign
+  up"; a tinted row, "Continue as guest" over "No sign-up required",
+  which starts a trial at once when the server has room for one and the
+  page is not a device's sign-in; "or"; the email field, its label
+  hidden but read out; "Email a code", the main button; "Use my
+  password"; and last, under a rule, "By continuing, you accept the
+  Terms of Service and Privacy Policy", which covers every way in.
+  Nothing is mailed until "Email a code" is pressed.
+- **The code**: "Check your email", "We sent a code to … It expires in
+  ten minutes. Change email", the link going back to the email; the six
+  boxes; "Create account" or "Log in" as now; then "Keep me logged in",
+  small and left-aligned, under the button; "Send a new code"; the
+  terms. `sign_in_with_code` answers `{ pending, new_account }` and
+  `sign_in_confirm` takes no password.
+- **The password**: "Use my password" shows the Password field under
+  the Email field on the same page, both labelled, then "Log in",
+  "Email a code instead", "Keep me logged in", and "Forgot your
+  password? Use a code, then change it in Account settings." It is one
+  request, `POST /api/accounts/sign-in/password`,
+  `accounts::sign_in_with_password` (`…_for_device` with a challenge,
+  ending in the device code as the code does), which records the terms
+  as the confirm does. From a trial user's browser it logs in to the
+  account and leaves the trial as it is, as a code for a confirmed
+  account does.
+- **Telling nobody which emails have accounts**: every failure answers
+  the same 401, "That email and password don't match": no account, an
+  unconfirmed one, one with no password, a wrong password, sign-ups
+  off. An email with no account is checked against a dummy hash, so
+  the answer takes as long. A password only ever exists on a confirmed
+  account, made signed in.
+- **Guessing**: a limit in `axum/src/rate_limits.rs`, five password
+  tries per address, one coming back every three minutes, beside the
+  accounts routes' limit per IP, answering 429 "Too many tries. Try your
+  password again in a few minutes, or log in with an emailed code now."
+  The code always works, so the limit locks nobody out.
+- **Keep me logged in** starts checked, and is sent with whichever
+  request makes the session, as now; the email step no longer carries
+  it.
+- **Changing a password**, signed in, at
+  `/accounts/current/password/edit`, no longer asks for the current
+  one: a person who forgot theirs logs in with a code and sets a new
+  one there. "Your password was changed" is still mailed. A minimum
+  length stays; no check against breached passwords, which would call
+  an outside service.
+- **Gone**: the password step and its `sign_in_password` token,
+  `needs_password` and `can_reset_password`,
+  `sign_in_with_reset_password` and its route, `FORGOTTEN_PASSWORD`,
+  and `SecondFactor` / `second_factors` with the
+  `accounts_second_factors` command; the password page reads whether
+  the account has a password, `GET /api/accounts/current/password`
+  (`accounts_password_get` in the apps), in their place. The last
+  step's pending row is a `sign_in_confirm` token. A real second factor, an
+  authenticator app or a passkey, is later, see
+  `docs/suggestions/sign-in.md`.
 
 ## Since 2026-11-11: the code first, a password optional
 

@@ -36,7 +36,7 @@
     {#if account.local}
       <Text>
         <strong>This is the only copy.</strong> Everything in this account is on this device alone and is deleted
-        with it. This cannot be undone. To keep it, sign up or sign in first and move it into your account.
+        with it. This cannot be undone. To keep it, sign up or log in first and move it into your account.
       </Text>
     {:else if loss}
       <ul class="list-disc pl-5">
@@ -51,7 +51,7 @@
     {:else}
       <Text>
         Any data stored on this device for this account is removed. What was synced stays on the server and on other
-        devices, and signing in again later downloads it to this device again.
+        devices, and logging in again later downloads it to this device again.
       </Text>
     {/if}
     <DialogActions>

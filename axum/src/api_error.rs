@@ -306,12 +306,10 @@ impl From<AccountError> for ApiError {
             AccountError::Sync(error) => return error.into(),
             AccountError::SignInExpired
             | AccountError::CodeDoesNotMatch
+            | AccountError::EmailOrPasswordDoesNotMatch
             | AccountError::UnknownDeviceCode => StatusCode::UNAUTHORIZED,
-            AccountError::PasswordDoesNotMatch | AccountError::NotATrial => {
-                StatusCode::UNPROCESSABLE_ENTITY
-            }
+            AccountError::NotATrial => StatusCode::UNPROCESSABLE_ENTITY,
             AccountError::TrialsFull => StatusCode::SERVICE_UNAVAILABLE,
-            AccountError::PasswordResetNotAllowed => StatusCode::FORBIDDEN,
             AccountError::Credential(
                 CredentialError::PasswordTooShort | CredentialError::PasswordTooLong,
             ) => StatusCode::UNPROCESSABLE_ENTITY,

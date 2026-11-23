@@ -64,14 +64,12 @@ Inside the Tauri app each is a command of the same name
 | `avatarsUploadsCreate(contentType, size)` | `POST /api/users/current/avatar/uploads`, 201 with where to PUT the picture; 422 with `"errors"` for a wrong file |
 | `avatarsUpdate(key)` | `PUT /api/users/current/avatar` with `{"key": "..."}`, the user with their `avatar_url` |
 | `avatarsUpload(file, onProgress?)` | both, with the file PUT straight to the bucket between them, see [Forms and uploads](#forms-and-uploads) |
-| `accountsSignUp(email, name)` | `POST /api/accounts/sign-up`, 202 with the pending token, a code emailed |
-| `accountsSignIn(email)` | `POST /api/accounts/sign-in`, the same |
-| `accountsCode(pending, code, challenge?)` | `POST /api/accounts/code`, the user and the token, and the cookie; with a device's challenge, the device code and no cookie; or `{next, pending}` when a password comes first |
-| `accountsSignInPassword(pending, password, challenge?)` | `POST /api/accounts/sign-in/password`, the account's password after the code; answers as a finished code |
-| `accountsSignInResetPassword(pending, password, challenge?)` | `POST /api/accounts/sign-in/reset-password`, a new password in place of a forgotten one; answers as a finished code, 403 when the app locks out |
-| `accountsSignInNewPassword(pending, password, challenge?)` | `POST /api/accounts/sign-in/new-password`, the password a new account makes, or null to skip; answers as a finished code |
-| `accountsSecondFactors()` | `GET /api/accounts/second-factors`, `["password"]` or `[]` |
-| `accountsPasswordUpdate(current, password)` | `PUT /api/accounts/current/password`, 204; the current one when there is one |
+| `accountsSignIn(email)` | `POST /api/accounts/sign-in`, 202 with the pending token, a code emailed; one route for signing up and signing in |
+| `accountsCode(pending, code)` | `POST /api/accounts/code`, `{pending, new_account}` for the last step; nobody is signed in yet |
+| `accountsSignInConfirm(pending, challenge?, keepSignedIn?)` | `POST /api/accounts/sign-in/confirm`, the last step: the user and the token, and the cookie; with a device's challenge, the device code and no cookie |
+| `accountsSignInPassword(email, password, challenge?, keepSignedIn?)` | `POST /api/accounts/sign-in/password`, the account's password in place of a code; answers as the last step does, 401 "That email and password don't match" for every refusal, 429 after five tries an address |
+| `accountsPasswordGet()` | `GET /api/accounts/current/password`, `{"is_set": true}` or false |
+| `accountsPasswordUpdate(password)` | `PUT /api/accounts/current/password`, 204; no current one asked, the account's email told |
 | `accountsCodeResend(pending)` | `POST /api/accounts/code/resend`, 202, a new code emailed |
 | `accountsSignOut()` | `DELETE /api/accounts/sign-out`, 204 |
 | `accountsSignInStart(email?)`, `accountsSignInPending()`, `accountsSignInFinish(code)`, `accountsSignInCancel()` | none: the web signs in on its own page; the app's `POST /api/accounts/device-token` is what `accountsSignInFinish` calls, see "Accounts on a device" |

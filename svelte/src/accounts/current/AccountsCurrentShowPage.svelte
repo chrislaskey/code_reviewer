@@ -29,7 +29,7 @@
   {#if currentUser.value && currentUser.value.kind !== "full"}
     <AccountsNeeded kind={currentUser.value.kind} />
     {#if currentUser.value.kind === "trial"}
-      <Text><Link href={accountsDeletionsNewUrl()}>Delete my trial</Link></Text>
+      <Text><Link href={accountsDeletionsNewUrl()}>Delete what I made as a guest</Link></Text>
     {/if}
   {:else}
     {#if currentUser.value}

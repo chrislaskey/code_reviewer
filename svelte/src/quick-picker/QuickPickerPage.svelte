@@ -199,7 +199,7 @@
 {:else}
   <div class="quick-picker">
     <div class="quick-picker-signed-out">
-      <p>Sign in to Starter Pack to pick from your images.</p>
+      <p>Log in to Starter Pack to pick from your images.</p>
       <button type="button" class="btn btn-primary btn-sm" bind:this={openAppButton} onclick={openApp}>Open Starter Pack</button>
       {#if message}
         <p class="error">{message}</p>
