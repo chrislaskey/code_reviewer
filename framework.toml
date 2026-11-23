@@ -76,6 +76,7 @@ seams = [
     "core/src/app/synced_tables.rs",
     "core/src/app/jobs.rs",
     "core/src/app/features.rs",
+    "core/src/app/locales.rs",
 
     "axum/src/app.rs",
     "axum/src/router.rs",

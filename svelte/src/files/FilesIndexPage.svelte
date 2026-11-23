@@ -10,6 +10,7 @@
      docs/design/files-browsing.md. -->
 <script>
   import { msgid, ngettext, t } from "ttag";
+  import { dateTimeFormat } from "../lib/formats.js";
   import AnimationsToggle from "../lib/AnimationsToggle.svelte";
   import FileImage from "../lib/FileImage.svelte";
   import FilesGrid from "./components/FilesGrid.svelte";
@@ -143,7 +144,7 @@
           <div class="flex min-w-0 grow flex-col">
             <Link class="truncate" href={filesShowUrl(file.id)}>{file.name}</Link>
             <Text as="span" tone="muted">
-              {fileSize(file.size)} · {file.inserted_at} · {t`in ${communityNames}`}
+              {fileSize(file.size)} · {dateTimeFormat(file.inserted_at)} · {t`in ${communityNames}`}
             </Text>
             {#if problem}
               <Text as="span" tone="error" size="sm">{problem}</Text>

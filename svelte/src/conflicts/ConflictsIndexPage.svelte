@@ -4,6 +4,7 @@
      refused it outright, or let go -->
 <script>
   import { t } from "ttag";
+  import { dateTimeFormat } from "../lib/formats.js";
   import {
     conflictsDelete,
     conflictsList,
@@ -56,7 +57,7 @@
     <ul class="flex flex-col gap-3">
       {#each pending as change (change.id)}
         <Panel as="li">
-          <Text tone="muted">{change.about ?? change.table} · {change.kind} · {change.made_at}</Text>
+          <Text tone="muted">{change.about ?? change.table} · {change.kind} · {dateTimeFormat(change.made_at)}</Text>
           {#each Object.entries(change.changes) as [name, value] (name)}
             <Text><strong>{name}</strong></Text>
             <Text class="whitespace-pre-wrap">{shown(value)}</Text>
@@ -72,7 +73,7 @@
   <ul class="flex flex-col gap-3">
     {#each conflicts as conflict (conflict.id)}
       <Panel as="li">
-        <Text tone="muted">{conflict.about ?? t`Something that is gone`} · {conflict.made_at}</Text>
+        <Text tone="muted">{conflict.about ?? t`Something that is gone`} · {dateTimeFormat(conflict.made_at)}</Text>
         {#if conflict.reason}
           <Text tone="error" size="sm">{conflict.reason}</Text>
         {/if}

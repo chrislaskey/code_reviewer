@@ -57,7 +57,7 @@ pages' `svelte/translations/`, so neither writes over the other.
   every other language, each in its own name. The dev server translates
   a page as it answers it.
 - **The web server** answers `/<locale>` and `/<locale>/<name>` for each
-  language of `helpers::locales::SUPPORTED`, a core test keeping both
+  language of `app::locales::SUPPORTED`, a core test keeping both
   catalogs to that list.
 - **The app's links** to the terms and the privacy policy open them in
   the language the app shows.

@@ -7,6 +7,7 @@
   import { t } from "ttag";
   import { accountsSignInUrl } from "./routes.js";
   import { Button, Text } from "./components/index.js";
+  import { dateTimeFormat } from "./formats.js";
 
   /**
    * @typedef {Object} Props
@@ -31,7 +32,7 @@
   let left = $derived(endsAt - now);
   let remaining = $derived(timeLeft(left));
   let deletedAt = $derived(
-    new Date(endsAt + KEPT_AFTER_HOURS * HOUR).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }),
+    dateTimeFormat(endsAt + KEPT_AFTER_HOURS * HOUR),
   );
 
   /** @param {number} milliseconds */

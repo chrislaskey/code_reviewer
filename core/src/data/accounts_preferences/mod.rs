@@ -16,7 +16,7 @@ use crate::helpers::locales;
 
 pub const TABLE: &str = "accounts_preferences";
 
-/// The language the pages are shown in: one of `locales::SUPPORTED`, or
+/// The language the pages are shown in: one of `app::locales::SUPPORTED`, or
 /// null to follow the device's.
 pub const LOCALE: &str = "locale";
 

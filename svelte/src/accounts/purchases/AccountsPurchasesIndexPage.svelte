@@ -6,6 +6,7 @@
   import { loaded } from "../../lib/loaded.svelte.js";
   import { accountsProductsIndexUrl, accountsPurchasesShowUrl } from "../../lib/routes.js";
   import { moneyFormat } from "../money.js";
+  import { dateFormat } from "../../lib/formats.js";
   import { ErrorMessage, Heading, Link, Page, Text } from "../../lib/components/index.js";
 
   const purchases = loaded(accountsPurchasesList);
@@ -24,7 +25,7 @@
       <li>
         <Link href={accountsPurchasesShowUrl(purchase.id)}>{purchase.product_name}</Link>
         <Text as="span" tone="muted">
-          · {moneyFormat(purchase.amount, purchase.currency)} · {new Date(purchase.inserted_at).toLocaleDateString()}
+          · {moneyFormat(purchase.amount, purchase.currency)} · {dateFormat(purchase.inserted_at)}
           {#if purchase.refunded_at}· {t`Refunded`}{/if}
         </Text>
       </li>

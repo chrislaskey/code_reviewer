@@ -22,6 +22,7 @@
   import { pathParams } from "../../lib/router.js";
   import { accountsProductsShowUrl, accountsSubscriptionsIndexUrl } from "../../lib/routes.js";
   import { priceFormat } from "../money.js";
+  import { dateFormat } from "../../lib/formats.js";
   import { storeManagedWhere, storeName } from "../stores.js";
   import { subscriptionStatusSay } from "./subscription_status.js";
   import { Button, ErrorMessage, Heading, Link, Page, Text } from "../../lib/components/index.js";
@@ -52,9 +53,6 @@
   }
 
   load();
-
-  /** @param {string} at */
-  const day = (at) => new Date(at).toLocaleDateString([], { dateStyle: "medium" });
 
   /** @param {{action: "switch_undo" | "cancel" | "resume"}} change */
   async function update(change) {
@@ -109,18 +107,18 @@
     <Text>{priceFormat(subscription.price)}</Text>
     <Text>{subscriptionStatusSay(subscription.status)}</Text>
     {#if subscription.ended_at}
-      {@const endedOn = day(subscription.ended_at)}
+      {@const endedOn = dateFormat(subscription.ended_at)}
       <Text tone="muted">{t`Ended ${endedOn}`}</Text>
     {:else if subscription.current_period_end && subscription.cancel_at_period_end}
-      {@const endsOn = day(subscription.current_period_end)}
+      {@const endsOn = dateFormat(subscription.current_period_end)}
       <Text tone="muted">{t`Ends ${endsOn}`}</Text>
     {:else if subscription.current_period_end && subscription.gives_plan}
-      {@const renewsOn = day(subscription.current_period_end)}
+      {@const renewsOn = dateFormat(subscription.current_period_end)}
       <Text tone="muted">{t`Renews ${renewsOn}`}</Text>
     {/if}
     {#if subscription.scheduled_price && subscription.scheduled_at}
       {@const scheduledPrice = priceFormat(subscription.scheduled_price)}
-      {@const scheduledOn = day(subscription.scheduled_at)}
+      {@const scheduledOn = dateFormat(subscription.scheduled_at)}
       <Text>{t`Changes to ${scheduledPrice} on ${scheduledOn}.`}</Text>
     {/if}
 

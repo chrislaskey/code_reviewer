@@ -2,13 +2,14 @@
 // currency's smallest unit, cents for usd; Intl knows how many digits a
 // currency has, none for jpy.
 import { t } from "ttag";
+import { translationsFormatLocale } from "../lib/translations.js";
 
 /**
  * @param {number} amount in the currency's smallest unit
  * @param {string} currency lowercase, `usd`
  */
 export function moneyFormat(amount, currency) {
-  const format = new Intl.NumberFormat(undefined, { style: "currency", currency: currency.toUpperCase() });
+  const format = new Intl.NumberFormat(translationsFormatLocale(), { style: "currency", currency: currency.toUpperCase() });
   const digits = format.resolvedOptions().maximumFractionDigits ?? 2;
   return format.format(amount / 10 ** digits);
 }

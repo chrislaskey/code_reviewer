@@ -1,19 +1,18 @@
-//! The languages the pages are translated into: English, the language
-//! they are written in, and one for each `svelte/translations/<locale>.po`
-//! and `svelte/translations/public/<locale>.po`, the public website's,
-//! and `core/translations/<locale>.po`, the emails', which a test keeps in
-//! step. A person's choice is one of them, see
-//! `accounts::preferences` and `docs/design/locales.md`.
+//! The languages the app is in, `app::locales::SUPPORTED`, which each
+//! app lists: whether one is, and which a request asks for. A test keeps
+//! the list in step with the `.po` files of `svelte/translations/`,
+//! `svelte/translations/public/` and `core/translations/`. A person's
+//! choice is one of them, see `accounts::preferences` and
+//! `docs/design/locales.md`.
+
+use crate::app;
 
 /// The language the pages are written in, shown when no other applies.
 pub const DEFAULT: &str = "en";
 
-/// Every language a person may choose, the default first.
-pub const SUPPORTED: &[&str] = &["en", "es"];
-
 /// Whether the language is one a person may choose.
 pub fn is_supported(locale: &str) -> bool {
-    SUPPORTED.contains(&locale)
+    app::locales::SUPPORTED.contains(&locale)
 }
 
 /// The first language of an `Accept-Language` header the pages are in,
@@ -28,7 +27,7 @@ pub fn resolve(accept_language: &str) -> &'static str {
             .trim()
             .to_lowercase();
         let language = tag.split('-').next().unwrap_or_default();
-        if let Some(locale) = SUPPORTED
+        if let Some(locale) = app::locales::SUPPORTED
             .iter()
             .find(|locale| **locale == tag || **locale == language)
         {
@@ -62,7 +61,7 @@ mod tests {
 
     #[test]
     fn locales_supported_are_the_default_and_the_translations() {
-        let mut supported: Vec<String> = SUPPORTED
+        let mut supported: Vec<String> = app::locales::SUPPORTED
             .iter()
             .filter(|locale| **locale != DEFAULT)
             .map(|locale| locale.to_string())
@@ -83,7 +82,7 @@ mod tests {
             translated_in("core/translations"),
             "SUPPORTED and core/translations/*.po"
         );
-        assert_eq!(SUPPORTED[0], DEFAULT);
+        assert_eq!(app::locales::SUPPORTED[0], DEFAULT);
     }
 
     #[test]

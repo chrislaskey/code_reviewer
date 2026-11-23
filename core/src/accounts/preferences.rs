@@ -91,7 +91,7 @@ pub(crate) async fn mail_locale_in(
         None => None,
     };
     let locale = chosen.as_deref().unwrap_or(requested);
-    Ok(locales::SUPPORTED
+    Ok(crate::app::locales::SUPPORTED
         .iter()
         .copied()
         .find(|supported| *supported == locale)

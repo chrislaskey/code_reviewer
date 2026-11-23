@@ -2,6 +2,7 @@
      those in their communities -->
 <script>
   import { t } from "ttag";
+  import { dateTimeFormat } from "../lib/formats.js";
   import { postsList } from "../lib/core/index.js";
   import { loaded } from "../lib/loaded.svelte.js";
   import { postsNewUrl, postsShowUrl } from "../lib/routes.js";
@@ -26,7 +27,7 @@
     {#each posts.value ?? [] as { post, owner, communities } (post.id)}
       <Panel as="li">
         <Text tone="muted">
-          {owner.name} · {post.inserted_at}
+          {owner.name} · {dateTimeFormat(post.inserted_at)}
           {#if communities.length > 0}
             {@const communityNames = communities.map((community) => community.name).join(", ")}
             · {t`in ${communityNames}`}

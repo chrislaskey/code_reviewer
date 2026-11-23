@@ -11,7 +11,7 @@ use axum::http::request::Parts;
 
 use app_core::helpers::locales;
 
-/// The language the request asked for, one of `locales::SUPPORTED`.
+/// The language the request asked for, one of `app::locales::SUPPORTED`.
 pub struct RequestLocale(pub &'static str);
 
 impl<S> FromRequestParts<S> for RequestLocale

@@ -22,12 +22,13 @@
   import { currentCommunityLoad } from "../lib/current_community.svelte.js";
   import { navigateToUrl } from "../lib/router.js";
   import { filesIndexUrl, filesShowUrl } from "../lib/routes.js";
+  import { numberFormat } from "../lib/formats.js";
   import { Alert, Button, FileInput, Heading, Label, Link, Page, Text } from "../lib/components/index.js";
   import FilesCommunitiesField from "./components/FilesCommunitiesField.svelte";
   import FilesNewRow from "./components/FilesNewRow.svelte";
 
   const MAX_FILES = 5000;
-  const maxFiles = MAX_FILES.toLocaleString();
+  const maxFiles = numberFormat(MAX_FILES);
   /** Checksums asked about in one request, the most the server takes. */
   const CHECKSUMS_PER_REQUEST = 500;
   const CHECKSUMS_AT_ONCE = 4;
@@ -386,13 +387,13 @@
         </Text>
       {/if}
       {#if asking > 0}
-        {@const hashedCount = hashed.toLocaleString()}
-        {@const askingCount = asking.toLocaleString()}
+        {@const hashedCount = numberFormat(hashed)}
+        {@const askingCount = numberFormat(asking)}
         <Text tone="muted" size="sm">
           {t`Looking for files already here… ${hashedCount} of ${askingCount} read.`}
         </Text>
       {:else if toDecide > 0}
-        {@const toDecideCount = toDecide.toLocaleString()}
+        {@const toDecideCount = numberFormat(toDecide)}
         <Text tone="muted" size="sm">
           {ngettext(
             msgid`One file is already here; choose what to do with it.`,
@@ -407,7 +408,7 @@
             {#if open.length === 0}
               {t`Create files`}
             {:else}
-              {@const openCount = open.length.toLocaleString()}
+              {@const openCount = numberFormat(open.length)}
               {ngettext(msgid`Create file`, `Create ${openCount} files`, open.length)}
             {/if}
           </Button>

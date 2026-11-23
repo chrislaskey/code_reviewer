@@ -598,9 +598,9 @@ msginit --no-translator -l fr -i translations/public/default.pot -o translations
 msginit --no-translator -l fr -i ../core/translations/default.pot -o ../core/translations/fr.po   # and its emails
 ```
 
-A new language also goes in `core/src/helpers/locales.rs`'s
-`SUPPORTED`, and its `.mo` in `core/src/helpers/translations.rs`'s
-`CATALOGS`; tests keep them in step with the three folders' `.po` files.
+A new language also goes in `core/src/app/locales.rs`, a seam the app
+edits: its code in `SUPPORTED` and its `.mo` in `CATALOGS`; tests keep
+them in step with the three folders' `.po` files.
 
 `translations:check` fails on English in a page's markup written
 without ttag (text, the attributes a person reads such as `placeholder`

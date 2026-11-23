@@ -20,7 +20,7 @@ pages' text is gettext through ttag, see the README's "Translations".
 ## Where the choice is kept: `accounts_preferences`
 
 A person's preferences are one row per user and key, `locale` the first,
-its value JSON: a language of `helpers::locales::SUPPORTED`, or null to
+its value JSON: a language of `app::locales::SUPPORTED`, or null to
 follow the device. `core/src/accounts/preferences.rs` reads them as
 `Preferences` and writes one key at a time; `data/accounts_preferences`
 holds the keys and the values each takes.
@@ -82,12 +82,12 @@ as any table does, through `SyncedTable`, listed in
 The public website is in the same languages, at `/es/about`, from a
 catalog of its own, see `public-pages.md`.
 
-The languages are `helpers::locales::SUPPORTED`, English first, and a
+The languages are `core/src/app/locales.rs`'s `SUPPORTED`, a seam each app edits, English first, and a
 `<locale>.po` each in `svelte/translations/`,
 `svelte/translations/public/` and `core/translations/`; core tests fail
 when they differ. Adding one: `msginit` the three `.po` files (README),
 translate them, `pnpm translations:update`, add its code to `SUPPORTED`
-and its `.mo` to `helpers::translations::CATALOGS`.
+and its `.mo` to `CATALOGS`, beside it.
 
 ## Emails
 

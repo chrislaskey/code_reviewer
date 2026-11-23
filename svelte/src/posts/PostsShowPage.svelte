@@ -1,6 +1,7 @@
 <!-- One post, at /posts/:id, with its Edit and Delete for its owner -->
 <script>
   import { t } from "ttag";
+  import { dateTimeFormat } from "../lib/formats.js";
   import { postsDelete, postsGet } from "../lib/core/index.js";
   import { loaded } from "../lib/loaded.svelte.js";
   import { errorMessageOf } from "../lib/error_message.js";
@@ -32,7 +33,7 @@
     {@const { post, owner, communities } = shown.value}
     <Panel as="article">
       <Text tone="muted">
-        {owner.name} · {post.inserted_at}
+        {owner.name} · {dateTimeFormat(post.inserted_at)}
         {#if communities.length > 0}
           {@const communityNames = communities.map((community) => community.name).join(", ")}
           · {t`in ${communityNames}`}

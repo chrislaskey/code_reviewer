@@ -11,14 +11,12 @@ use std::sync::OnceLock;
 
 use gettext::Catalog;
 
-/// Each language's compiled catalog, one for each of `locales::SUPPORTED`
-/// but English, which a test keeps in step.
-const CATALOGS: &[(&str, &[u8])] = &[("es", include_bytes!("../../translations/es.mo"))];
+use crate::app;
 
 fn catalogs() -> &'static HashMap<&'static str, Catalog> {
     static PARSED: OnceLock<HashMap<&'static str, Catalog>> = OnceLock::new();
     PARSED.get_or_init(|| {
-        CATALOGS
+        app::locales::CATALOGS
             .iter()
             .filter_map(|(locale, bytes)| Some((*locale, Catalog::parse(*bytes).ok()?)))
             .collect()
@@ -60,16 +58,23 @@ mod tests {
 
     #[test]
     fn translations_have_a_catalog_for_each_language_but_english_that_parses() {
-        let mut compiled: Vec<&str> = CATALOGS.iter().map(|(locale, _)| *locale).collect();
+        let mut compiled: Vec<&str> = app::locales::CATALOGS
+            .iter()
+            .map(|(locale, _)| *locale)
+            .collect();
         compiled.sort();
-        let mut supported: Vec<&str> = locales::SUPPORTED
+        let mut supported: Vec<&str> = app::locales::SUPPORTED
             .iter()
             .copied()
             .filter(|locale| *locale != locales::DEFAULT)
             .collect();
         supported.sort();
-        assert_eq!(compiled, supported, "CATALOGS and locales::SUPPORTED");
-        assert_eq!(catalogs().len(), CATALOGS.len(), "every catalog parses");
+        assert_eq!(compiled, supported, "app::locales: CATALOGS and SUPPORTED");
+        assert_eq!(
+            catalogs().len(),
+            app::locales::CATALOGS.len(),
+            "every catalog parses"
+        );
     }
 
     #[test]

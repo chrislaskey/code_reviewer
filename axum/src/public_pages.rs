@@ -4,7 +4,7 @@
 //! home page, `public/index.html`, at `/`. Each in another language is
 //! in its folder, `public/es/about.html` at `/es/about` and
 //! `public/es/index.html` at `/es`, for each of the languages the pages
-//! are in, `helpers::locales::SUPPORTED`. Every other path stays the
+//! are in, `app_core::app::locales::SUPPORTED`. Every other path stays the
 //! app's.
 
 use std::fs;
@@ -23,10 +23,12 @@ const HOME_PAGE: &str = "index";
 pub fn router(svelte_dist: &Path) -> Router {
     let public_pages = svelte_dist.join("public");
     let mut router = Router::new();
-    let languages = locales::SUPPORTED.iter().map(|locale| match *locale {
-        locales::DEFAULT => (String::new(), public_pages.clone()),
-        locale => (format!("/{locale}"), public_pages.join(locale)),
-    });
+    let languages = app_core::app::locales::SUPPORTED
+        .iter()
+        .map(|locale| match *locale {
+            locales::DEFAULT => (String::new(), public_pages.clone()),
+            locale => (format!("/{locale}"), public_pages.join(locale)),
+        });
     for (prefix, folder) in languages {
         for name in page_names(&folder) {
             let path = match (name.as_str(), prefix.as_str()) {

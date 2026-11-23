@@ -6,6 +6,7 @@
      the clipboard, where the device can. -->
 <script>
   import { t } from "ttag";
+  import { dateTimeFormat } from "../lib/formats.js";
   import AnimationsToggle from "../lib/AnimationsToggle.svelte";
   import FileImage from "../lib/FileImage.svelte";
   import {
@@ -74,7 +75,7 @@
       {shown.creator ? shown.creator.name : t`A former member`} · {t`in ${communityNames}`}
     </Text>
     <Text tone="muted">
-      {shown.file.content_type} · {fileSize(shown.file.size)} · {shown.file.inserted_at}
+      {shown.file.content_type} · {fileSize(shown.file.size)} · {dateTimeFormat(shown.file.inserted_at)}
       {#if shown.state === "waiting"}
         · {t`waiting to upload`}
       {:else if shown.state === "refused"}

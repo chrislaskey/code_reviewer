@@ -2,6 +2,7 @@
      member to edit or delete -->
 <script>
   import { t } from "ttag";
+  import { dateFormat } from "../lib/formats.js";
   import { communitiesDelete, communitiesGet } from "../lib/core/index.js";
   import { loaded } from "../lib/loaded.svelte.js";
   import { errorMessageOf } from "../lib/error_message.js";
@@ -38,8 +39,9 @@
   <ErrorMessage message={error || shown.error} />
   {#if shown.value}
     {@const { community, membership } = shown.value}
+    {@const createdOn = dateFormat(community.inserted_at)}
     <Text tone="muted">
-      {t`Created ${community.inserted_at}`}
+      {t`Created ${createdOn}`}
       {#if membership}
         · {t`you are a member`}
       {/if}

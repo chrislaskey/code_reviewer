@@ -14,7 +14,7 @@ const CATALOGS = import.meta.glob("../../translations/*.po", { import: "default"
 const DEFAULT_LOCALE = "en";
 const CHOSEN_KEY = "app:locale";
 
-/** Every language the pages are in, English first: Rust's `locales::SUPPORTED`. */
+/** Every language the pages are in, English first: Rust's `app::locales::SUPPORTED`. */
 export const TRANSLATIONS_LOCALES = [DEFAULT_LOCALE, ...Object.keys(CATALOGS).map(localeOfPath).sort()];
 
 /** The language the pages show now. */
@@ -41,6 +41,15 @@ export async function translationsUse(locale) {
 /** The language the pages show now, as `translationsUse` set it. */
 export function translationsShown() {
   return shown;
+}
+
+/**
+ * The language to format dates and numbers in: the one shown, with the
+ * device's region when the device is in that language, `es-MX` for `es`.
+ */
+export function translationsFormatLocale() {
+  const requested = navigator.languages?.length ? navigator.languages : [navigator.language];
+  return requested.find((tag) => tag.toLowerCase().split("-")[0] === shown) ?? shown;
 }
 
 /** Before the pages mount: the language last chosen on this device, else the device's. */
