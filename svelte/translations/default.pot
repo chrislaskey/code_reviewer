@@ -3,25 +3,132 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Plural-Forms: nplurals=2; plural=(n!=1);\n"
 
+#: src/lib/layouts/AppNav.svelte:30
+#: src/support/SupportIndexPage.svelte:9
+msgid "Support"
+msgstr ""
+
+#: src/forum/ForumIndexPage.svelte:11
+#: src/support/SupportIndexPage.svelte:11
+msgid "Nothing here yet."
+msgstr ""
+
+#: src/quick-picker/QuickPickerPage.svelte:137
+msgid "Search images by name…"
+msgstr ""
+
+#: src/quick-picker/QuickPickerPage.svelte:150
+msgid "No images have that in their name"
+msgstr ""
+
+#: src/quick-picker/QuickPickerPage.svelte:150
+msgid "No images yet"
+msgstr ""
+
+#: src/quick-picker/QuickPickerPage.svelte:154
+msgid "allow Accessibility access"
+msgstr ""
+
+#: src/quick-picker/QuickPickerPage.svelte:155
+#, javascript-format
+msgid "Copies only: ${ accessibilityButton } to paste."
+msgstr ""
+
+#: src/quick-picker/QuickPickerPage.svelte:157
+msgid "select"
+msgstr ""
+
+#: src/quick-picker/QuickPickerPage.svelte:158
+msgid "paste"
+msgstr ""
+
+#: src/quick-picker/QuickPickerPage.svelte:159
+#: src/quick-picker/QuickPickerPage.svelte:165
+msgid "close"
+msgstr ""
+
+#: src/quick-picker/QuickPickerPage.svelte:160
+msgid "Log in to Starter Pack to pick from your images."
+msgstr ""
+
+#: src/quick-picker/QuickPickerPage.svelte:162
+msgid "Open Starter Pack"
+msgstr ""
+
+#: src/quick-picker/QuickPickerPage.svelte:164
+msgid "open"
+msgstr ""
+
+#: src/quick-picker/QuickPickerPage.svelte:82
+msgid "Copying…"
+msgstr ""
+
+#: src/lib/layouts/AccountMenu.svelte:55
+#: src/profile/ProfileEditPage.svelte:78
+msgid "Profile"
+msgstr ""
+
+#: src/profile/ProfileEditPage.svelte:79
+msgid "This account is only on this device."
+msgstr ""
+
+#: src/profile/ProfileEditPage.svelte:80
+msgid ""
+"Nothing is backed up: if the device is lost or reset, or the app is "
+"removed, what you made is gone. Sign up or log in to keep it safe and use "
+"it on your other devices."
+msgstr ""
+
+#: src/accounts/AccountsIndexPage.svelte:52
+#: src/lib/AccountsNeeded.svelte:16
+#: src/profile/ProfileEditPage.svelte:82
+msgid "Sign up or log in"
+msgstr ""
+
+#: src/communities/components/CommunitiesForm.svelte:25
+#: src/files/FilesEditPage.svelte:53
+#: src/profile/ProfileEditPage.svelte:89
+msgid "Name"
+msgstr ""
+
+#: src/profile/ProfileEditPage.svelte:92
+msgid "Save name"
+msgstr ""
+
+#: src/profile/ProfileEditPage.svelte:94
+msgid "Picture"
+msgstr ""
+
+#: src/profile/ProfileEditPage.svelte:101
+msgid "Save picture"
+msgstr ""
+
 #: src/posts/PostsShowPage.svelte:26
 #: src/posts/components/PostsForm.svelte:46
 msgid "Post"
 msgstr ""
 
+#: src/files/FilesIndexPage.svelte:110
+#: src/files/FilesShowPage.svelte:64
 #: src/posts/PostsIndexPage.svelte:18
 #: src/posts/PostsShowPage.svelte:30
 #, javascript-format
 msgid "in ${ communityNames }"
 msgstr ""
 
+#: src/communities/CommunitiesShowPage.svelte:41
+#: src/files/FilesShowPage.svelte:88
 #: src/posts/PostsShowPage.svelte:33
 msgid "Edit"
 msgstr ""
 
+#: src/communities/CommunitiesShowPage.svelte:43
+#: src/files/FilesShowPage.svelte:90
 #: src/posts/PostsShowPage.svelte:35
 msgid "Delete"
 msgstr ""
 
+#: src/conflicts/ConflictsIndexPage.svelte:66
 #: src/posts/PostsNewPage.svelte:32
 #: src/posts/PostsShowPage.svelte:37
 msgid "Back to posts"
@@ -53,6 +160,8 @@ msgstr ""
 msgid "Edit post"
 msgstr ""
 
+#: src/communities/CommunitiesEditPage.svelte:46
+#: src/files/FilesEditPage.svelte:59
 #: src/posts/PostsEditPage.svelte:44
 msgid "Save"
 msgstr ""
@@ -65,8 +174,77 @@ msgstr ""
 msgid "What's on your mind?"
 msgstr ""
 
+#: src/files/components/FilesCommunitiesField.svelte:37
 #: src/posts/components/PostsForm.svelte:48
 msgid "In"
+msgstr ""
+
+#: src/lib/router.js:75
+#, javascript-format
+msgid "Could not check who is signed in: ${ reason }"
+msgstr ""
+
+#: src/lib/router.js:84
+#, javascript-format
+msgid "This page could not load: ${ reason }"
+msgstr ""
+
+#: src/lib/file_size.js:8
+#, javascript-format
+msgid "${ bytes } B"
+msgstr ""
+
+#: src/lib/file_size.js:10
+#, javascript-format
+msgid "${ kilobytes } KB"
+msgstr ""
+
+#: src/lib/file_size.js:12
+#, javascript-format
+msgid "${ megabytes } MB"
+msgstr ""
+
+#: src/lib/PublicPagesLinks.svelte:13
+msgid "Terms of Service"
+msgstr ""
+
+#: src/lib/PublicPagesLinks.svelte:15
+msgid "Privacy Policy"
+msgstr ""
+
+#: src/lib/PublicPagesLinks.svelte:16
+#, javascript-format
+msgid "${ termsLink } and ${ privacyLink }"
+msgstr ""
+
+#: src/lib/FileImage.svelte:15
+#. *
+#.    * @typedef {Object} Props
+#.    * @property {string} src
+#.    * @property {string} alt
+#.    * @property {string} [class]
+#.    * @property {string} [missing]
+#.    
+#. * @type {Props} 
+msgid "Not on this device"
+msgstr ""
+
+#: src/lib/AnimationsToggle.svelte:12
+msgid "Play animations"
+msgstr ""
+
+#: src/lib/AccountsNeeded.svelte:14
+msgid "This is online only, and your account is only on this device."
+msgstr ""
+
+#: src/lib/AccountsNeeded.svelte:17
+msgid "This needs an account, and you are a guest."
+msgstr ""
+
+#: src/lib/AccountsGuestNotice.svelte:44
+#: src/lib/AccountsNeeded.svelte:19
+#: src/lib/layouts/AccountMenu.svelte:71
+msgid "Sign up"
 msgstr ""
 
 #: src/lib/AccountsGuestNotice.svelte:35
@@ -97,11 +275,6 @@ msgstr ""
 msgid "Your guest visit ended. Sign up before ${ deletedAt } to keep what you made."
 msgstr ""
 
-#: src/lib/AccountsGuestNotice.svelte:44
-#: src/lib/layouts/AccountMenu.svelte:71
-msgid "Sign up"
-msgstr ""
-
 #: src/lib/layouts/ThemeMenu.svelte:21
 #, javascript-format
 msgid "Theme: ${ current }"
@@ -110,6 +283,10 @@ msgstr ""
 #: src/lib/layouts/BottomBar.svelte:40
 #: src/lib/layouts/ThemeMenu.svelte:22
 msgid "Theme"
+msgstr ""
+
+#: src/lib/layouts/ThemeChoices.svelte:22
+msgid "System"
 msgstr ""
 
 #: src/lib/layouts/SyncMenu.svelte:56
@@ -162,6 +339,38 @@ msgstr ""
 msgid "Work offline"
 msgstr ""
 
+#: src/lib/layouts/CurrentCommunityMenu.svelte:62
+msgid "No community"
+msgstr ""
+
+#: src/communities/CommunitiesIndexPage.svelte:13
+#: src/lib/layouts/AppNav.svelte:29
+#: src/lib/layouts/CurrentCommunityMenu.svelte:63
+msgid "Communities"
+msgstr ""
+
+#: src/lib/components/Dialog.svelte:18
+#: src/lib/layouts/CurrentCommunityMenu.svelte:64
+msgid "Close"
+msgstr ""
+
+#: src/lib/layouts/CurrentCommunityMenu.svelte:67
+#: src/lib/layouts/CurrentCommunityMenu.svelte:68
+msgid "Filter communities"
+msgstr ""
+
+#: src/lib/layouts/CurrentCommunityMenu.svelte:74
+msgid "You are not in a community yet."
+msgstr ""
+
+#: src/lib/layouts/CurrentCommunityMenu.svelte:74
+msgid "No community matches."
+msgstr ""
+
+#: src/lib/layouts/CurrentCommunityMenu.svelte:77
+msgid "Join / Manage Communities"
+msgstr ""
+
 #: src/lib/layouts/BottomBar.svelte:32
 msgid "Close menu"
 msgstr ""
@@ -194,24 +403,15 @@ msgstr ""
 msgid "Home"
 msgstr ""
 
+#: src/files/FilesIndexPage.svelte:87
+#: src/files/FilesNewPage.svelte:333
 #: src/lib/layouts/AppNav.svelte:28
 #. * @typedef {{ id: string, label: string, icon: string, href: string, target?: string }} Link 
 #. * @type {Link[]} 
 msgid "Files"
 msgstr ""
 
-#: src/lib/layouts/AppNav.svelte:29
-#. * @typedef {{ id: string, label: string, icon: string, href: string, target?: string }} Link 
-#. * @type {Link[]} 
-msgid "Communities"
-msgstr ""
-
-#: src/lib/layouts/AppNav.svelte:30
-#. * @typedef {{ id: string, label: string, icon: string, href: string, target?: string }} Link 
-#. * @type {Link[]} 
-msgid "Support"
-msgstr ""
-
+#: src/forum/ForumIndexPage.svelte:9
 #: src/lib/layouts/AppNav.svelte:31
 #. * @typedef {{ id: string, label: string, icon: string, href: string, target?: string }} Link 
 #. * @type {Link[]} 
@@ -224,10 +424,21 @@ msgstr ""
 msgid "Ops"
 msgstr ""
 
+#: src/lib/layouts/AccountsPaymentFailedBanner.svelte:14
+msgid ""
+"Your plan's payment failed, so your plan is paused. Update your payment to "
+"restore it."
+msgstr ""
+
+#: src/lib/layouts/AccountsPaymentFailedBanner.svelte:16
+msgid "Update your payment"
+msgstr ""
+
 #: src/lib/layouts/AccountMenu.svelte:45
 msgid "Account, as a guest"
 msgstr ""
 
+#: src/accounts/current/AccountsCurrentShowPage.svelte:23
 #: src/lib/layouts/AccountMenu.svelte:45
 msgid "Account"
 msgstr ""
@@ -236,12 +447,9 @@ msgstr ""
 msgid "Guest"
 msgstr ""
 
+#: src/accounts/AccountsIndexPage.svelte:209
 #: src/lib/layouts/AccountMenu.svelte:52
 msgid "On this device only"
-msgstr ""
-
-#: src/lib/layouts/AccountMenu.svelte:55
-msgid "Profile"
 msgstr ""
 
 #: src/lib/layouts/AccountMenu.svelte:58
@@ -256,9 +464,1232 @@ msgstr ""
 msgid "Log out"
 msgstr ""
 
+#: src/accounts/AccountsIndexPage.svelte:52
+#: src/accounts/AccountsIndexPage.svelte:222
+#: src/accounts/AccountsSignInPage.svelte:86
+#: src/accounts/AccountsSignInPage.svelte:96
+#: src/accounts/components/AccountsSignInSteps.svelte:30
 #: src/lib/layouts/AccountMenu.svelte:67
 #: src/lib/layouts/AccountMenu.svelte:69
 msgid "Log in"
+msgstr ""
+
+#: src/lib/core/uploads.js:24
+#, javascript-format
+msgid "The upload failed with ${ request.status }; try again"
+msgstr ""
+
+#: src/lib/core/uploads.js:26
+msgid "The upload could not reach the storage; try again"
+msgstr ""
+
+#: src/lib/core/http-api.js:522
+#, javascript-format
+msgid "Could not read the image (${ response.status })"
+msgstr ""
+
+#: src/lib/core/http-api.js:708
+msgid "On the web, plans and products are bought through Stripe"
+msgstr ""
+
+#: src/lib/core/http-api.js:712
+msgid "Restoring purchases is in the iPhone app"
+msgstr ""
+
+#: src/lib/core/http-api.js:716
+msgid "A plan from a phone's store is managed on the phone"
+msgstr ""
+
+#: src/lib/core/http-api.js:541
+msgid "Could not copy the image"
+msgstr ""
+
+#: src/lib/components/CodeInput.svelte:15
+#. *
+#.    * @typedef {Object} Props
+#.    * @property {string} [value]
+#.    * @property {number} [length]
+#.    * @property {boolean} [disabled]
+#.    * @property {string} [label] for screen readers
+#.    * @property {(code: string) => void} [oncomplete]
+#.    
+#. * @type {Props} 
+msgid "Code"
+msgstr ""
+
+#: src/lib/components/CodeInput.svelte:31
+#, javascript-format
+msgid "${ label }, digit ${ position } of ${ length }"
+msgstr ""
+
+#: src/home/HomePage.svelte:7
+msgid "posts"
+msgstr ""
+
+#: src/home/HomePage.svelte:9
+msgid ""
+"The same pages on the web, on the desktop and on a phone, over the same "
+"Rust application."
+msgstr ""
+
+#: src/home/HomePage.svelte:10
+#, javascript-format
+msgid "Log in, then start with the ${ postsLink }."
+msgstr ""
+
+#: src/files/FilesShowPage.svelte:61
+msgid "File"
+msgstr ""
+
+#: src/files/FilesShowPage.svelte:63
+msgid "A former member"
+msgstr ""
+
+#: src/files/FilesShowPage.svelte:68
+msgid "waiting to upload"
+msgstr ""
+
+#: src/files/FilesShowPage.svelte:69
+msgid "not saved on the server"
+msgstr ""
+
+#: src/files/FilesShowPage.svelte:72
+msgid "Try again or let it go"
+msgstr ""
+
+#: src/files/FilesShowPage.svelte:73
+msgid "Copy to the clipboard"
+msgstr ""
+
+#: src/accounts/components/AccountsDeviceCode.svelte:28
+#: src/files/FilesShowPage.svelte:77
+msgid "Copied"
+msgstr ""
+
+#: src/files/FilesShowPage.svelte:77
+msgid "Click the image to copy it"
+msgstr ""
+
+#: src/files/FilesShowPage.svelte:84
+msgid "This kind of file is not shown here."
+msgstr ""
+
+#: src/files/FilesShowPage.svelte:86
+msgid "Download"
+msgstr ""
+
+#: src/files/FilesNewPage.svelte:364
+#: src/files/FilesShowPage.svelte:93
+msgid "Back to files"
+msgstr ""
+
+#: src/files/FilesShowPage.svelte:44
+#, javascript-format
+msgid "Saved to ${ path }"
+msgstr ""
+
+#: src/files/FilesShowPage.svelte:51
+msgid "Delete this file from your communities? A community you are not in keeps it."
+msgstr ""
+
+#: src/files/FilesNewPage.svelte:129
+#, javascript-format
+msgid "A list holds ${ maxFiles } files; ${ leftOut } was left out."
+msgid_plural "A list holds ${ maxFiles } files; ${ leftOut } were left out."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/files/FilesIndexPage.svelte:89
+#: src/files/FilesNewPage.svelte:326
+msgid "New files"
+msgstr ""
+
+#: src/files/FilesNewPage.svelte:328
+msgid "Files to create"
+msgstr ""
+
+#: src/files/FilesNewPage.svelte:336
+#, javascript-format
+msgid "Pick one file or many, or drop them here, up to ${ maxFiles }."
+msgstr ""
+
+#: src/files/FilesNewPage.svelte:346
+#, javascript-format
+msgid ""
+"Creating ${ run.done } of ${ run.total }. Stay on this page until they are "
+"done."
+msgstr ""
+
+#: src/files/FilesNewPage.svelte:349
+msgid "Creating…"
+msgstr ""
+
+#: src/files/FilesNewPage.svelte:350
+#, javascript-format
+msgid ""
+"${ counts.created } created, ${ counts.put } put in, ${ counts.skipped } "
+"skipped, ${ counts.failed } failed."
+msgstr ""
+
+#: src/files/FilesNewPage.svelte:351
+#, javascript-format
+msgid "Looking for files already here… ${ hashedCount } of ${ askingCount } read."
+msgstr ""
+
+#: src/files/FilesNewPage.svelte:352
+msgid "One file is already here; choose what to do with it."
+msgid_plural "${ toDecideCount } files are already here; choose what to do with each."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/files/FilesNewPage.svelte:358
+msgid "Create files"
+msgstr ""
+
+#: src/files/FilesNewPage.svelte:359
+msgid "Create file"
+msgid_plural "Create ${ openCount } files"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/files/FilesNewPage.svelte:362
+msgid "Retry failed"
+msgstr ""
+
+#: src/files/FilesIndexPage.svelte:16
+#. * @type {{ view: import("./files_view.js").FilesView, label: string, icon: string }[]} 
+msgid "List"
+msgstr ""
+
+#: src/files/FilesIndexPage.svelte:17
+#. * @type {{ view: import("./files_view.js").FilesView, label: string, icon: string }[]} 
+msgid "Grid"
+msgstr ""
+
+#: src/files/FilesIndexPage.svelte:91
+msgid "No files yet."
+msgstr ""
+
+#: src/files/FilesIndexPage.svelte:93
+#: src/files/FilesIndexPage.svelte:94
+msgid "Search by name"
+msgstr ""
+
+#: src/files/FilesIndexPage.svelte:100
+msgid "No files have that in their name."
+msgstr ""
+
+#: src/files/FilesIndexPage.svelte:112
+#: src/files/components/FilesGrid.svelte:23
+msgid "Waiting to upload"
+msgstr ""
+
+#: src/files/FilesIndexPage.svelte:113
+#: src/files/components/FilesGrid.svelte:24
+msgid "Not saved on the server"
+msgstr ""
+
+#: src/files/FilesIndexPage.svelte:115
+msgid "Show more"
+msgstr ""
+
+#: src/files/FilesIndexPage.svelte:116
+#, javascript-format
+msgid "${ cache.count } file kept on this device, ${ cachedSize }."
+msgid_plural "${ cache.count } files kept on this device, ${ cachedSize }."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/files/FilesIndexPage.svelte:121
+msgid "Removing them frees the space; each is fetched again when it is next shown."
+msgstr ""
+
+#: src/files/FilesIndexPage.svelte:124
+msgid "Remove cached files"
+msgstr ""
+
+#: src/files/FilesEditPage.svelte:51
+msgid "Edit file"
+msgstr ""
+
+#: src/files/FilesEditPage.svelte:62
+msgid "Back to the file"
+msgstr ""
+
+#: src/files/components/FilesNewRow.svelte:24
+msgid "Put it in the communities chosen"
+msgstr ""
+
+#: src/files/components/FilesNewRow.svelte:24
+msgid "Create a copy"
+msgstr ""
+
+#: src/accounts/AccountsIndexPage.svelte:231
+#: src/files/components/FilesNewRow.svelte:24
+msgid "Skip"
+msgstr ""
+
+#: src/files/components/FilesNewRow.svelte:25
+msgid "Waiting"
+msgstr ""
+
+#: src/files/components/FilesNewRow.svelte:25
+msgid "Created"
+msgstr ""
+
+#: src/files/components/FilesNewRow.svelte:25
+msgid "Put in"
+msgstr ""
+
+#: src/files/components/FilesNewRow.svelte:25
+msgid "Skipped"
+msgstr ""
+
+#: src/files/components/FilesNewRow.svelte:49
+msgid "Rename"
+msgstr ""
+
+#: src/files/components/FilesNewRow.svelte:60
+msgid "Failed"
+msgstr ""
+
+#: src/files/components/FilesNewRow.svelte:63
+msgid "Take it off the list"
+msgstr ""
+
+#: src/files/components/FilesNewRow.svelte:64
+msgid "Remove"
+msgstr ""
+
+#: src/files/components/FilesNewRow.svelte:67
+#, javascript-format
+msgid "Already here, as ${ existingLink } in ${ communityNames }."
+msgstr ""
+
+#: src/files/components/FilesNewRow.svelte:68
+#, javascript-format
+msgid "The same file as ${ earlier.name }, earlier in this list."
+msgstr ""
+
+#: src/files/components/FilesNewRow.svelte:73
+#, javascript-format
+msgid "The same for ${ count } more"
+msgid_plural "The same for ${ count } more"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/conflicts/ConflictsIndexPage.svelte:41
+msgid "Changes not on the server"
+msgstr ""
+
+#: src/conflicts/ConflictsIndexPage.svelte:43
+msgid "Every change reached the server."
+msgstr ""
+
+#: src/conflicts/ConflictsIndexPage.svelte:44
+msgid "Waiting to reach the server"
+msgstr ""
+
+#: src/conflicts/ConflictsIndexPage.svelte:50
+msgid "Not kept by the server"
+msgstr ""
+
+#: src/conflicts/ConflictsIndexPage.svelte:51
+msgid "Something that is gone"
+msgstr ""
+
+#: src/conflicts/ConflictsIndexPage.svelte:54
+msgid "The server did not take this. It is still on this device."
+msgstr ""
+
+#: src/conflicts/ConflictsIndexPage.svelte:55
+msgid "Your change"
+msgstr ""
+
+#: src/conflicts/ConflictsIndexPage.svelte:57
+msgid "Now on the server"
+msgstr ""
+
+#: src/conflicts/ConflictsIndexPage.svelte:60
+msgid "Reapply"
+msgstr ""
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:64
+#: src/conflicts/ConflictsIndexPage.svelte:62
+msgid "Try again"
+msgstr ""
+
+#: src/conflicts/ConflictsIndexPage.svelte:64
+msgid "Let it go"
+msgstr ""
+
+#: src/communities/CommunitiesShowPage.svelte:33
+msgid "Community"
+msgstr ""
+
+#: src/communities/CommunitiesShowPage.svelte:35
+#, javascript-format
+msgid "Created ${ community.inserted_at }"
+msgstr ""
+
+#: src/communities/CommunitiesShowPage.svelte:36
+msgid "you are a member"
+msgstr ""
+
+#: src/communities/CommunitiesNewPage.svelte:36
+#: src/communities/CommunitiesShowPage.svelte:48
+msgid "Back to communities"
+msgstr ""
+
+#: src/communities/CommunitiesIndexPage.svelte:15
+#: src/communities/CommunitiesNewPage.svelte:32
+msgid "New community"
+msgstr ""
+
+#: src/communities/CommunitiesNewPage.svelte:33
+msgid "Create"
+msgstr ""
+
+#: src/communities/CommunitiesIndexPage.svelte:17
+msgid "No communities yet."
+msgstr ""
+
+#: src/communities/CommunitiesIndexPage.svelte:20
+msgid "member"
+msgstr ""
+
+#: src/communities/CommunitiesEditPage.svelte:45
+msgid "Edit community"
+msgstr ""
+
+#: src/communities/CommunitiesEditPage.svelte:50
+msgid "Back to the community"
+msgstr ""
+
+#: src/communities/components/CommunitiesMembershipButton.svelte:37
+msgid "Leave"
+msgstr ""
+
+#: src/communities/components/CommunitiesMembershipButton.svelte:37
+msgid "Join"
+msgstr ""
+
+#: src/communities/components/CommunitiesDeleteDialog.svelte:25
+#, javascript-format
+msgid "Delete ${ community.name }?"
+msgstr ""
+
+#: src/communities/components/CommunitiesDeleteDialog.svelte:26
+msgid ""
+"Every member leaves it, and the posts in it are taken out of it. The posts "
+"themselves stay with the people who wrote them."
+msgstr ""
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:48
+#: src/communities/components/CommunitiesDeleteDialog.svelte:29
+msgid "Keep"
+msgstr ""
+
+#: src/communities/components/CommunitiesDeleteDialog.svelte:32
+msgid "Delete community"
+msgstr ""
+
+#: src/accounts/stores.js:13
+msgid "the App Store"
+msgstr ""
+
+#: src/accounts/stores.js:14
+msgid "Google Play"
+msgstr ""
+
+#: src/accounts/stores.js:15
+msgid "the web"
+msgstr ""
+
+#: src/accounts/stores.js:23
+msgid "in the App Store on your iPhone"
+msgstr ""
+
+#: src/accounts/stores.js:24
+msgid "in Google Play on your Android device"
+msgstr ""
+
+#: src/accounts/stores.js:25
+msgid "on the web"
+msgstr ""
+
+#: src/accounts/money.js:22
+#, javascript-format
+msgid "${ money } / month"
+msgstr ""
+
+#: src/accounts/money.js:23
+#, javascript-format
+msgid "${ money } / year"
+msgstr ""
+
+#: src/accounts/AccountsTrialPage.svelte:35
+msgid "Try it now"
+msgstr ""
+
+#: src/accounts/AccountsTrialPage.svelte:36
+msgid "Guest visits are not available right now."
+msgstr ""
+
+#: src/accounts/AccountsSignInPage.svelte:86
+#: src/accounts/AccountsTrialPage.svelte:38
+#: src/accounts/AccountsTrialPage.svelte:46
+msgid "Log in or sign up"
+msgstr ""
+
+#: src/accounts/AccountsTrialPage.svelte:39
+msgid ""
+"Use the app for 24 hours with no account. What you make is deleted after "
+"that, unless you sign up, which keeps all of it."
+msgstr ""
+
+#: src/accounts/AccountsTrialPage.svelte:40
+msgid ""
+"A guest stays in this browser, and has no files or picture until they sign "
+"up."
+msgstr ""
+
+#: src/accounts/AccountsTrialPage.svelte:44
+#: src/accounts/components/AccountsGuestRow.svelte:29
+msgid "Continue as guest"
+msgstr ""
+
+#: src/accounts/AccountsSignInPage.svelte:86
+msgid "Check your email"
+msgstr ""
+
+#: src/accounts/AccountsSignInPage.svelte:87
+msgid "Logging in for the app on your device."
+msgstr ""
+
+#: src/accounts/AccountsSignInPage.svelte:90
+#: src/accounts/products/AccountsProductsIndexPage.svelte:43
+msgid "or"
+msgstr ""
+
+#: src/accounts/AccountsSignInPage.svelte:92
+#: src/accounts/AccountsSignInPage.svelte:102
+#: src/accounts/AccountsSignInPage.svelte:103
+msgid "Email"
+msgstr ""
+
+#: src/accounts/AccountsSignInPage.svelte:93
+#: src/accounts/current/AccountsCurrentShowPage.svelte:30
+msgid "Password"
+msgstr ""
+
+#: src/accounts/AccountsSignInPage.svelte:99
+msgid "Email a code instead"
+msgstr ""
+
+#: src/accounts/AccountsSignInPage.svelte:100
+#: src/accounts/components/AccountsSignInSteps.svelte:96
+msgid "Keep me logged in"
+msgstr ""
+
+#: src/accounts/AccountsSignInPage.svelte:101
+msgid "Forgot your password? Use a code, then change it in Account settings."
+msgstr ""
+
+#: src/accounts/AccountsSignInPage.svelte:106
+msgid "Email a code"
+msgstr ""
+
+#: src/accounts/AccountsSignInPage.svelte:109
+msgid "Use my password"
+msgstr ""
+
+#: src/accounts/AccountsSignInPage.svelte:110
+msgid "This server takes no new sign-ups."
+msgstr ""
+
+#: src/accounts/AccountsSignInPage.svelte:111
+#, javascript-format
+msgid "By continuing, you accept the ${ publicPagesLinks }."
+msgstr ""
+
+#: src/accounts/AccountsIndexPage.svelte:205
+msgid "Accounts on this device"
+msgstr ""
+
+#: src/accounts/AccountsIndexPage.svelte:206
+msgid "This account was deleted, and removed from this device."
+msgstr ""
+
+#: src/accounts/AccountsIndexPage.svelte:208
+msgid "No account yet."
+msgstr ""
+
+#: src/accounts/AccountsIndexPage.svelte:215
+#: src/accounts/subscriptions/subscription_status.js:8
+msgid "Active"
+msgstr ""
+
+#: src/accounts/AccountsIndexPage.svelte:218
+#: src/accounts/products/AccountsProductsShowPage.svelte:99
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:103
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:113
+msgid "Switch"
+msgstr ""
+
+#: src/accounts/AccountsIndexPage.svelte:219
+msgid "Logged out"
+msgstr ""
+
+#: src/accounts/AccountsIndexPage.svelte:225
+#: src/accounts/components/AccountsRemoveDialog.svelte:51
+msgid "Remove from device"
+msgstr ""
+
+#: src/accounts/AccountsIndexPage.svelte:228
+msgid "Add account"
+msgstr ""
+
+#: src/accounts/AccountsIndexPage.svelte:232
+msgid "Use the app on this device only, with no account. You can sign up later."
+msgstr ""
+
+#: src/accounts/AccountsBackToAppPage.svelte:6
+msgid "All done here"
+msgstr ""
+
+#: src/accounts/AccountsBackToAppPage.svelte:7
+msgid "Go back to the app. It shows what changed when you do."
+msgstr ""
+
+#: src/accounts/AccountsBackToAppPage.svelte:8
+msgid "You can close this tab."
+msgstr ""
+
+#: src/accounts/subscriptions/subscription_status.js:10
+msgid "In its free days"
+msgstr ""
+
+#: src/accounts/subscriptions/subscription_status.js:12
+msgid "Payment failed, Stripe is retrying"
+msgstr ""
+
+#: src/accounts/subscriptions/subscription_status.js:14
+msgid "Payment failed"
+msgstr ""
+
+#: src/accounts/subscriptions/subscription_status.js:16
+msgid "Waiting for the first payment"
+msgstr ""
+
+#: src/accounts/subscriptions/subscription_status.js:18
+msgid "Never paid"
+msgstr ""
+
+#: src/accounts/subscriptions/subscription_status.js:20
+msgid "Paused"
+msgstr ""
+
+#: src/accounts/subscriptions/subscription_status.js:22
+msgid "Ended"
+msgstr ""
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:96
+#, javascript-format
+msgid "Ended ${ endedOn }"
+msgstr ""
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:97
+#, javascript-format
+msgid "Ends ${ endsOn }"
+msgstr ""
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:98
+#, javascript-format
+msgid "Renews ${ renewsOn }"
+msgstr ""
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:99
+#, javascript-format
+msgid "Changes to ${ scheduledPrice } on ${ scheduledOn }."
+msgstr ""
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:100
+msgid "Stripe's page is open in your browser. This page updates when you come back."
+msgstr ""
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:101
+#, javascript-format
+msgid "Bought in ${ boughtIn }: manage it ${ managedWhere }."
+msgstr ""
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:105
+#, javascript-format
+msgid "Manage in ${ storeShown }"
+msgstr ""
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:108
+#, javascript-format
+msgid "Keep ${ currentPrice }"
+msgstr ""
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:111
+msgid "Resume"
+msgstr ""
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:116
+msgid "Cancel at the end of this period"
+msgstr ""
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:119
+msgid "Card and invoices"
+msgstr ""
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:119
+msgid "Update your card"
+msgstr ""
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:121
+msgid "Back to plans"
+msgstr ""
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:51
+msgid "Cancel your plan at the end of this period?"
+msgstr ""
+
+#: src/accounts/current/AccountsCurrentShowPage.svelte:33
+#: src/accounts/subscriptions/AccountsSubscriptionsIndexPage.svelte:13
+msgid "Plans"
+msgstr ""
+
+#: src/accounts/subscriptions/AccountsSubscriptionsIndexPage.svelte:15
+msgid "No plan yet."
+msgstr ""
+
+#: src/accounts/subscriptions/AccountsSubscriptionsIndexPage.svelte:17
+msgid "See the plans"
+msgstr ""
+
+#: src/accounts/purchases/AccountsPurchasesShowPage.svelte:16
+#, javascript-format
+msgid "${ amount }, tax included"
+msgstr ""
+
+#: src/accounts/purchases/AccountsPurchasesShowPage.svelte:17
+#, javascript-format
+msgid "Bought ${ boughtAt }"
+msgstr ""
+
+#: src/accounts/purchases/AccountsPurchasesShowPage.svelte:18
+#, javascript-format
+msgid "Refunded ${ refundedAt }"
+msgstr ""
+
+#: src/accounts/purchases/AccountsPurchasesShowPage.svelte:19
+msgid "The receipt is in the email sent when you paid."
+msgstr ""
+
+#: src/accounts/purchases/AccountsPurchasesShowPage.svelte:21
+msgid "Back to purchases"
+msgstr ""
+
+#: src/accounts/current/AccountsCurrentShowPage.svelte:37
+#: src/accounts/purchases/AccountsPurchasesIndexPage.svelte:12
+msgid "Purchases"
+msgstr ""
+
+#: src/accounts/purchases/AccountsPurchasesIndexPage.svelte:14
+msgid "Nothing bought yet."
+msgstr ""
+
+#: src/accounts/purchases/AccountsPurchasesIndexPage.svelte:16
+msgid "See what is for sale"
+msgstr ""
+
+#: src/accounts/purchases/AccountsPurchasesIndexPage.svelte:21
+msgid "Refunded"
+msgstr ""
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:91
+#, javascript-format
+msgid "The first ${ product.free_days } days are free."
+msgstr ""
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:94
+#, javascript-format
+msgid "You are on ${ plan.product_name }."
+msgstr ""
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:95
+#, javascript-format
+msgid "It was bought in ${ boughtIn }: manage it ${ managedWhere }."
+msgstr ""
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:96
+msgid "It ends with this period. Resume it on its page to switch."
+msgstr ""
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:101
+msgid ""
+"A dearer plan, or yearly, starts now with the difference charged; a cheaper "
+"one, or monthly, starts when this period ends."
+msgstr ""
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:102
+#, javascript-format
+msgid ""
+"${ storeShown } decides when the new plan starts: an upgrade at once, a "
+"downgrade at the renewal."
+msgstr ""
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:54
+#: src/accounts/products/AccountsProductsShowPage.svelte:104
+msgid "See your plan"
+msgstr ""
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:105
+msgid "Owned"
+msgstr ""
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:106
+msgid "You have this. You can buy it again."
+msgstr ""
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:109
+msgid "Buy"
+msgstr ""
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:111
+#, javascript-format
+msgid "Waiting for approval. It appears here once ${ storeShown } confirms it."
+msgstr ""
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:112
+#, javascript-format
+msgid ""
+"${ product.name }: an auto-renewing subscription, renewed each ${ periods } "
+"at the price shown until you cancel it in ${ storeShown }."
+msgstr ""
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:113
+#, javascript-format
+msgid "By buying you accept the ${ publicPagesLinks }."
+msgstr ""
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:115
+msgid "Back to plans and products"
+msgstr ""
+
+#: src/accounts/products/AccountsProductsIndexPage.svelte:36
+msgid "Plans and products"
+msgstr ""
+
+#: src/accounts/products/AccountsProductsIndexPage.svelte:38
+msgid "Nothing is for sale yet."
+msgstr ""
+
+#: src/accounts/products/AccountsProductsIndexPage.svelte:42
+msgid "Plan"
+msgstr ""
+
+#: src/accounts/products/AccountsProductsIndexPage.svelte:42
+msgid "One-time"
+msgstr ""
+
+#: src/accounts/products/AccountsProductsIndexPage.svelte:46
+msgid "Restore purchases"
+msgstr ""
+
+#: src/accounts/products/AccountsProductsIndexPage.svelte:26
+#, javascript-format
+msgid "${ recorded } purchase restored."
+msgid_plural "${ recorded } purchases restored."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/accounts/current/AccountsCurrentShowPage.svelte:39
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:56
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:75
+msgid "Delete my account"
+msgstr ""
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:57
+msgid "This account is only on this device, with nothing on the server to delete."
+msgstr ""
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:59
+msgid "this device's accounts"
+msgstr ""
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:60
+#, javascript-format
+msgid "To remove it and its data, remove it from ${ accountsLink }."
+msgstr ""
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:61
+msgid ""
+"Deleting your account deletes everything you made, in every community and "
+"on every device, and your purchases. It cannot be undone."
+msgstr ""
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:62
+#, javascript-format
+msgid ""
+"Your plan, ${ currentUser.value.plan.product_name }, ends now, with no "
+"refund."
+msgstr ""
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:63
+#, javascript-format
+msgid ""
+"Your plan, ${ currentUser.value.plan.product_name }, is billed by ${ store "
+"} until you cancel it there. Deleting your account does not cancel it."
+msgstr ""
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:65
+msgid "Manage it in the App Store"
+msgstr ""
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:65
+msgid "Manage it in Google Play"
+msgstr ""
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:67
+msgid "We email you a code to make sure it is you."
+msgstr ""
+
+#: src/accounts/components/AccountsSignInSteps.svelte:99
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:70
+msgid "Send a new code"
+msgstr ""
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:70
+msgid "Send code"
+msgstr ""
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:71
+#, javascript-format
+msgid ""
+"A code is on its way to ${ currentUser.value.email }. It expires in ten "
+"minutes."
+msgstr ""
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:50
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:77
+msgid "Back to account"
+msgstr ""
+
+#: src/accounts/current/AccountsCurrentShowPage.svelte:27
+msgid "Delete what I made as a guest"
+msgstr ""
+
+#: src/accounts/current/AccountsCurrentShowPage.svelte:31
+#, javascript-format
+msgid "Your plan: ${ currentUser.value.plan.product_name }"
+msgstr ""
+
+#: src/accounts/current/AccountsCurrentShowPage.svelte:35
+msgid "Plans and products for sale"
+msgstr ""
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:39
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:48
+msgid "Change password"
+msgstr ""
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:39
+msgid "Create a password"
+msgstr ""
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:41
+msgid ""
+"A password is optional. With one, you can log in with it instead of an "
+"emailed code."
+msgstr ""
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:42
+msgid "New password"
+msgstr ""
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:43
+msgid "New password, 12 characters or more"
+msgstr ""
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:44
+msgid "We'll email you when your password changes."
+msgstr ""
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:45
+msgid "Your password is saved."
+msgstr ""
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:48
+msgid "Create password"
+msgstr ""
+
+#: src/accounts/components/AccountsSignInSteps.svelte:30
+msgid "Create account"
+msgstr ""
+
+#: src/accounts/components/AccountsSignInSteps.svelte:84
+#, javascript-format
+msgid "We sent a code to ${ strongEmail }. It expires in ten minutes."
+msgstr ""
+
+#: src/accounts/components/AccountsSignInSteps.svelte:87
+msgid "Change email"
+msgstr ""
+
+#: src/accounts/components/AccountsSignInSteps.svelte:90
+msgid "Code confirmed."
+msgstr ""
+
+#: src/accounts/components/AccountsSignInSteps.svelte:91
+msgid "Checking the code…"
+msgstr ""
+
+#: src/accounts/components/AccountsSignInSteps.svelte:92
+msgid "A new code is on its way; the old one no longer works."
+msgstr ""
+
+#: src/accounts/components/AccountsSignInSteps.svelte:95
+msgid "Continue"
+msgstr ""
+
+#: src/accounts/components/AccountsSignInDialog.svelte:36
+msgid "Finish logging in in your browser"
+msgstr ""
+
+#: src/accounts/components/AccountsSignInDialog.svelte:38
+#, javascript-format
+msgid "The page to log in as ${ strongEmail } opened in your browser."
+msgstr ""
+
+#: src/accounts/components/AccountsSignInDialog.svelte:39
+msgid "The page to log in opened in your browser."
+msgstr ""
+
+#: src/accounts/components/AccountsSignInDialog.svelte:40
+msgid "When it shows a code, paste it here."
+msgstr ""
+
+#: src/accounts/components/AccountsSignInDialog.svelte:42
+#: src/accounts/components/AccountsSignInDialog.svelte:43
+msgid "Code from the browser"
+msgstr ""
+
+#: src/accounts/components/AccountsCustomServer.svelte:65
+#: src/accounts/components/AccountsSignInDialog.svelte:47
+msgid "Cancel"
+msgstr ""
+
+#: src/accounts/components/AccountsSignInDialog.svelte:50
+msgid "Open the browser again"
+msgstr ""
+
+#: src/accounts/components/AccountsSignInDialog.svelte:52
+msgid "Finish"
+msgstr ""
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:28
+msgid "Remove the account that is only on this device?"
+msgstr ""
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:28
+#, javascript-format
+msgid "Remove ${ account.email }?"
+msgstr ""
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:29
+msgid "This is the only copy."
+msgstr ""
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:30
+msgid ""
+"Everything in this account is on this device alone and is deleted with it. "
+"This cannot be undone. To keep it, sign up or log in first and move it into "
+"your account."
+msgstr ""
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:31
+#, javascript-format
+msgid "${ loss.pending } change has not reached the server yet."
+msgid_plural "${ loss.pending } changes have not reached the server yet."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:36
+#, javascript-format
+msgid "${ loss.conflicts } change was not kept by the server."
+msgid_plural "${ loss.conflicts } changes were not kept by the server."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:41
+msgid "Removing the account drops them from this device."
+msgstr ""
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:42
+msgid ""
+"Any data stored on this device for this account is removed. What was synced "
+"stays on the server and on other devices, and logging in again later "
+"downloads it to this device again."
+msgstr ""
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:45
+msgid "View changes"
+msgstr ""
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:51
+msgid "Delete it all"
+msgstr ""
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:51
+msgid "Remove anyway"
+msgstr ""
+
+#: src/accounts/components/AccountsMoveDialog.svelte:26
+#, javascript-format
+msgid "Move ${ offered.items } item into ${ offered.email }?"
+msgid_plural "Move ${ offered.items } items into ${ offered.email }?"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/accounts/components/AccountsMoveDialog.svelte:32
+#, javascript-format
+msgid ""
+"What you made on this device becomes part of ${ strongEmail } and syncs "
+"with it."
+msgstr ""
+
+#: src/accounts/components/AccountsMoveDialog.svelte:33
+msgid "The account that was only on this device is gone afterwards."
+msgstr ""
+
+#: src/accounts/components/AccountsMoveDialog.svelte:34
+#, javascript-format
+msgid ""
+"Keeping them separate adds ${ offered.email } beside it, and leaves what "
+"you made where it is, on this device only."
+msgstr ""
+
+#: src/accounts/components/AccountsMoveDialog.svelte:38
+msgid "Keep them separate"
+msgstr ""
+
+#: src/accounts/components/AccountsMoveDialog.svelte:41
+msgid "Move"
+msgstr ""
+
+#: src/accounts/components/AccountsGuestRow.svelte:30
+msgid "No sign-up required"
+msgstr ""
+
+#: src/accounts/components/AccountsDeviceCode.svelte:23
+msgid "You are logged in. Returning you to the app…"
+msgstr ""
+
+#: src/accounts/components/AccountsDeviceCode.svelte:24
+msgid "If the app does not open, paste this code into it."
+msgstr ""
+
+#: src/accounts/components/AccountsDeviceCode.svelte:25
+msgid ""
+"You are logged in. Paste this code into the app to finish there, then you "
+"can close this tab."
+msgstr ""
+
+#: src/accounts/components/AccountsDeviceCode.svelte:28
+msgid "Copy"
+msgstr ""
+
+#: src/accounts/components/AccountsDeviceCode.svelte:29
+msgid "The code works once and for five minutes."
+msgstr ""
+
+#: src/accounts/components/AccountsCustomServer.svelte:58
+msgid "Custom server"
+msgstr ""
+
+#: src/accounts/components/AccountsCustomServer.svelte:60
+msgid "Server address"
+msgstr ""
+
+#: src/accounts/components/AccountsCustomServer.svelte:62
+msgid "Check"
+msgstr ""
+
+#: src/accounts/components/AccountsCustomServer.svelte:69
+msgid "Listed"
+msgstr ""
+
+#: src/accounts/components/AccountsCustomServer.svelte:70
+msgid "The app's own server"
+msgstr ""
+
+#: src/accounts/components/AccountsCustomServer.svelte:71
+msgid ""
+"This server is not on the app's list. Go on only if you trust whoever runs "
+"it: everything you make there is theirs to keep."
+msgstr ""
+
+#: src/accounts/components/AccountsCustomServer.svelte:72
+msgid ""
+"The app's own server could not be reached to check this one. Go on only if "
+"you trust whoever runs it."
+msgstr ""
+
+#: src/accounts/components/AccountsCustomServer.svelte:73
+msgid "You log in on that server's own page, in the browser."
+msgstr ""
+
+#: src/accounts/components/AccountsCustomServer.svelte:76
+msgid "Sign up or log in there"
+msgstr ""
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:48
+msgid "Checkout"
+msgstr ""
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:50
+#, javascript-format
+msgid "Thank you. ${ checkout.product_name } is yours."
+msgstr ""
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:52
+msgid "See the purchase"
+msgstr ""
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:55
+#, javascript-format
+msgid ""
+"Your payment for ${ checkout.product_name } is processing. This page "
+"updates when it is done."
+msgstr ""
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:56
+#, javascript-format
+msgid ""
+"Finish paying for ${ checkout.product_name } in your browser. This page "
+"updates when you come back."
+msgstr ""
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:57
+#, javascript-format
+msgid "${ checkout.product_name } is not paid yet."
+msgstr ""
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:59
+#, javascript-format
+msgid "Back to ${ checkout.product_name }"
+msgstr ""
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:61
+msgid "The payment did not go through, and nothing was charged."
+msgstr ""
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:62
+msgid "This checkout expired, and nothing was charged."
 msgstr ""
 
 #: src/posts/PostsNewPage.svelte:29

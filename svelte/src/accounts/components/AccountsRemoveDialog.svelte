@@ -2,6 +2,7 @@
      means, and, when changes would be lost, how many and the choice to
      remove anyway. A local user's is the only copy, and says so. -->
 <script>
+  import { msgid, ngettext, t } from "ttag";
   import { conflictsIndexUrl } from "../../lib/routes.js";
   import { Button, Dialog, DialogActions, Heading, Text } from "../../lib/components/index.js";
 
@@ -25,42 +26,50 @@
     if (account && !dialog.open) dialog.showModal();
     if (!account && dialog.open) dialog.close();
   });
-
-  /** @param {number} count @param {string} one @param {string} many */
-  const counted = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 </script>
 
 <Dialog bind:element={dialog} onclose={oncancel}>
   {#if account}
-    <Heading>Remove {account.local ? "the account that is only on this device" : account.email}?</Heading>
+    <Heading>{account.local ? t`Remove the account that is only on this device?` : t`Remove ${account.email}?`}</Heading>
     {#if account.local}
       <Text>
-        <strong>This is the only copy.</strong> Everything in this account is on this device alone and is deleted
-        with it. This cannot be undone. To keep it, sign up or log in first and move it into your account.
+        <strong>{t`This is the only copy.`}</strong>
+        {t`Everything in this account is on this device alone and is deleted with it. This cannot be undone. To keep it, sign up or log in first and move it into your account.`}
       </Text>
     {:else if loss}
       <ul class="list-disc pl-5">
         {#if loss.pending > 0}
-          <li>{counted(loss.pending, "change has", "changes have")} not reached the server yet.</li>
+          <li>
+            {ngettext(
+              msgid`${loss.pending} change has not reached the server yet.`,
+              `${loss.pending} changes have not reached the server yet.`,
+              loss.pending,
+            )}
+          </li>
         {/if}
         {#if loss.conflicts > 0}
-          <li>{counted(loss.conflicts, "change was", "changes were")} not kept by the server.</li>
+          <li>
+            {ngettext(
+              msgid`${loss.conflicts} change was not kept by the server.`,
+              `${loss.conflicts} changes were not kept by the server.`,
+              loss.conflicts,
+            )}
+          </li>
         {/if}
       </ul>
-      <Text>Removing the account drops them from this device.</Text>
+      <Text>{t`Removing the account drops them from this device.`}</Text>
     {:else}
       <Text>
-        Any data stored on this device for this account is removed. What was synced stays on the server and on other
-        devices, and logging in again later downloads it to this device again.
+        {t`Any data stored on this device for this account is removed. What was synced stays on the server and on other devices, and logging in again later downloads it to this device again.`}
       </Text>
     {/if}
     <DialogActions>
       {#if loss && account.active}
-        <Button size="sm" href={conflictsIndexUrl()} onclick={oncancel}>View changes</Button>
+        <Button size="sm" href={conflictsIndexUrl()} onclick={oncancel}>{t`View changes`}</Button>
       {/if}
-      <Button size="sm" variant="ghost" onclick={oncancel} disabled={busy}>Keep</Button>
+      <Button size="sm" variant="ghost" onclick={oncancel} disabled={busy}>{t`Keep`}</Button>
       <Button size="sm" variant="danger" onclick={() => onremove(loss !== null)} disabled={busy}>
-        {account.local ? "Delete it all" : loss ? "Remove anyway" : "Remove from device"}
+        {account.local ? t`Delete it all` : loss ? t`Remove anyway` : t`Remove from device`}
       </Button>
     </DialogActions>
   {/if}

@@ -1,5 +1,6 @@
 <!-- Asked before a community is deleted: what a delete takes with it. -->
 <script>
+  import { t } from "ttag";
   import { Button, Dialog, DialogActions, Heading, Text } from "../../lib/components/index.js";
   /**
    * @typedef {Object} Props
@@ -24,14 +25,13 @@
 
 <Dialog bind:element={dialog} onclose={oncancel}>
   {#if community}
-    <Heading>Delete {community.name}?</Heading>
+    <Heading>{t`Delete ${community.name}?`}</Heading>
     <Text>
-      Every member leaves it, and the posts in it are taken out of it. The posts themselves stay with the people who
-      wrote them.
+      {t`Every member leaves it, and the posts in it are taken out of it. The posts themselves stay with the people who wrote them.`}
     </Text>
     <DialogActions>
-      <Button size="sm" variant="ghost" onclick={oncancel} disabled={busy}>Keep</Button>
-      <Button size="sm" variant="danger" onclick={ondelete} disabled={busy}>Delete community</Button>
+      <Button size="sm" variant="ghost" onclick={oncancel} disabled={busy}>{t`Keep`}</Button>
+      <Button size="sm" variant="danger" onclick={ondelete} disabled={busy}>{t`Delete community`}</Button>
     </DialogActions>
   {/if}
 </Dialog>

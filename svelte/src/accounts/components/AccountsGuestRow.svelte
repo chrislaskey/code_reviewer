@@ -2,6 +2,7 @@
      app for a day with no sign-up; the account menu explains it once
      they are in, see docs/design/accounts-local-and-trial-users.md. -->
 <script>
+  import { t } from "ttag";
   import { accountsTrialCreate } from "../../lib/core/index.js";
   import { errorMessageOf } from "../../lib/error_message.js";
   import { currentUserForget } from "../../lib/current_user.svelte.js";
@@ -35,8 +36,8 @@
   data-trial
 >
   <span>
-    <span class="block font-semibold">Continue as guest</span>
-    <span class="muted block text-sm">No sign-up required</span>
+    <span class="block font-semibold">{t`Continue as guest`}</span>
+    <span class="muted block text-sm">{t`No sign-up required`}</span>
   </span>
   <Icon name="hero-chevron-right" />
 </button>

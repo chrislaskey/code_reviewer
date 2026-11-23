@@ -3,8 +3,9 @@
      it stands once Create runs. The page owns the row and the choices;
      this shows them and says what the person clicked. -->
 <script>
+  import { jt, msgid, ngettext, t } from "ttag";
   import { filesShowUrl } from "../../lib/routes.js";
-  import { Badge, Button, FieldErrors, Input, Link, Panel, Text } from "../../lib/components/index.js";
+  import { Badge, Button, FieldErrors, Input, Link, Panel, Text, TranslatedParts } from "../../lib/components/index.js";
   import { fileSize } from "../../lib/file_size.js";
 
   /**
@@ -24,8 +25,8 @@
   /** @type {Props} */
   let { row, earlier, offered, rest, disabled, onchoose, onchooserest, onrename, onremove } = $props();
 
-  const CHOICE_LABELS = { put: "Put it in the communities chosen", copy: "Create a copy", skip: "Skip" };
-  const STATUS_LABELS = { waiting: "Waiting", created: "Created", put: "Put in", skipped: "Skipped" };
+  const CHOICE_LABELS = { put: t`Put it in the communities chosen`, copy: t`Create a copy`, skip: t`Skip` };
+  const STATUS_LABELS = { waiting: t`Waiting`, created: t`Created`, put: t`Put in`, skipped: t`Skipped` };
 
   let editing = $state(false);
   let editable = $derived(!disabled && (row.status === "ready" || row.status === "failed"));
@@ -58,7 +59,7 @@
           {@attach focus}
         />
       {:else if editable}
-        <Button variant="ghost" size="sm" class="max-w-full justify-start truncate" title="Rename" onclick={() => (editing = true)}>
+        <Button variant="ghost" size="sm" class="max-w-full justify-start truncate" title={t`Rename`} onclick={() => (editing = true)}>
           {row.name}
         </Button>
       {:else if row.created}
@@ -75,13 +76,13 @@
     {#if row.status === "uploading" && row.progress !== null}
       <progress class="progress w-24 shrink-0" value={row.progress} max="1"></progress>
     {:else if row.status === "failed"}
-      <Badge tone="warning">Failed</Badge>
+      <Badge tone="warning">{t`Failed`}</Badge>
     {:else if STATUS_LABELS[row.status]}
       <Badge>{STATUS_LABELS[row.status]}</Badge>
     {/if}
     {#if row.status === "ready"}
-      <Button variant="ghost" size="xs" {disabled} onclick={onremove} aria-label="Take it off the list">
-        Remove
+      <Button variant="ghost" size="xs" {disabled} onclick={onremove} aria-label={t`Take it off the list`}>
+        {t`Remove`}
       </Button>
     {/if}
   </div>
@@ -91,9 +92,10 @@
       <Text size="sm">
         {#if row.existing}
           {@const communityNames = row.existing.communities.map((community) => community.name).join(", ")}
-          Already here, as <Link href={filesShowUrl(row.existing.file.id)}>{row.existing.file.name}</Link> in {communityNames}.
+          {#snippet existingLink()}<Link href={filesShowUrl(row.existing.file.id)}>{row.existing.file.name}</Link>{/snippet}
+          <TranslatedParts parts={jt`Already here, as ${existingLink} in ${communityNames}.`} />
         {:else if earlier}
-          The same file as {earlier.name}, earlier in this list.
+          {t`The same file as ${earlier.name}, earlier in this list.`}
         {/if}
       </Text>
       {#if editable}
@@ -105,7 +107,8 @@
           {/each}
           {#if chosen && rest[chosen] > 0}
             <Button size="xs" variant="ghost" onclick={() => onchooserest(chosen)}>
-              The same for {rest[chosen]} more
+              {@const count = rest[chosen]}
+              {ngettext(msgid`The same for ${count} more`, `The same for ${count} more`, count)}
             </Button>
           {/if}
         </div>

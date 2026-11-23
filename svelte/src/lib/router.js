@@ -9,6 +9,7 @@
 // or a page's code does not load, the page says so above it rather than
 // going nowhere (page_load_error.svelte.js).
 import { Navigation, createRouter } from "sv-router";
+import { t } from "ttag";
 import AppLayout from "./layouts/AppLayout.svelte";
 import { hasDeviceAccounts } from "./core/index.js";
 import { currentUserLoad } from "./current_user.svelte.js";
@@ -70,7 +71,8 @@ const { navigate, route } = createRouter({
       try {
         user = await currentUserLoad();
       } catch (problem) {
-        pageLoadErrorShow(`Could not check who is signed in: ${errorMessageOf(problem)}`);
+        const reason = errorMessageOf(problem);
+        pageLoadErrorShow(t`Could not check who is signed in: ${reason}`);
         return;
       }
       if (!user) throw navigateToUrl(hasDeviceAccounts ? accountsIndexUrl() : accountsSignInUrl());
@@ -78,7 +80,8 @@ const { navigate, route } = createRouter({
     onError(problem) {
       // A redirect from beforeLoad arrives here too
       if (problem instanceof Navigation || problem instanceof Promise) return;
-      pageLoadErrorShow(`This page could not load: ${errorMessageOf(problem)}`);
+      const reason = errorMessageOf(problem);
+      pageLoadErrorShow(t`This page could not load: ${reason}`);
     },
   },
   [PUBLIC_HOME_PATH]: () => import("../home/HomePage.svelte"),

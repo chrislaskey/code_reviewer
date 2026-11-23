@@ -3,6 +3,7 @@
      docs/design/accounts-local-and-trial-users.md. The trial starts from
      the button, never from opening the page. -->
 <script>
+  import { t } from "ttag";
   import { accountsTrialCreate, accountsTrialGet } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
   import { currentUserForget } from "../lib/current_user.svelte.js";
@@ -36,22 +37,21 @@
 </script>
 
 <Page>
-  <Heading level={1}>Try it now</Heading>
+  <Heading level={1}>{t`Try it now`}</Heading>
   {#if available === false}
-    <Text>Guest visits are not available right now.</Text>
-    <Text><Button variant="primary" href={accountsSignInUrl()}>Log in or sign up</Button></Text>
+    <Text>{t`Guest visits are not available right now.`}</Text>
+    <Text><Button variant="primary" href={accountsSignInUrl()}>{t`Log in or sign up`}</Button></Text>
   {:else}
     <Text>
-      Use the app for 24 hours with no account. What you make is deleted after that, unless you sign up, which
-      keeps all of it.
+      {t`Use the app for 24 hours with no account. What you make is deleted after that, unless you sign up, which keeps all of it.`}
     </Text>
-    <Text tone="muted" size="sm">A guest stays in this browser, and has no files or picture until they sign up.</Text>
+    <Text tone="muted" size="sm">{t`A guest stays in this browser, and has no files or picture until they sign up.`}</Text>
     <ErrorMessage message={error} />
     <div class="flex flex-wrap items-center gap-3">
       <Button variant="primary" onclick={start} disabled={busy || available === null} data-trial>
-        Continue as guest
+        {t`Continue as guest`}
       </Button>
-      <Link size="sm" href={accountsSignInUrl()}>Log in or sign up</Link>
+      <Link size="sm" href={accountsSignInUrl()}>{t`Log in or sign up`}</Link>
     </div>
   {/if}
 </Page>

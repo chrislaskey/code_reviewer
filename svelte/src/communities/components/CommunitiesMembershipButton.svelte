@@ -1,6 +1,7 @@
 <!-- Join or Leave, for the community, by whether the person is a member;
      `onchange` runs once the membership changed. -->
 <script>
+  import { t } from "ttag";
   import { membershipsCreate, membershipsDelete } from "../../lib/core/index.js";
   import { errorMessageOf } from "../../lib/error_message.js";
   import { currentCommunity, currentCommunityLoad } from "../../lib/current_community.svelte.js";
@@ -34,5 +35,5 @@
 </script>
 
 <Button size="sm" variant={membership ? "ghost" : "default"} onclick={toggle} disabled={busy}>
-  {membership ? "Leave" : "Join"}
+  {membership ? t`Leave` : t`Join`}
 </Button>

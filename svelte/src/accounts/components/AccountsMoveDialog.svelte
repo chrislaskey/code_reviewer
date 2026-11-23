@@ -2,7 +2,8 @@
      what they made moves into the account that just signed in, or the
      two stay apart, see docs/design/accounts-local-and-trial-users.md. -->
 <script>
-  import { Button, Dialog, DialogActions, ErrorMessage, Heading, Text } from "../../lib/components/index.js";
+  import { jt, msgid, ngettext, t } from "ttag";
+  import { Button, Dialog, DialogActions, ErrorMessage, Heading, Text, TranslatedParts } from "../../lib/components/index.js";
   /**
    * @typedef {Object} Props
    * @property {{email: string, items: number} | null} offered the move offered; the dialog is open while set
@@ -27,19 +28,25 @@
 
 <Dialog bind:element={dialog} oncancel={(event) => event.preventDefault()}>
   {#if offered}
-    <Heading>Move {offered.items} {offered.items === 1 ? "item" : "items"} into {offered.email}?</Heading>
+    <Heading>
+      {ngettext(
+        msgid`Move ${offered.items} item into ${offered.email}?`,
+        `Move ${offered.items} items into ${offered.email}?`,
+        offered.items,
+      )}
+    </Heading>
+    {#snippet strongEmail()}<strong>{offered.email}</strong>{/snippet}
     <Text>
-      What you made on this device becomes part of <strong>{offered.email}</strong> and syncs with it. The account
-      that was only on this device is gone afterwards.
+      <TranslatedParts parts={jt`What you made on this device becomes part of ${strongEmail} and syncs with it.`} />
+      {t`The account that was only on this device is gone afterwards.`}
     </Text>
     <Text tone="muted" size="sm">
-      Keeping them separate adds {offered.email} beside it, and leaves what you made where it is, on this device
-      only.
+      {t`Keeping them separate adds ${offered.email} beside it, and leaves what you made where it is, on this device only.`}
     </Text>
     <ErrorMessage message={error} />
     <DialogActions>
-      <Button size="sm" variant="ghost" onclick={onkeepseparate} disabled={busy}>Keep them separate</Button>
-      <Button size="sm" variant="primary" onclick={onmove} disabled={busy} data-move>Move</Button>
+      <Button size="sm" variant="ghost" onclick={onkeepseparate} disabled={busy}>{t`Keep them separate`}</Button>
+      <Button size="sm" variant="primary" onclick={onmove} disabled={busy} data-move>{t`Move`}</Button>
     </DialogActions>
   {/if}
 </Dialog>

@@ -6,7 +6,8 @@
      pastes it where the person was typing; Escape closes. With nobody
      signed in, it says so and opens the app. -->
 <script>
-  import { TileGrid } from "../lib/components/index.js";
+  import { jt, t } from "ttag";
+  import { TileGrid, TranslatedParts } from "../lib/components/index.js";
   import { tick } from "svelte";
   import FileImage from "../lib/FileImage.svelte";
   import {
@@ -85,7 +86,7 @@
   /** @param {{id: string} | undefined} file */
   async function paste(file) {
     if (!file) return;
-    message = "Copying…";
+    message = t`Copying…`;
     try {
       await quickPickerPaste(file.id);
       message = "";
@@ -147,7 +148,7 @@
       bind:value={name}
       oninput={searchAfterPause}
       type="text"
-      placeholder="Search images by name…"
+      placeholder={t`Search images by name…`}
       autocomplete="off"
       spellcheck="false"
     />
@@ -179,34 +180,33 @@
           {/snippet}
         </TileGrid>
       {:else if search.total === 0}
-        <p class="muted empty">{name ? "No images have that in their name" : "No images yet"}</p>
+        <p class="muted empty">{name ? t`No images have that in their name` : t`No images yet`}</p>
       {/if}
     </div>
     <footer>
       {#if message || search.error}
         <p class="error" title={message || search.error}>{message || search.error}</p>
       {:else if !accessibilityTrusted}
-        <p>
-          Copies only: <button type="button" class="link" onclick={allowAccessibility}>allow Accessibility access</button> to paste.
-        </p>
+        {#snippet accessibilityButton()}<button type="button" class="link" onclick={allowAccessibility}>{t`allow Accessibility access`}</button>{/snippet}
+        <p><TranslatedParts parts={jt`Copies only: ${accessibilityButton} to paste.`} /></p>
       {/if}
       <div class="status">
         <p class="selected-file">{selectedFile ? `${selectedFile.name} · ${fileSize(selectedFile.size)}` : ""}</p>
-        <p class="keys"><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> select · <kbd>↵</kbd> paste · <kbd>esc</kbd> close</p>
+        <p class="keys"><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> {t`select`} · <kbd>↵</kbd> {t`paste`} · <!-- untranslated: the key's label --><kbd>esc</kbd> {t`close`}</p>
       </div>
     </footer>
   </form>
 {:else}
   <div class="quick-picker">
     <div class="quick-picker-signed-out">
-      <p>Log in to Starter Pack to pick from your images.</p>
-      <button type="button" class="btn btn-primary btn-sm" bind:this={openAppButton} onclick={openApp}>Open Starter Pack</button>
+      <p>{t`Log in to Starter Pack to pick from your images.`}</p>
+      <button type="button" class="btn btn-primary btn-sm" bind:this={openAppButton} onclick={openApp}>{t`Open Starter Pack`}</button>
       {#if message}
         <p class="error">{message}</p>
       {/if}
     </div>
     <footer>
-      <p class="keys"><kbd>↵</kbd> open · <kbd>esc</kbd> close</p>
+      <p class="keys"><kbd>↵</kbd> {t`open`} · <!-- untranslated: the key's label --><kbd>esc</kbd> {t`close`}</p>
     </footer>
   </div>
 {/if}

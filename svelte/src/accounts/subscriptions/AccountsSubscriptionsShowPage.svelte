@@ -9,6 +9,7 @@
      docs/design/purchasing.md, P6 to P9, and
      docs/design/purchasing-phones.md, M4 and M5. -->
 <script>
+  import { t } from "ttag";
   import {
     accountsStoreGet,
     accountsSubscriptionsGet,
@@ -57,7 +58,7 @@
 
   /** @param {{action: "switch_undo" | "cancel" | "resume"}} change */
   async function update(change) {
-    if (change.action === "cancel" && !confirm("Cancel your plan at the end of this period?")) return;
+    if (change.action === "cancel" && !confirm(t`Cancel your plan at the end of this period?`)) return;
     busy = true;
     error = "";
     try {
@@ -108,49 +109,58 @@
     <Text>{priceFormat(subscription.price)}</Text>
     <Text>{subscriptionStatusSay(subscription.status)}</Text>
     {#if subscription.ended_at}
-      <Text tone="muted">Ended {day(subscription.ended_at)}</Text>
+      {@const endedOn = day(subscription.ended_at)}
+      <Text tone="muted">{t`Ended ${endedOn}`}</Text>
     {:else if subscription.current_period_end && subscription.cancel_at_period_end}
-      <Text tone="muted">Ends {day(subscription.current_period_end)}</Text>
+      {@const endsOn = day(subscription.current_period_end)}
+      <Text tone="muted">{t`Ends ${endsOn}`}</Text>
     {:else if subscription.current_period_end && subscription.gives_plan}
-      <Text tone="muted">Renews {day(subscription.current_period_end)}</Text>
+      {@const renewsOn = day(subscription.current_period_end)}
+      <Text tone="muted">{t`Renews ${renewsOn}`}</Text>
     {/if}
     {#if subscription.scheduled_price && subscription.scheduled_at}
-      <Text>Changes to {priceFormat(subscription.scheduled_price)} on {day(subscription.scheduled_at)}.</Text>
+      {@const scheduledPrice = priceFormat(subscription.scheduled_price)}
+      {@const scheduledOn = day(subscription.scheduled_at)}
+      <Text>{t`Changes to ${scheduledPrice} on ${scheduledOn}.`}</Text>
     {/if}
 
     {#if inBrowser && subscription.store === "stripe"}
-      <Text tone="muted">Stripe's page is open in your browser. This page updates when you come back.</Text>
+      <Text tone="muted">{t`Stripe's page is open in your browser. This page updates when you come back.`}</Text>
     {/if}
     {#if !ended && subscription.store !== here}
-      <Text tone="muted">Bought in {storeName(subscription.store)}: manage it {storeManagedWhere(subscription.store)}.</Text>
+      {@const boughtIn = storeName(subscription.store)}
+      {@const managedWhere = storeManagedWhere(subscription.store)}
+      <Text tone="muted">{t`Bought in ${boughtIn}: manage it ${managedWhere}.`}</Text>
     {:else if !ended && subscription.store !== "stripe"}
+      {@const storeShown = storeName(subscription.store)}
       <div class="flex flex-wrap gap-2">
-        <Button size="sm" href={accountsProductsShowUrl(subscription.product_id)}>Switch</Button>
-        <Button size="sm" onclick={manage}>Manage in {storeName(subscription.store)}</Button>
+        <Button size="sm" href={accountsProductsShowUrl(subscription.product_id)}>{t`Switch`}</Button>
+        <Button size="sm" onclick={manage}>{t`Manage in ${storeShown}`}</Button>
       </div>
     {:else if !ended}
       <div class="flex flex-wrap gap-2">
         {#if subscription.scheduled_price}
+          {@const currentPrice = priceFormat(subscription.price)}
           <Button size="sm" disabled={busy} onclick={() => update({ action: "switch_undo" })}>
-            Keep {priceFormat(subscription.price)}
+            {t`Keep ${currentPrice}`}
           </Button>
         {/if}
         {#if subscription.cancel_at_period_end}
           <Button variant="primary" size="sm" disabled={busy} onclick={() => update({ action: "resume" })}>
-            Resume
+            {t`Resume`}
           </Button>
         {:else if subscription.gives_plan}
-          <Button size="sm" href={accountsProductsShowUrl(subscription.product_id)}>Switch</Button>
+          <Button size="sm" href={accountsProductsShowUrl(subscription.product_id)}>{t`Switch`}</Button>
           <Button variant="ghost" size="sm" disabled={busy} onclick={() => update({ action: "cancel" })}>
-            Cancel at the end of this period
+            {t`Cancel at the end of this period`}
           </Button>
         {/if}
         <Button size="sm" disabled={busy} onclick={portal}>
-          {subscription.gives_plan ? "Card and invoices" : "Update your card"}
+          {subscription.gives_plan ? t`Card and invoices` : t`Update your card`}
         </Button>
       </div>
     {/if}
   {/if}
 
-  <Link href={accountsSubscriptionsIndexUrl()}>Back to plans</Link>
+  <Link href={accountsSubscriptionsIndexUrl()}>{t`Back to plans`}</Link>
 </Page>

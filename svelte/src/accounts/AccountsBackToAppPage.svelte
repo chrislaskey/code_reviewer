@@ -4,11 +4,12 @@
      signed in. The app asks the server again when it has the focus. See
      docs/design/purchasing.md, step 7, and accounts-sign-in.md. -->
 <script>
+  import { t } from "ttag";
   import { Heading, Page, Text } from "../lib/components/index.js";
 </script>
 
 <Page>
-  <Heading level={1}>All done here</Heading>
-  <Text>Go back to the app. It shows what changed when you do.</Text>
-  <Text tone="muted">You can close this tab.</Text>
+  <Heading level={1}>{t`All done here`}</Heading>
+  <Text>{t`Go back to the app. It shows what changed when you do.`}</Text>
+  <Text tone="muted">{t`You can close this tab.`}</Text>
 </Page>

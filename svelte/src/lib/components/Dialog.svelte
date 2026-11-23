@@ -2,6 +2,8 @@
      go in a DialogActions at the end. With `closeOnBackdrop`, a click
      beside it closes it. -->
 <script>
+  import { t } from "ttag";
+
   /**
    * @typedef {Object} Props
    * @property {HTMLDialogElement} [element]
@@ -22,7 +24,7 @@
   </div>
   {#if closeOnBackdrop}
     <form method="dialog" class="modal-backdrop">
-      <button type="submit">Close</button>
+      <button type="submit">{t`Close`}</button>
     </form>
   {/if}
 </dialog>

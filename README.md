@@ -560,21 +560,41 @@ writes its English as the message, `t` for one, `ngettext` for a count,
 <p>{ngettext(msgid`${count} comment`, `${count} comments`, count)}</p>
 ```
 
+A sentence with a link or bold text in it stays one message: `jt` puts
+snippets where the translation says, and `TranslatedParts` draws them.
+`t` runs as a page draws, never in a module's constants, so the language
+chosen is the one shown:
+
+```svelte
+{#snippet termsLink()}<Link href="/terms">{t`Terms of Service`}</Link>{/snippet}
+<Text><TranslatedParts parts={jt`By continuing, you accept the ${termsLink}.`} /></Text>
+```
+
 The translations are `svelte/translations/`: `default.pot`, every
 message, and a `<locale>.po` per language. `src/lib/translations.js`'s
 `translationsUse(locale)` loads one, a file of its own in the build;
 until it does, and for a message with no translation or a fuzzy one, a
-page shows the English. Nothing picks a language yet. Converted so far:
-the posts pages. The ops app (staff only) and the public pages (plain
-HTML) are left out.
+page shows the English. Nothing picks a language yet. Every page is
+written through ttag, as are the messages the pages' own JavaScript
+shows; the errors the server sends are still English. The ops app
+(staff only) and the public pages (plain HTML) are left out.
 
 In `svelte/`, with GNU gettext (`brew install gettext`):
 
 ```sh
 pnpm translations:extract   # the messages into translations/default.pot
 pnpm translations:update    # that, then merged into every .po, changed English marked fuzzy
+pnpm translations:check     # what bin/lint runs, below
 msginit --no-translator -l es -i translations/default.pot -o translations/es.po   # a new language
 ```
+
+`translations:check` fails on English in a page's markup written
+without ttag (text, the attributes a person reads such as `placeholder`
+and `aria-label`, and strings an expression shows), on a `default.pot`
+that differs from the pages' messages, and on a `.po` with a message
+missing, untranslated or fuzzy. Text that stays as it is, a name or a
+key's label, has `<!-- untranslated: why -->` before it. Strings in
+`<script>` are not checked.
 
 ## Running
 

@@ -4,6 +4,7 @@
      `onshow` with the positions it draws, for the page to fetch the
      files there. See docs/design/files-browsing.md. -->
 <script>
+  import { t } from "ttag";
   import FileImage from "../../lib/FileImage.svelte";
   import { filesContentUrl } from "../../lib/core/index.js";
   import { filesShowUrl } from "../../lib/routes.js";
@@ -35,10 +36,10 @@
       {/if}
       {#if state === "waiting"}
         <Icon name="hero-cloud-arrow-up-mini" class="absolute top-1 right-1 size-4" />
-        <span class="sr-only">Waiting to upload</span>
+        <span class="sr-only">{t`Waiting to upload`}</span>
       {:else if state === "refused"}
         <Icon name="hero-exclamation-triangle-mini" class="absolute top-1 right-1 size-4 text-warning" />
-        <span class="sr-only">Not saved on the server</span>
+        <span class="sr-only">{t`Not saved on the server`}</span>
       {/if}
     </a>
   {/snippet}

@@ -4,10 +4,11 @@
      choice to stay logged in under it. The page finishes the sign-in, see
      docs/design/accounts-sign-in.md. -->
 <script>
+  import { jt, t } from "ttag";
   import { tick } from "svelte";
   import { accountsCode, accountsCodeResend, accountsSignInConfirm } from "../../lib/core/index.js";
   import { errorMessageOf } from "../../lib/error_message.js";
-  import { Button, Checkbox, CodeInput, ErrorMessage, Link, Text } from "../../lib/components/index.js";
+  import { Button, Checkbox, CodeInput, ErrorMessage, Link, Text, TranslatedParts } from "../../lib/components/index.js";
 
   /**
    * @typedef {Object} Props
@@ -31,7 +32,7 @@
   /** @type {CodeInput | undefined} */
   let codeInput = $state();
 
-  let submitText = $derived(matched?.new_account ? "Create account" : "Log in");
+  let submitText = $derived(matched?.new_account ? t`Create account` : t`Log in`);
 
   /** @param {() => Promise<void>} action */
   async function attempt(action) {
@@ -85,25 +86,26 @@
 </script>
 
 <form onsubmit={submit} class="flex flex-col gap-3">
+  {#snippet strongEmail()}<strong>{email}</strong>{/snippet}
   <Text>
-    We sent a code to <strong>{email}</strong>. It expires in ten minutes.
-    <Link onclick={onstartover} disabled={busy}>Change email</Link>
+    <TranslatedParts parts={jt`We sent a code to ${strongEmail}. It expires in ten minutes.`} />
+    <Link onclick={onstartover} disabled={busy}>{t`Change email`}</Link>
   </Text>
   <CodeInput bind:this={codeInput} bind:value={code} disabled={busy || !!matched} oncomplete={checkCode} />
   {#if matched}
-    <Text tone="muted" size="sm">Code confirmed.</Text>
+    <Text tone="muted" size="sm">{t`Code confirmed.`}</Text>
   {:else if busy && code.length === 6}
-    <Text tone="muted" size="sm">Checking the code…</Text>
+    <Text tone="muted" size="sm">{t`Checking the code…`}</Text>
   {/if}
   {#if resent}
-    <Text tone="muted" size="sm">A new code is on its way; the old one no longer works.</Text>
+    <Text tone="muted" size="sm">{t`A new code is on its way; the old one no longer works.`}</Text>
   {/if}
   <ErrorMessage message={error} />
-  <Button variant="primary" type="submit" disabled={busy || !matched}>{matched ? submitText : "Continue"}</Button>
+  <Button variant="primary" type="submit" disabled={busy || !matched}>{matched ? submitText : t`Continue`}</Button>
   {#if !challenge}
-    <Checkbox bind:checked={keepSignedIn} size="sm" tone="muted">Keep me logged in</Checkbox>
+    <Checkbox bind:checked={keepSignedIn} size="sm" tone="muted">{t`Keep me logged in`}</Checkbox>
   {/if}
   {#if !matched}
-    <div><Link size="sm" onclick={resend} disabled={busy}>Send a new code</Link></div>
+    <div><Link size="sm" onclick={resend} disabled={busy}>{t`Send a new code`}</Link></div>
   {/if}
 </form>

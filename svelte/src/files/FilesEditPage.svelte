@@ -1,6 +1,7 @@
 <!-- Editing a file, at /files/:id/edit: its name, and its communities
      among the person's; its bytes never change. Done, it shows the file -->
 <script>
+  import { t } from "ttag";
   import { FormError, filesGet, filesUpdate } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
@@ -50,10 +51,10 @@
 </script>
 
 <Page>
-  <Heading level={1}>Edit file</Heading>
+  <Heading level={1}>{t`Edit file`}</Heading>
   {#if loaded}
     <form onsubmit={save} class="flex flex-col gap-3">
-      <Label text="Name">
+      <Label text={t`Name`}>
         <Input bind:value={name} disabled={busy} />
         <FieldErrors {errors} fields={["name"]} />
       </Label>
@@ -62,11 +63,11 @@
         <ErrorMessage message={error} />
       {/if}
       <div>
-        <Button variant="primary" type="submit" disabled={busy}>Save</Button>
+        <Button variant="primary" type="submit" disabled={busy}>{t`Save`}</Button>
       </div>
     </form>
   {:else if error}
     <ErrorMessage message={error} />
   {/if}
-  <Link href={filesShowUrl(id)}>Back to the file</Link>
+  <Link href={filesShowUrl(id)}>{t`Back to the file`}</Link>
 </Page>

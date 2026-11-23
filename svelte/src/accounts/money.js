@@ -1,6 +1,7 @@
 // A price as the pages show it. The server keeps an amount in the
 // currency's smallest unit, cents for usd; Intl knows how many digits a
 // currency has, none for jpy.
+import { t } from "ttag";
 
 /**
  * @param {number} amount in the currency's smallest unit
@@ -18,5 +19,7 @@ export function moneyFormat(amount, currency) {
  */
 export function priceFormat(price) {
   const money = moneyFormat(price.amount, price.currency);
-  return price.interval ? `${money} / ${price.interval}` : money;
+  if (price.interval === "month") return t`${money} / month`;
+  if (price.interval === "year") return t`${money} / year`;
+  return money;
 }

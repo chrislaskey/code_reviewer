@@ -8,6 +8,7 @@
      from. See docs/design/purchasing.md, P1, P2 and P4, and
      docs/design/purchasing-phones.md, M1, M4 and M5. -->
 <script>
+  import { jt, t } from "ttag";
   import PublicPagesLinks from "../../lib/PublicPagesLinks.svelte";
   import AccountsNeeded from "../../lib/AccountsNeeded.svelte";
   import {
@@ -28,7 +29,7 @@
   } from "../../lib/routes.js";
   import { priceFormat } from "../money.js";
   import { storeManagedWhere, storeName, storePriceFormat } from "../stores.js";
-  import { Button, ErrorMessage, Heading, Link, Page, Text } from "../../lib/components/index.js";
+  import { Button, ErrorMessage, Heading, Link, Page, Text, TranslatedParts } from "../../lib/components/index.js";
 
   const id = pathParams().id;
   const shown = loaded(() => accountsProductsGet(id));
@@ -102,7 +103,7 @@
       <Text>{product.description}</Text>
     {/if}
     {#if product.free_days}
-      <Text tone="muted">The first {product.free_days} days are free.</Text>
+      <Text tone="muted">{t`The first ${product.free_days} days are free.`}</Text>
     {/if}
     {#if currentUser.value && currentUser.value.kind !== "full"}
       <ul>
@@ -113,11 +114,13 @@
       <AccountsNeeded kind={currentUser.value.kind} />
     {:else if product.kind === "plan" && currentUser.value?.plan}
       {@const plan = currentUser.value.plan}
-      <Text>You are on {plan.product_name}.</Text>
+      <Text>{t`You are on ${plan.product_name}.`}</Text>
       {#if plan.store !== store}
-        <Text tone="muted">It was bought in {storeName(plan.store)}: manage it {storeManagedWhere(plan.store)}.</Text>
+        {@const boughtIn = storeName(plan.store)}
+        {@const managedWhere = storeManagedWhere(plan.store)}
+        <Text tone="muted">{t`It was bought in ${boughtIn}: manage it ${managedWhere}.`}</Text>
       {:else if plan.cancel_at_period_end}
-        <Text tone="muted">It ends with this period. Resume it on its page to switch.</Text>
+        <Text tone="muted">{t`It ends with this period. Resume it on its page to switch.`}</Text>
       {:else}
         <div class="flex flex-wrap gap-2">
           {#each product.prices as price (price.id)}
@@ -126,45 +129,50 @@
                 disabled={buying}
                 onclick={() => (store === "stripe" ? planSwitch(price.id) : storeBuy(price.id))}
               >
-                Switch · {storePriceFormat(price, priceFormat)}
+                {t`Switch`} · {storePriceFormat(price, priceFormat)}
               </Button>
             {/if}
           {/each}
         </div>
         {#if store === "stripe"}
-          <Text tone="muted">A dearer plan, or yearly, starts now with the difference charged; a cheaper one, or monthly, starts when this period ends.</Text>
+          <Text tone="muted">{t`A dearer plan, or yearly, starts now with the difference charged; a cheaper one, or monthly, starts when this period ends.`}</Text>
         {:else}
-          <Text tone="muted">{storeName(store)} decides when the new plan starts: an upgrade at once, a downgrade at the renewal.</Text>
+          {@const storeShown = storeName(store)}
+          <Text tone="muted">{t`${storeShown} decides when the new plan starts: an upgrade at once, a downgrade at the renewal.`}</Text>
         {/if}
       {/if}
-      <Text><Link href={accountsSubscriptionsShowUrl(plan.subscription_id)}>See your plan</Link></Text>
+      <Text><Link href={accountsSubscriptionsShowUrl(plan.subscription_id)}>{t`See your plan`}</Link></Text>
     {:else if product.owned && !product.is_repeatable}
-      <Text>Owned</Text>
+      <Text>{t`Owned`}</Text>
     {:else}
       {#if product.owned}
-        <Text tone="muted">You have this. You can buy it again.</Text>
+        <Text tone="muted">{t`You have this. You can buy it again.`}</Text>
       {/if}
       <div class="flex flex-wrap gap-2">
         {#each product.prices as price (price.id)}
           <Button variant="primary" size="sm" disabled={buying} onclick={() => buy(price.id)}>
-            Buy · {storePriceFormat(price, priceFormat)}
+            {t`Buy`} · {storePriceFormat(price, priceFormat)}
           </Button>
         {/each}
       </div>
       {#if pending}
-        <Text tone="muted">Waiting for approval. It appears here once {storeName(store)} confirms it.</Text>
+        {@const storeShown = storeName(store)}
+        <Text tone="muted">{t`Waiting for approval. It appears here once ${storeShown} confirms it.`}</Text>
       {/if}
     {/if}
     {#if store !== "stripe" && product.kind === "plan"}
+      {@const periods = product.prices
+        .map((price) => price.store_period ?? price.interval)
+        .filter(Boolean)
+        .join(` ${t`or`} `)}
+      {@const storeShown = storeName(store)}
+      {#snippet publicPagesLinks()}<PublicPagesLinks />{/snippet}
       <Text tone="muted" size="sm">
-        {product.name}: an auto-renewing subscription, renewed each {product.prices
-          .map((price) => price.store_period ?? price.interval)
-          .filter(Boolean)
-          .join(" or ")} at the price shown until you cancel it in {storeName(store)}.
-        By buying you accept the <PublicPagesLinks />.
+        {t`${product.name}: an auto-renewing subscription, renewed each ${periods} at the price shown until you cancel it in ${storeShown}.`}
+        <TranslatedParts parts={jt`By buying you accept the ${publicPagesLinks}.`} />
       </Text>
     {/if}
   {/if}
 
-  <Link href={accountsProductsIndexUrl()}>Back to plans and products</Link>
+  <Link href={accountsProductsIndexUrl()}>{t`Back to plans and products`}</Link>
 </Page>

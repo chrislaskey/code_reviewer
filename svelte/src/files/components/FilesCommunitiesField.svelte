@@ -2,6 +2,7 @@
      checkbox for each community the person is a member of, bound to
      `communityIds`. A file is in one at least. -->
 <script>
+  import { t } from "ttag";
   import { communitiesList } from "../../lib/core/index.js";
   import { Checkbox, FieldErrors, Text } from "../../lib/components/index.js";
 
@@ -38,7 +39,7 @@
 </script>
 
 <fieldset class="flex flex-col gap-1">
-  <Text as="legend" tone="muted">In</Text>
+  <Text as="legend" tone="muted">{t`In`}</Text>
   <div class="flex flex-wrap gap-3">
     {#each mine as community (community.id)}
       <Checkbox

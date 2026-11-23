@@ -5,6 +5,7 @@
      first empty box takes the focus when it appears and from `focus()`. -->
 <script>
   import { onMount } from "svelte";
+  import { t } from "ttag";
 
   /**
    * @typedef {Object} Props
@@ -16,7 +17,7 @@
    */
 
   /** @type {Props} */
-  let { value = $bindable(""), length = 6, disabled = false, label = "Code", oncomplete } = $props();
+  let { value = $bindable(""), length = 6, disabled = false, label = t`Code`, oncomplete } = $props();
 
   /** @type {HTMLInputElement[]} */
   let boxes = $state([]);
@@ -27,6 +28,12 @@
   /** Focuses the first empty box, or the last when all are filled. */
   export function focus() {
     boxes[Math.min(value.length, length - 1)]?.focus();
+  }
+
+  /** @param {number} index */
+  function digitLabel(index) {
+    const position = index + 1;
+    return t`${label}, digit ${position} of ${length}`;
   }
 
   /** @param {string} text */
@@ -105,7 +112,7 @@
       {disabled}
       inputmode="numeric"
       autocomplete={index === 0 ? "one-time-code" : "off"}
-      aria-label={`${label}, digit ${index + 1} of ${length}`}
+      aria-label={digitLabel(index)}
       class="input h-12 w-11 px-0 text-center font-mono text-xl"
     />
   {/each}

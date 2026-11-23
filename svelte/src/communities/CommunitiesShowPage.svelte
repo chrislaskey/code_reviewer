@@ -1,6 +1,7 @@
 <!-- One community, at /communities/:id, to join or leave, and for a
      member to edit or delete -->
 <script>
+  import { t } from "ttag";
   import { communitiesDelete, communitiesGet } from "../lib/core/index.js";
   import { loaded } from "../lib/loaded.svelte.js";
   import { errorMessageOf } from "../lib/error_message.js";
@@ -32,15 +33,15 @@
 </script>
 
 <Page>
-  <Heading level={1}>{shown.value?.community.name ?? "Community"}</Heading>
+  <Heading level={1}>{shown.value?.community.name ?? t`Community`}</Heading>
 
   <ErrorMessage message={error || shown.error} />
   {#if shown.value}
     {@const { community, membership } = shown.value}
     <Text tone="muted">
-      Created {community.inserted_at}
+      {t`Created ${community.inserted_at}`}
       {#if membership}
-        · you are a member
+        · {t`you are a member`}
       {/if}
     </Text>
     <div class="flex flex-wrap gap-2">
@@ -51,8 +52,8 @@
         onerror={(problem) => (error = problem)}
       />
       {#if membership}
-        <Button size="sm" href={communitiesEditUrl(id)}>Edit</Button>
-        <Button size="sm" variant="ghost" onclick={() => (deleting = true)}>Delete</Button>
+        <Button size="sm" href={communitiesEditUrl(id)}>{t`Edit`}</Button>
+        <Button size="sm" variant="ghost" onclick={() => (deleting = true)}>{t`Delete`}</Button>
       {/if}
     </div>
     <CommunitiesDeleteDialog
@@ -63,5 +64,5 @@
     />
   {/if}
 
-  <Link href={communitiesIndexUrl()}>Back to communities</Link>
+  <Link href={communitiesIndexUrl()}>{t`Back to communities`}</Link>
 </Page>

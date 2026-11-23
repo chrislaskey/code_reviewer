@@ -3,6 +3,7 @@
      `app:set-theme` event the theme script in the page's <head> listens
      for (theme_script.js), then calls `onchoose`. -->
 <script>
+  import { t } from "ttag";
   import Icon from "../components/Icon.svelte";
   import { THEMES, currentTheme } from "./themes.js";
 
@@ -25,7 +26,7 @@
 <li>
   <button type="button" class:menu-active={current === "system"} onclick={setTheme} data-theme="system">
     <Icon name="hero-computer-desktop-micro" class="size-4" />
-    System
+    {t`System`}
   </button>
 </li>
 {#each THEMES as theme (theme)}

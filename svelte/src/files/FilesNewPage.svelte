@@ -9,6 +9,7 @@
      one that is created shows the file. The person stays on the page
      while the files go. See docs/design/files-create-many.md. -->
 <script>
+  import { msgid, ngettext, t } from "ttag";
   import {
     FormError,
     filesCreate,
@@ -26,6 +27,7 @@
   import FilesNewRow from "./components/FilesNewRow.svelte";
 
   const MAX_FILES = 5000;
+  const maxFiles = MAX_FILES.toLocaleString();
   /** Checksums asked about in one request, the most the server takes. */
   const CHECKSUMS_PER_REQUEST = 500;
   const CHECKSUMS_AT_ONCE = 4;
@@ -131,7 +133,15 @@
     const files = [...(picked ?? [])];
     if (files.length === 0) return;
     const room = MAX_FILES - rows.length;
-    notice = files.length > room ? `A list holds ${MAX_FILES.toLocaleString()} files; ${files.length - room} were left out.` : "";
+    const leftOut = files.length - room;
+    notice =
+      leftOut > 0
+        ? ngettext(
+            msgid`A list holds ${maxFiles} files; ${leftOut} was left out.`,
+            `A list holds ${maxFiles} files; ${leftOut} were left out.`,
+            leftOut,
+          )
+        : "";
     const start = rows.length;
     rows.push(
       ...files.slice(0, Math.max(room, 0)).map((file) => ({
@@ -325,20 +335,20 @@
 <svelte:window onbeforeunload={beforeunload} />
 
 <Page>
-  <Heading level={1}>New files</Heading>
+  <Heading level={1}>{t`New files`}</Heading>
   <form onsubmit={save} class="flex flex-col gap-3">
     <div
       role="region"
-      aria-label="Files to create"
+      aria-label={t`Files to create`}
       class={["flex flex-col gap-3 rounded-box border-2 border-dashed p-3", dragging ? "border-primary" : "border-transparent"]}
       ondragover={dragover}
       ondragleave={() => (dragging = false)}
       ondrop={drop}
     >
-      <Label text="Files">
+      <Label text={t`Files`}>
         <FileInput multiple onchange={pick} disabled={busy} />
       </Label>
-      <Text tone="muted" size="sm">Pick one file or many, or drop them here, up to {MAX_FILES.toLocaleString()}.</Text>
+      <Text tone="muted" size="sm">{t`Pick one file or many, or drop them here, up to ${maxFiles}.`}</Text>
       {#if notice}
         <Alert>{notice}</Alert>
       {/if}
@@ -364,38 +374,49 @@
     <!-- While files go, nothing here counts the whole list, which would
          run again for every row that changes. -->
     {#if busy}
-      <Text tone="muted">Creating {run.done} of {run.total}. Stay on this page until they are done.</Text>
+      <Text tone="muted">{t`Creating ${run.done} of ${run.total}. Stay on this page until they are done.`}</Text>
       <progress class="progress w-full" value={run.done} max={run.total}></progress>
       <div>
-        <Button variant="primary" disabled>Creating…</Button>
+        <Button variant="primary" disabled>{t`Creating…`}</Button>
       </div>
     {:else}
       {#if counts.created + counts.put + counts.skipped + counts.failed > 0}
         <Text>
-          {counts.created} created, {counts.put} put in, {counts.skipped} skipped, {counts.failed} failed.
+          {t`${counts.created} created, ${counts.put} put in, ${counts.skipped} skipped, ${counts.failed} failed.`}
         </Text>
       {/if}
       {#if asking > 0}
+        {@const hashedCount = hashed.toLocaleString()}
+        {@const askingCount = asking.toLocaleString()}
         <Text tone="muted" size="sm">
-          Looking for files already here… {hashed.toLocaleString()} of {asking.toLocaleString()} read.
+          {t`Looking for files already here… ${hashedCount} of ${askingCount} read.`}
         </Text>
       {:else if toDecide > 0}
+        {@const toDecideCount = toDecide.toLocaleString()}
         <Text tone="muted" size="sm">
-          {toDecide === 1 ? "One file is" : `${toDecide.toLocaleString()} files are`} already here; choose what to do with
-          {toDecide === 1 ? "it" : "each"}.
+          {ngettext(
+            msgid`One file is already here; choose what to do with it.`,
+            `${toDecideCount} files are already here; choose what to do with each.`,
+            toDecide,
+          )}
         </Text>
       {/if}
       <div class="flex flex-wrap gap-2">
         {#if open.length > 0 || rows.length === 0}
           <Button variant="primary" type="submit" disabled={!ready}>
-            {open.length === 0 ? "Create files" : open.length === 1 ? "Create file" : `Create ${open.length.toLocaleString()} files`}
+            {#if open.length === 0}
+              {t`Create files`}
+            {:else}
+              {@const openCount = open.length.toLocaleString()}
+              {ngettext(msgid`Create file`, `Create ${openCount} files`, open.length)}
+            {/if}
           </Button>
         {/if}
         {#if failed.length > 0}
-          <Button disabled={toDecide > 0 || communityIds.length === 0} onclick={() => createRows(failed)}>Retry failed</Button>
+          <Button disabled={toDecide > 0 || communityIds.length === 0} onclick={() => createRows(failed)}>{t`Retry failed`}</Button>
         {/if}
       </div>
     {/if}
   </form>
-  <Link href={filesIndexUrl()}>Back to files</Link>
+  <Link href={filesIndexUrl()}>{t`Back to files`}</Link>
 </Page>

@@ -3,6 +3,7 @@
      docs/design/purchasing.md; nothing to buy on an account of a server
      other than the app's own, see docs/design/multi-server.md. -->
 <script>
+  import { t } from "ttag";
   import PublicPagesLinks from "../../lib/PublicPagesLinks.svelte";
   import AccountsNeeded from "../../lib/AccountsNeeded.svelte";
   import { currentUser } from "../../lib/current_user.svelte.js";
@@ -24,27 +25,27 @@
 </script>
 
 <Page>
-  <Heading level={1}>Account</Heading>
+  <Heading level={1}>{t`Account`}</Heading>
   <ErrorMessage message={error} />
   {#if currentUser.value && currentUser.value.kind !== "full"}
     <AccountsNeeded kind={currentUser.value.kind} />
     {#if currentUser.value.kind === "trial"}
-      <Text><Link href={accountsDeletionsNewUrl()}>Delete what I made as a guest</Link></Text>
+      <Text><Link href={accountsDeletionsNewUrl()}>{t`Delete what I made as a guest`}</Link></Text>
     {/if}
   {:else}
     {#if currentUser.value}
       <Text>{currentUser.value.email}</Text>
     {/if}
-    <Text><Link href={accountsCurrentPasswordEditUrl()}>Password</Link></Text>
+    <Text><Link href={accountsCurrentPasswordEditUrl()}>{t`Password`}</Link></Text>
     {#if sells}
       {#if currentUser.value?.plan}
-        <Text>Your plan: {currentUser.value.plan.product_name}</Text>
+        <Text>{t`Your plan: ${currentUser.value.plan.product_name}`}</Text>
       {/if}
-      <Text><Link href={accountsSubscriptionsIndexUrl()}>Plans</Link></Text>
-      <Text><Link href={accountsProductsIndexUrl()}>Plans and products for sale</Link></Text>
-      <Text><Link href={accountsPurchasesIndexUrl()}>Purchases</Link></Text>
+      <Text><Link href={accountsSubscriptionsIndexUrl()}>{t`Plans`}</Link></Text>
+      <Text><Link href={accountsProductsIndexUrl()}>{t`Plans and products for sale`}</Link></Text>
+      <Text><Link href={accountsPurchasesIndexUrl()}>{t`Purchases`}</Link></Text>
     {/if}
-    <Text><Link tone="danger" href={accountsDeletionsNewUrl()}>Delete my account</Link></Text>
+    <Text><Link tone="danger" href={accountsDeletionsNewUrl()}>{t`Delete my account`}</Link></Text>
   {/if}
   <Text tone="muted"><PublicPagesLinks /></Text>
 </Page>

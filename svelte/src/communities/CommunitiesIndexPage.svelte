@@ -1,5 +1,6 @@
 <!-- Every community, at /communities, each to show, join or leave -->
 <script>
+  import { t } from "ttag";
   import { communitiesList } from "../lib/core/index.js";
   import { loaded } from "../lib/loaded.svelte.js";
   import { communitiesNewUrl, communitiesShowUrl } from "../lib/routes.js";
@@ -12,14 +13,14 @@
 
 <Page>
   <div class="flex items-center justify-between gap-4">
-    <Heading level={1}>Communities</Heading>
-    <Button variant="primary" size="sm" href={communitiesNewUrl()}>New community</Button>
+    <Heading level={1}>{t`Communities`}</Heading>
+    <Button variant="primary" size="sm" href={communitiesNewUrl()}>{t`New community`}</Button>
   </div>
 
   <ErrorMessage message={error || communities.error} />
 
   {#if communities.value?.length === 0}
-    <Text tone="muted">No communities yet.</Text>
+    <Text tone="muted">{t`No communities yet.`}</Text>
   {/if}
 
   <ul class="flex flex-col gap-3">
@@ -28,7 +29,7 @@
         <span>
           <Link href={communitiesShowUrl(community.id)}>{community.name}</Link>
           {#if membership}
-            <Text as="span" tone="muted">· member</Text>
+            <Text as="span" tone="muted">· {t`member`}</Text>
           {/if}
         </span>
         <CommunitiesMembershipButton

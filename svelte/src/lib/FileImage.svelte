@@ -4,6 +4,7 @@
      an <img>. An image that cannot be had, a file not on this device
      with the network off, shows `missing` instead. -->
 <script>
+  import { t } from "ttag";
   import { animationsOn, onAnimationsChanged } from "./animations.js";
   import { Text } from "./components/index.js";
 
@@ -16,7 +17,7 @@
    */
 
   /** @type {Props} */
-  let { src, alt, class: className = "", missing = "Not on this device" } = $props();
+  let { src, alt, class: className = "", missing = t`Not on this device` } = $props();
 
   let moving = $state(animationsOn());
   let failed = $state(false);

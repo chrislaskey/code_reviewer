@@ -5,6 +5,7 @@
      only on this device; they and a trial user have no picture, which
      needs an account on the server. -->
 <script>
+  import { t } from "ttag";
   import { FormError, avatarsUpload, currentUserGet, currentUserUpdate } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
   import { currentUserForget } from "../lib/current_user.svelte.js";
@@ -81,16 +82,15 @@
 </script>
 
 <Page>
-  <Heading level={1}>Profile</Heading>
+  <Heading level={1}>{t`Profile`}</Heading>
   {#if currentUser}
     {#if currentUser.kind === "local"}
       <Alert tone="warning" class="flex flex-col items-start gap-2" data-local-user>
         <Text>
-          <strong>This account is only on this device.</strong> Nothing is backed up: if the device is lost or reset,
-          or the app is removed, what you made is gone. Sign up or log in to keep it safe and use it on your other
-          devices.
+          <strong>{t`This account is only on this device.`}</strong>
+          {t`Nothing is backed up: if the device is lost or reset, or the app is removed, what you made is gone. Sign up or log in to keep it safe and use it on your other devices.`}
         </Text>
-        <Button size="sm" href={accountsIndexUrl()}>Sign up or log in</Button>
+        <Button size="sm" href={accountsIndexUrl()}>{t`Sign up or log in`}</Button>
       </Alert>
     {:else if currentUser.kind === "trial" && currentUser.trial_expires_at}
       <Alert tone="warning">
@@ -108,17 +108,17 @@
       <span>{currentUser.name}</span>
     </div>
     <form onsubmit={saveName} class="flex flex-col gap-3">
-      <Label text="Name">
+      <Label text={t`Name`}>
         <Input bind:value={name} autocomplete="name" maxlength="80" required />
       </Label>
       <ErrorMessage message={nameError} />
       <div>
-        <Button variant="primary" type="submit" disabled={nameBusy || name.trim() === currentUser.name}>Save name</Button>
+        <Button variant="primary" type="submit" disabled={nameBusy || name.trim() === currentUser.name}>{t`Save name`}</Button>
       </div>
     </form>
     {#if currentUser.kind === "full"}
       <form onsubmit={save} class="flex flex-col gap-3">
-        <Label text="Picture">
+        <Label text={t`Picture`}>
           <FileInput
             accept="image/png,image/jpeg,image/gif,image/webp"
             onchange={pick}
@@ -133,7 +133,7 @@
           <ErrorMessage message={error} />
         {/if}
         <div>
-          <Button variant="primary" type="submit" disabled={busy || !file}>Save picture</Button>
+          <Button variant="primary" type="submit" disabled={busy || !file}>{t`Save picture`}</Button>
         </div>
       </form>
     {/if}

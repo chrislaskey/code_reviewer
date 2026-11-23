@@ -5,6 +5,7 @@
      where the keyboard would cover the list. Enter in the filter
      chooses the first match. Choosing one reloads the page in it. -->
 <script>
+  import { t } from "ttag";
   import { communitiesList, currentCommunityUpdate, onSynced } from "../core/index.js";
   import { errorMessageOf } from "../error_message.js";
   import { currentCommunity, currentCommunityLoad } from "../current_community.svelte.js";
@@ -66,14 +67,14 @@
 
 <Button variant="ghost" size="sm" class="gap-1" onclick={open}>
   <Icon name="hero-user-group-mini" class="size-5" />
-  {currentCommunity.value?.name ?? "No community"}
+  {currentCommunity.value?.name ?? t`No community`}
   <Icon name="hero-chevron-down-mini" class="size-4" />
 </Button>
 
 <Dialog bind:element={dialog} closeOnBackdrop class="max-h-[80vh]">
   <div class="flex items-center justify-between gap-2">
-    <Heading>Communities</Heading>
-    <Button variant="ghost" size="sm" class="btn-square" aria-label="Close" onclick={() => dialog?.close()}>
+    <Heading>{t`Communities`}</Heading>
+    <Button variant="ghost" size="sm" class="btn-square" aria-label={t`Close`} onclick={() => dialog?.close()}>
       <Icon name="hero-x-mark-mini" class="size-5" />
     </Button>
   </div>
@@ -82,8 +83,8 @@
     bind:value={filter}
     onkeydown={chooseFirstOnEnter}
     type="search"
-    placeholder="Filter communities"
-    aria-label="Filter communities"
+    placeholder={t`Filter communities`}
+    aria-label={t`Filter communities`}
   />
   <ErrorMessage message={error} />
   <ul class="menu w-full flex-nowrap overflow-y-auto p-0">
@@ -103,9 +104,9 @@
       </li>
     {:else}
       <li class="muted px-3 py-2">
-        {mine.length === 0 ? "You are not in a community yet." : "No community matches."}
+        {mine.length === 0 ? t`You are not in a community yet.` : t`No community matches.`}
       </li>
     {/each}
   </ul>
-  <Link href={communitiesIndexUrl()} onclick={() => dialog?.close()}>Join / Manage Communities</Link>
+  <Link href={communitiesIndexUrl()} onclick={() => dialog?.close()}>{t`Join / Manage Communities`}</Link>
 </Dialog>

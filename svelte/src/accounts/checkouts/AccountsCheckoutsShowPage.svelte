@@ -5,6 +5,7 @@
      page asks again when the app has the focus. See
      docs/design/purchasing.md, P3. -->
 <script>
+  import { t } from "ttag";
   import { accountsCheckoutsGet, hasDeviceAccounts } from "../../lib/core/index.js";
   import { errorMessageOf } from "../../lib/error_message.js";
   import { currentUserReload } from "../../lib/current_user.svelte.js";
@@ -52,30 +53,31 @@
 <svelte:window onfocus={onFocus} />
 
 <Page>
-  <Heading level={1}>Checkout</Heading>
+  <Heading level={1}>{t`Checkout`}</Heading>
 
   <ErrorMessage message={error} />
   {#if checkout}
     {#if checkout.status === "paid"}
-      <Text>Thank you. {checkout.product_name} is yours.</Text>
+      <Text>{t`Thank you. ${checkout.product_name} is yours.`}</Text>
       {#if checkout.purchase_id}
-        <Text><Link href={accountsPurchasesShowUrl(checkout.purchase_id)}>See the purchase</Link></Text>
+        <Text><Link href={accountsPurchasesShowUrl(checkout.purchase_id)}>{t`See the purchase`}</Link></Text>
       {:else if checkout.kind === "plan"}
-        <Text><Link href={accountsSubscriptionsIndexUrl()}>See your plan</Link></Text>
+        <Text><Link href={accountsSubscriptionsIndexUrl()}>{t`See your plan`}</Link></Text>
       {/if}
     {:else if checkout.status === "processing"}
-      <Text>Your payment for {checkout.product_name} is processing. This page updates when it is done.</Text>
+      <Text>{t`Your payment for ${checkout.product_name} is processing. This page updates when it is done.`}</Text>
     {:else if checkout.status === "open" && hasDeviceAccounts}
-      <Text>Finish paying for {checkout.product_name} in your browser. This page updates when you come back.</Text>
+      <Text>{t`Finish paying for ${checkout.product_name} in your browser. This page updates when you come back.`}</Text>
     {:else if checkout.status === "open"}
-      <Text>{checkout.product_name} is not paid yet.</Text>
-      <Text><Link href={accountsProductsShowUrl(checkout.product_id)}>Back to {checkout.product_name}</Link></Text>
+      <Text>{t`${checkout.product_name} is not paid yet.`}</Text>
+      <Text><Link href={accountsProductsShowUrl(checkout.product_id)}>{t`Back to ${checkout.product_name}`}</Link></Text>
     {:else}
       <Text>
-        {checkout.status === "failed" ? "The payment did not go through" : "This checkout expired"}, and
-        nothing was charged.
+        {checkout.status === "failed"
+          ? t`The payment did not go through, and nothing was charged.`
+          : t`This checkout expired, and nothing was charged.`}
       </Text>
-      <Text><Link href={accountsProductsShowUrl(checkout.product_id)}>Try again</Link></Text>
+      <Text><Link href={accountsProductsShowUrl(checkout.product_id)}>{t`Try again`}</Link></Text>
     {/if}
   {/if}
 </Page>

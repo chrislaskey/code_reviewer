@@ -5,6 +5,7 @@
      it, and signed in to once the person confirms. What is allowed is the
      Rust side's to say; this only shows it. -->
 <script>
+  import { t } from "ttag";
   import { deviceServersCreate, serversGet } from "../../lib/core/index.js";
   import { errorMessageOf } from "../../lib/error_message.js";
   import { Alert, Badge, Button, ErrorMessage, Input, Label, Panel, Text } from "../../lib/components/index.js";
@@ -60,16 +61,17 @@
 </script>
 
 {#if !open}
-  <Button size="sm" variant="ghost" onclick={() => (open = true)} disabled={busy}>Custom server</Button>
+  <Button size="sm" variant="ghost" onclick={() => (open = true)} disabled={busy}>{t`Custom server`}</Button>
 {:else}
   <Panel>
     <form class="flex flex-col gap-3" onsubmit={check}>
-      <Label text="Server address">
+      <Label text={t`Server address`}>
+        <!-- untranslated: an example address -->
         <Input type="url" bind:value={url} placeholder="https://example.com" autocapitalize="off" spellcheck="false" />
       </Label>
       <div class="flex flex-wrap gap-3">
-        <Button size="sm" type="submit" disabled={busy || checking || !url.trim()}>Check</Button>
-        <Button size="sm" variant="ghost" onclick={close} disabled={checking}>Cancel</Button>
+        <Button size="sm" type="submit" disabled={busy || checking || !url.trim()}>{t`Check`}</Button>
+        <Button size="sm" variant="ghost" onclick={close} disabled={checking}>{t`Cancel`}</Button>
       </div>
     </form>
     <ErrorMessage message={error} />
@@ -77,24 +79,23 @@
       <div class="flex flex-wrap items-center gap-3">
         <span class="grow">{checked.display_name} · {checked.host}</span>
         {#if checked.listing === "listed"}
-          <Badge tone="primary">Listed</Badge>
+          <Badge tone="primary">{t`Listed`}</Badge>
         {:else if checked.listing === "default"}
-          <Badge tone="primary">The app's own server</Badge>
+          <Badge tone="primary">{t`The app's own server`}</Badge>
         {/if}
       </div>
       {#if checked.listing === "unlisted"}
         <Alert tone="warning">
-          This server is not on the app's list. Go on only if you trust whoever runs it: everything you make there is
-          theirs to keep.
+          {t`This server is not on the app's list. Go on only if you trust whoever runs it: everything you make there is theirs to keep.`}
         </Alert>
       {:else if checked.listing === "unchecked"}
         <Alert tone="warning">
-          The app's own server could not be reached to check this one. Go on only if you trust whoever runs it.
+          {t`The app's own server could not be reached to check this one. Go on only if you trust whoever runs it.`}
         </Alert>
       {/if}
-      <Text tone="muted" size="sm">You log in on that server's own page, in the browser.</Text>
+      <Text tone="muted" size="sm">{t`You log in on that server's own page, in the browser.`}</Text>
       <div>
-        <Button size="sm" variant="primary" onclick={signIn} disabled={busy || checking}>Sign up or log in there</Button>
+        <Button size="sm" variant="primary" onclick={signIn} disabled={busy || checking}>{t`Sign up or log in there`}</Button>
       </div>
     {/if}
   </Panel>

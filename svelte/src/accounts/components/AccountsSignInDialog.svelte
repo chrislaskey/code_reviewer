@@ -2,7 +2,8 @@
      browser has the web's sign-in page and ends by showing a code, which
      the person pastes here, see docs/design/accounts-sign-in.md. -->
 <script>
-  import { Button, Dialog, DialogActions, ErrorMessage, Heading, Input, Text } from "../../lib/components/index.js";
+  import { jt, t } from "ttag";
+  import { Button, Dialog, DialogActions, ErrorMessage, Heading, Input, Text, TranslatedParts } from "../../lib/components/index.js";
   /**
    * @typedef {Object} Props
    * @property {{email: string | null} | null} pending the sign-in waiting; the dialog is open while set
@@ -37,22 +38,23 @@
 
 <Dialog bind:element={dialog} onclose={() => pending && oncancel()}>
   {#if pending}
-    <Heading>Finish logging in in your browser</Heading>
+    <Heading>{t`Finish logging in in your browser`}</Heading>
     <Text>
       {#if pending.email}
-        The page to log in as <strong>{pending.email}</strong> opened in your browser.
+        {#snippet strongEmail()}<strong>{pending.email}</strong>{/snippet}
+        <TranslatedParts parts={jt`The page to log in as ${strongEmail} opened in your browser.`} />
       {:else}
-        The page to log in opened in your browser.
+        {t`The page to log in opened in your browser.`}
       {/if}
-      When it shows a code, paste it here.
+      {t`When it shows a code, paste it here.`}
     </Text>
     <form onsubmit={submit} class="flex flex-col gap-3">
-      <Input bind:value={code} autocomplete="off" aria-label="Code from the browser" placeholder="Code from the browser" required />
+      <Input bind:value={code} autocomplete="off" aria-label={t`Code from the browser`} placeholder={t`Code from the browser`} required />
       <ErrorMessage message={error} />
       <DialogActions>
-        <Button size="sm" variant="ghost" onclick={oncancel} disabled={busy}>Cancel</Button>
-        <Button size="sm" onclick={onopenbrowser} disabled={busy}>Open the browser again</Button>
-        <Button size="sm" variant="primary" type="submit" disabled={busy}>Finish</Button>
+        <Button size="sm" variant="ghost" onclick={oncancel} disabled={busy}>{t`Cancel`}</Button>
+        <Button size="sm" onclick={onopenbrowser} disabled={busy}>{t`Open the browser again`}</Button>
+        <Button size="sm" variant="primary" type="submit" disabled={busy}>{t`Finish`}</Button>
       </DialogActions>
     </form>
   {/if}

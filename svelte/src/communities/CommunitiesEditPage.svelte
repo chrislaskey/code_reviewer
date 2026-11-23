@@ -1,6 +1,7 @@
 <!-- Editing a community, at /communities/:id/edit; done, it shows the
      community -->
 <script>
+  import { t } from "ttag";
   import { FormError, communitiesGet, communitiesUpdate } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
@@ -44,11 +45,11 @@
 </script>
 
 <Page>
-  <Heading level={1}>Edit community</Heading>
+  <Heading level={1}>{t`Edit community`}</Heading>
   {#if loaded}
-    <CommunitiesForm bind:name submitText="Save" {errors} {error} {busy} onsubmit={save} />
+    <CommunitiesForm bind:name submitText={t`Save`} {errors} {error} {busy} onsubmit={save} />
   {:else if error}
     <ErrorMessage message={error} />
   {/if}
-  <Link href={communitiesShowUrl(id)}>Back to the community</Link>
+  <Link href={communitiesShowUrl(id)}>{t`Back to the community`}</Link>
 </Page>

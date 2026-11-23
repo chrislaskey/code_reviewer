@@ -2,6 +2,7 @@
 // answered, never through the server. XMLHttpRequest, since fetch reports
 // no upload progress. The URL was signed for the file's Content-Type, and
 // for a file's checksum, so the bucket refuses anything else.
+import { t } from "ttag";
 
 /**
  * @param {{upload_url: string, content_type: string, checksum_sha256?: string}} upload
@@ -20,9 +21,9 @@ export function putFile(upload, file, onProgress) {
     };
     request.onload = () => {
       if (request.status >= 200 && request.status < 300) resolve();
-      else reject(new Error(`The upload failed with ${request.status}; try again`));
+      else reject(new Error(t`The upload failed with ${request.status}; try again`));
     };
-    request.onerror = () => reject(new Error("The upload could not reach the storage; try again"));
+    request.onerror = () => reject(new Error(t`The upload could not reach the storage; try again`));
     request.send(file);
   });
 }

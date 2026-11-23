@@ -3,6 +3,7 @@
 // `status`, as a FormError with the fields' messages when it has
 // `"errors"`. An answer that is not JSON is thrown too, naming the
 // request, so a server without the route never passes for one with it.
+import { t } from "ttag";
 import { FormError } from "./form_error.js";
 import { sha256Of } from "./checksums.js";
 import { putFile } from "./uploads.js";
@@ -518,7 +519,7 @@ export function filesCopySupported() {
  */
 export function filesCopy(id) {
   const png = fetch(`${filePath(id)}/content`, { cache: "no-store" }).then(async (response) => {
-    if (!response.ok) throw new Error(`Could not read the image (${response.status})`);
+    if (!response.ok) throw new Error(t`Could not read the image (${response.status})`);
     return asPng(await response.blob());
   });
   return navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
@@ -537,7 +538,7 @@ async function asPng(image) {
   canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
   bitmap.close();
   return new Promise((resolve, reject) =>
-    canvas.toBlob((png) => (png ? resolve(png) : reject(new Error("Could not copy the image"))), "image/png"),
+    canvas.toBlob((png) => (png ? resolve(png) : reject(new Error(t`Could not copy the image`))), "image/png"),
   );
 }
 
@@ -704,13 +705,13 @@ export function accountsStoreGet() {
 
 /** A phone store's sheet: never on the web. */
 export function accountsStoreTransactionsCreate(_priceId) {
-  return Promise.reject(new Error("On the web, plans and products are bought through Stripe"));
+  return Promise.reject(new Error(t`On the web, plans and products are bought through Stripe`));
 }
 
 export function accountsStoreTransactionsRestore() {
-  return Promise.reject(new Error("Restoring purchases is in the iPhone app"));
+  return Promise.reject(new Error(t`Restoring purchases is in the iPhone app`));
 }
 
 export function accountsSubscriptionsManageOpen() {
-  return Promise.reject(new Error("A plan from a phone's store is managed on the phone"));
+  return Promise.reject(new Error(t`A plan from a phone's store is managed on the phone`));
 }

@@ -5,6 +5,7 @@
      out of the person's communities. A click on an image copies it to
      the clipboard, where the device can. -->
 <script>
+  import { t } from "ttag";
   import AnimationsToggle from "../lib/AnimationsToggle.svelte";
   import FileImage from "../lib/FileImage.svelte";
   import {
@@ -46,14 +47,14 @@
     error = "";
     try {
       const path = await filesDownload(id);
-      saved = path ? `Saved to ${path}` : "";
+      saved = path ? t`Saved to ${path}` : "";
     } catch (problem) {
       error = errorMessageOf(problem);
     }
   }
 
   async function remove() {
-    if (!confirm("Delete this file from your communities? A community you are not in keeps it.")) return;
+    if (!confirm(t`Delete this file from your communities? A community you are not in keeps it.`)) return;
     try {
       await filesDelete(id);
       await navigateToUrl(filesIndexUrl());
@@ -64,37 +65,36 @@
 </script>
 
 <Page>
-  <Heading level={1}>{shown ? shown.file.name : "File"}</Heading>
+  <Heading level={1}>{shown ? shown.file.name : t`File`}</Heading>
 
   <ErrorMessage message={error || file.error} />
   {#if shown}
+    {@const communityNames = shown.communities.map((community) => community.name).join(", ")}
     <Text tone="muted">
-      {shown.creator ? shown.creator.name : "A former member"} · in {shown.communities
-        .map((community) => community.name)
-        .join(", ")}
+      {shown.creator ? shown.creator.name : t`A former member`} · {t`in ${communityNames}`}
     </Text>
     <Text tone="muted">
       {shown.file.content_type} · {fileSize(shown.file.size)} · {shown.file.inserted_at}
       {#if shown.state === "waiting"}
-        · waiting to upload
+        · {t`waiting to upload`}
       {:else if shown.state === "refused"}
-        · not saved on the server
+        · {t`not saved on the server`}
       {/if}
     </Text>
     {#if shown.error}
       <Text tone="error" size="sm">{shown.error}</Text>
     {/if}
     {#if shown.state === "refused"}
-      <Text><Link href={conflictsIndexUrl()}>Try again or let it go</Link></Text>
+      <Text><Link href={conflictsIndexUrl()}>{t`Try again or let it go`}</Link></Text>
     {/if}
 
     {#if shown.shown_as === "image"}
       <AnimationsToggle />
       {#if can.value?.copy}
-        <button type="button" class="cursor-copy self-start text-left" title="Copy to the clipboard" onclick={copy}>
+        <button type="button" class="cursor-copy self-start text-left" title={t`Copy to the clipboard`} onclick={copy}>
           <FileImage src={filesContentUrl(id)} alt={shown.file.name} class="file-shown" />
         </button>
-        <Text tone="muted">{copied ? "Copied" : "Click the image to copy it"}</Text>
+        <Text tone="muted">{copied ? t`Copied` : t`Click the image to copy it`}</Text>
       {:else}
         <div>
           <FileImage src={filesContentUrl(id)} alt={shown.file.name} class="file-shown" />
@@ -105,20 +105,20 @@
     {:else if shown.shown_as === "pdf"}
       <iframe src={filesContentUrl(id)} title={shown.file.name} class="file-shown"></iframe>
     {:else}
-      <Text tone="muted">This kind of file is not shown here.</Text>
+      <Text tone="muted">{t`This kind of file is not shown here.`}</Text>
     {/if}
 
     <div class="flex flex-wrap items-center gap-2">
       {#if can.value?.download}
-        <Button size="sm" onclick={download}>Download</Button>
+        <Button size="sm" onclick={download}>{t`Download`}</Button>
       {/if}
-      <Button size="sm" href={filesEditUrl(id)}>Edit</Button>
-      <Button size="sm" variant="ghost" onclick={remove}>Delete</Button>
+      <Button size="sm" href={filesEditUrl(id)}>{t`Edit`}</Button>
+      <Button size="sm" variant="ghost" onclick={remove}>{t`Delete`}</Button>
       {#if saved}
         <Text as="span" tone="muted">{saved}</Text>
       {/if}
     </div>
   {/if}
 
-  <Link href={filesIndexUrl()}>Back to files</Link>
+  <Link href={filesIndexUrl()}>{t`Back to files`}</Link>
 </Page>

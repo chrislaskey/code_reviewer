@@ -10,6 +10,7 @@
      account, see docs/design/accounts-local-and-trial-users.md. Sign up
      is offered only where the server takes new sign-ups. -->
 <script>
+  import { t } from "ttag";
   import {
     accountsSignInCancel,
     accountsSignInFinish,
@@ -59,7 +60,7 @@
   currentServerLoad().catch(() => {});
   /** Whether the server takes new sign-ups, as its settings say. */
   let signUpOffered = $derived(currentServer.value?.settings.features.accounts_sign_up ?? true);
-  let signUpOrSignIn = $derived(signUpOffered ? "Sign up or log in" : "Log in");
+  let signUpOrSignIn = $derived(signUpOffered ? t`Sign up or log in` : t`Log in`);
   /** Whether the page was opened just after an account was deleted. */
   const accountDeleted = new URLSearchParams(window.location.search).has("account_deleted");
 
@@ -213,22 +214,22 @@
 </script>
 
 <Page>
-  <Heading level={1}>Accounts on this device</Heading>
+  <Heading level={1}>{t`Accounts on this device`}</Heading>
   {#if accountDeleted}
-    <Text tone="muted">This account was deleted, and removed from this device.</Text>
+    <Text tone="muted">{t`This account was deleted, and removed from this device.`}</Text>
   {/if}
 
   <ErrorMessage message={error} />
 
   {#if accounts.length === 0 && !error}
-    <Text tone="muted">No account yet.</Text>
+    <Text tone="muted">{t`No account yet.`}</Text>
   {/if}
 
   <ul class="flex flex-col gap-3">
     {#each accounts as account (account.id)}
       <Panel as="li" layout="row" class="flex-wrap">
         <span class="flex grow flex-col">
-          <span>{account.local ? "On this device only" : account.email}</span>
+          <span>{account.local ? t`On this device only` : account.email}</span>
           {#if account.server_host}
             <Text as="span" tone="muted" size="sm">{account.server_display_name} · {account.server_host}</Text>
           {/if}
@@ -239,15 +240,15 @@
           </Button>
         {/if}
         {#if account.active}
-          <Badge tone="primary">Active</Badge>
+          <Badge tone="primary">{t`Active`}</Badge>
         {:else if account.signed_in}
-          <Button size="sm" onclick={() => switchTo(account)} disabled={busy}>Switch</Button>
+          <Button size="sm" onclick={() => switchTo(account)} disabled={busy}>{t`Switch`}</Button>
         {:else}
-          <Badge tone="ghost">Logged out</Badge>
-          <Button size="sm" onclick={() => openBrowser(account.email, account.server_id)} disabled={busy}>Log in</Button>
+          <Badge tone="ghost">{t`Logged out`}</Badge>
+          <Button size="sm" onclick={() => openBrowser(account.email, account.server_id)} disabled={busy}>{t`Log in`}</Button>
         {/if}
         <Button size="sm" variant="ghost" onclick={() => ((loss = null), (removing = account))} disabled={busy}>
-          Remove from device
+          {t`Remove from device`}
         </Button>
       </Panel>
     {/each}
@@ -255,11 +256,11 @@
 
   <div class="flex flex-wrap items-center gap-3">
     <Button size="sm" onclick={() => openBrowser(null)} disabled={busy}>
-      {accounts.length === 0 ? signUpOrSignIn : "Add account"}
+      {accounts.length === 0 ? signUpOrSignIn : t`Add account`}
     </Button>
     {#if canSkip}
-      <Button size="sm" variant="ghost" onclick={skip} disabled={busy} data-skip>Skip</Button>
-      <Text as="span" tone="muted" size="sm">Use the app on this device only, with no account. You can sign up later.</Text>
+      <Button size="sm" variant="ghost" onclick={skip} disabled={busy} data-skip>{t`Skip`}</Button>
+      <Text as="span" tone="muted" size="sm">{t`Use the app on this device only, with no account. You can sign up later.`}</Text>
     {/if}
   </div>
 

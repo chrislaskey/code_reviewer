@@ -4,6 +4,7 @@
      after logging in with a code, and the account's email is told. The
      server keeps it, so in the app this needs a connection. -->
 <script>
+  import { t } from "ttag";
   import { accountsPasswordGet, accountsPasswordUpdate } from "../../../lib/core/index.js";
   import { errorMessageOf } from "../../../lib/error_message.js";
   import { accountsCurrentShowUrl } from "../../../lib/routes.js";
@@ -41,29 +42,29 @@
 </script>
 
 <Page>
-  <Heading level={1}>{hasPassword ? "Change password" : "Create a password"}</Heading>
+  <Heading level={1}>{hasPassword ? t`Change password` : t`Create a password`}</Heading>
   {#if hasPassword !== null}
     <form onsubmit={save} class="flex flex-col gap-3">
       {#if !hasPassword}
-        <Text>A password is optional. With one, you can log in with it instead of an emailed code.</Text>
+        <Text>{t`A password is optional. With one, you can log in with it instead of an emailed code.`}</Text>
       {/if}
       <Input
         bind:value={password}
         type="password"
         autocomplete="new-password"
         minlength="12"
-        aria-label="New password"
-        placeholder="New password, 12 characters or more"
+        aria-label={t`New password`}
+        placeholder={t`New password, 12 characters or more`}
         required
       />
-      <Text tone="muted" size="sm">We'll email you when your password changes.</Text>
+      <Text tone="muted" size="sm">{t`We'll email you when your password changes.`}</Text>
       {#if saved}
-        <Text tone="muted" data-saved>Your password is saved.</Text>
+        <Text tone="muted" data-saved>{t`Your password is saved.`}</Text>
       {/if}
       <ErrorMessage message={error} />
       <div class="flex flex-wrap items-center gap-3">
-        <Button variant="primary" type="submit" disabled={busy}>{hasPassword ? "Change password" : "Create password"}</Button>
-        <Link size="sm" href={accountsCurrentShowUrl()}>Back to account</Link>
+        <Button variant="primary" type="submit" disabled={busy}>{hasPassword ? t`Change password` : t`Create password`}</Button>
+        <Link size="sm" href={accountsCurrentShowUrl()}>{t`Back to account`}</Link>
       </div>
     </form>
   {:else if error}

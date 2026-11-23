@@ -9,6 +9,7 @@
      this device and a button that removes them. See
      docs/design/files-browsing.md. -->
 <script>
+  import { msgid, ngettext, t } from "ttag";
   import AnimationsToggle from "../lib/AnimationsToggle.svelte";
   import FileImage from "../lib/FileImage.svelte";
   import FilesGrid from "./components/FilesGrid.svelte";
@@ -22,8 +23,8 @@
 
   /** @type {{ view: import("./files_view.js").FilesView, label: string, icon: string }[]} */
   const VIEW_CHOICES = [
-    { view: "list", label: "List", icon: "hero-list-bullet-mini" },
-    { view: "grid", label: "Grid", icon: "hero-squares-2x2-mini" },
+    { view: "list", label: t`List`, icon: "hero-list-bullet-mini" },
+    { view: "grid", label: t`Grid`, icon: "hero-squares-2x2-mini" },
   ];
 
   let name = $state("");
@@ -95,16 +96,16 @@
 
 <Page>
   <div class="flex items-center justify-between gap-4">
-    <Heading level={1}>Files</Heading>
-    <Button variant="primary" size="sm" href={filesNewUrl()}>New files</Button>
+    <Heading level={1}>{t`Files`}</Heading>
+    <Button variant="primary" size="sm" href={filesNewUrl()}>{t`New files`}</Button>
   </div>
 
   <ErrorMessage message={error} />
 
   {#if total === 0 && name === ""}
-    <Text tone="muted">No files yet.</Text>
+    <Text tone="muted">{t`No files yet.`}</Text>
   {:else if total !== null}
-    <Input type="search" bind:value={name} oninput={searchAfterPause} placeholder="Search by name" aria-label="Search by name" />
+    <Input type="search" bind:value={name} oninput={searchAfterPause} placeholder={t`Search by name`} aria-label={t`Search by name`} />
     <div class="flex flex-wrap items-center justify-between gap-3">
       <AnimationsToggle />
       <div class="join">
@@ -123,7 +124,7 @@
       </div>
     </div>
     {#if total === 0}
-      <Text tone="muted">No files have that in their name.</Text>
+      <Text tone="muted">{t`No files have that in their name.`}</Text>
     {/if}
   {/if}
 
@@ -132,6 +133,7 @@
   {:else if total}
     <ul class="flex flex-col gap-3">
       {#each listed as { file, communities, shown_as, state, error: problem } (file.id)}
+        {@const communityNames = communities.map((community) => community.name).join(", ")}
         <Panel as="li" layout="row">
           <a href={filesShowUrl(file.id)} class="flex size-12 shrink-0 items-center justify-center">
             {#if shown_as === "image"}
@@ -141,33 +143,37 @@
           <div class="flex min-w-0 grow flex-col">
             <Link class="truncate" href={filesShowUrl(file.id)}>{file.name}</Link>
             <Text as="span" tone="muted">
-              {fileSize(file.size)} · {file.inserted_at} · in {communities.map((community) => community.name).join(", ")}
+              {fileSize(file.size)} · {file.inserted_at} · {t`in ${communityNames}`}
             </Text>
             {#if problem}
               <Text as="span" tone="error" size="sm">{problem}</Text>
             {/if}
           </div>
           {#if state === "waiting"}
-            <Badge>Waiting to upload</Badge>
+            <Badge>{t`Waiting to upload`}</Badge>
           {:else if state === "refused"}
-            <Badge tone="warning">Not saved on the server</Badge>
+            <Badge tone="warning">{t`Not saved on the server`}</Badge>
           {/if}
         </Panel>
       {/each}
     </ul>
     {#if listed.length < total}
-      <Button class="self-center" onclick={loadMore}>Show more</Button>
+      <Button class="self-center" onclick={loadMore}>{t`Show more`}</Button>
     {/if}
   {/if}
 
   {#if cache}
+    {@const cachedSize = fileSize(cache.bytes)}
     <div class="flex items-center justify-between gap-3">
       <Text tone="muted">
-        {cache.count}
-        {cache.count === 1 ? "file" : "files"} kept on this device, {fileSize(cache.bytes)}. Removing them frees the space;
-        each is fetched again when it is next shown.
+        {ngettext(
+          msgid`${cache.count} file kept on this device, ${cachedSize}.`,
+          `${cache.count} files kept on this device, ${cachedSize}.`,
+          cache.count,
+        )}
+        {t`Removing them frees the space; each is fetched again when it is next shown.`}
       </Text>
-      <Button size="sm" class="shrink-0" disabled={cache.count === 0} onclick={removeCached}>Remove cached files</Button>
+      <Button size="sm" class="shrink-0" disabled={cache.count === 0} onclick={removeCached}>{t`Remove cached files`}</Button>
     </div>
   {/if}
 </Page>

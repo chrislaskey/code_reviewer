@@ -8,6 +8,7 @@
      see docs/design/accounts-sign-in.md. The email is filled in from
      ?email=. -->
 <script>
+  import { jt, t } from "ttag";
   import PublicPagesLinks from "../lib/PublicPagesLinks.svelte";
   import { accountsSignIn, accountsSignInPassword, accountsTrialGet } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
@@ -19,7 +20,7 @@
   import AccountsGuestRow from "./components/AccountsGuestRow.svelte";
   import AccountsSignInSteps from "./components/AccountsSignInSteps.svelte";
   import { KEEP_SIGNED_IN_CHECKED } from "./keep_signed_in.js";
-  import { Button, Checkbox, ErrorMessage, Heading, Input, Label, Page, Text } from "../lib/components/index.js";
+  import { Button, Checkbox, ErrorMessage, Heading, Input, Label, Page, Text, TranslatedParts } from "../lib/components/index.js";
 
   const query = new URLSearchParams(window.location.search);
   const challenge = query.get("challenge") ?? "";
@@ -94,45 +95,46 @@
   {#if deviceCode}
     <AccountsDeviceCode code={deviceCode} {appReturn} />
   {:else}
-    <Heading level={1}>{pending ? "Check your email" : signUpOffered ? "Log in or sign up" : "Log in"}</Heading>
+    <Heading level={1}>{pending ? t`Check your email` : signUpOffered ? t`Log in or sign up` : t`Log in`}</Heading>
     {#if challenge}
-      <Text tone="muted">Logging in for the app on your device.</Text>
+      <Text tone="muted">{t`Logging in for the app on your device.`}</Text>
     {/if}
     {#if pending}
       <AccountsSignInSteps {email} {pending} {challenge} bind:keepSignedIn onfinish={finish} onstartover={() => (pending = "")} />
     {:else}
       {#if guestOffered && !withPassword}
         <AccountsGuestRow />
-        <div class="divider muted my-0 text-sm">or</div>
+        <div class="divider muted my-0 text-sm">{t`or`}</div>
       {/if}
       <form onsubmit={submit} class="flex flex-col gap-3">
         {#if withPassword}
-          <Label text="Email">
+          <Label text={t`Email`}>
             <Input bind:value={email} type="email" autocomplete="username" required />
           </Label>
-          <Label text="Password">
+          <Label text={t`Password`}>
             <Input bind:value={password} type="password" autocomplete="current-password" required />
           </Label>
           <ErrorMessage message={error} />
-          <Button variant="primary" type="submit" disabled={busy}>Log in</Button>
-          <Button onclick={emailCode} disabled={busy}>Email a code instead</Button>
+          <Button variant="primary" type="submit" disabled={busy}>{t`Log in`}</Button>
+          <Button onclick={emailCode} disabled={busy}>{t`Email a code instead`}</Button>
           {#if !challenge}
-            <Checkbox bind:checked={keepSignedIn} size="sm" tone="muted">Keep me logged in</Checkbox>
+            <Checkbox bind:checked={keepSignedIn} size="sm" tone="muted">{t`Keep me logged in`}</Checkbox>
           {/if}
-          <Text tone="muted" size="sm">Forgot your password? Use a code, then change it in Account settings.</Text>
+          <Text tone="muted" size="sm">{t`Forgot your password? Use a code, then change it in Account settings.`}</Text>
         {:else}
-          <Input bind:value={email} type="email" autocomplete="username" aria-label="Email" placeholder="Email" required />
+          <Input bind:value={email} type="email" autocomplete="username" aria-label={t`Email`} placeholder={t`Email`} required />
           <ErrorMessage message={error} />
-          <Button variant="primary" type="submit" disabled={busy}>Email a code</Button>
-          <Button onclick={usePassword} disabled={busy}>Use my password</Button>
+          <Button variant="primary" type="submit" disabled={busy}>{t`Email a code`}</Button>
+          <Button onclick={usePassword} disabled={busy}>{t`Use my password`}</Button>
           {#if !signUpOffered}
-            <Text tone="muted" size="sm">This server takes no new sign-ups.</Text>
+            <Text tone="muted" size="sm">{t`This server takes no new sign-ups.`}</Text>
           {/if}
         {/if}
       </form>
     {/if}
     <div class="border-base-300 border-t pt-3 text-center">
-      <Text tone="muted" size="sm">By continuing, you accept the <PublicPagesLinks />.</Text>
+      {#snippet publicPagesLinks()}<PublicPagesLinks />{/snippet}
+      <Text tone="muted" size="sm"><TranslatedParts parts={jt`By continuing, you accept the ${publicPagesLinks}.`} /></Text>
     </div>
   {/if}
 </Page>

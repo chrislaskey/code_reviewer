@@ -1,21 +1,18 @@
 // Where a plan or product was bought, as the pages name it. The pages
 // read `store` from what the server and the commands answer, never the
 // platform, see docs/design/purchasing-phones.md.
+import { t } from "ttag";
 
 /** @typedef {"stripe" | "app_store" | "play_store"} Store */
-
-/** @type {Record<Store, string>} */
-const NAMES = { stripe: "the web", app_store: "the App Store", play_store: "Google Play" };
-
-/** @type {Record<Store, string>} */
-const DEVICES = { stripe: "on the web", app_store: "on your iPhone", play_store: "on your Android device" };
 
 /**
  * `the App Store`
  * @param {Store} store
  */
 export function storeName(store) {
-  return NAMES[store] ?? NAMES.stripe;
+  if (store === "app_store") return t`the App Store`;
+  if (store === "play_store") return t`Google Play`;
+  return t`the web`;
 }
 
 /**
@@ -23,7 +20,9 @@ export function storeName(store) {
  * @param {Store} store
  */
 export function storeManagedWhere(store) {
-  return store === "stripe" ? "on the web" : `in ${storeName(store)} ${DEVICES[store]}`;
+  if (store === "app_store") return t`in the App Store on your iPhone`;
+  if (store === "play_store") return t`in Google Play on your Android device`;
+  return t`on the web`;
 }
 
 /**

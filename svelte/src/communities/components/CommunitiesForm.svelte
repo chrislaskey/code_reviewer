@@ -1,6 +1,7 @@
 <!-- The fields of a community, for the New and Edit pages: its name,
      bound to the page's `name`, with the messages a write came back with. -->
 <script>
+  import { t } from "ttag";
   import { Button, ErrorMessage, FieldErrors, Input, Label } from "../../lib/components/index.js";
 
   /**
@@ -24,7 +25,7 @@
 </script>
 
 <form onsubmit={submit} class="flex flex-col gap-3">
-  <Label text="Name">
+  <Label text={t`Name`}>
     <Input bind:value={name} maxlength="80" disabled={busy} />
     <FieldErrors {errors} fields={["name"]} />
   </Label>

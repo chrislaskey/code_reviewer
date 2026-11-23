@@ -1,6 +1,7 @@
 <!-- Making a community, at /communities/new, which the person joins;
      done, it shows the community -->
 <script>
+  import { t } from "ttag";
   import { FormError, communitiesCreate } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
   import { navigateToUrl } from "../lib/router.js";
@@ -31,7 +32,7 @@
 </script>
 
 <Page>
-  <Heading level={1}>New community</Heading>
-  <CommunitiesForm bind:name submitText="Create" {errors} {error} {busy} onsubmit={save} />
-  <Link href={communitiesIndexUrl()}>Back to communities</Link>
+  <Heading level={1}>{t`New community`}</Heading>
+  <CommunitiesForm bind:name submitText={t`Create`} {errors} {error} {busy} onsubmit={save} />
+  <Link href={communitiesIndexUrl()}>{t`Back to communities`}</Link>
 </Page>
