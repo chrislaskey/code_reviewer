@@ -274,6 +274,16 @@ reason = "Larger pull pages for big files; upstream once settled"
   upstream.
 - **Seams and examples** are not checked. Seams are kept small by
   design, and examples are the app's to change.
+- **An app's new files are its own**, wherever they sit. Since
+  2026-11-23 a folder is claimed whole (`**`) only where an app adds
+  nothing of its own (`core/src/sync/**`, `svelte/src/lib/components/**`);
+  in `axum/src/`, `tauri/src/`, `core/src/services/`, `core/src/helpers/`,
+  `svelte/src/lib/` and `bin/` the template's files are named one by one,
+  so an app's `axum/src/app/recipes.rs` or `core/src/services/tmux.rs`
+  is not reported as an added framework file. A test,
+  `framework_check_leaves_an_apps_new_files_beside_the_templates_to_the_app`,
+  keeps it so. The cost: a file the template adds there is listed in
+  `framework.toml` too.
 - **As built**: the `framework_check` crate. Its test,
   `framework_check_finds_the_framework_files_as_locked`, runs with the
   workspace's; `cargo run -p framework_check -- check` runs it alone and

@@ -9,7 +9,8 @@
 //! as its user, see `user_auth` and `accounts`, and it syncs with the web
 //! server, see `sync`. A sign-in happens in the system browser, see
 //! `accounts`. On macOS ⌃⌘T anywhere opens the quick picker, a second
-//! window, see `quick_picker`.
+//! window, see `quick_picker`. On iOS the bar above the keyboard is
+//! hidden, see `keyboard_accessory_bar`.
 
 mod accounts;
 mod app;
@@ -17,6 +18,8 @@ mod app;
 mod clipboard;
 mod command_error;
 mod device_accounts;
+#[cfg(target_os = "ios")]
+mod keyboard_accessory_bar;
 #[cfg(target_os = "macos")]
 mod macos;
 mod public_pages;
@@ -46,6 +49,8 @@ pub fn run() {
             });
         })
         .setup(|app| {
+            #[cfg(target_os = "ios")]
+            keyboard_accessory_bar::hide();
             device_accounts::open_and_manage(app)?;
             #[cfg(desktop)]
             app.manage(accounts::sign_in_loopback::AccountsLoopback::default());
