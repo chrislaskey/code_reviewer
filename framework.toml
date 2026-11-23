@@ -29,6 +29,7 @@ framework = [
     "core/src/servers.rs",
     "core/src/servers/**",
     "core/src/jobs.rs",
+    "core/src/server_tasks.rs",
     "core/src/sync.rs",
     "core/src/sync/**",
     "core/src/helpers.rs",
@@ -93,6 +94,7 @@ framework = [
     "axum/src/public_pages.rs",
     "axum/src/rate_limits.rs",
     "axum/src/request_locale.rs",
+    "axum/src/server_tasks.rs",
     "axum/src/servers.rs",
     "axum/src/servers/**",
     "axum/src/state.rs",
@@ -162,6 +164,7 @@ seams = [
     "core/src/app/identity.rs",
     "core/src/app/synced_tables.rs",
     "core/src/app/jobs.rs",
+    "core/src/app/server_tasks.rs",
     "core/src/app/features.rs",
     "core/src/app/locales.rs",
 

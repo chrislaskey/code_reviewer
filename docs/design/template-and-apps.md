@@ -243,6 +243,10 @@ The runner and the template's jobs are `core/src/jobs.rs`, each job a
 with synced tables, and run after the template's. `app_jobs` keeps a
 row per job by its name.
 
+A task the server runs while it is up, a `ServerTask`
+(`core/src/server_tasks.rs`), is listed the same way, in
+`core/src/app/server_tasks.rs`; see "Server tasks" in `jobs.md`.
+
 ### The manifest and its check
 
 Decided 2026-11-21: TOML, so a divergence carries its reason, and a

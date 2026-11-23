@@ -148,6 +148,7 @@ version = "0.1.0"
 dependencies = [
  "app_core",
  "async-stripe-webhook",
+ "async-trait",
  "axum",
  "axum-extra",
  "chrono",

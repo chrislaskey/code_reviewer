@@ -14,6 +14,8 @@
 //!   role a deployment plays; `servers`: what a server says it is, for
 //!   a device signing in to another server, see
 //!   `docs/design/multi-server.md`.
+//! - `jobs`, `server_tasks`: what the server runs by itself, recurring
+//!   jobs and the tasks it runs while it is up, see `docs/design/jobs.md`.
 //!
 //! Synced writes are events so devices and the server converge. Bulk
 //! maintenance exceptions are documented in
@@ -27,6 +29,7 @@ pub mod deployment;
 pub mod helpers;
 pub mod jobs;
 pub mod ops;
+pub mod server_tasks;
 pub mod servers;
 pub mod services;
 pub mod sync;

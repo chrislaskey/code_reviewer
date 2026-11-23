@@ -23,6 +23,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["serde"] }
 
 [dev-dependencies]
+async-trait = "0.1"
 async-stripe-webhook = "=1.0.0-rc.10"
 http-body-util = "0.1"
 tower = { version = "0.5", features = ["util"] }

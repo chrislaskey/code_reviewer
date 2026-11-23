@@ -78,3 +78,26 @@ PostgreSQL, where an advisory lock would only work on one.
 - **Only an outside cron** calling the command line: the schedule would
   live outside the app, in every deployment's own setup. It still works,
   through `app_web jobs run`, beside the loop.
+
+## Server tasks, for what cannot wait a tick
+
+Added 2026-11-23, for Code Reviewer, whose server watches its tmux
+sessions and must notice an agent finishing within seconds. A job runs
+at most every `TICK`, fifteen minutes, so a watcher is a task instead:
+a `ServerTask` (`core/src/server_tasks.rs`), listed by the app in
+`core/src/app/server_tasks.rs`, a seam like `app/jobs.rs`, and empty in
+the template.
+
+- **Started with the server**, by `axum/src/server_tasks.rs`, beside the
+  jobs' loop; not for a command on the server's command line.
+- **Started again when it fails**, ten seconds later, with the error in
+  the log; a task that returns `Ok` is done.
+- **Stopped with the server.** The server has no graceful shutdown, so a
+  task, like a job, is written to be stopped at any point.
+- **Not recorded.** Unlike a job, a task has no row in `app_jobs`: it is
+  not due, it runs. Each server runs its own, so with several servers on
+  one database a task must not assume it is the only one.
+- **In core, with no timer.** The trait is core's, so a task is written
+  beside the functions it calls; the restarts and their pause are the
+  web server's, which has Tokio's timer.
+

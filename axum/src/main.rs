@@ -16,7 +16,8 @@
 //! `LISTED_SERVERS`, see `servers`; every setting is read at start, see
 //! `config`.
 //!
-//! It runs the recurring jobs as they come due, see `jobs`. With
+//! It runs the recurring jobs as they come due, see `jobs`, and the
+//! app's tasks while it is up, see `server_tasks`. With
 //! arguments it runs a command on that database instead and exits:
 //! `jobs run` runs the jobs due, `jobs run <name>` that job now,
 //! `ops staff create <email>` makes that account staff,
@@ -40,6 +41,7 @@ mod public_pages;
 mod rate_limits;
 mod request_locale;
 mod router;
+mod server_tasks;
 mod servers;
 mod state;
 mod sync;
@@ -100,6 +102,7 @@ async fn main() -> Result<(), String> {
         }
     });
     jobs::spawn(deployment.clone());
+    server_tasks::spawn(deployment.clone());
     let server_settings = config::server_settings()?;
     let state = AppState {
         deployment,
