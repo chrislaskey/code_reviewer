@@ -9,7 +9,8 @@
     "build": "vite build && vite build --mode ops",
     "check": "svelte-check",
     "translations:extract": "ttag extract --output translations/default.pot --ignore 'src/ops/**' src",
-    "translations:update": "pnpm translations:extract && for po in translations/*.po; do [ -e \"$po\" ] || continue; msgmerge --quiet --update --backup=none \"$po\" translations/default.pot; done"
+    "translations:update": "pnpm translations:extract && for po in translations/*.po; do [ -e \"$po\" ] || continue; msgmerge --quiet --update --backup=none \"$po\" translations/default.pot; done",
+    "translations:check": "node scripts/translations_check.js"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",

@@ -10,7 +10,7 @@ This is a Cargo workspace with three Rust crates: `core/` (`app_core`, the share
 * **Core Philosophy:** Strictly idiomatic, zero-cost abstractions, robust type-driven safety, and compile-first accuracy.
 
 ## 2. Verification Toolchain Commands
-AI Agents MUST run these commands to test, lint, and verify code before declaring a task complete. Never skip these steps.
+AI Agents MUST run these commands to test, lint, and verify code before declaring a task complete. Never skip these steps. `bin/lint` runs all but the tests, and the pages' checks too: `pnpm check` and `pnpm translations:check` in `svelte/`.
 
 * **Format Check:** `cargo fmt --all -- --check`
 * **Linter (Fail on Warnings):** `cargo clippy --workspace --all-targets -- -D warnings`

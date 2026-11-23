@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+#
+# Runs the checks a change passes before it is committed: Rust's format,
+# Clippy and the dependency audit, the Svelte pages' type check, and the
+# translations. Runs each, then lists the ones that failed.
+#
+# Run `bin/lint --help` for the targets and options.
+
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+help() {
+  cat <<USAGE
+Runs the checks a change passes before it is committed.
+
+Usage: $0 [TARGET...] [--fix]
+
+Targets, any number of them, all when none:
+  rust           cargo fmt --all -- --check
+                 cargo clippy --workspace --all-targets -- -D warnings
+                 cargo audit
+  svelte         pnpm check (svelte-check), in svelte/
+  translations   pnpm translations:check, in svelte/: translations/default.pot
+                 has every message the pages write, and each <locale>.po
+                 translates them all, none fuzzy. Needs GNU gettext for --fix.
+
+Options:
+  --fix    Fix what can be fixed first: cargo fmt --all, and
+           pnpm translations:update, then check.
+  help     Show this help. Also -h and --help.
+
+Tests are not run here: cargo test --workspace --all-targets.
+USAGE
+}
+
+fail() {
+  echo "$0: $*" >&2
+  exit 2
+}
+
+targets=()
+fix=false
+for argument in "$@"; do
+  case "$argument" in
+    rust|svelte|translations) targets+=("$argument") ;;
+    --fix) fix=true ;;
+    help|-h|--help) help; exit 0 ;;
+    *) fail "unknown target or option '$argument'; run \`$0 --help\`" ;;
+  esac
+done
+[ ${#targets[@]} -gt 0 ] || targets=(rust svelte translations)
+
+failed=()
+
+# Runs one check, its command echoed first, and notes it when it fails.
+check() {
+  echo "==> $*"
+  if ! "$@"; then
+    failed+=("$*")
+  fi
+}
+
+svelte_dependencies_install() {
+  if [ ! -d "$ROOT/svelte/node_modules" ]; then
+    (cd "$ROOT/svelte" && pnpm install --frozen-lockfile) || fail "pnpm install failed in svelte/"
+  fi
+}
+
+cd "$ROOT" || fail "no folder $ROOT"
+
+for target in "${targets[@]}"; do
+  case "$target" in
+    rust)
+      [ "$fix" = true ] && cargo fmt --all
+      check cargo fmt --all -- --check
+      check cargo clippy --workspace --all-targets -- -D warnings
+      if command -v cargo-audit > /dev/null; then
+        check cargo audit
+      else
+        failed+=("cargo audit: not installed, \`cargo install cargo-audit\`")
+      fi
+      ;;
+    svelte)
+      svelte_dependencies_install
+      check pnpm --dir svelte --silent check
+      ;;
+    translations)
+      svelte_dependencies_install
+      [ "$fix" = true ] && pnpm --dir svelte --silent translations:update
+      check pnpm --dir svelte --silent translations:check
+      ;;
+  esac
+done
+
+if [ ${#failed[@]} -gt 0 ]; then
+  echo
+  echo "Failed:"
+  printf '  %s\n' "${failed[@]}"
+  exit 1
+fi
+echo
+echo "All checks passed: ${targets[*]}."

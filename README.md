@@ -17,6 +17,7 @@ axum/      app_web, the web server: app_core over HTTP under /api, and svelte/di
 tauri/     app_tauri, the desktop and mobile app: app_core behind Tauri commands
 svelte/    the pages, one Svelte app the web server serves and the Tauri app bundles
 bin/dev    starts a deployment in dev mode
+bin/lint   runs the checks a change passes before it is committed
 bin/reset  deletes the local SQLite files and drops the dev PostgreSQL database
 bin/storage runs Garage, the S3-style bucket uploads go to in dev
 phoenix/   the Phoenix version this one replaces in stages, kept as the reference
@@ -727,11 +728,13 @@ are refused, and every upload fails as if the bucket were unreachable.
 ## Checks
 
 ```sh
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
+bin/lint                          # format, Clippy, audit, svelte-check, translations
+bin/lint --fix                    # cargo fmt and translations:update first
 cargo test --workspace --all-targets
-(cd svelte && pnpm check)
 ```
+
+`bin/lint rust`, `svelte` or `translations` runs one part; `bin/lint
+--help` lists each command.
 
 With `TEST_POSTGRES_URL` set, the core tests run against PostgreSQL too,
 see [The database](#the-database).
