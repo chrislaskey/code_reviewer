@@ -62,6 +62,30 @@ pub async fn update(
     Ok(())
 }
 
+/// Keeps the password as the account's with the email, on the server,
+/// from its command line: a forgotten one reset, nothing mailed. Only
+/// an account that signs in with a password, confirmed and no trial;
+/// its sessions stay signed in, as with `update`.
+pub async fn update_from_command_line(
+    deployment: &Deployment,
+    email: &str,
+    password: &str,
+) -> Result<(), AccountError> {
+    if deployment.role != Role::Server {
+        return Err(AccountError::ServerOnly);
+    }
+    let mut tx = deployment.begin().await?;
+    let account = accounts_users::get_by_email(&mut tx, email)
+        .await?
+        .filter(|account| account.confirmed_at.is_some() && account.trial_expires_at.is_none())
+        .ok_or_else(|| AccountError::NoAccount {
+            email: email.to_string(),
+        })?;
+    accounts_credentials::set(&mut tx, account.id, password).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
 /// `get` asked of the server by the user signed in on this device.
 #[cfg(feature = "sync-http")]
 pub async fn get_on_device(
@@ -82,4 +106,44 @@ pub async fn update_on_device(
 ) -> Result<(), AccountError> {
     let (_user, token) = crate::app::users::signed_in_with_token(deployment).await?;
     Ok(server.accounts_password_update(&token, update).await?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::accounts::tests::PASSWORD;
+    use crate::accounts::{sign_in_with_password, users};
+    use crate::database::with_each_database;
+
+    #[tokio::test]
+    async fn password_update_from_command_line_replaces_the_password_of_the_account() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let new_password = "another horse battery";
+            users::create(&server, "dana@example.com", PASSWORD)
+                .await
+                .expect("created");
+
+            update_from_command_line(&server, "Dana@Example.com", new_password)
+                .await
+                .expect("updated");
+
+            assert!(matches!(
+                sign_in_with_password(&server, "dana@example.com", PASSWORD).await,
+                Err(AccountError::EmailOrPasswordDoesNotMatch)
+            ));
+            sign_in_with_password(&server, "dana@example.com", new_password)
+                .await
+                .expect("signed in with the new one");
+            assert!(matches!(
+                update_from_command_line(&server, "nobody@example.com", new_password).await,
+                Err(AccountError::NoAccount { .. })
+            ));
+            assert!(matches!(
+                update_from_command_line(&server, "dana@example.com", "short").await,
+                Err(AccountError::Credential(_))
+            ));
+        })
+        .await;
+    }
 }

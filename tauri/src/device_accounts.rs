@@ -1579,6 +1579,7 @@ mod tests {
         let closed = ServerSettings {
             features: Features {
                 accounts_sign_up: false,
+                ..Features::default()
             },
         };
         let directory = tempfile::tempdir().expect("a directory");

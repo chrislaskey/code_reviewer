@@ -465,8 +465,8 @@ msgstr "Cerrar sesión"
 
 #: src/accounts/AccountsIndexPage.svelte:52
 #: src/accounts/AccountsIndexPage.svelte:222
-#: src/accounts/AccountsSignInPage.svelte:86
-#: src/accounts/AccountsSignInPage.svelte:96
+#: src/accounts/AccountsSignInPage.svelte:89
+#: src/accounts/AccountsSignInPage.svelte:99
 #: src/accounts/components/AccountsSignInSteps.svelte:30
 #: src/lib/layouts/AccountMenu.svelte:67 src/lib/layouts/AccountMenu.svelte:69
 msgid "Log in"
@@ -951,7 +951,7 @@ msgstr "Pruébalo ahora"
 msgid "Guest visits are not available right now."
 msgstr "Las visitas como invitado no están disponibles ahora mismo."
 
-#: src/accounts/AccountsSignInPage.svelte:86
+#: src/accounts/AccountsSignInPage.svelte:89
 #: src/accounts/AccountsTrialPage.svelte:38
 #: src/accounts/AccountsTrialPage.svelte:46
 msgid "Log in or sign up"
@@ -978,58 +978,62 @@ msgstr ""
 msgid "Continue as guest"
 msgstr "Continuar como invitado"
 
-#: src/accounts/AccountsSignInPage.svelte:86
+#: src/accounts/AccountsSignInPage.svelte:89
 msgid "Check your email"
 msgstr "Revisa tu correo"
 
-#: src/accounts/AccountsSignInPage.svelte:87
+#: src/accounts/AccountsSignInPage.svelte:90
 msgid "Logging in for the app on your device."
 msgstr "Iniciando sesión para la app de tu dispositivo."
 
-#: src/accounts/AccountsSignInPage.svelte:90
+#: src/accounts/AccountsSignInPage.svelte:93
 #: src/accounts/products/AccountsProductsIndexPage.svelte:43
 msgid "or"
 msgstr "o"
 
-#: src/accounts/AccountsSignInPage.svelte:92
-#: src/accounts/AccountsSignInPage.svelte:102
-#: src/accounts/AccountsSignInPage.svelte:103
+#: src/accounts/AccountsSignInPage.svelte:95
+#: src/accounts/AccountsSignInPage.svelte:106
+#: src/accounts/AccountsSignInPage.svelte:107
 msgid "Email"
 msgstr "Correo electrónico"
 
-#: src/accounts/AccountsSignInPage.svelte:93
+#: src/accounts/AccountsSignInPage.svelte:96
 #: src/accounts/current/AccountsCurrentShowPage.svelte:30
 msgid "Password"
 msgstr "Contraseña"
 
-#: src/accounts/AccountsSignInPage.svelte:99
+#: src/accounts/AccountsSignInPage.svelte:102
 msgid "Email a code instead"
 msgstr "Enviarme un código por correo"
 
-#: src/accounts/AccountsSignInPage.svelte:100
+#: src/accounts/AccountsSignInPage.svelte:103
 #: src/accounts/components/AccountsSignInSteps.svelte:96
 msgid "Keep me logged in"
 msgstr "Mantener la sesión iniciada"
 
-#: src/accounts/AccountsSignInPage.svelte:101
+#: src/accounts/AccountsSignInPage.svelte:104
 msgid "Forgot your password? Use a code, then change it in Account settings."
 msgstr ""
 "¿Olvidaste tu contraseña? Usa un código y luego cámbiala en la configuración "
 "de la cuenta."
 
-#: src/accounts/AccountsSignInPage.svelte:106
+#: src/accounts/AccountsSignInPage.svelte:105
+msgid "Forgot your password? Ask whoever runs this server."
+msgstr "¿Olvidaste tu contraseña? Pregunta a quien administra este servidor."
+
+#: src/accounts/AccountsSignInPage.svelte:110
 msgid "Email a code"
 msgstr "Enviarme un código"
 
-#: src/accounts/AccountsSignInPage.svelte:109
+#: src/accounts/AccountsSignInPage.svelte:113
 msgid "Use my password"
 msgstr "Usar mi contraseña"
 
-#: src/accounts/AccountsSignInPage.svelte:110
+#: src/accounts/AccountsSignInPage.svelte:114
 msgid "This server takes no new sign-ups."
 msgstr "Este servidor no acepta registros nuevos."
 
-#: src/accounts/AccountsSignInPage.svelte:111
+#: src/accounts/AccountsSignInPage.svelte:115
 #, javascript-format
 msgid "By continuing, you accept the ${ publicPagesLinks }."
 msgstr "Al continuar, aceptas los ${ publicPagesLinks }."

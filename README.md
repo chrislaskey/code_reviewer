@@ -193,6 +193,13 @@ curl -H "Content-Type: application/json" \
 curl -H "Authorization: Bearer <token>" localhost:4000/api/posts
 ```
 
+A server only known people reach can sign in by password alone:
+`SERVER_SETTINGS='{"features": {"accounts_sign_up": false, "accounts_sign_in_code": false}}'`,
+each account made on the server with `cargo run -p app_web -- accounts
+users create <email>`, which asks for its password, given a new one
+with `accounts users password <email>` and deleted with `accounts users
+delete <email>`; see `docs/design/accounts-sign-in.md`.
+
 What was left out, changing the email and the rest of the Phoenix flow, is
 `docs/suggestions/accounts.md`.
 

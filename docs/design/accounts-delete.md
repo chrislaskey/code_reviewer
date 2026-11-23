@@ -7,6 +7,10 @@ iOS release (guideline 5.1.1(v)), and `purchasing.md`'s P12 and
 `purchasing-phones.md`'s M8 left it for here. The build plan is
 `purchasing-ios-build.md`, step 1.
 
+Since 2026-11-23 the server's command line deletes an account too,
+`app_web accounts users delete <email>`: the same delete, with no code
+and no mail, see `accounts-sign-in.md`.
+
 ## In one paragraph
 
 The delete is the soft delete every synced row already has, done at

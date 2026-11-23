@@ -16,6 +16,39 @@ under `svelte/src/accounts/`. Every item under "To decide" is
 **Agreed**; each carries the recommendation and what else was weighed; the sections after it describe the design as recommended, so
 it can be read whole, and change where a decision goes the other way.
 
+## Since 2026-11-23: a password alone, on a private server
+
+For a server only known people reach, such as one on a tailnet that
+runs code for its users: nobody signs up, an operator makes each
+account, and nobody signs in by email.
+
+- **The setting**: `features.accounts_sign_in_code`, true by default.
+  Off, `POST /api/accounts/sign-in`, `/api/accounts/code` and
+  `/api/accounts/code/resend` answer 403, "This server signs in with a
+  password only", and mail nothing; `/api/accounts/sign-in/password`
+  is the way in, a device's sign-in through the browser too. The
+  server will not start with sign-ups on and codes off, since only a
+  code proves a new email.
+- **The page** shows the email and the password alone, with no "Email
+  a code instead", and says to ask whoever runs the server about a
+  forgotten password. Too many tries answer without pointing to a code.
+- **Accounts from the command line**, `axum/src/command_line/accounts_users.rs`,
+  until the ops app does this; none of them mails anything:
+  - `app_web accounts users create <email>` makes the account as a
+    finished sign-up would, confirmed, with its user and first community
+    (`app_core::accounts::users::create`).
+  - `app_web accounts users password <email>` gives it a new password,
+    for a forgotten one; its sessions stay signed in
+    (`accounts::password::update_from_command_line`).
+  - `app_web accounts users delete <email>` deletes it as the person's
+    own delete does, with no code, after typing yes at a terminal
+    (`accounts::deletions::create_from_command_line`).
+
+  A password is asked for twice without echo at a terminal, or read as
+  one line from standard input, so it never sits in the shell's history.
+- **Not yet**: the pages that still mail a code, deleting an account,
+  and mention one, the password page.
+
 ## Since 2026-11-22: one sign-in for signing up and signing in
 
 There is one page, `/accounts/sign-in`, and one route,

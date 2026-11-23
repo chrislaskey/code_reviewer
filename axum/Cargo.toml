@@ -10,6 +10,7 @@ axum = "0.8"
 axum-extra = { version = "0.12", features = ["cookie"] }
 chrono = { version = "0.4", default-features = false, features = ["serde"] }
 governor = "0.10"
+rpassword = "7"
 secrecy = "0.10"
 serde = { workspace = true }
 serde_json = { workspace = true }

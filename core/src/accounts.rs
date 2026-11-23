@@ -141,6 +141,8 @@ pub enum AccountError {
     NotATrial,
     #[error("Trials are full right now; sign up instead")]
     TrialsFull,
+    #[error("no account has the email {email}")]
+    NoAccount { email: String },
     #[error(transparent)]
     User(#[from] UserError),
     #[error(transparent)]

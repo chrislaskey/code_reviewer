@@ -2,6 +2,7 @@
 //! server, one module per command.
 
 pub mod accounts_products;
+pub mod accounts_users;
 pub mod jobs;
 pub mod ops_staff;
 
@@ -19,9 +20,11 @@ pub async fn run(
         ["jobs", rest @ ..] => jobs::run(deployment, rest).await,
         ["ops", "staff", rest @ ..] => ops_staff::run(deployment, rest).await,
         ["accounts", "products", rest @ ..] => accounts_products::run(deployment, stripe, rest).await,
+        ["accounts", "users", rest @ ..] => accounts_users::run(deployment, rest).await,
         _ => Err(
             "commands: jobs run, jobs run <name>, ops staff create <email>, ops staff delete <email>, \
-             accounts products sync"
+             accounts products sync, accounts users create <email>, \
+             accounts users password <email>, accounts users delete <email>"
                 .to_string(),
         ),
     }

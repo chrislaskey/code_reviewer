@@ -225,6 +225,11 @@ accounts sign in as before. The pages offer no Sign up: the sign-in
 page is headed "Sign in" and says the server takes no new sign-ups,
 and the app's accounts page says "Sign in".
 
+The second, `features.accounts_sign_in_code`, true by default: off, the
+server signs in by password alone and mails no codes, see "Since
+2026-11-23" in `accounts-sign-in.md`. It needs `accounts_sign_up` off
+too, or the server stops at start.
+
 Later, for settings: files a document names, a logo, fetched when their
 content hash changes and kept under `servers/<id>/`, with limits on
 their size and type settled when the first one is needed.

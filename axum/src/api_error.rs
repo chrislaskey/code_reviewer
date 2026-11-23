@@ -325,6 +325,7 @@ impl From<AccountError> for ApiError {
             | AccountError::EmailOrPasswordDoesNotMatch
             | AccountError::UnknownDeviceCode => StatusCode::UNAUTHORIZED,
             AccountError::NotATrial => StatusCode::UNPROCESSABLE_ENTITY,
+            AccountError::NoAccount { .. } => StatusCode::NOT_FOUND,
             AccountError::TrialsFull => StatusCode::SERVICE_UNAVAILABLE,
             AccountError::Credential(
                 CredentialError::PasswordTooShort | CredentialError::PasswordTooLong,
@@ -353,6 +354,7 @@ impl From<DeletionError> for ApiError {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
             DeletionError::Mail(_) => StatusCode::SERVICE_UNAVAILABLE,
+            DeletionError::NoAccount { .. } => StatusCode::NOT_FOUND,
             DeletionError::ServerOnly | DeletionError::Refused(_) | DeletionError::Database(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }

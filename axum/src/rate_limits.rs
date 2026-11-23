@@ -54,6 +54,8 @@ pub const ACCOUNT_REQUESTS_PER_MINUTE_PER_IP: u32 = 30;
 const TOO_MANY: &str = "Too many attempts; try again in a few minutes";
 const TOO_MANY_PASSWORDS: &str =
     "Too many tries. Try your password again in a few minutes, or log in with an emailed code now.";
+const TOO_MANY_PASSWORDS_WITHOUT_CODE: &str =
+    "Too many tries. Try your password again in a few minutes.";
 
 /// The limits the accounts handlers check before calling core.
 #[derive(Clone)]
@@ -93,13 +95,19 @@ impl RateLimits {
             .map_err(|_| ApiError::new(StatusCode::TOO_MANY_REQUESTS, TOO_MANY))
     }
 
-    /// One more password try for the address, or 429.
-    pub fn check_password(&self, email: &str) -> Result<(), ApiError> {
+    /// One more password try for the address, or 429, which points to
+    /// the emailed code when the server offers one.
+    pub fn check_password(&self, email: &str, sign_in_code_offered: bool) -> Result<(), ApiError> {
         let key = email.trim().to_lowercase();
+        let message = if sign_in_code_offered {
+            TOO_MANY_PASSWORDS
+        } else {
+            TOO_MANY_PASSWORDS_WITHOUT_CODE
+        };
         self.limiters
             .passwords
             .check_key(&key)
-            .map_err(|_| ApiError::new(StatusCode::TOO_MANY_REQUESTS, TOO_MANY_PASSWORDS))
+            .map_err(|_| ApiError::new(StatusCode::TOO_MANY_REQUESTS, message))
     }
 
     /// One more code for the pending sign-in, or 429.
@@ -262,15 +270,15 @@ mod tests {
             .expect("another address");
         for _ in 0..PASSWORD_TRIES_PER_ADDRESS {
             limits
-                .check_password(" Alice@Example.com ")
+                .check_password(" Alice@Example.com ", true)
                 .expect("within the address's tries");
         }
         assert!(
-            limits.check_password("alice@example.com").is_err(),
+            limits.check_password("alice@example.com", true).is_err(),
             "the same address"
         );
         limits
-            .check_password("bob@example.com")
+            .check_password("bob@example.com", true)
             .expect("another address");
         limits.check_resend("pending-1").expect("the first");
         assert!(

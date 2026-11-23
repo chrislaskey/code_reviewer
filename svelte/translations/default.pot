@@ -475,8 +475,8 @@ msgstr ""
 
 #: src/accounts/AccountsIndexPage.svelte:52
 #: src/accounts/AccountsIndexPage.svelte:222
-#: src/accounts/AccountsSignInPage.svelte:86
-#: src/accounts/AccountsSignInPage.svelte:96
+#: src/accounts/AccountsSignInPage.svelte:89
+#: src/accounts/AccountsSignInPage.svelte:99
 #: src/accounts/components/AccountsSignInSteps.svelte:30
 #: src/lib/layouts/AccountMenu.svelte:67
 #: src/lib/layouts/AccountMenu.svelte:69
@@ -945,7 +945,7 @@ msgstr ""
 msgid "Guest visits are not available right now."
 msgstr ""
 
-#: src/accounts/AccountsSignInPage.svelte:86
+#: src/accounts/AccountsSignInPage.svelte:89
 #: src/accounts/AccountsTrialPage.svelte:38
 #: src/accounts/AccountsTrialPage.svelte:46
 msgid "Log in or sign up"
@@ -968,56 +968,60 @@ msgstr ""
 msgid "Continue as guest"
 msgstr ""
 
-#: src/accounts/AccountsSignInPage.svelte:86
+#: src/accounts/AccountsSignInPage.svelte:89
 msgid "Check your email"
 msgstr ""
 
-#: src/accounts/AccountsSignInPage.svelte:87
+#: src/accounts/AccountsSignInPage.svelte:90
 msgid "Logging in for the app on your device."
 msgstr ""
 
-#: src/accounts/AccountsSignInPage.svelte:90
+#: src/accounts/AccountsSignInPage.svelte:93
 #: src/accounts/products/AccountsProductsIndexPage.svelte:43
 msgid "or"
 msgstr ""
 
-#: src/accounts/AccountsSignInPage.svelte:92
-#: src/accounts/AccountsSignInPage.svelte:102
-#: src/accounts/AccountsSignInPage.svelte:103
+#: src/accounts/AccountsSignInPage.svelte:95
+#: src/accounts/AccountsSignInPage.svelte:106
+#: src/accounts/AccountsSignInPage.svelte:107
 msgid "Email"
 msgstr ""
 
-#: src/accounts/AccountsSignInPage.svelte:93
+#: src/accounts/AccountsSignInPage.svelte:96
 #: src/accounts/current/AccountsCurrentShowPage.svelte:30
 msgid "Password"
 msgstr ""
 
-#: src/accounts/AccountsSignInPage.svelte:99
+#: src/accounts/AccountsSignInPage.svelte:102
 msgid "Email a code instead"
 msgstr ""
 
-#: src/accounts/AccountsSignInPage.svelte:100
+#: src/accounts/AccountsSignInPage.svelte:103
 #: src/accounts/components/AccountsSignInSteps.svelte:96
 msgid "Keep me logged in"
 msgstr ""
 
-#: src/accounts/AccountsSignInPage.svelte:101
+#: src/accounts/AccountsSignInPage.svelte:104
 msgid "Forgot your password? Use a code, then change it in Account settings."
 msgstr ""
 
-#: src/accounts/AccountsSignInPage.svelte:106
-msgid "Email a code"
-msgstr ""
-
-#: src/accounts/AccountsSignInPage.svelte:109
-msgid "Use my password"
+#: src/accounts/AccountsSignInPage.svelte:105
+msgid "Forgot your password? Ask whoever runs this server."
 msgstr ""
 
 #: src/accounts/AccountsSignInPage.svelte:110
+msgid "Email a code"
+msgstr ""
+
+#: src/accounts/AccountsSignInPage.svelte:113
+msgid "Use my password"
+msgstr ""
+
+#: src/accounts/AccountsSignInPage.svelte:114
 msgid "This server takes no new sign-ups."
 msgstr ""
 
-#: src/accounts/AccountsSignInPage.svelte:111
+#: src/accounts/AccountsSignInPage.svelte:115
 #, javascript-format
 msgid "By continuing, you accept the ${ publicPagesLinks }."
 msgstr ""

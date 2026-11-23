@@ -19,7 +19,10 @@
 //! It runs the recurring jobs as they come due, see `jobs`. With
 //! arguments it runs a command on that database instead and exits:
 //! `jobs run` runs the jobs due, `jobs run <name>` that job now,
-//! `ops staff create <email>` makes that account staff, and
+//! `ops staff create <email>` makes that account staff,
+//! `accounts users create <email>` makes an account with a password,
+//! `password <email>` gives it a new one and `delete <email>` deletes it,
+//! and
 //! `accounts products sync` copies Stripe's catalog, see `command_line`.
 //!
 //! The routes mirror core: a handler sits at the path of the core module

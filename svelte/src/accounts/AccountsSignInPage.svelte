@@ -6,7 +6,8 @@
      on this page; and the terms last, for every way in. Opened by a
      device with ?challenge=, it ends in a code for the device instead,
      see docs/design/accounts-sign-in.md. The email is filled in from
-     ?email=. -->
+     ?email=. A server that signs in by password alone shows only the
+     password. -->
 <script>
   import { jt, t } from "ttag";
   import PublicPagesLinks from "../lib/PublicPagesLinks.svelte";
@@ -29,7 +30,7 @@
   let email = $state(query.get("email") ?? "");
   let password = $state("");
   /** Whether the person chose "Use my password". */
-  let withPassword = $state(false);
+  let choseWithPassword = $state(false);
   let keepSignedIn = $state(KEEP_SIGNED_IN_CHECKED);
   /** Whether to offer a trial: on the web, when the server has room for one. */
   let trialAvailable = $state(false);
@@ -37,6 +38,9 @@
   currentServerLoad().catch(() => {});
   /** Whether the server takes new sign-ups, as its settings say. */
   let signUpOffered = $derived(currentServer.value?.settings.features.accounts_sign_up ?? true);
+  /** Whether the server signs in with an emailed code, else by password alone. */
+  let signInCodeOffered = $derived(currentServer.value?.settings.features.accounts_sign_in_code ?? true);
+  let withPassword = $derived(choseWithPassword || !signInCodeOffered);
   /** A guest already is one, and comes here to sign up. */
   let guestOffered = $derived(trialAvailable && currentUser.value?.kind !== "trial");
   let pending = $state("");
@@ -60,7 +64,7 @@
   function emailCode() {
     return attempt(async () => {
       pending = (await accountsSignIn(email)).pending;
-      withPassword = false;
+      choseWithPassword = false;
       password = "";
     });
   }
@@ -86,7 +90,7 @@
   }
 
   function usePassword() {
-    withPassword = true;
+    choseWithPassword = true;
     error = "";
   }
 </script>
@@ -116,11 +120,17 @@
           </Label>
           <ErrorMessage message={error} />
           <Button variant="primary" type="submit" disabled={busy}>{t`Log in`}</Button>
-          <Button onclick={emailCode} disabled={busy}>{t`Email a code instead`}</Button>
+          {#if signInCodeOffered}
+            <Button onclick={emailCode} disabled={busy}>{t`Email a code instead`}</Button>
+          {/if}
           {#if !challenge}
             <Checkbox bind:checked={keepSignedIn} size="sm" tone="muted">{t`Keep me logged in`}</Checkbox>
           {/if}
-          <Text tone="muted" size="sm">{t`Forgot your password? Use a code, then change it in Account settings.`}</Text>
+          {#if signInCodeOffered}
+            <Text tone="muted" size="sm">{t`Forgot your password? Use a code, then change it in Account settings.`}</Text>
+          {:else}
+            <Text tone="muted" size="sm">{t`Forgot your password? Ask whoever runs this server.`}</Text>
+          {/if}
         {:else}
           <Input bind:value={email} type="email" autocomplete="username" aria-label={t`Email`} placeholder={t`Email`} required />
           <ErrorMessage message={error} />

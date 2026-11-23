@@ -467,6 +467,7 @@ async fn accounts_sign_in_makes_no_account_and_trials_are_refused_when_the_setti
     let closed = ServerSettings {
         features: app_core::app::features::Features {
             accounts_sign_up: false,
+            ..app_core::app::features::Features::default()
         },
     };
     let (router, _) = test_router_with(TrialUsersMax(2), false, closed).await;
@@ -492,6 +493,71 @@ async fn accounts_sign_in_makes_no_account_and_trials_are_refused_when_the_setti
         body["new_account"],
         json!(false),
         "an account signs in all the same"
+    );
+}
+
+#[tokio::test]
+async fn accounts_sign_in_codes_are_refused_and_a_password_signs_in_when_the_settings_turn_codes_off()
+ {
+    let password_only = ServerSettings {
+        features: app_core::app::features::Features {
+            accounts_sign_up: false,
+            accounts_sign_in_code: false,
+        },
+    };
+    let (router, _) = test_router_with(TrialUsersMax(2), false, password_only).await;
+    app_core::accounts::users::create(&router.deployment, "dana@example.com", PASSWORD)
+        .await
+        .expect("created");
+    let ask = |path: &'static str, body: Value| {
+        let router = router.router.clone();
+        async move { send_as(&router, None, Method::POST, path, Some(body)).await }
+    };
+    let refused = json!({ "error": "This server signs in with a password only" });
+    for (path, body) in [
+        (
+            "/api/accounts/sign-in",
+            json!({ "email": "dana@example.com" }),
+        ),
+        (
+            "/api/accounts/code",
+            json!({ "pending": "pending", "code": "000000" }),
+        ),
+        ("/api/accounts/code/resend", json!({ "pending": "pending" })),
+    ] {
+        let (status, body) = ask(path, body).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{path}");
+        assert_eq!(body, refused, "{path}");
+    }
+    assert!(
+        router.mailer.last_sent_to("dana@example.com").is_none(),
+        "nothing mailed"
+    );
+
+    let (status, body) = ask(
+        "/api/accounts/sign-in/password",
+        json!({ "email": "dana@example.com", "password": PASSWORD }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["email"], json!("dana@example.com"));
+
+    for _ in 0..rate_limits::PASSWORD_TRIES_PER_ADDRESS {
+        ask(
+            "/api/accounts/sign-in/password",
+            json!({ "email": "eli@example.com", "password": PASSWORD }),
+        )
+        .await;
+    }
+    let (status, body) = ask(
+        "/api/accounts/sign-in/password",
+        json!({ "email": "eli@example.com", "password": PASSWORD }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        body,
+        json!({ "error": "Too many tries. Try your password again in a few minutes." })
     );
 }
 

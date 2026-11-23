@@ -13,12 +13,16 @@ use serde::{Deserialize, Serialize};
 pub struct Features {
     /// Whether the server takes new sign-ups, trial users included.
     pub accounts_sign_up: bool,
+    /// Whether a person may sign in with an emailed code; off, by
+    /// password alone, and the server sends no sign-in emails.
+    pub accounts_sign_in_code: bool,
 }
 
 impl Default for Features {
     fn default() -> Features {
         Features {
             accounts_sign_up: true,
+            accounts_sign_in_code: true,
         }
     }
 }

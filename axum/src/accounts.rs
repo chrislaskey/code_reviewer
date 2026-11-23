@@ -17,7 +17,9 @@
 //! sign-in from a trial user's browser may be theirs signing up, see
 //! `trial_users`. A server whose settings turn sign-ups off,
 //! `features.accounts_sign_up`, makes no account for a new email,
-//! `sign_up_offered`. The accounts app's other routes are its
+//! `sign_up_offered`; one that turns codes off,
+//! `features.accounts_sign_in_code`, signs in by password alone,
+//! `sign_in_code_offered`. The accounts app's other routes are its
 //! submodules, each at the path of the core module it calls.
 
 pub mod app_store_notifications;
@@ -106,6 +108,19 @@ pub(crate) fn sign_up_offered(document: &SettingsDocument) -> Result<(), ApiErro
     }
 }
 
+/// Whether the server signs in with an emailed code; a 403 when its
+/// settings say by password alone.
+pub(crate) fn sign_in_code_offered(document: &SettingsDocument) -> Result<(), ApiError> {
+    if document.settings.features.accounts_sign_in_code {
+        Ok(())
+    } else {
+        Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "This server signs in with a password only",
+        ))
+    }
+}
+
 /// A sign-in, a sign-up for an email with no account when the server
 /// takes them; from a trial user's browser, that trial user signing up,
 /// who keeps what they made.
@@ -118,6 +133,7 @@ pub async fn sign_in(
     RequestLocale(requested): RequestLocale,
     Json(sign_in): Json<SignIn>,
 ) -> Result<(StatusCode, Json<CodeSent>), ApiError> {
+    sign_in_code_offered(&settings)?;
     limits.check_email(&sign_in.email)?;
     let offered = sign_up_offered(&settings).is_ok();
     let trial = if offered {
@@ -156,9 +172,11 @@ pub async fn code_resend(
     State(deployment): State<Deployment>,
     State(mailer): State<Mailer>,
     State(limits): State<RateLimits>,
+    State(settings): State<Arc<SettingsDocument>>,
     RequestLocale(requested): RequestLocale,
     Json(resend): Json<Resend>,
 ) -> Result<StatusCode, ApiError> {
+    sign_in_code_offered(&settings)?;
     limits.check_resend(&resend.pending)?;
     let email = accounts::resend_code_to(&deployment, &resend.pending).await?;
     limits.check_email(&email)?;
@@ -170,8 +188,10 @@ pub async fn code_resend(
 /// pending token. Nobody is signed in yet.
 pub async fn code(
     State(deployment): State<Deployment>,
+    State(settings): State<Arc<SettingsDocument>>,
     Json(code): Json<Code>,
 ) -> Result<Json<CodeMatched>, ApiError> {
+    sign_in_code_offered(&settings)?;
     let matched = accounts::sign_in_with_code(&deployment, &code.pending, &code.code).await?;
     Ok(Json(matched))
 }
@@ -203,9 +223,10 @@ pub async fn sign_in_password(
     State(limits): State<RateLimits>,
     headers: HeaderMap,
     jar: CookieJar,
+    State(settings): State<Arc<SettingsDocument>>,
     Json(password): Json<Password>,
 ) -> Result<Response, ApiError> {
-    limits.check_password(&password.email)?;
+    limits.check_password(&password.email, sign_in_code_offered(&settings).is_ok())?;
     if let Some(challenge) = challenge_of(&password.challenge) {
         let device_code = accounts::sign_in_with_password_for_device(
             &deployment,

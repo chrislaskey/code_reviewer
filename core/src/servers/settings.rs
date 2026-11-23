@@ -44,6 +44,9 @@ impl ServerSettings {
         if !unknown.is_empty() {
             return Err(SettingsError::UnknownKeys(unknown.join(", ")));
         }
+        if settings.features.accounts_sign_up && !settings.features.accounts_sign_in_code {
+            return Err(SettingsError::SignUpNeedsSignInCode);
+        }
         Ok(settings)
     }
 
@@ -95,6 +98,10 @@ pub enum SettingsError {
     Malformed(String),
     #[error("the server's settings have keys this server does not know: {0}")]
     UnknownKeys(String),
+    #[error(
+        "the server's settings take sign-ups but no sign-in codes, and only a code proves a new email; set features.accounts_sign_up to false too"
+    )]
+    SignUpNeedsSignInCode,
 }
 
 #[cfg(test)]
@@ -139,12 +146,26 @@ mod tests {
     }
 
     #[test]
+    fn servers_settings_the_server_refuses_sign_ups_without_sign_in_codes() {
+        assert_eq!(
+            ServerSettings::parse_strict(r#"{"features": {"accounts_sign_in_code": false}}"#),
+            Err(SettingsError::SignUpNeedsSignInCode)
+        );
+        let password_only = ServerSettings::parse_strict(
+            r#"{"features": {"accounts_sign_up": false, "accounts_sign_in_code": false}}"#,
+        )
+        .expect("parsed");
+        assert!(!password_only.features.accounts_sign_in_code);
+    }
+
+    #[test]
     fn servers_settings_version_changes_with_a_setting_alone() {
         let defaults = ServerSettings::default();
         assert_eq!(defaults.version(), ServerSettings::default().version());
         let closed = ServerSettings {
             features: Features {
                 accounts_sign_up: false,
+                ..Features::default()
             },
         };
         assert_ne!(defaults.version(), closed.version());

@@ -33,6 +33,7 @@ async fn servers_settings_get_answers_the_settings_with_their_version_to_anyone(
     let closed = ServerSettings {
         features: app_core::app::features::Features {
             accounts_sign_up: false,
+            ..app_core::app::features::Features::default()
         },
     };
     let (router, _) = test_router_with(TrialUsersMax(2), false, closed.clone()).await;
@@ -46,7 +47,9 @@ async fn servers_settings_get_answers_the_settings_with_their_version_to_anyone(
         body,
         json!({
             "settings_version": closed.version(),
-            "settings": { "features": { "accounts_sign_up": false } },
+            "settings": {
+                "features": { "accounts_sign_up": false, "accounts_sign_in_code": true },
+            },
         })
     );
     let (_, _, current) = ask("/api/servers/current").await;

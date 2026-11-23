@@ -16,6 +16,10 @@
 //!
 //! A trial user needs no code, having no real email, and goes outright,
 //! as their trial would. A local user has no account on the server.
+//!
+//! The server's command line deletes an account by its email with
+//! `create_from_command_line`: no code, nothing mailed, the rest the
+//! same.
 
 pub mod code;
 
@@ -53,6 +57,8 @@ pub enum DeletionError {
     CodeDoesNotMatch,
     #[error("A trial is deleted without a code")]
     TrialHasNoCode,
+    #[error("no account has the email {email}")]
+    NoAccount { email: String },
     #[error("the delete was refused: {0}")]
     Refused(String),
     #[error(transparent)]
@@ -108,6 +114,52 @@ pub async fn create(
         tx.commit().await?;
         return Err(error);
     }
+    delete_and_commit(deployment, tx, user).await?;
+    if let Err(error) = mailer
+        .send(mails::account_deleted(locale, &account.email))
+        .await
+    {
+        tracing::warn!("could not mail {} that it was deleted: {error}", user.id);
+    }
+    Ok(())
+}
+
+/// Deletes the account with the email, on the server, as `create` does
+/// once the code matched, from the server's command line: no code asked
+/// and nothing mailed. A trial goes outright, as in `create`.
+pub async fn create_from_command_line(
+    deployment: &Deployment,
+    email: &str,
+) -> Result<(), DeletionError> {
+    if deployment.role != Role::Server {
+        return Err(DeletionError::ServerOnly);
+    }
+    let no_account = || DeletionError::NoAccount {
+        email: email.to_string(),
+    };
+    let mut tx = deployment.begin().await?;
+    let account = accounts_users::get_by_email(&mut tx, email)
+        .await?
+        .ok_or_else(no_account)?;
+    if account.trial_expires_at.is_some() {
+        trial_users::delete_in(&mut tx, account.id).await?;
+        tx.commit().await?;
+        return Ok(());
+    }
+    let user = users::get_in(&mut tx, account.id)
+        .await?
+        .filter(|user| user.deleted_at.is_none())
+        .ok_or_else(no_account)?;
+    delete_and_commit(deployment, tx, &user).await
+}
+
+/// The delete of a full user once it is meant: the rows in the
+/// transaction, committed, then Stripe and the pictures.
+async fn delete_and_commit(
+    deployment: &Deployment,
+    mut tx: Transaction,
+    user: &User,
+) -> Result<(), DeletionError> {
     #[cfg(feature = "stripe")]
     let stripe_left = stripe_left_in(&mut tx, user.id).await?;
     delete_in(&mut tx, user).await?;
@@ -117,12 +169,8 @@ pub async fn create(
     stripe_end(deployment, stripe_left).await;
     #[cfg(feature = "object-storage")]
     bucket_empty(deployment, user.id).await;
-    if let Err(error) = mailer
-        .send(mails::account_deleted(locale, &account.email))
-        .await
-    {
-        tracing::warn!("could not mail {} that it was deleted: {error}", user.id);
-    }
+    #[cfg(not(any(feature = "stripe", feature = "object-storage")))]
+    let _ = deployment;
     Ok(())
 }
 
@@ -442,6 +490,50 @@ mod tests {
             assert!(mail.subject.contains("No "), "no account to sign in to");
             let again = signed_up_for_a_device(&server, "alice@example.com").await;
             assert_ne!(again.user.id, alice.user.id, "a new account");
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn deletions_create_from_command_line_deletes_the_account_with_no_code_and_no_mail() {
+        with_each_database(|database| async move {
+            let server = server(database);
+            let mailer = Mailer::memory();
+            let password = crate::accounts::tests::PASSWORD;
+            crate::accounts::users::create(&server, "dana@example.com", password)
+                .await
+                .expect("created");
+            let dana = accounts::sign_in_with_password(&server, "dana@example.com", password)
+                .await
+                .expect("signed in");
+
+            create_from_command_line(&server, "Dana@Example.com")
+                .await
+                .expect("deleted");
+
+            assert!(mailer.last_sent_to("dana@example.com").is_none());
+            assert!(matches!(
+                users::get_by_token(&server, &dana.token).await,
+                Err(UserError::AccountDeleted)
+            ));
+            let mut tx = server.begin().await.expect("a transaction");
+            let deleted_user = users::get_in(&mut tx, dana.user.id)
+                .await
+                .expect("read")
+                .expect("kept until the purge");
+            tx.commit().await.expect("committed");
+            assert!(deleted_user.deleted_at.is_some());
+            assert!(matches!(
+                accounts::sign_in_with_password(&server, "dana@example.com", password).await,
+                Err(AccountError::EmailOrPasswordDoesNotMatch)
+            ));
+            assert!(matches!(
+                create_from_command_line(&server, "dana@example.com").await,
+                Err(DeletionError::NoAccount { .. })
+            ));
+            crate::accounts::users::create(&server, "dana@example.com", password)
+                .await
+                .expect("the email is free again");
         })
         .await;
     }
