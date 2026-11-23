@@ -144,9 +144,15 @@ fn test_listed_servers() -> app_core::servers::ListedServers {
 
 /// A user signed up on the server and finished with their code.
 async fn signed_up(deployment: &Deployment, mailer: &Mailer, email: &str) -> Session {
-    let sent = app_core::accounts::sign_in(deployment, mailer, email, true)
-        .await
-        .expect("signed in");
+    let sent = app_core::accounts::sign_in(
+        deployment,
+        mailer,
+        email,
+        true,
+        app_core::helpers::locales::DEFAULT,
+    )
+    .await
+    .expect("signed in");
     let code = code_sent_to(mailer, email);
     let matched = app_core::accounts::sign_in_with_code(deployment, &sent.pending, &code)
         .await

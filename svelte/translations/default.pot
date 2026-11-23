@@ -213,15 +213,15 @@ msgstr ""
 msgid "${ megabytes } MB"
 msgstr ""
 
-#: src/lib/PublicPagesLinks.svelte:13
+#: src/lib/PublicPagesLinks.svelte:18
 msgid "Terms of Service"
 msgstr ""
 
-#: src/lib/PublicPagesLinks.svelte:15
+#: src/lib/PublicPagesLinks.svelte:21
 msgid "Privacy Policy"
 msgstr ""
 
-#: src/lib/PublicPagesLinks.svelte:16
+#: src/lib/PublicPagesLinks.svelte:22
 #, javascript-format
 msgid "${ termsLink } and ${ privacyLink }"
 msgstr ""
@@ -497,15 +497,15 @@ msgstr ""
 msgid "Could not read the image (${ response.status })"
 msgstr ""
 
-#: src/lib/core/http-api.js:728
+#: src/lib/core/http-api.js:730
 msgid "On the web, plans and products are bought through Stripe"
 msgstr ""
 
-#: src/lib/core/http-api.js:732
+#: src/lib/core/http-api.js:734
 msgid "Restoring purchases is in the iPhone app"
 msgstr ""
 
-#: src/lib/core/http-api.js:736
+#: src/lib/core/http-api.js:738
 msgid "A plan from a phone's store is managed on the phone"
 msgstr ""
 

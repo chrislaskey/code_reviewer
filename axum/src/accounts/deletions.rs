@@ -18,6 +18,7 @@ use app_core::deployment::Deployment;
 use app_core::services::mailer::Mailer;
 
 use crate::api_error::ApiError;
+use crate::request_locale::RequestLocale;
 use crate::user_auth::{CurrentUser, TOKEN_COOKIE};
 
 #[derive(Deserialize)]
@@ -33,9 +34,17 @@ pub async fn create(
     State(mailer): State<Mailer>,
     CurrentUser(user): CurrentUser,
     jar: CookieJar,
+    RequestLocale(requested): RequestLocale,
     Json(deletion): Json<DeletionNew>,
 ) -> Result<(StatusCode, CookieJar), ApiError> {
-    deletions::create(&deployment, &mailer, &user, deletion.code.as_deref()).await?;
+    deletions::create(
+        &deployment,
+        &mailer,
+        &user,
+        deletion.code.as_deref(),
+        requested,
+    )
+    .await?;
     let jar = jar.remove(Cookie::build(TOKEN_COOKIE).path("/"));
     Ok((StatusCode::NO_CONTENT, jar))
 }

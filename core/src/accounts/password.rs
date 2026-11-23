@@ -7,6 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::accounts::AccountError;
+use crate::accounts::preferences;
 use crate::data::app_users::User;
 use crate::data::{accounts_credentials, accounts_users};
 use crate::deployment::{Deployment, Role};
@@ -36,12 +37,14 @@ pub async fn get(deployment: &Deployment, user: &User) -> Result<PasswordStatus,
 }
 
 /// Keeps the password as the signed-in user's, their first or in place
-/// of the one they had, and mails their account's email that it changed.
+/// of the one they had, and mails their account's email that it changed,
+/// in their language, else `requested`, the request's.
 pub async fn update(
     deployment: &Deployment,
     mailer: &Mailer,
     user: &User,
     update: &PasswordUpdate,
+    requested: &str,
 ) -> Result<(), AccountError> {
     if deployment.role != Role::Server {
         return Err(AccountError::ServerOnly);
@@ -51,8 +54,11 @@ pub async fn update(
         .await?
         .ok_or(AccountError::SignInExpired)?;
     accounts_credentials::set(&mut tx, user.id, &update.password).await?;
+    let locale = preferences::mail_locale_in(&mut tx, Some(user.id), requested).await?;
     tx.commit().await?;
-    mailer.send(mails::password_changed(&account.email)).await?;
+    mailer
+        .send(mails::password_changed(locale, &account.email))
+        .await?;
     Ok(())
 }
 

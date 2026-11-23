@@ -21,6 +21,7 @@ use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
+use crate::helpers::locales;
 use crate::sync::TableRow;
 use crate::sync::events::{self, Answer};
 use crate::sync::synced_table::{LocalCreate, SyncedTable, TableError};
@@ -73,6 +74,28 @@ pub async fn get_in(tx: &mut Transaction, user_id: Uuid) -> Result<Preferences, 
         }
     }
     Ok(preferences)
+}
+
+/// The language to mail the user in: the one they chose, else
+/// `requested`, the language the request asked for, else English. With no
+/// user yet, a sign-up's, `requested`.
+pub(crate) async fn mail_locale_in(
+    tx: &mut Transaction,
+    user_id: Option<Uuid>,
+    requested: &str,
+) -> Result<&'static str, sqlx::Error> {
+    let chosen = match user_id {
+        Some(user_id) => accounts_preferences::get_by_user_and_key(tx, user_id, LOCALE)
+            .await?
+            .and_then(|row| row.value.as_str().map(str::to_string)),
+        None => None,
+    };
+    let locale = chosen.as_deref().unwrap_or(requested);
+    Ok(locales::SUPPORTED
+        .iter()
+        .copied()
+        .find(|supported| *supported == locale)
+        .unwrap_or(locales::DEFAULT))
 }
 
 /// Sets one of the user's preferences, with the time from this
@@ -601,6 +624,38 @@ mod tests {
             assert_eq!(removed, 1);
             assert_eq!(rows_of(&server, alice.id).await.len(), 1);
             assert!(rows_of(&server, gone.id).await.is_empty());
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn preferences_mail_locale_in_is_the_choice_else_the_request_else_english() {
+        with_each_database(|database| async move {
+            let server = server(database);
+            let alice = accounts::tests::signed_up_for_a_device(&server, "alice@example.com")
+                .await
+                .user;
+            let mut tx = server.begin().await.expect("a transaction");
+            let asked = mail_locale_in(&mut tx, Some(alice.id), "es")
+                .await
+                .expect("asked");
+            assert_eq!(asked, "es", "the request's, with no choice");
+            let unknown = mail_locale_in(&mut tx, None, "xx").await.expect("asked");
+            assert_eq!(
+                unknown,
+                locales::DEFAULT,
+                "English for a language the app is not in"
+            );
+            tx.commit().await.expect("committed");
+
+            update(&server, &alice, LOCALE, json!("es"))
+                .await
+                .expect("chosen");
+            let mut tx = server.begin().await.expect("a transaction");
+            let chosen = mail_locale_in(&mut tx, Some(alice.id), "en")
+                .await
+                .expect("asked");
+            assert_eq!(chosen, "es", "her choice over the request's");
         })
         .await;
     }

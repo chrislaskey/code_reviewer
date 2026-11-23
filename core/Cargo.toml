@@ -53,6 +53,8 @@ base64 = { version = "0.22", optional = true }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
 futures-util = { version = "0.3", default-features = false, optional = true }
 garde = { version = "0.23", features = ["derive"] }
+# Reads the emails' translations, core/translations/<locale>.mo, see helpers::translations
+gettext = "0.4"
 object_store = { version = "0.14", default-features = false, features = ["aws"], optional = true }
 rand = "0.10"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"], optional = true }

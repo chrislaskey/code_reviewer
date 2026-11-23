@@ -176,12 +176,14 @@ enum Finish<'a> {
 /// looks the same, so it tells nobody whether an email has an account:
 /// an email with none on a server that takes no sign-ups is emailed
 /// so, and a trial user's made-up address is answered and mailed
-/// nothing.
+/// nothing. The mail is in the account's language, else `requested`,
+/// the request's, see `preferences::mail_locale_in`.
 pub async fn sign_in(
     deployment: &Deployment,
     mailer: &Mailer,
     email: &str,
     sign_up_offered: bool,
+    requested: &str,
 ) -> Result<CodeSent, AccountError> {
     if deployment.role != Role::Server {
         return Err(AccountError::ServerOnly);
@@ -194,7 +196,11 @@ pub async fn sign_in(
         Some(account) => {
             let (pending, code) =
                 accounts_tokens::create_sign_in_code(&mut tx, account.id, None).await?;
-            (Some(mails::sign_in_code(&account.email, &code)), pending)
+            let locale = preferences::mail_locale_in(&mut tx, Some(account.id), requested).await?;
+            (
+                Some(mails::sign_in_code(locale, &account.email, &code)),
+                pending,
+            )
         }
         None if sign_up_offered => {
             let account = accounts_users::create(&mut tx, Uuid::now_v7(), &email, false).await?;
@@ -202,9 +208,16 @@ pub async fn sign_in(
             crate::app::users::create_in(&mut tx, account.id, &name).await?;
             let (pending, code) =
                 accounts_tokens::create_sign_in_code(&mut tx, account.id, None).await?;
-            (Some(mails::sign_in_code(&account.email, &code)), pending)
+            let locale = preferences::mail_locale_in(&mut tx, None, requested).await?;
+            (
+                Some(mails::sign_in_code(locale, &account.email, &code)),
+                pending,
+            )
         }
-        None => (Some(mails::no_account(&email)), random::hex(32)),
+        None => {
+            let locale = preferences::mail_locale_in(&mut tx, None, requested).await?;
+            (Some(mails::no_account(locale, &email)), random::hex(32))
+        }
     };
     tx.commit().await?;
     if let Some(mail) = mail {
@@ -220,12 +233,14 @@ pub async fn sign_in(
 /// `sign_in_confirm`, their account takes that address and is a trial no
 /// longer; the user and everything they made stay as they are. Their
 /// made-up name gives way at once to one from the address,
-/// `users::name_from_email_in`.
+/// `users::name_from_email_in`. The mail is in the account's language,
+/// else the trial's, else `requested`, the request's.
 pub async fn sign_in_from_trial(
     deployment: &Deployment,
     mailer: &Mailer,
     trial: &User,
     email: &str,
+    requested: &str,
 ) -> Result<CodeSent, AccountError> {
     if deployment.role != Role::Server {
         return Err(AccountError::ServerOnly);
@@ -241,14 +256,19 @@ pub async fn sign_in_from_trial(
         Some(taken) if taken.confirmed_at.is_some() => {
             let (pending, code) =
                 accounts_tokens::create_sign_in_code(&mut tx, taken.id, None).await?;
-            (Some(mails::sign_in_code(&taken.email, &code)), pending)
+            let locale = preferences::mail_locale_in(&mut tx, Some(taken.id), requested).await?;
+            (
+                Some(mails::sign_in_code(locale, &taken.email, &code)),
+                pending,
+            )
         }
         _ => {
             let name = crate::app::users::name_from_email_in(&mut tx, &email, trial.id).await?;
             crate::app::users::update_name_in(&mut tx, trial.id, &name).await?;
             let (pending, code) =
                 accounts_tokens::create_sign_in_code(&mut tx, trial.id, Some(&email)).await?;
-            (Some(mails::sign_in_code(&email, &code)), pending)
+            let locale = preferences::mail_locale_in(&mut tx, Some(trial.id), requested).await?;
+            (Some(mails::sign_in_code(locale, &email, &code)), pending)
         }
     };
     tx.commit().await?;
@@ -261,11 +281,13 @@ pub async fn sign_in_from_trial(
 /// Mails the pending sign-in a new code, on the server, its ten minutes
 /// starting over and its wrong attempts forgotten; the old code is no
 /// longer good. For the "Send a new code" button; how often is the web
-/// server's limit, see `docs/design/accounts-sign-in.md`.
+/// server's limit, see `docs/design/accounts-sign-in.md`. The mail is in
+/// the account's language, else `requested`, the request's.
 pub async fn resend_code(
     deployment: &Deployment,
     mailer: &Mailer,
     pending: &str,
+    requested: &str,
 ) -> Result<(), AccountError> {
     if deployment.role != Role::Server {
         return Err(AccountError::ServerOnly);
@@ -281,9 +303,12 @@ pub async fn resend_code(
     .ok_or(AccountError::CodeDoesNotMatch)?;
     let account = live_account_in(&mut tx, row.user_id).await?;
     let code = accounts_tokens::reset_code(&mut tx, row.id).await?;
+    let locale = preferences::mail_locale_in(&mut tx, Some(row.user_id), requested).await?;
     tx.commit().await?;
     let sent_to = row.sent_to.unwrap_or(account.email);
-    mailer.send(mails::sign_in_code(&sent_to, &code)).await?;
+    mailer
+        .send(mails::sign_in_code(locale, &sent_to, &code))
+        .await?;
     Ok(())
 }
 
@@ -719,9 +744,15 @@ pub(crate) mod tests {
     /// A sign-in of the email on a server that takes sign-ups, its code
     /// matched: the last step still to take.
     async fn code_matched(server: &Deployment, mailer: &Mailer, email: &str) -> CodeMatched {
-        let sent = sign_in(server, mailer, email, true)
-            .await
-            .expect("signed in");
+        let sent = sign_in(
+            server,
+            mailer,
+            email,
+            true,
+            crate::helpers::locales::DEFAULT,
+        )
+        .await
+        .expect("signed in");
         let code = code_sent_to(mailer, email);
         sign_in_with_code(server, &sent.pending, &code)
             .await
@@ -766,9 +797,15 @@ pub(crate) mod tests {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let mailer = Mailer::memory();
-            let sent = sign_in(&server, &mailer, " Alice@Example.com ", true)
-                .await
-                .expect("signed in");
+            let sent = sign_in(
+                &server,
+                &mailer,
+                " Alice@Example.com ",
+                true,
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("signed in");
             assert_eq!(sent.pending.len(), 64);
             let mail = mailer.last_sent_to("alice@example.com").expect("mailed");
             let code = mails::code_in(&mail).expect("a code");
@@ -921,9 +958,15 @@ pub(crate) mod tests {
         let update = PasswordUpdate {
             password: new.to_string(),
         };
-        password::update(server, mailer, user, &update)
-            .await
-            .expect("a password");
+        password::update(
+            server,
+            mailer,
+            user,
+            &update,
+            crate::helpers::locales::DEFAULT,
+        )
+        .await
+        .expect("a password");
     }
 
     #[tokio::test]
@@ -974,9 +1017,15 @@ pub(crate) mod tests {
             let alice = signed_up(&server, &mailer, "alice@example.com").await.user;
             password_set(&server, &mailer, &alice, PASSWORD).await;
             signed_up(&server, &mailer, "bob@example.com").await;
-            sign_in(&server, &mailer, "carol@example.com", true)
-                .await
-                .expect("registered, never confirmed");
+            sign_in(
+                &server,
+                &mailer,
+                "carol@example.com",
+                true,
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("registered, never confirmed");
 
             for (email, attempt) in [
                 ("alice@example.com", "wrong horse battery"),
@@ -1007,7 +1056,14 @@ pub(crate) mod tests {
                 password: "short".to_string(),
             };
             assert!(matches!(
-                password::update(&server, &mailer, &alice, &short).await,
+                password::update(
+                    &server,
+                    &mailer,
+                    &alice,
+                    &short,
+                    crate::helpers::locales::DEFAULT
+                )
+                .await,
                 Err(AccountError::Credential(CredentialError::PasswordTooShort))
             ));
             password_set(&server, &mailer, &alice, PASSWORD).await;
@@ -1032,22 +1088,40 @@ pub(crate) mod tests {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let mailer = Mailer::memory();
-            let error = sign_in(&server, &mailer, "alice", true)
-                .await
-                .expect_err("no @");
+            let error = sign_in(
+                &server,
+                &mailer,
+                "alice",
+                true,
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect_err("no @");
             assert!(matches!(
                 error,
                 AccountError::AccountUser(AccountUserError::InvalidEmail)
             ));
             assert!(mailer.sent().is_empty());
 
-            let first = sign_in(&server, &mailer, "alice@example.com", true)
-                .await
-                .expect("signed in");
+            let first = sign_in(
+                &server,
+                &mailer,
+                "alice@example.com",
+                true,
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("signed in");
             let first_code = code_sent_to(&mailer, "alice@example.com");
-            let again = sign_in(&server, &mailer, "alice@example.com", true)
-                .await
-                .expect("signed in again before finishing");
+            let again = sign_in(
+                &server,
+                &mailer,
+                "alice@example.com",
+                true,
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("signed in again before finishing");
             assert!(
                 matches!(
                     sign_in_with_code(&server, &first.pending, &first_code).await,
@@ -1076,9 +1150,15 @@ pub(crate) mod tests {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let mailer = Mailer::memory();
-            let sent = sign_in(&server, &mailer, "nobody@example.com", false)
-                .await
-                .expect("answered as a known one");
+            let sent = sign_in(
+                &server,
+                &mailer,
+                "nobody@example.com",
+                false,
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("answered as a known one");
             assert_eq!(sent.pending.len(), 64);
             let mail = mailer.last_sent_to("nobody@example.com").expect("mailed");
             assert!(mail.subject.starts_with("No "));
@@ -1098,9 +1178,15 @@ pub(crate) mod tests {
             tx.commit().await.expect("committed");
 
             signed_up(&server, &mailer, "alice@example.com").await;
-            let sent = sign_in(&server, &mailer, "alice@example.com", false)
-                .await
-                .expect("an account signs in still");
+            let sent = sign_in(
+                &server,
+                &mailer,
+                "alice@example.com",
+                false,
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("an account signs in still");
             let code = code_sent_to(&mailer, "alice@example.com");
             let matched = sign_in_with_code(&server, &sent.pending, &code)
                 .await
@@ -1115,9 +1201,15 @@ pub(crate) mod tests {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let mailer = Mailer::memory();
-            let sent = sign_in(&server, &mailer, "alice@example.com", true)
-                .await
-                .expect("signed in");
+            let sent = sign_in(
+                &server,
+                &mailer,
+                "alice@example.com",
+                true,
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("signed in");
             let code = code_sent_to(&mailer, "alice@example.com");
             let wrong = if code == "999999" { "999998" } else { "999999" };
             for _ in 0..MAX_CODE_ATTEMPTS {
@@ -1144,13 +1236,24 @@ pub(crate) mod tests {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let mailer = Mailer::memory();
-            let sent = sign_in(&server, &mailer, "alice@example.com", true)
-                .await
-                .expect("signed in");
+            let sent = sign_in(
+                &server,
+                &mailer,
+                "alice@example.com",
+                true,
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("signed in");
             let first = code_sent_to(&mailer, "alice@example.com");
-            resend_code(&server, &mailer, &sent.pending)
-                .await
-                .expect("a new code sent");
+            resend_code(
+                &server,
+                &mailer,
+                &sent.pending,
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("a new code sent");
             let second = code_sent_to(&mailer, "alice@example.com");
             assert_eq!(mailer.sent().len(), 2);
             assert_eq!(
@@ -1173,13 +1276,25 @@ pub(crate) mod tests {
                 .expect("the new one is");
             assert!(
                 matches!(
-                    resend_code(&server, &mailer, &sent.pending).await,
+                    resend_code(
+                        &server,
+                        &mailer,
+                        &sent.pending,
+                        crate::helpers::locales::DEFAULT
+                    )
+                    .await,
                     Err(AccountError::CodeDoesNotMatch)
                 ),
                 "nothing pending any more"
             );
             assert!(matches!(
-                resend_code(&server, &mailer, "not a pending token").await,
+                resend_code(
+                    &server,
+                    &mailer,
+                    "not a pending token",
+                    crate::helpers::locales::DEFAULT
+                )
+                .await,
                 Err(AccountError::CodeDoesNotMatch)
             ));
         })
@@ -1226,7 +1341,14 @@ pub(crate) mod tests {
         let device = users::tests::device().await;
         let mailer = Mailer::memory();
         assert!(matches!(
-            sign_in(&device, &mailer, "alice@example.com", true).await,
+            sign_in(
+                &device,
+                &mailer,
+                "alice@example.com",
+                true,
+                crate::helpers::locales::DEFAULT
+            )
+            .await,
             Err(AccountError::ServerOnly)
         ));
         assert!(matches!(

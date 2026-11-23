@@ -192,9 +192,15 @@ mod tests {
         with_each_database(|database| async move {
             let deployment = Deployment::new(database, Role::Server);
             let mailer = crate::services::mailer::Mailer::memory();
-            crate::accounts::sign_in(&deployment, &mailer, "bob@example.com", true)
-                .await
-                .expect("bob started a sign-up and stopped there");
+            crate::accounts::sign_in(
+                &deployment,
+                &mailer,
+                "bob@example.com",
+                true,
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("bob started a sign-up and stopped there");
             let mut tx = deployment.begin().await.expect("a transaction");
             let bob = crate::data::accounts_users::get_by_email(&mut tx, "bob@example.com")
                 .await
@@ -238,9 +244,15 @@ mod tests {
             );
             tx.commit().await.expect("committed");
             assert!(
-                crate::accounts::sign_in(&deployment, &mailer, "bob@example.com", true)
-                    .await
-                    .is_ok(),
+                crate::accounts::sign_in(
+                    &deployment,
+                    &mailer,
+                    "bob@example.com",
+                    true,
+                    crate::helpers::locales::DEFAULT
+                )
+                .await
+                .is_ok(),
                 "and the email is free again"
             );
         })

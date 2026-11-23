@@ -582,20 +582,25 @@ ttag, as are the messages the pages' own JavaScript shows; the errors
 the server sends are still English. The public website is translated
 too, from its own catalog, `translations/public/`, its English marked
 `<t>…</t>` in the HTML, at `/es/about`, see
-`docs/design/public-pages.md`. The ops app (staff only) is left out.
+`docs/design/public-pages.md`. The emails are too, from Rust's own
+catalog, `core/translations/`, their English in `t!`, in the person's
+language, else the request's, else English, see
+`docs/design/locales.md`. The ops app (staff only) is left out.
 
 In `svelte/`, with GNU gettext (`brew install gettext`):
 
 ```sh
 pnpm translations:extract   # the messages into translations/default.pot
-pnpm translations:update    # that, then merged into every .po, changed English marked fuzzy
+pnpm translations:update    # that, then merged into every .po, changed English marked fuzzy, and the emails' .mo compiled
 pnpm translations:check     # what bin/lint runs, below
 msginit --no-translator -l fr -i translations/default.pot -o translations/fr.po   # a new language
 msginit --no-translator -l fr -i translations/public/default.pot -o translations/public/fr.po   # and its public pages
+msginit --no-translator -l fr -i ../core/translations/default.pot -o ../core/translations/fr.po   # and its emails
 ```
 
 A new language also goes in `core/src/helpers/locales.rs`'s
-`SUPPORTED`, which a test keeps in step with both folders' `.po` files.
+`SUPPORTED`, and its `.mo` in `core/src/helpers/translations.rs`'s
+`CATALOGS`; tests keep them in step with the three folders' `.po` files.
 
 `translations:check` fails on English in a page's markup written
 without ttag (text, the attributes a person reads such as `placeholder`

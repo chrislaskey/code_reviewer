@@ -896,9 +896,15 @@ mod tests {
     /// session its exchange answered.
     async fn signed_up(server: &Deployment, email: &str) -> Session {
         let mailer = Mailer::memory();
-        let sent = accounts::sign_in(server, &mailer, email, true)
-            .await
-            .expect("signed in");
+        let sent = accounts::sign_in(
+            server,
+            &mailer,
+            email,
+            true,
+            app_core::helpers::locales::DEFAULT,
+        )
+        .await
+        .expect("signed in");
         let code = mails::code_in(&mailer.last_sent_to(email).expect("mailed")).expect("a code");
         let (verifier, challenge) = accounts::verifier_and_challenge();
         let matched = accounts::sign_in_with_code(server, &sent.pending, &code)
@@ -1472,14 +1478,25 @@ mod tests {
         .await
         .expect("a post");
         let mailer = Mailer::memory();
-        app_core::accounts::deletions::code::create(&server, &mailer, &session.user)
-            .await
-            .expect("a code");
+        app_core::accounts::deletions::code::create(
+            &server,
+            &mailer,
+            &session.user,
+            app_core::helpers::locales::DEFAULT,
+        )
+        .await
+        .expect("a code");
         let code = mails::code_in(&mailer.last_sent_to("alice@example.com").expect("mailed"))
             .expect("a code in it");
-        app_core::accounts::deletions::create(&server, &mailer, &session.user, Some(&code))
-            .await
-            .expect("deleted on the web");
+        app_core::accounts::deletions::create(
+            &server,
+            &mailer,
+            &session.user,
+            Some(&code),
+            app_core::helpers::locales::DEFAULT,
+        )
+        .await
+        .expect("deleted on the web");
 
         let error = sync::run(&device.active().await.expect("alice's"), &transport)
             .await

@@ -35,6 +35,7 @@ mod jobs;
 mod ops;
 mod public_pages;
 mod rate_limits;
+mod request_locale;
 mod router;
 mod servers;
 mod state;

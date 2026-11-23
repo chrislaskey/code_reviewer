@@ -203,15 +203,15 @@ msgstr "${ kilobytes } KB"
 msgid "${ megabytes } MB"
 msgstr "${ megabytes } MB"
 
-#: src/lib/PublicPagesLinks.svelte:13
+#: src/lib/PublicPagesLinks.svelte:18
 msgid "Terms of Service"
 msgstr "Términos del servicio"
 
-#: src/lib/PublicPagesLinks.svelte:15
+#: src/lib/PublicPagesLinks.svelte:21
 msgid "Privacy Policy"
 msgstr "Política de privacidad"
 
-#: src/lib/PublicPagesLinks.svelte:16
+#: src/lib/PublicPagesLinks.svelte:22
 #, javascript-format
 msgid "${ termsLink } and ${ privacyLink }"
 msgstr "${ termsLink } y la ${ privacyLink }"
@@ -486,15 +486,15 @@ msgstr "La subida no pudo llegar al almacenamiento; inténtalo de nuevo"
 msgid "Could not read the image (${ response.status })"
 msgstr "No se pudo leer la imagen (${ response.status })"
 
-#: src/lib/core/http-api.js:728
+#: src/lib/core/http-api.js:730
 msgid "On the web, plans and products are bought through Stripe"
 msgstr "En la web, los planes y productos se compran a través de Stripe"
 
-#: src/lib/core/http-api.js:732
+#: src/lib/core/http-api.js:734
 msgid "Restoring purchases is in the iPhone app"
 msgstr "Restaurar compras está en la app de iPhone"
 
-#: src/lib/core/http-api.js:736
+#: src/lib/core/http-api.js:738
 msgid "A plan from a phone's store is managed on the phone"
 msgstr "Un plan de la tienda de un teléfono se administra en el teléfono"
 

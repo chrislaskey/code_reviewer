@@ -2787,9 +2787,15 @@ pub(crate) mod tests {
         email: &str,
     ) -> Session {
         let mailer = crate::services::mailer::Mailer::memory();
-        let sent = accounts::sign_in(servers_database, &mailer, email, true)
-            .await
-            .expect("signed in");
+        let sent = accounts::sign_in(
+            servers_database,
+            &mailer,
+            email,
+            true,
+            crate::helpers::locales::DEFAULT,
+        )
+        .await
+        .expect("signed in");
         let code = crate::accounts::tests::code_sent_to(&mailer, email);
         let (verifier, challenge) = accounts::verifier_and_challenge();
         let matched = accounts::sign_in_with_code(servers_database, &sent.pending, &code)

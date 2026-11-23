@@ -8,8 +8,8 @@
     "dev": "vite",
     "build": "vite build && vite build --mode ops",
     "check": "svelte-check",
-    "translations:extract": "ttag extract --output translations/default.pot --ignore 'src/ops/**' src && node scripts/public_pages_extract.js",
-    "translations:update": "pnpm translations:extract && for po in translations/*.po translations/public/*.po; do [ -e \"$po\" ] || continue; msgmerge --quiet --update --backup=none \"$po\" \"$(dirname \"$po\")/default.pot\"; done",
+    "translations:extract": "ttag extract --output translations/default.pot --ignore 'src/ops/**' src && node scripts/public_pages_extract.js && node scripts/rust_translations_extract.js",
+    "translations:update": "pnpm translations:extract && for po in translations/*.po translations/public/*.po ../core/translations/*.po; do [ -e \"$po\" ] || continue; msgmerge --quiet --update --backup=none \"$po\" \"$(dirname \"$po\")/default.pot\"; done && node scripts/rust_translations_compile.js",
     "translations:check": "node scripts/translations_check.js"
   },
   "dependencies": {

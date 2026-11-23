@@ -90,12 +90,15 @@ pub async fn create(
     mailer: &Mailer,
     user: &User,
     code: Option<&str>,
+    requested: &str,
 ) -> Result<(), DeletionError> {
     if deployment.role != Role::Server {
         return Err(DeletionError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
     let account = live_account_in(&mut tx, user.id).await?;
+    // Their language, read before their preferences go with the account
+    let locale = preferences::mail_locale_in(&mut tx, Some(user.id), requested).await?;
     if account.trial_expires_at.is_some() {
         trial_users::delete_in(&mut tx, user.id).await?;
         tx.commit().await?;
@@ -114,7 +117,10 @@ pub async fn create(
     stripe_end(deployment, stripe_left).await;
     #[cfg(feature = "object-storage")]
     bucket_empty(deployment, user.id).await;
-    if let Err(error) = mailer.send(mails::account_deleted(&account.email)).await {
+    if let Err(error) = mailer
+        .send(mails::account_deleted(locale, &account.email))
+        .await
+    {
         tracing::warn!("could not mail {} that it was deleted: {error}", user.id);
     }
     Ok(())
@@ -302,9 +308,14 @@ mod tests {
 
     /// The code mailed to the address for deleting its account.
     async fn code_mailed(server: &Deployment, mailer: &Mailer, session: &Session) -> String {
-        code::create(server, mailer, &session.user)
-            .await
-            .expect("a code mailed");
+        code::create(
+            server,
+            mailer,
+            &session.user,
+            crate::helpers::locales::DEFAULT,
+        )
+        .await
+        .expect("a code mailed");
         code_sent_to(mailer, &session.email)
     }
 
@@ -366,9 +377,15 @@ mod tests {
             assert_eq!(bodies(&bobs_device, &bob.user).await, ["alice's", "bob's"]);
 
             let code = code_mailed(&server, &mailer, &alice).await;
-            create(&server, &mailer, &alice.user, Some(&code))
-                .await
-                .expect("deleted");
+            create(
+                &server,
+                &mailer,
+                &alice.user,
+                Some(&code),
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("deleted");
 
             assert_eq!(bodies(&server, &bob.user).await, ["bob's"]);
             communities::get(&server, &bob.user, shared.id)
@@ -412,9 +429,15 @@ mod tests {
                 .expect_err("refused");
             assert!(matches!(error, sync::SyncError::AccountDeleted));
 
-            accounts::sign_in(&server, &mailer, "alice@example.com", false)
-                .await
-                .expect("answered");
+            accounts::sign_in(
+                &server,
+                &mailer,
+                "alice@example.com",
+                false,
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("answered");
             let mail = mailer.last_sent_to("alice@example.com").expect("a mail");
             assert!(mail.subject.contains("No "), "no account to sign in to");
             let again = signed_up_for_a_device(&server, "alice@example.com").await;
@@ -468,9 +491,15 @@ mod tests {
             }
 
             let code = code_mailed(&server, &mailer, &alice).await;
-            create(&server, &mailer, &alice.user, Some(&code))
-                .await
-                .expect("deleted");
+            create(
+                &server,
+                &mailer,
+                &alice.user,
+                Some(&code),
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("deleted");
 
             let shown = files::get(&server, &bob.user, created[0].id)
                 .await
@@ -508,33 +537,64 @@ mod tests {
             let mailer = Mailer::memory();
             let alice = signed_up_for_a_device(&server, "alice@example.com").await;
 
-            let error = create(&server, &mailer, &alice.user, Some("123456"))
-                .await
-                .expect_err("no code asked for");
+            let error = create(
+                &server,
+                &mailer,
+                &alice.user,
+                Some("123456"),
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect_err("no code asked for");
             assert!(matches!(error, DeletionError::CodeDoesNotMatch));
 
             let first = code_mailed(&server, &mailer, &alice).await;
             let second = code_mailed(&server, &mailer, &alice).await;
             if first != second {
-                let error = create(&server, &mailer, &alice.user, Some(&first))
-                    .await
-                    .expect_err("replaced by the second");
+                let error = create(
+                    &server,
+                    &mailer,
+                    &alice.user,
+                    Some(&first),
+                    crate::helpers::locales::DEFAULT,
+                )
+                .await
+                .expect_err("replaced by the second");
                 assert!(matches!(error, DeletionError::CodeDoesNotMatch));
             }
-            let error = create(&server, &mailer, &alice.user, Some(other_than(&second)))
-                .await
-                .expect_err("wrong");
+            let error = create(
+                &server,
+                &mailer,
+                &alice.user,
+                Some(other_than(&second)),
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect_err("wrong");
             assert!(matches!(error, DeletionError::CodeDoesNotMatch));
             users::get_by_token(&server, &alice.token)
                 .await
                 .expect("still there");
 
             for _ in 1..MAX_CODE_ATTEMPTS {
-                let _ = create(&server, &mailer, &alice.user, Some(other_than(&second))).await;
+                let _ = create(
+                    &server,
+                    &mailer,
+                    &alice.user,
+                    Some(other_than(&second)),
+                    crate::helpers::locales::DEFAULT,
+                )
+                .await;
             }
-            let error = create(&server, &mailer, &alice.user, Some(&second))
-                .await
-                .expect_err("gone after too many wrong ones");
+            let error = create(
+                &server,
+                &mailer,
+                &alice.user,
+                Some(&second),
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect_err("gone after too many wrong ones");
             assert!(matches!(error, DeletionError::CodeDoesNotMatch));
             users::get_by_token(&server, &alice.token)
                 .await
@@ -549,14 +609,25 @@ mod tests {
             let server = server(database);
             let mailer = Mailer::memory();
             let trial = trial_users::create(&server, 10).await.expect("a trial");
-            let error = code::create(&server, &mailer, &trial.user)
-                .await
-                .expect_err("no code for a trial");
+            let error = code::create(
+                &server,
+                &mailer,
+                &trial.user,
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect_err("no code for a trial");
             assert!(matches!(error, DeletionError::TrialHasNoCode));
 
-            create(&server, &mailer, &trial.user, None)
-                .await
-                .expect("deleted");
+            create(
+                &server,
+                &mailer,
+                &trial.user,
+                None,
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("deleted");
             assert!(matches!(
                 users::get_by_token(&server, &trial.token).await,
                 Err(UserError::UnknownToken)
@@ -577,9 +648,15 @@ mod tests {
                 .await
                 .expect("a post");
             let code = code_mailed(&server, &mailer, &alice).await;
-            create(&server, &mailer, &alice.user, Some(&code))
-                .await
-                .expect("deleted");
+            create(
+                &server,
+                &mailer,
+                &alice.user,
+                Some(&code),
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("deleted");
 
             purge::run(&server, now() + Duration::days(89))
                 .await
@@ -719,9 +796,15 @@ mod tests {
             assert_eq!(stripe_state(&stripe), ("active".to_string(), 1));
 
             let code = code_mailed(&server, &mailer, &alice).await;
-            create(&server, &mailer, &alice.user, Some(&code))
-                .await
-                .expect("deleted");
+            create(
+                &server,
+                &mailer,
+                &alice.user,
+                Some(&code),
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("deleted");
             assert_eq!(stripe_state(&stripe), ("canceled".to_string(), 0));
         })
         .await;
@@ -739,9 +822,15 @@ mod tests {
             on_a_stripe_plan(&server, &stripe, &alice.user).await;
 
             let code = code_mailed(&server, &mailer, &alice).await;
-            create(&server, &mailer, &alice.user, Some(&code))
-                .await
-                .expect("deleted");
+            create(
+                &server,
+                &mailer,
+                &alice.user,
+                Some(&code),
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("deleted");
             assert_eq!(stripe_state(&stripe).0, "active");
 
             crate::accounts::stripe_reconcile::run(&server, &stripe)

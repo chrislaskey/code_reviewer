@@ -52,6 +52,7 @@ use app_core::services::mailer::Mailer;
 
 use crate::api_error::ApiError;
 use crate::rate_limits::RateLimits;
+use crate::request_locale::RequestLocale;
 use crate::user_auth::{CurrentToken, CurrentUser, TOKEN_COOKIE, signed_in_user_of, token_cookie};
 
 #[derive(Deserialize)]
@@ -114,6 +115,7 @@ pub async fn sign_in(
     State(limits): State<RateLimits>,
     State(settings): State<Arc<SettingsDocument>>,
     jar: CookieJar,
+    RequestLocale(requested): RequestLocale,
     Json(sign_in): Json<SignIn>,
 ) -> Result<(StatusCode, Json<CodeSent>), ApiError> {
     limits.check_email(&sign_in.email)?;
@@ -125,9 +127,10 @@ pub async fn sign_in(
     };
     let sent = match trial {
         Some(trial) => {
-            accounts::sign_in_from_trial(&deployment, &mailer, &trial, &sign_in.email).await?
+            accounts::sign_in_from_trial(&deployment, &mailer, &trial, &sign_in.email, requested)
+                .await?
         }
-        None => accounts::sign_in(&deployment, &mailer, &sign_in.email, offered).await?,
+        None => accounts::sign_in(&deployment, &mailer, &sign_in.email, offered, requested).await?,
     };
     Ok((StatusCode::ACCEPTED, Json(sent)))
 }
@@ -153,12 +156,13 @@ pub async fn code_resend(
     State(deployment): State<Deployment>,
     State(mailer): State<Mailer>,
     State(limits): State<RateLimits>,
+    RequestLocale(requested): RequestLocale,
     Json(resend): Json<Resend>,
 ) -> Result<StatusCode, ApiError> {
     limits.check_resend(&resend.pending)?;
     let email = accounts::resend_code_to(&deployment, &resend.pending).await?;
     limits.check_email(&email)?;
-    accounts::resend_code(&deployment, &mailer, &resend.pending).await?;
+    accounts::resend_code(&deployment, &mailer, &resend.pending, requested).await?;
     Ok(StatusCode::ACCEPTED)
 }
 

@@ -10,6 +10,7 @@ use app_core::deployment::Deployment;
 use app_core::services::mailer::Mailer;
 
 use crate::api_error::ApiError;
+use crate::request_locale::RequestLocale;
 use crate::user_auth::CurrentUser;
 
 /// `GET /api/accounts/current/password`: whether the user has a password.
@@ -26,8 +27,9 @@ pub async fn update(
     State(deployment): State<Deployment>,
     State(mailer): State<Mailer>,
     CurrentUser(user): CurrentUser,
+    RequestLocale(requested): RequestLocale,
     Json(update): Json<PasswordUpdate>,
 ) -> Result<StatusCode, ApiError> {
-    password::update(&deployment, &mailer, &user, &update).await?;
+    password::update(&deployment, &mailer, &user, &update, requested).await?;
     Ok(StatusCode::NO_CONTENT)
 }

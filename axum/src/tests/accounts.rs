@@ -1284,3 +1284,70 @@ async fn accounts_subscriptions_and_the_plan_on_the_current_user() {
     assert_eq!(me["plan"], Value::Null);
     assert_eq!(me["payment_failed_subscription_id"], subscription_id);
 }
+
+#[tokio::test]
+async fn accounts_mails_go_in_the_persons_language_else_the_requests_else_english() {
+    let (router, _) = test_router().await;
+    let request = Request::builder()
+        .method(Method::POST)
+        .uri("/api/accounts/sign-in")
+        .header(header::ACCEPT_LANGUAGE, "es-MX,es;q=0.9,en;q=0.8")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            json!({ "email": "bob@example.com" }).to_string(),
+        ))
+        .expect("a request");
+    let response = router
+        .router
+        .clone()
+        .oneshot(request)
+        .await
+        .expect("a response");
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+    let mail = router
+        .mailer
+        .last_sent_to("bob@example.com")
+        .expect("mailed");
+    assert_eq!(
+        mail.subject, "Tu código de Starter Pack",
+        "the request's language"
+    );
+
+    let (status, _) = send_as(
+        &router.router,
+        None,
+        Method::POST,
+        "/api/accounts/sign-in",
+        Some(json!({ "email": "carol@example.com" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::ACCEPTED);
+    let mail = router
+        .mailer
+        .last_sent_to("carol@example.com")
+        .expect("mailed");
+    assert_eq!(
+        mail.subject, "Your Starter Pack code",
+        "English when the request names none"
+    );
+
+    let (status, _) = send(
+        &router,
+        Method::PUT,
+        "/api/accounts/current/preferences",
+        Some(json!({ "key": "locale", "value": "es" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = send(&router, Method::POST, "/api/accounts/deletions/code", None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let mail = router
+        .mailer
+        .last_sent_to("alice@example.com")
+        .expect("mailed");
+    assert!(
+        mail.subject.starts_with("Tu código"),
+        "her choice: {}",
+        mail.subject
+    );
+}

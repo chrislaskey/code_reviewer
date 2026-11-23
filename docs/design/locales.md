@@ -82,21 +82,40 @@ as any table does, through `SyncedTable`, listed in
 The public website is in the same languages, at `/es/about`, from a
 catalog of its own, see `public-pages.md`.
 
-The languages are `helpers::locales::SUPPORTED`, English first, and one
-`svelte/translations/<locale>.po` and one
-`svelte/translations/public/<locale>.po` each; a core test fails when
-they differ. Adding one: `msginit` both `.po` files (README), translate
-them, and add its code to `SUPPORTED`.
+The languages are `helpers::locales::SUPPORTED`, English first, and a
+`<locale>.po` each in `svelte/translations/`,
+`svelte/translations/public/` and `core/translations/`; core tests fail
+when they differ. Adding one: `msginit` the three `.po` files (README),
+translate them, `pnpm translations:update`, add its code to `SUPPORTED`
+and its `.mo` to `helpers::translations::CATALOGS`.
+
+## Emails
+
+An email goes in the person's language: their `locale` preference, else
+the language the request that sent it asked for, its `Accept-Language`
+matched by `helpers::locales::resolve`, else English
+(`accounts::preferences::mail_locale_in`). The web server reads the
+header with `RequestLocale`; the apps' own requests send none, so a
+person who never chose gets those in English, which is fine. Every mail
+function in `services/mailer/mails.rs` takes the language, and each
+sender of one takes `requested`.
+
+Rust's text has a catalog of its own, `core/translations/`, the third
+beside the pages' two, so none writes over another:
+
+- **The English** is written in `t!(locale, "…", name = value)`
+  (`helpers::translations`), named placeholders in braces, the app's
+  name `{app}`.
+- **`pnpm translations:extract`** reads every `t!` in `core/src` into
+  `default.pot` (`svelte/scripts/rust_translations.js`), and
+  **`translations:update`** merges each `<locale>.po` and compiles it to
+  the `<locale>.mo` the `gettext` crate reads, committed, embedded with
+  `include_bytes!`: no gettext tool is needed to build.
+- **`translations:check`** fails on a `.pot` out of date, a message
+  untranslated or fuzzy, a `.mo` not compiled from its `.po`, and a
+  translation whose placeholders differ from the English's.
 
 ## Later
-
-- **Emails in the person's language.** The accounts mails take the
-  language as an argument; a mail answering a request, the sign-in code
-  for an email with no account yet, uses the request's
-  `Accept-Language`, and one to an account its `locale` preference. Rust
-  needs a catalog of its own for them, the same `.po` files read with the
-  pure-Rust `gettext` crate, which is a new crate to approve, and a way
-  to extract Rust's messages.
 - **Errors in the person's language.** The server sends a code and its
   values (`posts.body_too_long`, `{max}`) beside the English, and the
   pages translate the code; `ApiError` has a `code` already.
