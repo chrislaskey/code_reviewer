@@ -64,15 +64,15 @@ msgid "Copying…"
 msgstr ""
 
 #: src/lib/layouts/AccountMenu.svelte:55
-#: src/profile/ProfileEditPage.svelte:78
+#: src/profile/ProfileEditPage.svelte:119
 msgid "Profile"
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:79
+#: src/profile/ProfileEditPage.svelte:120
 msgid "This account is only on this device."
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:80
+#: src/profile/ProfileEditPage.svelte:121
 msgid ""
 "Nothing is backed up: if the device is lost or reset, or the app is "
 "removed, what you made is gone. Sign up or log in to keep it safe and use "
@@ -81,25 +81,34 @@ msgstr ""
 
 #: src/accounts/AccountsIndexPage.svelte:52
 #: src/lib/AccountsNeeded.svelte:16
-#: src/profile/ProfileEditPage.svelte:82
+#: src/profile/ProfileEditPage.svelte:123
 msgid "Sign up or log in"
 msgstr ""
 
 #: src/communities/components/CommunitiesForm.svelte:25
 #: src/files/FilesEditPage.svelte:53
-#: src/profile/ProfileEditPage.svelte:89
+#: src/profile/ProfileEditPage.svelte:130
 msgid "Name"
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:92
+#: src/profile/ProfileEditPage.svelte:133
 msgid "Save name"
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:94
+#: src/profile/ProfileEditPage.svelte:134
+msgid "Language"
+msgstr ""
+
+#: src/profile/ProfileEditPage.svelte:138
+#, javascript-format
+msgid "Follow the system (${ systemLanguage })"
+msgstr ""
+
+#: src/profile/ProfileEditPage.svelte:144
 msgid "Picture"
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:101
+#: src/profile/ProfileEditPage.svelte:151
 msgid "Save picture"
 msgstr ""
 
@@ -483,24 +492,24 @@ msgstr ""
 msgid "The upload could not reach the storage; try again"
 msgstr ""
 
-#: src/lib/core/http-api.js:522
+#: src/lib/core/http-api.js:542
 #, javascript-format
 msgid "Could not read the image (${ response.status })"
 msgstr ""
 
-#: src/lib/core/http-api.js:708
+#: src/lib/core/http-api.js:728
 msgid "On the web, plans and products are bought through Stripe"
 msgstr ""
 
-#: src/lib/core/http-api.js:712
+#: src/lib/core/http-api.js:732
 msgid "Restoring purchases is in the iPhone app"
 msgstr ""
 
-#: src/lib/core/http-api.js:716
+#: src/lib/core/http-api.js:736
 msgid "A plan from a phone's store is managed on the phone"
 msgstr ""
 
-#: src/lib/core/http-api.js:541
+#: src/lib/core/http-api.js:561
 msgid "Could not copy the image"
 msgstr ""
 

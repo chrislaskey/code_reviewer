@@ -1,9 +1,10 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
 import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import tailwindcss from "@tailwindcss/vite";
 import { po } from "gettext-parser";
+import { PUBLIC_DEFAULT_LOCALE, publicCatalogs, publicPageTranslated } from "./scripts/public_pages_translations.js";
 
 // The theme script sets `data-theme` on <html> before the first paint. The
 // `<!-- theme-script -->` marker in an HTML entry becomes an inline classic
@@ -31,7 +32,11 @@ function themeScript() {
 // `/about` with `public/about.html` and `/` with `public/index.html`; the
 // dev server does the same here. The
 // `<!-- public-header -->` and `<!-- public-footer -->` markers become the
-// files in src/public/partials. See docs/design/public-pages.md.
+// files in src/public/partials. Each page is in every language of
+// translations/public too, `/es/about` for `es`: the dev server
+// translates a page as it answers it, and a build writes each language's
+// copy to dist/public/<locale>/ once Vite has written the English, see
+// scripts/public_pages_translations.js. See docs/design/public-pages.md.
 const PUBLIC_PAGES = resolve(import.meta.dirname, "src/public");
 const PUBLIC_PARTIALS = { "public-header": "header.html", "public-footer": "footer.html" };
 
@@ -44,11 +49,31 @@ function publicPageNames() {
 function publicPages() {
   return {
     name: "public-pages",
-    transformIndexHtml(html) {
+    transformIndexHtml(html, context) {
       for (const [marker, file] of Object.entries(PUBLIC_PARTIALS)) {
         html = html.replace(`<!-- ${marker} -->`, () => readFileSync(resolve(PUBLIC_PAGES, "partials", file), "utf8"));
       }
-      return html;
+      if (!context.server || !context.path.startsWith("/public/")) return html;
+      const catalogs = publicCatalogs();
+      const [first] = new URL(context.originalUrl ?? "/", "http://localhost").pathname.split("/").filter(Boolean);
+      const locale = catalogs.has(first) ? first : PUBLIC_DEFAULT_LOCALE;
+      const name = basename(context.path, ".html");
+      return publicPageTranslated(html, { locale, name, pageNames: publicPageNames(), catalogs });
+    },
+    writeBundle(options, bundle) {
+      const catalogs = publicCatalogs();
+      const pageNames = publicPageNames();
+      for (const fileName of Object.keys(bundle)) {
+        if (!fileName.startsWith("public/") || !fileName.endsWith(".html")) continue;
+        const name = basename(fileName, ".html");
+        const english = resolve(options.dir, fileName);
+        const html = readFileSync(english, "utf8");
+        for (const locale of [PUBLIC_DEFAULT_LOCALE, ...catalogs.keys()]) {
+          const file = locale === PUBLIC_DEFAULT_LOCALE ? english : resolve(dirname(english), locale, `${name}.html`);
+          mkdirSync(dirname(file), { recursive: true });
+          writeFileSync(file, publicPageTranslated(html, { locale, name, pageNames, catalogs }));
+        }
+      }
     },
     configureServer(server) {
       server.watcher.on("change", (file) => {
@@ -56,7 +81,9 @@ function publicPages() {
       });
       server.middlewares.use((request, _response, next) => {
         const { pathname, search } = new URL(request.url ?? "/", "http://localhost");
-        const name = pathname === "/" ? "index" : pathname.slice(1);
+        const parts = pathname.split("/").filter(Boolean);
+        if (parts.length > 0 && publicCatalogs().has(parts[0])) parts.shift();
+        const name = parts.length === 0 ? "index" : parts.join("/");
         const isPublicPage = /^[\w-]+$/.test(name) && existsSync(resolve(PUBLIC_PAGES, `${name}.html`));
         if (isPublicPage) request.url = `/public/${name}.html${search}`;
         // The ops app's pages are its own entry; in dev, open to anyone

@@ -2,5 +2,6 @@
 // one page, no router.
 import { mount } from "svelte";
 import QuickPickerPage from "./QuickPickerPage.svelte";
+import { translationsStart } from "../lib/translations.js";
 
-mount(QuickPickerPage, { target: document.getElementById("app") });
+translationsStart().then(() => mount(QuickPickerPage, { target: document.getElementById("app") }));

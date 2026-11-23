@@ -17,7 +17,7 @@ use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 
 use crate::accounts::{
-    app_store_notifications, checkouts, deletions, password, products, purchases,
+    app_store_notifications, checkouts, deletions, password, preferences, products, purchases,
     store_transactions, stripe_events, subscriptions, trial_users,
 };
 use crate::api_error::ApiError;
@@ -147,6 +147,10 @@ fn accounts_api(state: &AppState) -> Router<AppState> {
         .route(
             "/api/accounts/current/password",
             get(password::get).put(password::update),
+        )
+        .route(
+            "/api/accounts/current/preferences",
+            get(preferences::get).put(preferences::update),
         )
         .route("/api/accounts/device-token", post(accounts::device_token))
         .route("/api/accounts/sign-out", delete(accounts::sign_out))

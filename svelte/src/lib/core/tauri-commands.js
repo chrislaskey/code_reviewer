@@ -113,6 +113,26 @@ export function accountsPasswordUpdate(password) {
   return invoke("accounts_password_update", { password });
 }
 
+/**
+ * The signed-in person's preferences, kept on this device and synced:
+ * `locale`, the language chosen, or null to follow the device's.
+ * @returns {Promise<{locale: string | null}>}
+ */
+export function accountsPreferencesGet() {
+  return invoke("accounts_preferences_get");
+}
+
+/**
+ * One of the signed-in person's preferences, null for its default,
+ * written on this device and synced when it next can, then all of them.
+ * @param {"locale"} key
+ * @param {unknown} value
+ * @returns {Promise<{locale: string | null}>}
+ */
+export function accountsPreferencesUpdate(key, value) {
+  return invoke("accounts_preferences_update", { key, value });
+}
+
 /** @param {string} _pending */
 export function accountsCodeResend(_pending) {
   return Promise.reject(new Error("in the app, sign in from the accounts page"));
@@ -642,11 +662,13 @@ export function onQuickPickerOpened(callback) {
 
 /**
  * Opens a public page, `terms` or `privacy`, in the system browser, since
- * the app never shows one (../../../../tauri/src/public_pages.rs).
+ * the app never shows one (../../../../tauri/src/public_pages.rs), in the
+ * language the pages show.
  * @param {"terms" | "privacy"} page
+ * @param {string} locale
  */
-export function publicPagesOpen(page) {
-  return invoke("public_pages_open", { page });
+export function publicPagesOpen(page, locale) {
+  return invoke("public_pages_open", { page, locale });
 }
 
 /** Mails the signed-in person the code that confirms deleting their account. */

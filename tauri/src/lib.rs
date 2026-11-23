@@ -73,6 +73,8 @@ pub fn run() {
             accounts::accounts_sign_out,
             accounts::password::accounts_password_get,
             accounts::password::accounts_password_update,
+            accounts::preferences::accounts_preferences_get,
+            accounts::preferences::accounts_preferences_update,
             accounts::deletions::code::accounts_deletions_code_create,
             accounts::deletions::accounts_deletions_create,
             app::communities::communities_list,

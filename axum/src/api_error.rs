@@ -13,6 +13,7 @@ use app_core::accounts::app_store_notifications::AppStoreNotificationError;
 use app_core::accounts::checkouts::CheckoutError;
 use app_core::accounts::deletions::DeletionError;
 use app_core::accounts::plans::PlanError;
+use app_core::accounts::preferences::PreferenceError;
 use app_core::accounts::products::ProductError;
 use app_core::accounts::purchases::PurchaseError;
 use app_core::accounts::store_transactions::StoreTransactionError;
@@ -219,6 +220,21 @@ impl From<UserError> for ApiError {
             UserError::AccountUser(error) => return error.into(),
             UserError::Record(error) => return ApiError::from_record(&error),
             UserError::ServerOnly | UserError::DeviceSettings(_) | UserError::Database(_) => {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        };
+        ApiError::new(status, error.to_string())
+    }
+}
+
+impl From<PreferenceError> for ApiError {
+    fn from(error: PreferenceError) -> Self {
+        let status = match error {
+            PreferenceError::Invalid(_) | PreferenceError::Rejected(_) => {
+                StatusCode::UNPROCESSABLE_ENTITY
+            }
+            PreferenceError::Record(error) => return ApiError::from_record(&error),
+            PreferenceError::Json(_) | PreferenceError::Database(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
         };

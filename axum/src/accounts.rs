@@ -24,6 +24,7 @@ pub mod app_store_notifications;
 pub mod checkouts;
 pub mod deletions;
 pub mod password;
+pub mod preferences;
 pub mod products;
 pub mod purchases;
 pub mod store_transactions;

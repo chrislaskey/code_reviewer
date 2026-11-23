@@ -6,6 +6,7 @@ use axum::extract::State;
 use serde::{Deserialize, Serialize};
 
 use app_core::accounts::plans::{self, Plan};
+use app_core::accounts::preferences::{self, Preferences};
 use app_core::app::users::{self, Kind};
 use app_core::data::app_users::User;
 use app_core::deployment::Deployment;
@@ -19,8 +20,9 @@ use crate::user_auth::CurrentUser;
 /// The request's user as their own pages show them: with their
 /// account's email, which nobody else is sent, whether they are staff,
 /// for the link to the ops app, whether they are a trial user, with
-/// when the trial ends, for the banner, and their plan, with the
-/// subscription whose payment failed, for that banner.
+/// when the trial ends, for the banner, their plan, with the
+/// subscription whose payment failed, for that banner, and their
+/// preferences, the language their pages are shown in.
 #[derive(Serialize)]
 pub struct CurrentUserShown {
     #[serde(flatten)]
@@ -31,6 +33,7 @@ pub struct CurrentUserShown {
     pub trial_expires_at: Option<DateTime<Utc>>,
     pub plan: Option<Plan>,
     pub payment_failed_subscription_id: Option<Uuid>,
+    pub preferences: Preferences,
 }
 
 /// `GET /api/users/current`: the user the request is from.
@@ -69,6 +72,7 @@ async fn shown(deployment: &Deployment, user: User) -> Result<CurrentUserShown, 
     };
     let plan = plans::current(deployment, &user).await?;
     let payment_failed_subscription_id = plans::payment_failed(deployment, &user).await?;
+    let preferences = preferences::get(deployment, &user).await?;
     Ok(CurrentUserShown {
         user,
         email: account.email,
@@ -77,5 +81,6 @@ async fn shown(deployment: &Deployment, user: User) -> Result<CurrentUserShown, 
         trial_expires_at: account.trial_expires_at,
         plan,
         payment_failed_subscription_id,
+        preferences,
     })
 }

@@ -170,6 +170,26 @@ export function accountsPasswordUpdate(password) {
 }
 
 /**
+ * The signed-in person's preferences: `locale`, the language chosen, or
+ * null to follow the device's.
+ * @returns {Promise<{locale: string | null}>}
+ */
+export function accountsPreferencesGet() {
+  return send("GET", "/api/accounts/current/preferences");
+}
+
+/**
+ * One of the signed-in person's preferences, null for its default, then
+ * all of them.
+ * @param {"locale"} key
+ * @param {unknown} value
+ * @returns {Promise<{locale: string | null}>}
+ */
+export function accountsPreferencesUpdate(key, value) {
+  return send("PUT", "/api/accounts/current/preferences", { key, value });
+}
+
+/**
  * A new code emailed for the pending sign-in; the old one stops working.
  * @param {string} pending
  */
@@ -677,11 +697,13 @@ export function onQuickPickerOpened(_callback) {
 }
 
 /**
- * Opens a public page, `terms` or `privacy`, in a new tab.
+ * Opens a public page, `terms` or `privacy`, in a new tab, in the
+ * language the pages show: `/es/terms`, or `/terms` in English.
  * @param {"terms" | "privacy"} page
+ * @param {string} locale
  */
-export function publicPagesOpen(page) {
-  window.open(`/${page}`, "_blank", "noopener");
+export function publicPagesOpen(page, locale) {
+  window.open(locale === "en" ? `/${page}` : `/${locale}/${page}`, "_blank", "noopener");
   return Promise.resolve();
 }
 

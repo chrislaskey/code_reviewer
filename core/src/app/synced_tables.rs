@@ -1,7 +1,9 @@
 //! The app's synced tables, which sync, conflicts, pending changes,
 //! purge and a local user's move run over: a table the app adds is
-//! listed here, see `sync::synced_table`.
+//! listed here, see `sync::synced_table`. `accounts_preferences` is the
+//! one accounts table among them, see `docs/design/locales.md`.
 
+use crate::accounts::preferences;
 use crate::app::{
     communities, files, files_communities, memberships, posts, posts_communities, users,
 };
@@ -13,6 +15,7 @@ use crate::sync::synced_table::SyncedTable;
 pub fn list() -> &'static [&'static dyn SyncedTable] {
     &[
         &users::Synced,
+        &preferences::Synced,
         &communities::Synced,
         &memberships::Synced,
         &posts::Synced,

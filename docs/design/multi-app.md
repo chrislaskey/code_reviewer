@@ -63,15 +63,19 @@ other app carries its name:
 
 The prefix says which app a table is, and that says whether it leaves
 the server: `app_*` tables sync to devices, every other table is the
-server's alone.
+server's alone, but one.
 
+- **`accounts_preferences` is the one exception**: a person's own
+  choices, their language first, synced to their own devices only, so
+  every app reads them, `accounts` included, and a device changes them
+  offline. See `locales.md`.
 - The sync's own tables are the app's: `app_events`, `app_jobs`,
   `app_purges`, `app_sync_state`, `app_sync_backfills`.
 - `device_*` tables are a device's own and never synced.
 - On a device, `accounts`, `support` and `forum` are online only: their
   pages call the web server's API with the device's token, and a change
   is the server's at once. Nothing of theirs is in the device's
-  database.
+  database, but the person's preferences.
 - Purchasing on a phone is the store's in-app purchase. What a device
   must know offline, the person's plan, it keeps from the last time it
   was online, in `device_settings`, never through `app_users`, which

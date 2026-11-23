@@ -8,6 +8,7 @@ use tauri::{AppHandle, State};
 use uuid::Uuid;
 
 use app_core::accounts::online;
+use app_core::accounts::preferences::{self, Preferences};
 use app_core::app::users::{self, Kind, UserError};
 use app_core::data::app_users::User;
 
@@ -19,8 +20,9 @@ use crate::user_auth::signed_in;
 /// The user signed in as their own pages show them: with the email of
 /// their account, which the device keeps in its list of accounts and
 /// their synced row does not carry, whether they are a local user, on
-/// this device only, and their plan as the device last heard it, until
-/// its period ends, see `app_core::accounts::online`.
+/// this device only, their plan as the device last heard it, until
+/// its period ends, see `app_core::accounts::online`, and their
+/// preferences, the language their pages are shown in.
 #[derive(Serialize)]
 pub struct CurrentUserShown {
     #[serde(flatten)]
@@ -29,6 +31,7 @@ pub struct CurrentUserShown {
     pub kind: Kind,
     pub plan: Value,
     pub payment_failed_subscription_id: Option<Uuid>,
+    pub preferences: Preferences,
 }
 
 /// The user signed in, or none when nobody is; an error only when the
@@ -76,11 +79,13 @@ async fn shown(device: &DeviceAccounts, user: User) -> Result<CurrentUserShown, 
     };
     let deployment = device.active().await?;
     let kept = online::plan_kept(&deployment).await?;
+    let preferences = preferences::get(&deployment, &user).await?;
     Ok(CurrentUserShown {
         user,
         email: account.email,
         kind,
         plan: kept.as_ref().map_or(Value::Null, |kept| kept.plan.clone()),
         payment_failed_subscription_id: kept.and_then(|kept| kept.payment_failed_subscription_id),
+        preferences,
     })
 }

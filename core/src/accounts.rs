@@ -35,6 +35,7 @@ pub mod online;
 pub mod password;
 #[cfg(feature = "stripe")]
 pub mod plans;
+pub mod preferences;
 #[cfg(feature = "stripe")]
 pub mod prices;
 #[cfg(feature = "stripe")]

@@ -87,6 +87,8 @@ async fn public_pages_answer_at_their_file_names() {
             ("/about", "public about"),
             ("/terms", "public terms"),
             ("/privacy", "public privacy"),
+            ("/es", "public home es"),
+            ("/es/about", "public about es"),
         ] {
             let (status, _headers, body) =
                 send_with(&router.router, None, cookie, Method::GET, path, None).await;

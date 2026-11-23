@@ -1,0 +1,1766 @@
+msgid ""
+msgstr ""
+"Language: es\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: src/lib/layouts/AppNav.svelte:30 src/support/SupportIndexPage.svelte:9
+msgid "Support"
+msgstr "Soporte"
+
+#: src/forum/ForumIndexPage.svelte:11 src/support/SupportIndexPage.svelte:11
+msgid "Nothing here yet."
+msgstr "Todavía no hay nada aquí."
+
+#: src/quick-picker/QuickPickerPage.svelte:137
+msgid "Search images by name…"
+msgstr "Buscar imágenes por nombre…"
+
+#: src/quick-picker/QuickPickerPage.svelte:150
+msgid "No images have that in their name"
+msgstr "Ninguna imagen tiene eso en su nombre"
+
+#: src/quick-picker/QuickPickerPage.svelte:150
+msgid "No images yet"
+msgstr "Todavía no hay imágenes"
+
+#: src/quick-picker/QuickPickerPage.svelte:154
+msgid "allow Accessibility access"
+msgstr "permite el acceso de Accesibilidad"
+
+#: src/quick-picker/QuickPickerPage.svelte:155
+#, javascript-format
+msgid "Copies only: ${ accessibilityButton } to paste."
+msgstr "Solo copia: ${ accessibilityButton } para pegar."
+
+#: src/quick-picker/QuickPickerPage.svelte:157
+msgid "select"
+msgstr "elegir"
+
+#: src/quick-picker/QuickPickerPage.svelte:158
+msgid "paste"
+msgstr "pegar"
+
+#: src/quick-picker/QuickPickerPage.svelte:159
+#: src/quick-picker/QuickPickerPage.svelte:165
+msgid "close"
+msgstr "cerrar"
+
+#: src/quick-picker/QuickPickerPage.svelte:160
+msgid "Log in to Starter Pack to pick from your images."
+msgstr "Inicia sesión en Starter Pack para elegir entre tus imágenes."
+
+#: src/quick-picker/QuickPickerPage.svelte:162
+msgid "Open Starter Pack"
+msgstr "Abrir Starter Pack"
+
+#: src/quick-picker/QuickPickerPage.svelte:164
+msgid "open"
+msgstr "abrir"
+
+#: src/quick-picker/QuickPickerPage.svelte:82
+msgid "Copying…"
+msgstr "Copiando…"
+
+#: src/lib/layouts/AccountMenu.svelte:55 src/profile/ProfileEditPage.svelte:119
+msgid "Profile"
+msgstr "Perfil"
+
+#: src/profile/ProfileEditPage.svelte:120
+msgid "This account is only on this device."
+msgstr "Esta cuenta solo está en este dispositivo."
+
+#: src/profile/ProfileEditPage.svelte:121
+msgid ""
+"Nothing is backed up: if the device is lost or reset, or the app is removed, "
+"what you made is gone. Sign up or log in to keep it safe and use it on your "
+"other devices."
+msgstr ""
+"No hay copia de seguridad: si el dispositivo se pierde o se restablece, o se "
+"elimina la app, lo que hiciste se pierde. Regístrate o inicia sesión para "
+"guardarlo y usarlo en tus otros dispositivos."
+
+#: src/accounts/AccountsIndexPage.svelte:52 src/lib/AccountsNeeded.svelte:16
+#: src/profile/ProfileEditPage.svelte:123
+msgid "Sign up or log in"
+msgstr "Regístrate o inicia sesión"
+
+#: src/communities/components/CommunitiesForm.svelte:25
+#: src/files/FilesEditPage.svelte:53 src/profile/ProfileEditPage.svelte:130
+msgid "Name"
+msgstr "Nombre"
+
+#: src/profile/ProfileEditPage.svelte:133
+msgid "Save name"
+msgstr "Guardar nombre"
+
+#: src/profile/ProfileEditPage.svelte:134
+msgid "Language"
+msgstr "Idioma"
+
+#: src/profile/ProfileEditPage.svelte:138
+#, javascript-format
+msgid "Follow the system (${ systemLanguage })"
+msgstr "Seguir al sistema (${ systemLanguage })"
+
+#: src/profile/ProfileEditPage.svelte:144
+msgid "Picture"
+msgstr "Foto"
+
+#: src/profile/ProfileEditPage.svelte:151
+msgid "Save picture"
+msgstr "Guardar foto"
+
+#: src/posts/PostsShowPage.svelte:26 src/posts/components/PostsForm.svelte:46
+msgid "Post"
+msgstr "Publicación"
+
+#: src/files/FilesIndexPage.svelte:110 src/files/FilesShowPage.svelte:64
+#: src/posts/PostsIndexPage.svelte:18 src/posts/PostsShowPage.svelte:30
+#, javascript-format
+msgid "in ${ communityNames }"
+msgstr "en ${ communityNames }"
+
+#: src/communities/CommunitiesShowPage.svelte:41
+#: src/files/FilesShowPage.svelte:88 src/posts/PostsShowPage.svelte:33
+msgid "Edit"
+msgstr "Editar"
+
+#: src/communities/CommunitiesShowPage.svelte:43
+#: src/files/FilesShowPage.svelte:90 src/posts/PostsShowPage.svelte:35
+msgid "Delete"
+msgstr "Eliminar"
+
+#: src/conflicts/ConflictsIndexPage.svelte:66 src/posts/PostsNewPage.svelte:32
+#: src/posts/PostsShowPage.svelte:37
+msgid "Back to posts"
+msgstr "Volver a las publicaciones"
+
+#: src/posts/PostsShowPage.svelte:16
+msgid "Delete this post?"
+msgstr "¿Eliminar esta publicación?"
+
+#: src/posts/PostsIndexPage.svelte:13 src/posts/PostsNewPage.svelte:28
+msgid "New post"
+msgstr "Nueva publicación"
+
+#: src/lib/layouts/AppNav.svelte:27 src/posts/PostsIndexPage.svelte:11
+msgid "Posts"
+msgstr "Publicaciones"
+
+#: src/posts/PostsIndexPage.svelte:15
+msgid "No posts yet."
+msgstr "Todavía no hay publicaciones."
+
+#: src/posts/PostsIndexPage.svelte:21
+msgid "Show"
+msgstr "Ver"
+
+#: src/posts/PostsEditPage.svelte:43
+msgid "Edit post"
+msgstr "Editar publicación"
+
+#: src/communities/CommunitiesEditPage.svelte:46
+#: src/files/FilesEditPage.svelte:59 src/posts/PostsEditPage.svelte:44
+msgid "Save"
+msgstr "Guardar"
+
+#: src/posts/PostsEditPage.svelte:48
+msgid "Back to the post"
+msgstr "Volver a la publicación"
+
+#: src/posts/components/PostsForm.svelte:47
+msgid "What's on your mind?"
+msgstr "¿Qué estás pensando?"
+
+#: src/files/components/FilesCommunitiesField.svelte:37
+#: src/posts/components/PostsForm.svelte:48
+msgid "In"
+msgstr "En"
+
+#: src/lib/router.js:75
+#, javascript-format
+msgid "Could not check who is signed in: ${ reason }"
+msgstr "No se pudo comprobar quién inició sesión: ${ reason }"
+
+#: src/lib/router.js:84
+#, javascript-format
+msgid "This page could not load: ${ reason }"
+msgstr "Esta página no se pudo cargar: ${ reason }"
+
+#: src/lib/file_size.js:8
+#, javascript-format
+msgid "${ bytes } B"
+msgstr "${ bytes } B"
+
+#: src/lib/file_size.js:10
+#, javascript-format
+msgid "${ kilobytes } KB"
+msgstr "${ kilobytes } KB"
+
+#: src/lib/file_size.js:12
+#, javascript-format
+msgid "${ megabytes } MB"
+msgstr "${ megabytes } MB"
+
+#: src/lib/PublicPagesLinks.svelte:13
+msgid "Terms of Service"
+msgstr "Términos del servicio"
+
+#: src/lib/PublicPagesLinks.svelte:15
+msgid "Privacy Policy"
+msgstr "Política de privacidad"
+
+#: src/lib/PublicPagesLinks.svelte:16
+#, javascript-format
+msgid "${ termsLink } and ${ privacyLink }"
+msgstr "${ termsLink } y la ${ privacyLink }"
+
+#. *
+#.    * @typedef {Object} Props
+#.    * @property {string} src
+#.    * @property {string} alt
+#.    * @property {string} [class]
+#.    * @property {string} [missing]
+#.    
+#. * @type {Props} 
+#: src/lib/FileImage.svelte:15
+msgid "Not on this device"
+msgstr "No está en este dispositivo"
+
+#: src/lib/AnimationsToggle.svelte:12
+msgid "Play animations"
+msgstr "Reproducir animaciones"
+
+#: src/lib/AccountsNeeded.svelte:14
+msgid "This is online only, and your account is only on this device."
+msgstr ""
+"Esto solo funciona en línea, y tu cuenta solo está en este dispositivo."
+
+#: src/lib/AccountsNeeded.svelte:17
+msgid "This needs an account, and you are a guest."
+msgstr "Esto necesita una cuenta, y eres un invitado."
+
+#: src/lib/AccountsGuestNotice.svelte:44 src/lib/AccountsNeeded.svelte:19
+#: src/lib/layouts/AccountMenu.svelte:71
+msgid "Sign up"
+msgstr "Regístrate"
+
+#: src/lib/AccountsGuestNotice.svelte:35
+msgid "1 hour"
+msgstr "1 hora"
+
+#: src/lib/AccountsGuestNotice.svelte:35
+#, javascript-format
+msgid "${ hours } hours"
+msgstr "${ hours } horas"
+
+#: src/lib/AccountsGuestNotice.svelte:37
+msgid "1 minute"
+msgstr "1 minuto"
+
+#: src/lib/AccountsGuestNotice.svelte:37
+#, javascript-format
+msgid "${ minutes } minutes"
+msgstr "${ minutes } minutos"
+
+#: src/lib/AccountsGuestNotice.svelte:40
+#, javascript-format
+msgid "You're a guest. Sign up within ${ remaining } to keep what you make."
+msgstr ""
+"Eres un invitado. Regístrate en menos de ${ remaining } para conservar lo "
+"que hagas."
+
+#: src/lib/AccountsGuestNotice.svelte:41
+#, javascript-format
+msgid ""
+"Your guest visit ended. Sign up before ${ deletedAt } to keep what you made."
+msgstr ""
+"Tu visita como invitado terminó. Regístrate antes de ${ deletedAt } para "
+"conservar lo que hiciste."
+
+#: src/lib/layouts/ThemeMenu.svelte:21
+#, javascript-format
+msgid "Theme: ${ current }"
+msgstr "Tema: ${ current }"
+
+#: src/lib/layouts/BottomBar.svelte:40 src/lib/layouts/ThemeMenu.svelte:22
+msgid "Theme"
+msgstr "Tema"
+
+#: src/lib/layouts/ThemeChoices.svelte:22
+msgid "System"
+msgstr "Sistema"
+
+#: src/lib/layouts/SyncMenu.svelte:56
+msgid "Sync"
+msgstr "Sincronizar"
+
+#: src/lib/layouts/SyncMenu.svelte:57
+msgid "Offline"
+msgstr "Sin conexión"
+
+#: src/lib/layouts/SyncMenu.svelte:58
+#, javascript-format
+msgid "${ status.conflicts } not saved"
+msgstr "${ status.conflicts } sin guardar"
+
+#: src/lib/layouts/SyncMenu.svelte:59
+#, javascript-format
+msgid "${ status.pending } waiting"
+msgstr "${ status.pending } en espera"
+
+#: src/lib/layouts/SyncMenu.svelte:62
+msgid "Working offline"
+msgstr "Trabajando sin conexión"
+
+#: src/lib/layouts/SyncMenu.svelte:65
+#, javascript-format
+msgid "${ status.conflicts } change was not saved on the server"
+msgid_plural "${ status.conflicts } changes were not saved on the server"
+msgstr[0] "${ status.conflicts } cambio no se guardó en el servidor"
+msgstr[1] "${ status.conflicts } cambios no se guardaron en el servidor"
+
+#: src/lib/layouts/SyncMenu.svelte:70
+#, javascript-format
+msgid "${ status.pending } waiting to sync"
+msgstr "${ status.pending } esperando para sincronizar"
+
+#: src/lib/layouts/SyncMenu.svelte:71
+msgid "Everything is synced"
+msgstr "Todo está sincronizado"
+
+#: src/lib/layouts/SyncMenu.svelte:75
+msgid "Go online"
+msgstr "Conectarse"
+
+#: src/lib/layouts/SyncMenu.svelte:78
+msgid "Sync now"
+msgstr "Sincronizar ahora"
+
+#: src/lib/layouts/SyncMenu.svelte:81
+msgid "Work offline"
+msgstr "Trabajar sin conexión"
+
+#: src/lib/layouts/CurrentCommunityMenu.svelte:62
+msgid "No community"
+msgstr "Sin comunidad"
+
+#: src/communities/CommunitiesIndexPage.svelte:13
+#: src/lib/layouts/AppNav.svelte:29
+#: src/lib/layouts/CurrentCommunityMenu.svelte:63
+msgid "Communities"
+msgstr "Comunidades"
+
+#: src/lib/components/Dialog.svelte:18
+#: src/lib/layouts/CurrentCommunityMenu.svelte:64
+msgid "Close"
+msgstr "Cerrar"
+
+#: src/lib/layouts/CurrentCommunityMenu.svelte:67
+#: src/lib/layouts/CurrentCommunityMenu.svelte:68
+msgid "Filter communities"
+msgstr "Filtrar comunidades"
+
+#: src/lib/layouts/CurrentCommunityMenu.svelte:74
+msgid "You are not in a community yet."
+msgstr "Todavía no estás en ninguna comunidad."
+
+#: src/lib/layouts/CurrentCommunityMenu.svelte:74
+msgid "No community matches."
+msgstr "Ninguna comunidad coincide."
+
+#: src/lib/layouts/CurrentCommunityMenu.svelte:77
+msgid "Join / Manage Communities"
+msgstr "Unirse / Administrar comunidades"
+
+#: src/lib/layouts/BottomBar.svelte:32
+msgid "Close menu"
+msgstr "Cerrar menú"
+
+#: src/lib/layouts/BottomBar.svelte:34 src/lib/layouts/BottomBar.svelte:56
+msgid "Menu"
+msgstr "Menú"
+
+#: src/lib/layouts/AppNav.svelte:69 src/lib/layouts/BottomBar.svelte:42
+msgid "Main"
+msgstr "Principal"
+
+#: src/lib/layouts/AppHeader.svelte:18 src/lib/layouts/AppHeader.svelte:19
+#: src/lib/layouts/BottomBar.svelte:49
+msgid "Back"
+msgstr "Atrás"
+
+#: src/lib/layouts/AppHeader.svelte:22 src/lib/layouts/AppHeader.svelte:23
+#: src/lib/layouts/BottomBar.svelte:52
+msgid "Forward"
+msgstr "Adelante"
+
+#. * @typedef {{ id: string, label: string, icon: string, href: string, target?: string }} Link 
+#. * @type {Link[]} 
+#: src/lib/layouts/AppNav.svelte:24
+msgid "Home"
+msgstr "Inicio"
+
+#. * @typedef {{ id: string, label: string, icon: string, href: string, target?: string }} Link 
+#. * @type {Link[]} 
+#: src/files/FilesIndexPage.svelte:87 src/files/FilesNewPage.svelte:333
+#: src/lib/layouts/AppNav.svelte:28
+msgid "Files"
+msgstr "Archivos"
+
+#. * @typedef {{ id: string, label: string, icon: string, href: string, target?: string }} Link 
+#. * @type {Link[]} 
+#: src/forum/ForumIndexPage.svelte:9 src/lib/layouts/AppNav.svelte:31
+msgid "Forum"
+msgstr "Foro"
+
+#. * @typedef {{ id: string, label: string, icon: string, href: string, target?: string }} Link 
+#. * @type {Link[]} 
+#: src/lib/layouts/AppNav.svelte:35
+msgid "Ops"
+msgstr "Operaciones"
+
+#: src/lib/layouts/AccountsPaymentFailedBanner.svelte:14
+msgid ""
+"Your plan's payment failed, so your plan is paused. Update your payment to "
+"restore it."
+msgstr ""
+"El pago de tu plan falló, así que tu plan está en pausa. Actualiza tu pago "
+"para restablecerlo."
+
+#: src/lib/layouts/AccountsPaymentFailedBanner.svelte:16
+msgid "Update your payment"
+msgstr "Actualizar tu pago"
+
+#: src/lib/layouts/AccountMenu.svelte:45
+msgid "Account, as a guest"
+msgstr "Cuenta, como invitado"
+
+#: src/accounts/current/AccountsCurrentShowPage.svelte:23
+#: src/lib/layouts/AccountMenu.svelte:45
+msgid "Account"
+msgstr "Cuenta"
+
+#: src/lib/layouts/AccountMenu.svelte:48
+msgid "Guest"
+msgstr "Invitado"
+
+#: src/accounts/AccountsIndexPage.svelte:209
+#: src/lib/layouts/AccountMenu.svelte:52
+msgid "On this device only"
+msgstr "Solo en este dispositivo"
+
+#: src/lib/layouts/AccountMenu.svelte:58
+msgid "Account settings"
+msgstr "Configuración de la cuenta"
+
+#: src/lib/layouts/AccountMenu.svelte:61
+msgid "Switch account"
+msgstr "Cambiar de cuenta"
+
+#: src/lib/layouts/AccountMenu.svelte:64
+msgid "Log out"
+msgstr "Cerrar sesión"
+
+#: src/accounts/AccountsIndexPage.svelte:52
+#: src/accounts/AccountsIndexPage.svelte:222
+#: src/accounts/AccountsSignInPage.svelte:86
+#: src/accounts/AccountsSignInPage.svelte:96
+#: src/accounts/components/AccountsSignInSteps.svelte:30
+#: src/lib/layouts/AccountMenu.svelte:67 src/lib/layouts/AccountMenu.svelte:69
+msgid "Log in"
+msgstr "Iniciar sesión"
+
+#: src/lib/core/uploads.js:24
+#, javascript-format
+msgid "The upload failed with ${ request.status }; try again"
+msgstr "La subida falló con ${ request.status }; inténtalo de nuevo"
+
+#: src/lib/core/uploads.js:26
+msgid "The upload could not reach the storage; try again"
+msgstr "La subida no pudo llegar al almacenamiento; inténtalo de nuevo"
+
+#: src/lib/core/http-api.js:542
+#, javascript-format
+msgid "Could not read the image (${ response.status })"
+msgstr "No se pudo leer la imagen (${ response.status })"
+
+#: src/lib/core/http-api.js:728
+msgid "On the web, plans and products are bought through Stripe"
+msgstr "En la web, los planes y productos se compran a través de Stripe"
+
+#: src/lib/core/http-api.js:732
+msgid "Restoring purchases is in the iPhone app"
+msgstr "Restaurar compras está en la app de iPhone"
+
+#: src/lib/core/http-api.js:736
+msgid "A plan from a phone's store is managed on the phone"
+msgstr "Un plan de la tienda de un teléfono se administra en el teléfono"
+
+#: src/lib/core/http-api.js:561
+msgid "Could not copy the image"
+msgstr "No se pudo copiar la imagen"
+
+#. *
+#.    * @typedef {Object} Props
+#.    * @property {string} [value]
+#.    * @property {number} [length]
+#.    * @property {boolean} [disabled]
+#.    * @property {string} [label] for screen readers
+#.    * @property {(code: string) => void} [oncomplete]
+#.    
+#. * @type {Props} 
+#: src/lib/components/CodeInput.svelte:15
+msgid "Code"
+msgstr "Código"
+
+#: src/lib/components/CodeInput.svelte:31
+#, javascript-format
+msgid "${ label }, digit ${ position } of ${ length }"
+msgstr "${ label }, dígito ${ position } de ${ length }"
+
+#: src/home/HomePage.svelte:7
+msgid "posts"
+msgstr "publicaciones"
+
+#: src/home/HomePage.svelte:9
+msgid ""
+"The same pages on the web, on the desktop and on a phone, over the same Rust "
+"application."
+msgstr ""
+"Las mismas páginas en la web, en el escritorio y en el teléfono, sobre la "
+"misma aplicación en Rust."
+
+#: src/home/HomePage.svelte:10
+#, javascript-format
+msgid "Log in, then start with the ${ postsLink }."
+msgstr "Inicia sesión y empieza por las ${ postsLink }."
+
+#: src/files/FilesShowPage.svelte:61
+msgid "File"
+msgstr "Archivo"
+
+#: src/files/FilesShowPage.svelte:63
+msgid "A former member"
+msgstr "Un exmiembro"
+
+#: src/files/FilesShowPage.svelte:68
+msgid "waiting to upload"
+msgstr "esperando para subirse"
+
+#: src/files/FilesShowPage.svelte:69
+msgid "not saved on the server"
+msgstr "sin guardar en el servidor"
+
+#: src/files/FilesShowPage.svelte:72
+msgid "Try again or let it go"
+msgstr "Inténtalo de nuevo o descártalo"
+
+#: src/files/FilesShowPage.svelte:73
+msgid "Copy to the clipboard"
+msgstr "Copiar al portapapeles"
+
+#: src/accounts/components/AccountsDeviceCode.svelte:28
+#: src/files/FilesShowPage.svelte:77
+msgid "Copied"
+msgstr "Copiado"
+
+#: src/files/FilesShowPage.svelte:77
+msgid "Click the image to copy it"
+msgstr "Haz clic en la imagen para copiarla"
+
+#: src/files/FilesShowPage.svelte:84
+msgid "This kind of file is not shown here."
+msgstr "Este tipo de archivo no se muestra aquí."
+
+#: src/files/FilesShowPage.svelte:86
+msgid "Download"
+msgstr "Descargar"
+
+#: src/files/FilesNewPage.svelte:364 src/files/FilesShowPage.svelte:93
+msgid "Back to files"
+msgstr "Volver a los archivos"
+
+#: src/files/FilesShowPage.svelte:44
+#, javascript-format
+msgid "Saved to ${ path }"
+msgstr "Guardado en ${ path }"
+
+#: src/files/FilesShowPage.svelte:51
+msgid ""
+"Delete this file from your communities? A community you are not in keeps it."
+msgstr ""
+"¿Eliminar este archivo de tus comunidades? Una comunidad en la que no estás "
+"lo conserva."
+
+#: src/files/FilesNewPage.svelte:129
+#, javascript-format
+msgid "A list holds ${ maxFiles } files; ${ leftOut } was left out."
+msgid_plural "A list holds ${ maxFiles } files; ${ leftOut } were left out."
+msgstr[0] "Una lista admite ${ maxFiles } archivos; ${ leftOut } quedó fuera."
+msgstr[1] ""
+"Una lista admite ${ maxFiles } archivos; ${ leftOut } quedaron fuera."
+
+#: src/files/FilesIndexPage.svelte:89 src/files/FilesNewPage.svelte:326
+msgid "New files"
+msgstr "Nuevos archivos"
+
+#: src/files/FilesNewPage.svelte:328
+msgid "Files to create"
+msgstr "Archivos para crear"
+
+#: src/files/FilesNewPage.svelte:336
+#, javascript-format
+msgid "Pick one file or many, or drop them here, up to ${ maxFiles }."
+msgstr "Elige uno o varios archivos, o suéltalos aquí, hasta ${ maxFiles }."
+
+#: src/files/FilesNewPage.svelte:346
+#, javascript-format
+msgid ""
+"Creating ${ run.done } of ${ run.total }. Stay on this page until they are "
+"done."
+msgstr ""
+"Creando ${ run.done } de ${ run.total }. Quédate en esta página hasta que "
+"terminen."
+
+#: src/files/FilesNewPage.svelte:349
+msgid "Creating…"
+msgstr "Creando…"
+
+#: src/files/FilesNewPage.svelte:350
+#, javascript-format
+msgid ""
+"${ counts.created } created, ${ counts.put } put in, ${ counts.skipped } "
+"skipped, ${ counts.failed } failed."
+msgstr ""
+"${ counts.created } creados, ${ counts.put } añadidos, ${ counts.skipped } "
+"omitidos, ${ counts.failed } fallidos."
+
+#: src/files/FilesNewPage.svelte:351
+#, javascript-format
+msgid ""
+"Looking for files already here… ${ hashedCount } of ${ askingCount } read."
+msgstr ""
+"Buscando archivos que ya están aquí… ${ hashedCount } de ${ askingCount } "
+"leídos."
+
+#: src/files/FilesNewPage.svelte:352
+msgid "One file is already here; choose what to do with it."
+msgid_plural ""
+"${ toDecideCount } files are already here; choose what to do with each."
+msgstr[0] "Un archivo ya está aquí; elige qué hacer con él."
+msgstr[1] ""
+"${ toDecideCount } archivos ya están aquí; elige qué hacer con cada uno."
+
+#: src/files/FilesNewPage.svelte:358
+msgid "Create files"
+msgstr "Crear archivos"
+
+#: src/files/FilesNewPage.svelte:359
+msgid "Create file"
+msgid_plural "Create ${ openCount } files"
+msgstr[0] "Crear archivo"
+msgstr[1] "Crear ${ openCount } archivos"
+
+#: src/files/FilesNewPage.svelte:362
+msgid "Retry failed"
+msgstr "Reintentar los fallidos"
+
+#. * @type {{ view: import("./files_view.js").FilesView, label: string, icon: string }[]} 
+#: src/files/FilesIndexPage.svelte:16
+msgid "List"
+msgstr "Lista"
+
+#. * @type {{ view: import("./files_view.js").FilesView, label: string, icon: string }[]} 
+#: src/files/FilesIndexPage.svelte:17
+msgid "Grid"
+msgstr "Cuadrícula"
+
+#: src/files/FilesIndexPage.svelte:91
+msgid "No files yet."
+msgstr "Todavía no hay archivos."
+
+#: src/files/FilesIndexPage.svelte:93 src/files/FilesIndexPage.svelte:94
+msgid "Search by name"
+msgstr "Buscar por nombre"
+
+#: src/files/FilesIndexPage.svelte:100
+msgid "No files have that in their name."
+msgstr "Ningún archivo tiene eso en su nombre."
+
+#: src/files/FilesIndexPage.svelte:112 src/files/components/FilesGrid.svelte:23
+msgid "Waiting to upload"
+msgstr "Esperando para subirse"
+
+#: src/files/FilesIndexPage.svelte:113 src/files/components/FilesGrid.svelte:24
+msgid "Not saved on the server"
+msgstr "Sin guardar en el servidor"
+
+#: src/files/FilesIndexPage.svelte:115
+msgid "Show more"
+msgstr "Mostrar más"
+
+#: src/files/FilesIndexPage.svelte:116
+#, javascript-format
+msgid "${ cache.count } file kept on this device, ${ cachedSize }."
+msgid_plural "${ cache.count } files kept on this device, ${ cachedSize }."
+msgstr[0] ""
+"${ cache.count } archivo guardado en este dispositivo, ${ cachedSize }."
+msgstr[1] ""
+"${ cache.count } archivos guardados en este dispositivo, ${ cachedSize }."
+
+#: src/files/FilesIndexPage.svelte:121
+msgid ""
+"Removing them frees the space; each is fetched again when it is next shown."
+msgstr ""
+"Quitarlos libera el espacio; cada uno se descarga de nuevo la próxima vez "
+"que se muestre."
+
+#: src/files/FilesIndexPage.svelte:124
+msgid "Remove cached files"
+msgstr "Quitar los archivos guardados"
+
+#: src/files/FilesEditPage.svelte:51
+msgid "Edit file"
+msgstr "Editar archivo"
+
+#: src/files/FilesEditPage.svelte:62
+msgid "Back to the file"
+msgstr "Volver al archivo"
+
+#: src/files/components/FilesNewRow.svelte:24
+msgid "Put it in the communities chosen"
+msgstr "Ponerlo en las comunidades elegidas"
+
+#: src/files/components/FilesNewRow.svelte:24
+msgid "Create a copy"
+msgstr "Crear una copia"
+
+#: src/accounts/AccountsIndexPage.svelte:231
+#: src/files/components/FilesNewRow.svelte:24
+msgid "Skip"
+msgstr "Omitir"
+
+#: src/files/components/FilesNewRow.svelte:25
+msgid "Waiting"
+msgstr "En espera"
+
+#: src/files/components/FilesNewRow.svelte:25
+msgid "Created"
+msgstr "Creado"
+
+#: src/files/components/FilesNewRow.svelte:25
+msgid "Put in"
+msgstr "Añadido"
+
+#: src/files/components/FilesNewRow.svelte:25
+msgid "Skipped"
+msgstr "Omitido"
+
+#: src/files/components/FilesNewRow.svelte:49
+msgid "Rename"
+msgstr "Cambiar nombre"
+
+#: src/files/components/FilesNewRow.svelte:60
+msgid "Failed"
+msgstr "Falló"
+
+#: src/files/components/FilesNewRow.svelte:63
+msgid "Take it off the list"
+msgstr "Quitarlo de la lista"
+
+#: src/files/components/FilesNewRow.svelte:64
+msgid "Remove"
+msgstr "Quitar"
+
+#: src/files/components/FilesNewRow.svelte:67
+#, javascript-format
+msgid "Already here, as ${ existingLink } in ${ communityNames }."
+msgstr "Ya está aquí, como ${ existingLink } en ${ communityNames }."
+
+#: src/files/components/FilesNewRow.svelte:68
+#, javascript-format
+msgid "The same file as ${ earlier.name }, earlier in this list."
+msgstr "El mismo archivo que ${ earlier.name }, antes en esta lista."
+
+#: src/files/components/FilesNewRow.svelte:73
+#, javascript-format
+msgid "The same for ${ count } more"
+msgid_plural "The same for ${ count } more"
+msgstr[0] "Lo mismo para ${ count } más"
+msgstr[1] "Lo mismo para ${ count } más"
+
+#: src/conflicts/ConflictsIndexPage.svelte:41
+msgid "Changes not on the server"
+msgstr "Cambios que no están en el servidor"
+
+#: src/conflicts/ConflictsIndexPage.svelte:43
+msgid "Every change reached the server."
+msgstr "Todos los cambios llegaron al servidor."
+
+#: src/conflicts/ConflictsIndexPage.svelte:44
+msgid "Waiting to reach the server"
+msgstr "Esperando para llegar al servidor"
+
+#: src/conflicts/ConflictsIndexPage.svelte:50
+msgid "Not kept by the server"
+msgstr "No conservados por el servidor"
+
+#: src/conflicts/ConflictsIndexPage.svelte:51
+msgid "Something that is gone"
+msgstr "Algo que ya no existe"
+
+#: src/conflicts/ConflictsIndexPage.svelte:54
+msgid "The server did not take this. It is still on this device."
+msgstr "El servidor no aceptó esto. Sigue en este dispositivo."
+
+#: src/conflicts/ConflictsIndexPage.svelte:55
+msgid "Your change"
+msgstr "Tu cambio"
+
+#: src/conflicts/ConflictsIndexPage.svelte:57
+msgid "Now on the server"
+msgstr "Ahora en el servidor"
+
+#: src/conflicts/ConflictsIndexPage.svelte:60
+msgid "Reapply"
+msgstr "Volver a aplicar"
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:64
+#: src/conflicts/ConflictsIndexPage.svelte:62
+msgid "Try again"
+msgstr "Intentar de nuevo"
+
+#: src/conflicts/ConflictsIndexPage.svelte:64
+msgid "Let it go"
+msgstr "Descartarlo"
+
+#: src/communities/CommunitiesShowPage.svelte:33
+msgid "Community"
+msgstr "Comunidad"
+
+#: src/communities/CommunitiesShowPage.svelte:35
+#, javascript-format
+msgid "Created ${ community.inserted_at }"
+msgstr "Creada el ${ community.inserted_at }"
+
+#: src/communities/CommunitiesShowPage.svelte:36
+msgid "you are a member"
+msgstr "eres miembro"
+
+#: src/communities/CommunitiesNewPage.svelte:36
+#: src/communities/CommunitiesShowPage.svelte:48
+msgid "Back to communities"
+msgstr "Volver a las comunidades"
+
+#: src/communities/CommunitiesIndexPage.svelte:15
+#: src/communities/CommunitiesNewPage.svelte:32
+msgid "New community"
+msgstr "Nueva comunidad"
+
+#: src/communities/CommunitiesNewPage.svelte:33
+msgid "Create"
+msgstr "Crear"
+
+#: src/communities/CommunitiesIndexPage.svelte:17
+msgid "No communities yet."
+msgstr "Todavía no hay comunidades."
+
+#: src/communities/CommunitiesIndexPage.svelte:20
+msgid "member"
+msgstr "miembro"
+
+#: src/communities/CommunitiesEditPage.svelte:45
+msgid "Edit community"
+msgstr "Editar comunidad"
+
+#: src/communities/CommunitiesEditPage.svelte:50
+msgid "Back to the community"
+msgstr "Volver a la comunidad"
+
+#: src/communities/components/CommunitiesMembershipButton.svelte:37
+msgid "Leave"
+msgstr "Salir"
+
+#: src/communities/components/CommunitiesMembershipButton.svelte:37
+msgid "Join"
+msgstr "Unirse"
+
+#: src/communities/components/CommunitiesDeleteDialog.svelte:25
+#, javascript-format
+msgid "Delete ${ community.name }?"
+msgstr "¿Eliminar ${ community.name }?"
+
+#: src/communities/components/CommunitiesDeleteDialog.svelte:26
+msgid ""
+"Every member leaves it, and the posts in it are taken out of it. The posts "
+"themselves stay with the people who wrote them."
+msgstr ""
+"Todos los miembros salen de ella y sus publicaciones se quitan de ella. Las "
+"publicaciones en sí siguen siendo de quienes las escribieron."
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:48
+#: src/communities/components/CommunitiesDeleteDialog.svelte:29
+msgid "Keep"
+msgstr "Conservar"
+
+#: src/communities/components/CommunitiesDeleteDialog.svelte:32
+msgid "Delete community"
+msgstr "Eliminar comunidad"
+
+#: src/accounts/stores.js:13
+msgid "the App Store"
+msgstr "el App Store"
+
+#: src/accounts/stores.js:14
+msgid "Google Play"
+msgstr "Google Play"
+
+#: src/accounts/stores.js:15
+msgid "the web"
+msgstr "la web"
+
+#: src/accounts/stores.js:23
+msgid "in the App Store on your iPhone"
+msgstr "en el App Store de tu iPhone"
+
+#: src/accounts/stores.js:24
+msgid "in Google Play on your Android device"
+msgstr "en Google Play de tu dispositivo Android"
+
+#: src/accounts/stores.js:25
+msgid "on the web"
+msgstr "en la web"
+
+#: src/accounts/money.js:22
+#, javascript-format
+msgid "${ money } / month"
+msgstr "${ money } / mes"
+
+#: src/accounts/money.js:23
+#, javascript-format
+msgid "${ money } / year"
+msgstr "${ money } / año"
+
+#: src/accounts/AccountsTrialPage.svelte:35
+msgid "Try it now"
+msgstr "Pruébalo ahora"
+
+#: src/accounts/AccountsTrialPage.svelte:36
+msgid "Guest visits are not available right now."
+msgstr "Las visitas como invitado no están disponibles ahora mismo."
+
+#: src/accounts/AccountsSignInPage.svelte:86
+#: src/accounts/AccountsTrialPage.svelte:38
+#: src/accounts/AccountsTrialPage.svelte:46
+msgid "Log in or sign up"
+msgstr "Inicia sesión o regístrate"
+
+#: src/accounts/AccountsTrialPage.svelte:39
+msgid ""
+"Use the app for 24 hours with no account. What you make is deleted after "
+"that, unless you sign up, which keeps all of it."
+msgstr ""
+"Usa la app durante 24 horas sin cuenta. Lo que hagas se elimina después, a "
+"menos que te registres, lo que lo conserva todo."
+
+#: src/accounts/AccountsTrialPage.svelte:40
+msgid ""
+"A guest stays in this browser, and has no files or picture until they sign "
+"up."
+msgstr ""
+"Un invitado se queda en este navegador y no tiene archivos ni foto hasta que "
+"se registra."
+
+#: src/accounts/AccountsTrialPage.svelte:44
+#: src/accounts/components/AccountsGuestRow.svelte:29
+msgid "Continue as guest"
+msgstr "Continuar como invitado"
+
+#: src/accounts/AccountsSignInPage.svelte:86
+msgid "Check your email"
+msgstr "Revisa tu correo"
+
+#: src/accounts/AccountsSignInPage.svelte:87
+msgid "Logging in for the app on your device."
+msgstr "Iniciando sesión para la app de tu dispositivo."
+
+#: src/accounts/AccountsSignInPage.svelte:90
+#: src/accounts/products/AccountsProductsIndexPage.svelte:43
+msgid "or"
+msgstr "o"
+
+#: src/accounts/AccountsSignInPage.svelte:92
+#: src/accounts/AccountsSignInPage.svelte:102
+#: src/accounts/AccountsSignInPage.svelte:103
+msgid "Email"
+msgstr "Correo electrónico"
+
+#: src/accounts/AccountsSignInPage.svelte:93
+#: src/accounts/current/AccountsCurrentShowPage.svelte:30
+msgid "Password"
+msgstr "Contraseña"
+
+#: src/accounts/AccountsSignInPage.svelte:99
+msgid "Email a code instead"
+msgstr "Enviarme un código por correo"
+
+#: src/accounts/AccountsSignInPage.svelte:100
+#: src/accounts/components/AccountsSignInSteps.svelte:96
+msgid "Keep me logged in"
+msgstr "Mantener la sesión iniciada"
+
+#: src/accounts/AccountsSignInPage.svelte:101
+msgid "Forgot your password? Use a code, then change it in Account settings."
+msgstr ""
+"¿Olvidaste tu contraseña? Usa un código y luego cámbiala en la configuración "
+"de la cuenta."
+
+#: src/accounts/AccountsSignInPage.svelte:106
+msgid "Email a code"
+msgstr "Enviarme un código"
+
+#: src/accounts/AccountsSignInPage.svelte:109
+msgid "Use my password"
+msgstr "Usar mi contraseña"
+
+#: src/accounts/AccountsSignInPage.svelte:110
+msgid "This server takes no new sign-ups."
+msgstr "Este servidor no acepta registros nuevos."
+
+#: src/accounts/AccountsSignInPage.svelte:111
+#, javascript-format
+msgid "By continuing, you accept the ${ publicPagesLinks }."
+msgstr "Al continuar, aceptas los ${ publicPagesLinks }."
+
+#: src/accounts/AccountsIndexPage.svelte:205
+msgid "Accounts on this device"
+msgstr "Cuentas en este dispositivo"
+
+#: src/accounts/AccountsIndexPage.svelte:206
+msgid "This account was deleted, and removed from this device."
+msgstr "Esta cuenta se eliminó y se quitó de este dispositivo."
+
+#: src/accounts/AccountsIndexPage.svelte:208
+msgid "No account yet."
+msgstr "Todavía no hay ninguna cuenta."
+
+#: src/accounts/AccountsIndexPage.svelte:215
+#: src/accounts/subscriptions/subscription_status.js:8
+msgid "Active"
+msgstr "Activa"
+
+#: src/accounts/AccountsIndexPage.svelte:218
+#: src/accounts/products/AccountsProductsShowPage.svelte:99
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:103
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:113
+msgid "Switch"
+msgstr "Cambiar"
+
+#: src/accounts/AccountsIndexPage.svelte:219
+msgid "Logged out"
+msgstr "Sesión cerrada"
+
+#: src/accounts/AccountsIndexPage.svelte:225
+#: src/accounts/components/AccountsRemoveDialog.svelte:51
+msgid "Remove from device"
+msgstr "Quitar del dispositivo"
+
+#: src/accounts/AccountsIndexPage.svelte:228
+msgid "Add account"
+msgstr "Añadir cuenta"
+
+#: src/accounts/AccountsIndexPage.svelte:232
+msgid ""
+"Use the app on this device only, with no account. You can sign up later."
+msgstr ""
+"Usa la app solo en este dispositivo, sin cuenta. Puedes registrarte más "
+"tarde."
+
+#: src/accounts/AccountsBackToAppPage.svelte:6
+msgid "All done here"
+msgstr "Todo listo"
+
+#: src/accounts/AccountsBackToAppPage.svelte:7
+msgid "Go back to the app. It shows what changed when you do."
+msgstr "Vuelve a la app. Mostrará lo que cambió cuando lo hagas."
+
+#: src/accounts/AccountsBackToAppPage.svelte:8
+msgid "You can close this tab."
+msgstr "Puedes cerrar esta pestaña."
+
+#: src/accounts/subscriptions/subscription_status.js:10
+msgid "In its free days"
+msgstr "En sus días gratis"
+
+#: src/accounts/subscriptions/subscription_status.js:12
+msgid "Payment failed, Stripe is retrying"
+msgstr "El pago falló, Stripe lo está reintentando"
+
+#: src/accounts/subscriptions/subscription_status.js:14
+msgid "Payment failed"
+msgstr "El pago falló"
+
+#: src/accounts/subscriptions/subscription_status.js:16
+msgid "Waiting for the first payment"
+msgstr "Esperando el primer pago"
+
+#: src/accounts/subscriptions/subscription_status.js:18
+msgid "Never paid"
+msgstr "Nunca se pagó"
+
+#: src/accounts/subscriptions/subscription_status.js:20
+msgid "Paused"
+msgstr "En pausa"
+
+#: src/accounts/subscriptions/subscription_status.js:22
+msgid "Ended"
+msgstr "Terminado"
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:96
+#, javascript-format
+msgid "Ended ${ endedOn }"
+msgstr "Terminó el ${ endedOn }"
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:97
+#, javascript-format
+msgid "Ends ${ endsOn }"
+msgstr "Termina el ${ endsOn }"
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:98
+#, javascript-format
+msgid "Renews ${ renewsOn }"
+msgstr "Se renueva el ${ renewsOn }"
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:99
+#, javascript-format
+msgid "Changes to ${ scheduledPrice } on ${ scheduledOn }."
+msgstr "Cambia a ${ scheduledPrice } el ${ scheduledOn }."
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:100
+msgid ""
+"Stripe's page is open in your browser. This page updates when you come back."
+msgstr ""
+"La página de Stripe está abierta en tu navegador. Esta página se actualiza "
+"cuando vuelvas."
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:101
+#, javascript-format
+msgid "Bought in ${ boughtIn }: manage it ${ managedWhere }."
+msgstr "Comprado en ${ boughtIn }: adminístralo ${ managedWhere }."
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:105
+#, javascript-format
+msgid "Manage in ${ storeShown }"
+msgstr "Administrar en ${ storeShown }"
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:108
+#, javascript-format
+msgid "Keep ${ currentPrice }"
+msgstr "Mantener ${ currentPrice }"
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:111
+msgid "Resume"
+msgstr "Reanudar"
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:116
+msgid "Cancel at the end of this period"
+msgstr "Cancelar al final de este período"
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:119
+msgid "Card and invoices"
+msgstr "Tarjeta y facturas"
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:119
+msgid "Update your card"
+msgstr "Actualizar tu tarjeta"
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:121
+msgid "Back to plans"
+msgstr "Volver a los planes"
+
+#: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:51
+msgid "Cancel your plan at the end of this period?"
+msgstr "¿Cancelar tu plan al final de este período?"
+
+#: src/accounts/current/AccountsCurrentShowPage.svelte:33
+#: src/accounts/subscriptions/AccountsSubscriptionsIndexPage.svelte:13
+msgid "Plans"
+msgstr "Planes"
+
+#: src/accounts/subscriptions/AccountsSubscriptionsIndexPage.svelte:15
+msgid "No plan yet."
+msgstr "Todavía no tienes ningún plan."
+
+#: src/accounts/subscriptions/AccountsSubscriptionsIndexPage.svelte:17
+msgid "See the plans"
+msgstr "Ver los planes"
+
+#: src/accounts/purchases/AccountsPurchasesShowPage.svelte:16
+#, javascript-format
+msgid "${ amount }, tax included"
+msgstr "${ amount }, impuestos incluidos"
+
+#: src/accounts/purchases/AccountsPurchasesShowPage.svelte:17
+#, javascript-format
+msgid "Bought ${ boughtAt }"
+msgstr "Comprado el ${ boughtAt }"
+
+#: src/accounts/purchases/AccountsPurchasesShowPage.svelte:18
+#, javascript-format
+msgid "Refunded ${ refundedAt }"
+msgstr "Reembolsado el ${ refundedAt }"
+
+#: src/accounts/purchases/AccountsPurchasesShowPage.svelte:19
+msgid "The receipt is in the email sent when you paid."
+msgstr "El recibo está en el correo que se envió cuando pagaste."
+
+#: src/accounts/purchases/AccountsPurchasesShowPage.svelte:21
+msgid "Back to purchases"
+msgstr "Volver a las compras"
+
+#: src/accounts/current/AccountsCurrentShowPage.svelte:37
+#: src/accounts/purchases/AccountsPurchasesIndexPage.svelte:12
+msgid "Purchases"
+msgstr "Compras"
+
+#: src/accounts/purchases/AccountsPurchasesIndexPage.svelte:14
+msgid "Nothing bought yet."
+msgstr "Todavía no has comprado nada."
+
+#: src/accounts/purchases/AccountsPurchasesIndexPage.svelte:16
+msgid "See what is for sale"
+msgstr "Ver lo que está a la venta"
+
+#: src/accounts/purchases/AccountsPurchasesIndexPage.svelte:21
+msgid "Refunded"
+msgstr "Reembolsado"
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:91
+#, javascript-format
+msgid "The first ${ product.free_days } days are free."
+msgstr "Los primeros ${ product.free_days } días son gratis."
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:94
+#, javascript-format
+msgid "You are on ${ plan.product_name }."
+msgstr "Tienes ${ plan.product_name }."
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:95
+#, javascript-format
+msgid "It was bought in ${ boughtIn }: manage it ${ managedWhere }."
+msgstr "Se compró en ${ boughtIn }: adminístralo ${ managedWhere }."
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:96
+msgid "It ends with this period. Resume it on its page to switch."
+msgstr "Termina con este período. Reanúdalo en su página para cambiar."
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:101
+msgid ""
+"A dearer plan, or yearly, starts now with the difference charged; a cheaper "
+"one, or monthly, starts when this period ends."
+msgstr ""
+"Un plan más caro, o anual, empieza ahora y se cobra la diferencia; uno más "
+"barato, o mensual, empieza cuando termina este período."
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:102
+#, javascript-format
+msgid ""
+"${ storeShown } decides when the new plan starts: an upgrade at once, a "
+"downgrade at the renewal."
+msgstr ""
+"${ storeShown } decide cuándo empieza el nuevo plan: una mejora, al "
+"instante; una reducción, en la renovación."
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:54
+#: src/accounts/products/AccountsProductsShowPage.svelte:104
+msgid "See your plan"
+msgstr "Ver tu plan"
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:105
+msgid "Owned"
+msgstr "Ya es tuyo"
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:106
+msgid "You have this. You can buy it again."
+msgstr "Ya lo tienes. Puedes volver a comprarlo."
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:109
+msgid "Buy"
+msgstr "Comprar"
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:111
+#, javascript-format
+msgid "Waiting for approval. It appears here once ${ storeShown } confirms it."
+msgstr ""
+"Esperando aprobación. Aparecerá aquí cuando ${ storeShown } lo confirme."
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:112
+#, javascript-format
+msgid ""
+"${ product.name }: an auto-renewing subscription, renewed each ${ periods } "
+"at the price shown until you cancel it in ${ storeShown }."
+msgstr ""
+"${ product.name }: una suscripción que se renueva automáticamente cada $"
+"{ periods } al precio indicado hasta que la canceles en ${ storeShown }."
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:113
+#, javascript-format
+msgid "By buying you accept the ${ publicPagesLinks }."
+msgstr "Al comprar, aceptas los ${ publicPagesLinks }."
+
+#: src/accounts/products/AccountsProductsShowPage.svelte:115
+msgid "Back to plans and products"
+msgstr "Volver a los planes y productos"
+
+#: src/accounts/products/AccountsProductsIndexPage.svelte:36
+msgid "Plans and products"
+msgstr "Planes y productos"
+
+#: src/accounts/products/AccountsProductsIndexPage.svelte:38
+msgid "Nothing is for sale yet."
+msgstr "Todavía no hay nada a la venta."
+
+#: src/accounts/products/AccountsProductsIndexPage.svelte:42
+msgid "Plan"
+msgstr "Plan"
+
+#: src/accounts/products/AccountsProductsIndexPage.svelte:42
+msgid "One-time"
+msgstr "Pago único"
+
+#: src/accounts/products/AccountsProductsIndexPage.svelte:46
+msgid "Restore purchases"
+msgstr "Restaurar compras"
+
+#: src/accounts/products/AccountsProductsIndexPage.svelte:26
+#, javascript-format
+msgid "${ recorded } purchase restored."
+msgid_plural "${ recorded } purchases restored."
+msgstr[0] "${ recorded } compra restaurada."
+msgstr[1] "${ recorded } compras restauradas."
+
+#: src/accounts/current/AccountsCurrentShowPage.svelte:39
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:56
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:75
+msgid "Delete my account"
+msgstr "Eliminar mi cuenta"
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:57
+msgid ""
+"This account is only on this device, with nothing on the server to delete."
+msgstr ""
+"Esta cuenta solo está en este dispositivo, sin nada en el servidor que "
+"eliminar."
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:59
+msgid "this device's accounts"
+msgstr "las cuentas de este dispositivo"
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:60
+#, javascript-format
+msgid "To remove it and its data, remove it from ${ accountsLink }."
+msgstr "Para quitarla junto con sus datos, quítala de ${ accountsLink }."
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:61
+msgid ""
+"Deleting your account deletes everything you made, in every community and on "
+"every device, and your purchases. It cannot be undone."
+msgstr ""
+"Eliminar tu cuenta elimina todo lo que hiciste, en todas las comunidades y "
+"en todos los dispositivos, y tus compras. No se puede deshacer."
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:62
+#, javascript-format
+msgid ""
+"Your plan, ${ currentUser.value.plan.product_name }, ends now, with no "
+"refund."
+msgstr ""
+"Tu plan, ${ currentUser.value.plan.product_name }, termina ahora, sin "
+"reembolso."
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:63
+#, javascript-format
+msgid ""
+"Your plan, ${ currentUser.value.plan.product_name }, is billed by ${ store } "
+"until you cancel it there. Deleting your account does not cancel it."
+msgstr ""
+"Tu plan, ${ currentUser.value.plan.product_name }, lo cobra ${ store } hasta "
+"que lo canceles allí. Eliminar tu cuenta no lo cancela."
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:65
+msgid "Manage it in the App Store"
+msgstr "Adminístralo en el App Store"
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:65
+msgid "Manage it in Google Play"
+msgstr "Adminístralo en Google Play"
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:67
+msgid "We email you a code to make sure it is you."
+msgstr "Te enviamos un código por correo para asegurarnos de que eres tú."
+
+#: src/accounts/components/AccountsSignInSteps.svelte:99
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:70
+msgid "Send a new code"
+msgstr "Enviar un código nuevo"
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:70
+msgid "Send code"
+msgstr "Enviar código"
+
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:71
+#, javascript-format
+msgid ""
+"A code is on its way to ${ currentUser.value.email }. It expires in ten "
+"minutes."
+msgstr ""
+"Un código va en camino a ${ currentUser.value.email }. Caduca en diez "
+"minutos."
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:50
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:77
+msgid "Back to account"
+msgstr "Volver a la cuenta"
+
+#: src/accounts/current/AccountsCurrentShowPage.svelte:27
+msgid "Delete what I made as a guest"
+msgstr "Eliminar lo que hice como invitado"
+
+#: src/accounts/current/AccountsCurrentShowPage.svelte:31
+#, javascript-format
+msgid "Your plan: ${ currentUser.value.plan.product_name }"
+msgstr "Tu plan: ${ currentUser.value.plan.product_name }"
+
+#: src/accounts/current/AccountsCurrentShowPage.svelte:35
+msgid "Plans and products for sale"
+msgstr "Planes y productos a la venta"
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:39
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:48
+msgid "Change password"
+msgstr "Cambiar contraseña"
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:39
+msgid "Create a password"
+msgstr "Crear una contraseña"
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:41
+msgid ""
+"A password is optional. With one, you can log in with it instead of an "
+"emailed code."
+msgstr ""
+"La contraseña es opcional. Con una, puedes iniciar sesión con ella en lugar "
+"de con un código por correo."
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:42
+msgid "New password"
+msgstr "Nueva contraseña"
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:43
+msgid "New password, 12 characters or more"
+msgstr "Nueva contraseña, de 12 caracteres o más"
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:44
+msgid "We'll email you when your password changes."
+msgstr "Te avisaremos por correo cuando cambie tu contraseña."
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:45
+msgid "Your password is saved."
+msgstr "Tu contraseña está guardada."
+
+#: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:48
+msgid "Create password"
+msgstr "Crear contraseña"
+
+#: src/accounts/components/AccountsSignInSteps.svelte:30
+msgid "Create account"
+msgstr "Crear cuenta"
+
+#: src/accounts/components/AccountsSignInSteps.svelte:84
+#, javascript-format
+msgid "We sent a code to ${ strongEmail }. It expires in ten minutes."
+msgstr "Enviamos un código a ${ strongEmail }. Caduca en diez minutos."
+
+#: src/accounts/components/AccountsSignInSteps.svelte:87
+msgid "Change email"
+msgstr "Cambiar correo"
+
+#: src/accounts/components/AccountsSignInSteps.svelte:90
+msgid "Code confirmed."
+msgstr "Código confirmado."
+
+#: src/accounts/components/AccountsSignInSteps.svelte:91
+msgid "Checking the code…"
+msgstr "Comprobando el código…"
+
+#: src/accounts/components/AccountsSignInSteps.svelte:92
+msgid "A new code is on its way; the old one no longer works."
+msgstr "Un código nuevo va en camino; el anterior ya no funciona."
+
+#: src/accounts/components/AccountsSignInSteps.svelte:95
+msgid "Continue"
+msgstr "Continuar"
+
+#: src/accounts/components/AccountsSignInDialog.svelte:36
+msgid "Finish logging in in your browser"
+msgstr "Termina de iniciar sesión en tu navegador"
+
+#: src/accounts/components/AccountsSignInDialog.svelte:38
+#, javascript-format
+msgid "The page to log in as ${ strongEmail } opened in your browser."
+msgstr ""
+"La página para iniciar sesión como ${ strongEmail } se abrió en tu navegador."
+
+#: src/accounts/components/AccountsSignInDialog.svelte:39
+msgid "The page to log in opened in your browser."
+msgstr "La página para iniciar sesión se abrió en tu navegador."
+
+#: src/accounts/components/AccountsSignInDialog.svelte:40
+msgid "When it shows a code, paste it here."
+msgstr "Cuando muestre un código, pégalo aquí."
+
+#: src/accounts/components/AccountsSignInDialog.svelte:42
+#: src/accounts/components/AccountsSignInDialog.svelte:43
+msgid "Code from the browser"
+msgstr "Código del navegador"
+
+#: src/accounts/components/AccountsCustomServer.svelte:65
+#: src/accounts/components/AccountsSignInDialog.svelte:47
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: src/accounts/components/AccountsSignInDialog.svelte:50
+msgid "Open the browser again"
+msgstr "Abrir el navegador de nuevo"
+
+#: src/accounts/components/AccountsSignInDialog.svelte:52
+msgid "Finish"
+msgstr "Terminar"
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:28
+msgid "Remove the account that is only on this device?"
+msgstr "¿Quitar la cuenta que solo está en este dispositivo?"
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:28
+#, javascript-format
+msgid "Remove ${ account.email }?"
+msgstr "¿Quitar ${ account.email }?"
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:29
+msgid "This is the only copy."
+msgstr "Esta es la única copia."
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:30
+msgid ""
+"Everything in this account is on this device alone and is deleted with it. "
+"This cannot be undone. To keep it, sign up or log in first and move it into "
+"your account."
+msgstr ""
+"Todo lo de esta cuenta está solo en este dispositivo y se elimina con ella. "
+"No se puede deshacer. Para conservarlo, regístrate o inicia sesión primero y "
+"muévelo a tu cuenta."
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:31
+#, javascript-format
+msgid "${ loss.pending } change has not reached the server yet."
+msgid_plural "${ loss.pending } changes have not reached the server yet."
+msgstr[0] "${ loss.pending } cambio todavía no llegó al servidor."
+msgstr[1] "${ loss.pending } cambios todavía no llegaron al servidor."
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:36
+#, javascript-format
+msgid "${ loss.conflicts } change was not kept by the server."
+msgid_plural "${ loss.conflicts } changes were not kept by the server."
+msgstr[0] "${ loss.conflicts } cambio no lo conservó el servidor."
+msgstr[1] "${ loss.conflicts } cambios no los conservó el servidor."
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:41
+msgid "Removing the account drops them from this device."
+msgstr "Quitar la cuenta los borra de este dispositivo."
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:42
+msgid ""
+"Any data stored on this device for this account is removed. What was synced "
+"stays on the server and on other devices, and logging in again later "
+"downloads it to this device again."
+msgstr ""
+"Se quitan los datos de esta cuenta guardados en este dispositivo. Lo que se "
+"sincronizó sigue en el servidor y en otros dispositivos, y si vuelves a "
+"iniciar sesión más tarde se descarga de nuevo en este dispositivo."
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:45
+msgid "View changes"
+msgstr "Ver los cambios"
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:51
+msgid "Delete it all"
+msgstr "Eliminarlo todo"
+
+#: src/accounts/components/AccountsRemoveDialog.svelte:51
+msgid "Remove anyway"
+msgstr "Quitar de todos modos"
+
+#: src/accounts/components/AccountsMoveDialog.svelte:26
+#, javascript-format
+msgid "Move ${ offered.items } item into ${ offered.email }?"
+msgid_plural "Move ${ offered.items } items into ${ offered.email }?"
+msgstr[0] "¿Mover ${ offered.items } elemento a ${ offered.email }?"
+msgstr[1] "¿Mover ${ offered.items } elementos a ${ offered.email }?"
+
+#: src/accounts/components/AccountsMoveDialog.svelte:32
+#, javascript-format
+msgid ""
+"What you made on this device becomes part of ${ strongEmail } and syncs with "
+"it."
+msgstr ""
+"Lo que hiciste en este dispositivo pasa a formar parte de ${ strongEmail } y "
+"se sincroniza con ella."
+
+#: src/accounts/components/AccountsMoveDialog.svelte:33
+msgid "The account that was only on this device is gone afterwards."
+msgstr "La cuenta que solo estaba en este dispositivo desaparece después."
+
+#: src/accounts/components/AccountsMoveDialog.svelte:34
+#, javascript-format
+msgid ""
+"Keeping them separate adds ${ offered.email } beside it, and leaves what you "
+"made where it is, on this device only."
+msgstr ""
+"Mantenerlas separadas añade ${ offered.email } junto a ella y deja lo que "
+"hiciste donde está, solo en este dispositivo."
+
+#: src/accounts/components/AccountsMoveDialog.svelte:38
+msgid "Keep them separate"
+msgstr "Mantenerlas separadas"
+
+#: src/accounts/components/AccountsMoveDialog.svelte:41
+msgid "Move"
+msgstr "Mover"
+
+#: src/accounts/components/AccountsGuestRow.svelte:30
+msgid "No sign-up required"
+msgstr "No hace falta registrarse"
+
+#: src/accounts/components/AccountsDeviceCode.svelte:23
+msgid "You are logged in. Returning you to the app…"
+msgstr "Iniciaste sesión. Volviendo a la app…"
+
+#: src/accounts/components/AccountsDeviceCode.svelte:24
+msgid "If the app does not open, paste this code into it."
+msgstr "Si la app no se abre, pega este código en ella."
+
+#: src/accounts/components/AccountsDeviceCode.svelte:25
+msgid ""
+"You are logged in. Paste this code into the app to finish there, then you "
+"can close this tab."
+msgstr ""
+"Iniciaste sesión. Pega este código en la app para terminar allí; después "
+"puedes cerrar esta pestaña."
+
+#: src/accounts/components/AccountsDeviceCode.svelte:28
+msgid "Copy"
+msgstr "Copiar"
+
+#: src/accounts/components/AccountsDeviceCode.svelte:29
+msgid "The code works once and for five minutes."
+msgstr "El código funciona una sola vez y durante cinco minutos."
+
+#: src/accounts/components/AccountsCustomServer.svelte:58
+msgid "Custom server"
+msgstr "Servidor personalizado"
+
+#: src/accounts/components/AccountsCustomServer.svelte:60
+msgid "Server address"
+msgstr "Dirección del servidor"
+
+#: src/accounts/components/AccountsCustomServer.svelte:62
+msgid "Check"
+msgstr "Comprobar"
+
+#: src/accounts/components/AccountsCustomServer.svelte:69
+msgid "Listed"
+msgstr "En la lista"
+
+#: src/accounts/components/AccountsCustomServer.svelte:70
+msgid "The app's own server"
+msgstr "El servidor de la app"
+
+#: src/accounts/components/AccountsCustomServer.svelte:71
+msgid ""
+"This server is not on the app's list. Go on only if you trust whoever runs "
+"it: everything you make there is theirs to keep."
+msgstr ""
+"Este servidor no está en la lista de la app. Continúa solo si confías en "
+"quien lo administra: todo lo que hagas allí queda en sus manos."
+
+#: src/accounts/components/AccountsCustomServer.svelte:72
+msgid ""
+"The app's own server could not be reached to check this one. Go on only if "
+"you trust whoever runs it."
+msgstr ""
+"No se pudo contactar con el servidor de la app para comprobar este. Continúa "
+"solo si confías en quien lo administra."
+
+#: src/accounts/components/AccountsCustomServer.svelte:73
+msgid "You log in on that server's own page, in the browser."
+msgstr "Inicias sesión en la página de ese servidor, en el navegador."
+
+#: src/accounts/components/AccountsCustomServer.svelte:76
+msgid "Sign up or log in there"
+msgstr "Regístrate o inicia sesión allí"
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:48
+msgid "Checkout"
+msgstr "Pago"
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:50
+#, javascript-format
+msgid "Thank you. ${ checkout.product_name } is yours."
+msgstr "Gracias. ${ checkout.product_name } ya es tuyo."
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:52
+msgid "See the purchase"
+msgstr "Ver la compra"
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:55
+#, javascript-format
+msgid ""
+"Your payment for ${ checkout.product_name } is processing. This page updates "
+"when it is done."
+msgstr ""
+"Tu pago de ${ checkout.product_name } se está procesando. Esta página se "
+"actualiza cuando termine."
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:56
+#, javascript-format
+msgid ""
+"Finish paying for ${ checkout.product_name } in your browser. This page "
+"updates when you come back."
+msgstr ""
+"Termina de pagar ${ checkout.product_name } en tu navegador. Esta página se "
+"actualiza cuando vuelvas."
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:57
+#, javascript-format
+msgid "${ checkout.product_name } is not paid yet."
+msgstr "${ checkout.product_name } todavía no está pagado."
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:59
+#, javascript-format
+msgid "Back to ${ checkout.product_name }"
+msgstr "Volver a ${ checkout.product_name }"
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:61
+msgid "The payment did not go through, and nothing was charged."
+msgstr "El pago no se completó y no se cobró nada."
+
+#: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:62
+msgid "This checkout expired, and nothing was charged."
+msgstr "Este pago caducó y no se cobró nada."
+
+#: src/posts/PostsNewPage.svelte:29
+msgctxt "verb"
+msgid "Post"
+msgstr "Publicar"

@@ -1,13 +1,17 @@
 // Checks the translations, `pnpm translations:check`: that the pages'
-// markup writes its English through ttag (untranslated_text.js); then,
-// with the messages extracted afresh, that translations/default.pot has
-// them all and no others, and that every translations/<locale>.po
-// translates each of them, none fuzzy. Prints what is wrong and exits 1.
+// markup writes its English through ttag (untranslated_text.js) and the
+// public pages' marks theirs `<t>…</t>` (public_pages_translations.js);
+// then, for each catalog, the app's pages' in translations/ and the
+// public pages' in translations/public/, with the messages extracted
+// afresh, that its default.pot has them all and no others, and that
+// every <locale>.po beside it translates each of them, none fuzzy.
+// Prints what is wrong and exits 1.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { po } from "gettext-parser";
+import { PUBLIC_TRANSLATIONS, publicPagesMessages, publicPagesUntranslated } from "./public_pages_translations.js";
 import { untranslatedText } from "./untranslated_text.js";
 
 const SVELTE = resolve(import.meta.dirname, "..");
@@ -17,17 +21,28 @@ const COMMITTED_POT = "default.pot";
 const IGNORED = "src/ops";
 const EXTRACT_SOURCES = ["--ignore", `${IGNORED}/**`, "src"];
 
-const untranslated = untranslatedText(SVELTE, resolve(SVELTE, "src"), [IGNORED]);
-const extracted = messagesExtract();
-const problems = [
-  ...messagesCompare(COMMITTED_POT, messagesRead(resolve(TRANSLATIONS, COMMITTED_POT)), extracted),
-  ...localeFiles().flatMap((file) => localeProblems(file, messagesRead(resolve(TRANSLATIONS, file)), extracted)),
+const untranslated = [
+  ...untranslatedText(SVELTE, resolve(SVELTE, "src"), [IGNORED]),
+  ...publicPagesUntranslated(),
 ];
+const catalogs = [
+  { folder: TRANSLATIONS, extracted: messagesExtract() },
+  { folder: PUBLIC_TRANSLATIONS, extracted: publicMessagesExtracted() },
+];
+const problems = catalogs.flatMap(({ folder, extracted }) => {
+  const shown = (file) => relative(TRANSLATIONS, resolve(folder, file));
+  return [
+    ...messagesCompare(shown(COMMITTED_POT), messagesRead(resolve(folder, COMMITTED_POT)), extracted),
+    ...localeFiles(folder).flatMap((file) =>
+      localeProblems(shown(file), messagesRead(resolve(folder, file)), extracted),
+    ),
+  ];
+});
 
 if (untranslated.length > 0) {
   for (const problem of untranslated) console.error(problem);
   console.error(
-    "\nWrite these through ttag, `{t`...`}`, or put `<!-- untranslated: why -->` before one that stays as it is.\n",
+    "\nWrite these through ttag, `{t`...`}`, in a public page `<t>…</t>`, or put `<!-- untranslated: why -->` before one that stays as it is.\n",
   );
 }
 if (problems.length > 0) {
@@ -37,7 +52,17 @@ if (problems.length > 0) {
   );
 }
 if (untranslated.length > 0 || problems.length > 0) process.exit(1);
-console.log(`Translations: ${extracted.size} messages, ${localeFiles().length} languages, all translated.`);
+for (const { folder, extracted } of catalogs) {
+  const locales = localeFiles(folder).map((file) => file.slice(0, -".po".length));
+  console.log(
+    `Translations, ${relative(SVELTE, folder)}: ${extracted.size} messages, translated into: ${locales.join(", ") || "none yet"}.`,
+  );
+}
+
+/** The public pages' messages, as messagesRead answers a file's. */
+function publicMessagesExtracted() {
+  return new Map([...publicPagesMessages().keys()].map((message) => [message, { msgid: message, msgstr: [""] }]));
+}
 
 function messagesExtract() {
   const folder = mkdtempSync(join(tmpdir(), "translations-check-"));
@@ -118,8 +143,9 @@ function localeProblems(file, messages, expected) {
   return problems;
 }
 
-function localeFiles() {
-  return readdirSync(TRANSLATIONS)
+/** @param {string} folder */
+function localeFiles(folder) {
+  return readdirSync(folder)
     .filter((file) => file.endsWith(".po"))
     .sort();
 }

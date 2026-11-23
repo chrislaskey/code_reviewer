@@ -5,12 +5,16 @@
 // sends a visitor to the sign-in page (router.js); an error only when the
 // application could not tell, which the page shows.
 //
+// Their `preferences.locale` is the language the pages follow, see
+// translations.js.
+//
 // Whether someone is signed in is also kept in localStorage, under
 // `app:signed-in`, for the public website's header (src/public/partials),
 // which has no way to ask: it shows "Open the app" in place of Sign in
 // and Sign up. Only a hint, so a stale one costs a click.
 import { currentUserGet } from "./core/index.js";
 import { currentServerForget } from "./current_server.svelte.js";
+import { translationsFollow } from "./translations.js";
 
 /**
  * The user with what only they are shown: their account's email, on the
@@ -19,7 +23,7 @@ import { currentServerForget } from "./current_server.svelte.js";
  * web until `trial_expires_at` unless they sign up. See
  * docs/design/accounts-local-and-trial-users.md.
  * @typedef {{grant: string, product_id: string, product_name: string, price_id: string, subscription_id: string, store: "stripe" | "app_store" | "play_store", status: string, current_period_end: string | null, cancel_at_period_end: boolean}} Plan
- * @typedef {{id: string, name: string, email: string, kind: "full" | "local" | "trial", trial_expires_at?: string | null, is_staff?: boolean, avatar_url?: string | null, plan?: Plan | null, payment_failed_subscription_id?: string | null}} User
+ * @typedef {{id: string, name: string, email: string, kind: "full" | "local" | "trial", trial_expires_at?: string | null, is_staff?: boolean, avatar_url?: string | null, plan?: Plan | null, payment_failed_subscription_id?: string | null, preferences?: {locale: string | null}}} User
  */
 
 /** The user signed in; null until asked and while nobody is. */
@@ -43,6 +47,7 @@ export function currentUserLoad() {
       if (!user) current = null;
       currentUser.value = user;
       rememberSignedIn(Boolean(user));
+      if (user?.preferences) translationsFollow(user.preferences.locale);
       return user;
     },
     (problem) => {

@@ -25,6 +25,7 @@ pub mod checkouts;
 pub mod deletions;
 pub mod password;
 pub mod plans;
+pub mod preferences;
 pub mod products;
 pub mod purchases;
 #[cfg(desktop)]

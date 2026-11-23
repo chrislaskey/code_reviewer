@@ -22,8 +22,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::accounts::preferences;
 use crate::app::synced_tables;
 use crate::app::users;
+use crate::data::accounts_preferences;
 use crate::data::accounts_tokens;
 use crate::data::accounts_users;
 use crate::deployment::{Deployment, Role};
@@ -83,6 +85,8 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
     removed.insert("accounts_users unconfirmed".to_string(), unconfirmed);
     let accounts = accounts_users::maintenance::delete_without_user(&mut tx).await?;
     removed.insert(accounts_users::TABLE.to_string(), accounts);
+    let preferences = preferences::delete_without_account_in(&mut tx).await?;
+    removed.insert(accounts_preferences::TABLE.to_string(), preferences);
     let purge = Purge {
         id: Uuid::now_v7(),
         horizon,

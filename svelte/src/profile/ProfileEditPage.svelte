@@ -3,17 +3,37 @@
      and syncs it later; a picture goes straight to object storage, see
      avatarsUpload in lib/core/. A local user is told their account is
      only on this device; they and a trial user have no picture, which
-     needs an account on the server. -->
+     needs an account on the server. Their language, when the pages are in
+     more than one: a preference, synced, which reloads the page in it. -->
 <script>
   import { t } from "ttag";
-  import { FormError, avatarsUpload, currentUserGet, currentUserUpdate } from "../lib/core/index.js";
+  import {
+    FormError,
+    accountsPreferencesUpdate,
+    avatarsUpload,
+    currentUserGet,
+    currentUserUpdate,
+  } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
   import { currentUserForget } from "../lib/current_user.svelte.js";
   import { accountsIndexUrl } from "../lib/routes.js";
   import AccountsGuestNotice from "../lib/AccountsGuestNotice.svelte";
-  import { Alert, Button, ErrorMessage, FieldErrors, FileInput, Heading, Input, Label, Page, Text } from "../lib/components/index.js";
+  import { TRANSLATIONS_LOCALES, translationsFollow, translationsLocaleShown } from "../lib/translations.js";
+  import {
+    Alert,
+    Button,
+    ErrorMessage,
+    FieldErrors,
+    FileInput,
+    Heading,
+    Input,
+    Label,
+    Page,
+    Select,
+    Text,
+  } from "../lib/components/index.js";
 
-  /** @type {{name: string, kind?: string, avatar_url?: string | null, trial_expires_at?: string | null} | null} */
+  /** @type {{name: string, kind?: string, avatar_url?: string | null, trial_expires_at?: string | null, preferences?: {locale: string | null}} | null} */
   let currentUser = $state(null);
   /** @type {File | null} */
   let file = $state(null);
@@ -26,6 +46,28 @@
   let nameBusy = $state(false);
   /** From 0 to 1 while the file uploads, else null. */
   let progress = $state(null);
+  let localeError = $state("");
+  let localeBusy = $state(false);
+
+  /** @param {string} locale */
+  function languageName(locale) {
+    const name = new Intl.DisplayNames([locale], { type: "language" }).of(locale) ?? locale;
+    return name.charAt(0).toLocaleUpperCase(locale) + name.slice(1);
+  }
+
+  /** @param {Event & {currentTarget: HTMLSelectElement}} event */
+  async function chooseLocale(event) {
+    localeBusy = true;
+    localeError = "";
+    try {
+      const preferences = await accountsPreferencesUpdate("locale", event.currentTarget.value || null);
+      translationsFollow(preferences.locale);
+    } catch (problem) {
+      localeError = errorMessageOf(problem);
+    } finally {
+      localeBusy = false;
+    }
+  }
 
   async function load() {
     try {
@@ -116,6 +158,19 @@
         <Button variant="primary" type="submit" disabled={nameBusy || name.trim() === currentUser.name}>{t`Save name`}</Button>
       </div>
     </form>
+    {#if TRANSLATIONS_LOCALES.length > 1}
+      {@const systemLanguage = languageName(translationsLocaleShown(null))}
+      <Label text={t`Language`}>
+        <Select value={currentUser.preferences?.locale ?? ""} onchange={chooseLocale} disabled={localeBusy}>
+          <option value="">{t`Follow the system (${systemLanguage})`}</option>
+          {#each TRANSLATIONS_LOCALES as locale (locale)}
+            <!-- untranslated: each language in its own name -->
+            <option value={locale} lang={locale}>{languageName(locale)}</option>
+          {/each}
+        </Select>
+      </Label>
+      <ErrorMessage message={localeError} />
+    {/if}
     {#if currentUser.kind === "full"}
       <form onsubmit={save} class="flex flex-col gap-3">
         <Label text={t`Picture`}>

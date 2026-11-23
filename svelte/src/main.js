@@ -3,6 +3,7 @@ import { Router } from "sv-router";
 import { isTauri } from "@tauri-apps/api/core";
 // Registers the pages with the router before it mounts.
 import "./lib/router.js";
+import { translationsStart } from "./lib/translations.js";
 
 // Where the pages run, for the styles that keep clear of the window chrome
 // (styles.css): "desktop" under the Tauri window's title bar, "mobile"
@@ -19,4 +20,5 @@ if (document.documentElement.dataset.app === "mobile" || inSignInSheet) {
     ?.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover");
 }
 
-mount(Router, { target: document.getElementById("app") });
+// In the language chosen, before the first page draws its text
+translationsStart().then(() => mount(Router, { target: document.getElementById("app") }));

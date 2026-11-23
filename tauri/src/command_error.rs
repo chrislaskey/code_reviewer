@@ -10,6 +10,7 @@ use serde::Serialize;
 
 use app_core::accounts::AccountError;
 use app_core::accounts::online::OnlineError;
+use app_core::accounts::preferences::PreferenceError;
 use app_core::app::avatars::AvatarError;
 use app_core::app::communities::CommunityError;
 use app_core::app::current_community::CurrentCommunityError;
@@ -87,6 +88,7 @@ from_message!(
     OnlineError,
     PendingChangeError,
     PostError,
+    PreferenceError,
     SyncError,
     UserError,
     tauri::Error,

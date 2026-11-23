@@ -1,0 +1,775 @@
+msgid ""
+msgstr ""
+"Language: es\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Plural-Forms: nplurals=2; plural=(n!=1);\n"
+
+#: src/public/about.html:7 src/public/about.html:16
+#: src/public/partials/footer.html:6 src/public/partials/header.html:8
+msgid "About"
+msgstr "Acerca de"
+
+#: src/public/about.html:8
+msgid ""
+"How Starter Pack runs one application on the web, the desktop and phones."
+msgstr ""
+"Cómo Starter Pack ejecuta una sola aplicación en la web, el escritorio y los "
+"teléfonos."
+
+#: src/public/about.html:18
+msgid ""
+"Starter Pack is one application written once and run in three places: a web "
+"server, a desktop app and a phone app. The web server is the system of "
+"record; each app keeps a copy of what you can see and syncs its changes when "
+"it is online."
+msgstr ""
+"Starter Pack es una aplicación escrita una sola vez que funciona en tres "
+"lugares: un servidor web, una app de escritorio y una app para el teléfono. "
+"El servidor web es la fuente de verdad; cada app guarda una copia de lo que "
+"puedes ver y sincroniza sus cambios cuando tiene conexión."
+
+#: src/public/about.html:23
+msgid ""
+"<a href=\"/accounts/sign-in\" class=\"link\">Sign up</a> on the web, then "
+"log in from the app on each of your devices."
+msgstr ""
+"<a href=\"/accounts/sign-in\" class=\"link\">Regístrate</a> en la web y "
+"luego inicia sesión desde la app en cada uno de tus dispositivos."
+
+#: src/public/index.html:8
+msgid ""
+"One Rust application on the web, on the desktop and on a phone, working "
+"offline."
+msgstr ""
+"Una aplicación en Rust en la web, en el escritorio y en el teléfono, que "
+"funciona sin conexión."
+
+#: src/public/index.html:16
+msgid "One application, on the web, the desktop and your phone"
+msgstr "Una aplicación, en la web, el escritorio y tu teléfono"
+
+#: src/public/index.html:18
+msgid ""
+"Starter Pack keeps your posts and files with you: the apps work offline and "
+"catch up with the web when they are back online."
+msgstr ""
+"Starter Pack lleva tus publicaciones y archivos contigo: las apps funcionan "
+"sin conexión y se ponen al día con la web cuando vuelven a conectarse."
+
+#: src/public/index.html:22 src/public/partials/header.html:11
+msgid "Sign up"
+msgstr "Regístrate"
+
+#: src/public/index.html:23
+msgid "Try it now"
+msgstr "Pruébalo ahora"
+
+#: src/public/index.html:24
+msgid "How it works"
+msgstr "Cómo funciona"
+
+#: src/public/index.html:38
+msgid "Everywhere"
+msgstr "En todas partes"
+
+#: src/public/index.html:39
+msgid "The same pages in a browser, in a desktop window and on a phone."
+msgstr ""
+"Las mismas páginas en un navegador, en una ventana de escritorio y en un "
+"teléfono."
+
+#: src/public/index.html:42
+msgid "Offline"
+msgstr "Sin conexión"
+
+#: src/public/index.html:43
+msgid "Each app has its own copy, so it keeps working with no connection."
+msgstr ""
+"Cada app tiene su propia copia, así que sigue funcionando sin conexión."
+
+#: src/public/index.html:46
+msgid "Together"
+msgstr "Juntos"
+
+#: src/public/index.html:47
+msgid "Add what you write to a community and its members see it."
+msgstr "Añade lo que escribes a una comunidad y sus miembros lo verán."
+
+#: src/public/partials/footer.html:5
+msgid "Home"
+msgstr "Inicio"
+
+#: src/public/partials/footer.html:7
+msgid "Terms"
+msgstr "Términos"
+
+#: src/public/partials/footer.html:8
+msgid "Privacy"
+msgstr "Privacidad"
+
+#: src/public/partials/header.html:10
+msgid "Sign in"
+msgstr "Iniciar sesión"
+
+#: src/public/partials/header.html:12
+msgid "Open the app"
+msgstr "Abrir la app"
+
+#: src/public/privacy.html:11 src/public/privacy.html:20
+msgid "Privacy Policy"
+msgstr "Política de privacidad"
+
+#: src/public/privacy.html:12
+msgid ""
+"What Starter Pack collects, why, who it shares it with, and how to delete it."
+msgstr ""
+"Qué recopila Starter Pack, por qué, con quién lo comparte y cómo eliminarlo."
+
+#: src/public/privacy.html:21 src/public/terms.html:21
+msgid "Effective [Effective date]"
+msgstr "Vigente desde [Effective date]"
+
+#: src/public/privacy.html:24
+msgid ""
+"This policy explains what [Company name] (\"we\", \"us\") collects when you "
+"use Starter Pack on the web, the desktop or a phone, why, who we share it "
+"with, and the choices you have. We do not sell your personal data, and we do "
+"not use it for advertising."
+msgstr ""
+"Esta política explica qué recopila [Company name] («nosotros») cuando usas "
+"Starter Pack en la web, el escritorio o un teléfono, por qué, con quién lo "
+"compartimos y qué opciones tienes. No vendemos tus datos personales ni los "
+"usamos para publicidad."
+
+#: src/public/privacy.html:29
+msgid "1. What we collect"
+msgstr "1. Qué recopilamos"
+
+#: src/public/privacy.html:31
+msgid ""
+"<strong>Your account</strong>: your name, your email address, and a password "
+"if you set one (stored only as a secure hash). We email you codes to sign in "
+"and to confirm changes."
+msgstr ""
+"<strong>Tu cuenta</strong>: tu nombre, tu dirección de correo electrónico y "
+"una contraseña si la configuras (guardada solo como un hash seguro). Te "
+"enviamos códigos por correo para iniciar sesión y confirmar cambios."
+
+#: src/public/privacy.html:33
+msgid ""
+"<strong>Your content</strong>: posts, files and pictures you add, the "
+"communities you make or join, and your profile picture."
+msgstr ""
+"<strong>Tu contenido</strong>: las publicaciones, archivos e imágenes que "
+"añades, las comunidades que creas o a las que te unes, y tu foto de perfil."
+
+#: src/public/privacy.html:35
+msgid ""
+"<strong>Purchases</strong>: which plan or product you bought, its price and "
+"currency, its status and dates, and the store's ids for it. We never see or "
+"store your card details: Stripe or Apple holds them."
+msgstr ""
+"<strong>Compras</strong>: qué plan o producto compraste, su precio y moneda, "
+"su estado y fechas, y los identificadores de la tienda. Nunca vemos ni "
+"guardamos los datos de tu tarjeta: los conserva Stripe o Apple."
+
+#: src/public/privacy.html:38
+msgid ""
+"<strong>Technical data</strong>: your IP address and requests, which our "
+"servers use to keep the service secure and to limit abuse, and keep in short-"
+"lived server logs."
+msgstr ""
+"<strong>Datos técnicos</strong>: tu dirección IP y tus solicitudes, que "
+"nuestros servidores usan para mantener seguro el servicio y limitar el "
+"abuso, y que se guardan en registros del servidor de corta duración."
+
+#: src/public/privacy.html:40
+msgid ""
+"<strong>On your devices</strong>: the apps keep a copy of your content so "
+"they work offline, and data you keep in an app before signing up stays on "
+"that device and is never sent to us."
+msgstr ""
+"<strong>En tus dispositivos</strong>: las apps guardan una copia de tu "
+"contenido para funcionar sin conexión, y los datos que guardas en una app "
+"antes de registrarte se quedan en ese dispositivo y nunca se nos envían."
+
+#: src/public/privacy.html:44
+msgid "2. Why we use it"
+msgstr "2. Para qué lo usamos"
+
+#: src/public/privacy.html:46
+msgid ""
+"To run the service: your account, signing in, syncing your content between "
+"your devices and with the people you share it with (performing our contract "
+"with you)."
+msgstr ""
+"Para prestar el servicio: tu cuenta, el inicio de sesión, la sincronización "
+"de tu contenido entre tus dispositivos y con las personas con quienes lo "
+"compartes (cumplimiento de nuestro contrato contigo)."
+
+#: src/public/privacy.html:48
+msgid "To take payments and provide what you bought (contract)."
+msgstr "Para cobrar los pagos y entregarte lo que compraste (contrato)."
+
+#: src/public/privacy.html:49
+msgid ""
+"To keep the service secure, prevent abuse and fix problems (our legitimate "
+"interests)."
+msgstr ""
+"Para mantener seguro el servicio, prevenir el abuso y resolver problemas "
+"(nuestro interés legítimo)."
+
+#: src/public/privacy.html:50
+msgid ""
+"To email you about your account, such as sign-in codes, purchases and "
+"changes to these policies (contract and legitimate interests). We do not "
+"send marketing email without your consent."
+msgstr ""
+"Para escribirte sobre tu cuenta, como códigos de inicio de sesión, compras y "
+"cambios en estas políticas (contrato e interés legítimo). No enviamos "
+"correos de marketing sin tu consentimiento."
+
+#: src/public/privacy.html:52
+msgid "To meet legal obligations, such as tax and accounting records."
+msgstr ""
+"Para cumplir obligaciones legales, como los registros fiscales y contables."
+
+#: src/public/privacy.html:55
+msgid "3. Who we share it with"
+msgstr "3. Con quién lo compartimos"
+
+#: src/public/privacy.html:56
+msgid ""
+"We share personal data only with the providers who run parts of the service "
+"for us:"
+msgstr ""
+"Compartimos datos personales solo con los proveedores que prestan partes del "
+"servicio por nosotros:"
+
+#: src/public/privacy.html:58
+msgid ""
+"<strong>Stripe</strong>, which takes payments on the web and the desktop as "
+"the merchant of record (Stripe Managed Payments) and receives your email and "
+"billing details for that."
+msgstr ""
+"<strong>Stripe</strong>, que cobra los pagos en la web y en el escritorio "
+"como comerciante registrado (Stripe Managed Payments) y recibe para ello tu "
+"correo y tus datos de facturación."
+
+#: src/public/privacy.html:60
+msgid ""
+"<strong>Apple</strong>, which takes payments in the iPhone and iPad app "
+"through the App Store. Apple tells us about the purchase, with an id that "
+"links it to your account, not your Apple ID's details."
+msgstr ""
+"<strong>Apple</strong>, que cobra los pagos en la app de iPhone y iPad a "
+"través del App Store. Apple nos informa de la compra con un identificador "
+"que la vincula a tu cuenta, no con los datos de tu Apple ID."
+
+#: src/public/privacy.html:62
+msgid ""
+"<strong>[Hosting provider]</strong>, which hosts our servers, database and "
+"file storage."
+msgstr ""
+"<strong>[Hosting provider]</strong>, que aloja nuestros servidores, la base "
+"de datos y el almacenamiento de archivos."
+
+#: src/public/privacy.html:63
+msgid "<strong>[Email provider]</strong>, which sends our emails."
+msgstr "<strong>[Email provider]</strong>, que envía nuestros correos."
+
+#: src/public/privacy.html:66
+msgid ""
+"Your content is also visible to the members of the communities you post in. "
+"We disclose data when the law requires it, and to a buyer of our business, "
+"who would be bound by this policy."
+msgstr ""
+"Tu contenido también es visible para los miembros de las comunidades en las "
+"que publicas. Revelamos datos cuando la ley lo exige, y a un comprador de "
+"nuestro negocio, que quedaría obligado por esta política."
+
+#: src/public/privacy.html:70
+msgid "4. Cookies and browser storage"
+msgstr "4. Cookies y almacenamiento del navegador"
+
+#: src/public/privacy.html:72
+msgid ""
+"On the web we use one cookie, to keep you signed in. We use no analytics, "
+"advertising or tracking cookies. Your browser also keeps a few settings of "
+"yours, such as your theme and whether you are signed in, in its local "
+"storage, which never leaves your device."
+msgstr ""
+"En la web usamos una sola cookie, para mantener tu sesión iniciada. No "
+"usamos cookies de analítica, publicidad ni seguimiento. Tu navegador también "
+"guarda algunos de tus ajustes, como tu tema y si tienes la sesión iniciada, "
+"en su almacenamiento local, que nunca sale de tu dispositivo."
+
+#: src/public/privacy.html:77
+msgid "5. How long we keep it"
+msgstr "5. Cuánto tiempo lo conservamos"
+
+#: src/public/privacy.html:79
+msgid ""
+"Your account and content: while your account exists. Content you delete is "
+"removed from our database 90 days later, which gives your devices time to "
+"see the delete."
+msgstr ""
+"Tu cuenta y tu contenido: mientras exista tu cuenta. El contenido que "
+"eliminas se quita de nuestra base de datos 90 días después, lo que da tiempo "
+"a tus dispositivos para enterarse de la eliminación."
+
+#: src/public/privacy.html:81
+msgid ""
+"When you delete your account, your content is deleted at once in every "
+"community and on every device as it syncs, your files and pictures are "
+"deleted from storage at once, and the rest is removed from our database "
+"within 90 days."
+msgstr ""
+"Cuando eliminas tu cuenta, tu contenido se elimina al instante en todas las "
+"comunidades y en cada dispositivo a medida que se sincroniza, tus archivos e "
+"imágenes se eliminan del almacenamiento al instante, y el resto se quita de "
+"nuestra base de datos en un plazo de 90 días."
+
+#: src/public/privacy.html:84
+msgid "A trial on the web without an account: deleted after two days."
+msgstr "Una prueba en la web sin cuenta: se elimina después de dos días."
+
+#: src/public/privacy.html:85
+msgid ""
+"Payment records that the law requires us to keep, such as invoices, are kept "
+"by Stripe or Apple for as long as it requires."
+msgstr ""
+"Los registros de pago que la ley nos obliga a conservar, como las facturas, "
+"los conserva Stripe o Apple durante el tiempo que la ley exija."
+
+#: src/public/privacy.html:87
+msgid "Backups are overwritten within [Backup retention, e.g. 30 days]."
+msgstr ""
+"Las copias de seguridad se sobrescriben en un plazo de [Backup retention, "
+"e.g. 30 days]."
+
+#: src/public/privacy.html:90
+msgid "6. Your choices and rights"
+msgstr "6. Tus opciones y derechos"
+
+#: src/public/privacy.html:92
+msgid ""
+"You can see and change your name, email, picture and content in the service, "
+"and delete your account at any time in the app's account settings. Depending "
+"on where you live, you may also have the right to ask for a copy of your "
+"data, to correct or erase it, to object to or restrict how we use it, to "
+"move it to another service, and to complain to your data protection "
+"authority. To use any of these rights, email [Contact email]; we answer "
+"within 30 days."
+msgstr ""
+"Puedes ver y cambiar tu nombre, tu correo, tu foto y tu contenido en el "
+"servicio, y eliminar tu cuenta en cualquier momento en la configuración de "
+"la cuenta de la app. Según dónde vivas, también puedes tener derecho a pedir "
+"una copia de tus datos, a corregirlos o borrarlos, a oponerte a cómo los "
+"usamos o limitarlo, a llevarlos a otro servicio y a reclamar ante tu "
+"autoridad de protección de datos. Para ejercer cualquiera de estos derechos, "
+"escribe a [Contact email]; respondemos en un plazo de 30 días."
+
+#: src/public/privacy.html:99
+msgid "7. Security"
+msgstr "7. Seguridad"
+
+#: src/public/privacy.html:101
+msgid ""
+"Data travels encrypted between your devices and our servers. Passwords are "
+"stored only as hashes, sign-in codes expire within minutes, and access to "
+"our systems is limited to the people who run them. No system is perfectly "
+"secure; we will tell you and the authorities of a breach that affects you, "
+"as the law requires."
+msgstr ""
+"Los datos viajan cifrados entre tus dispositivos y nuestros servidores. Las "
+"contraseñas se guardan solo como hashes, los códigos de inicio de sesión "
+"caducan en minutos y el acceso a nuestros sistemas está limitado a las "
+"personas que los administran. Ningún sistema es perfectamente seguro; te "
+"avisaremos a ti y a las autoridades de cualquier brecha que te afecte, como "
+"exige la ley."
+
+#: src/public/privacy.html:106
+msgid "8. Where it is processed"
+msgstr "8. Dónde se tratan"
+
+#: src/public/privacy.html:108
+msgid ""
+"We and our providers may process data in [Countries, e.g. the United States] "
+"and other countries. Where the law requires, transfers are covered by "
+"safeguards such as the European Commission's standard contractual clauses."
+msgstr ""
+"Nosotros y nuestros proveedores podemos tratar datos en [Countries, e.g. the "
+"United States] y en otros países. Cuando la ley lo exige, las transferencias "
+"están cubiertas por garantías como las cláusulas contractuales tipo de la "
+"Comisión Europea."
+
+#: src/public/privacy.html:113
+msgid "9. Children"
+msgstr "9. Menores"
+
+#: src/public/privacy.html:115
+msgid ""
+"The service is not meant for children under [16]. We do not knowingly "
+"collect their data; if you believe a child has given us data, email [Contact "
+"email] and we will delete it."
+msgstr ""
+"El servicio no está pensado para menores de [16] años. No recopilamos sus "
+"datos a sabiendas; si crees que un menor nos ha dado datos, escribe a "
+"[Contact email] y los eliminaremos."
+
+#: src/public/privacy.html:119
+msgid "10. Changes to this policy"
+msgstr "10. Cambios en esta política"
+
+#: src/public/privacy.html:121
+msgid ""
+"We will post changes here with their effective date and, for changes that "
+"matter, tell you by email or in the service before they apply."
+msgstr ""
+"Publicaremos aquí los cambios con su fecha de entrada en vigor y, si son "
+"importantes, te avisaremos por correo o en el servicio antes de que se "
+"apliquen."
+
+#: src/public/privacy.html:125
+msgid "11. Contact"
+msgstr "11. Contacto"
+
+#: src/public/privacy.html:127
+msgid ""
+"[Company name], [Postal address]. Email: [Contact email]. [Data protection "
+"officer or EU/UK representative, if you need one.] See also our <a href=\"/"
+"terms\" class=\"link\">Terms of Service</a>."
+msgstr ""
+"[Company name], [Postal address]. Correo: [Contact email]. [Data protection "
+"officer or EU/UK representative, if you need one.] Consulta también nuestros "
+"<a href=\"/terms\" class=\"link\">Términos del servicio</a>."
+
+#: src/public/terms.html:11 src/public/terms.html:20
+msgid "Terms of Service"
+msgstr "Términos del servicio"
+
+#: src/public/terms.html:12
+msgid "The terms for using Starter Pack on the web, the desktop and phones."
+msgstr ""
+"Los términos para usar Starter Pack en la web, el escritorio y los teléfonos."
+
+#: src/public/terms.html:24
+msgid ""
+"These terms are an agreement between you and [Company name] (\"we\", \"us\") "
+"for using Starter Pack: the website, the web application, and the desktop "
+"and phone apps (together, \"the service\"). By creating an account or using "
+"the service you accept these terms and our <a href=\"/privacy\" "
+"class=\"link\">Privacy Policy</a>. If you do not accept them, do not use the "
+"service."
+msgstr ""
+"Estos términos son un acuerdo entre tú y [Company name] («nosotros») para "
+"usar Starter Pack: el sitio web, la aplicación web y las apps de escritorio "
+"y de teléfono (en conjunto, «el servicio»). Al crear una cuenta o usar el "
+"servicio, aceptas estos términos y nuestra <a href=\"/privacy\" "
+"class=\"link\">Política de privacidad</a>. Si no los aceptas, no uses el "
+"servicio."
+
+#: src/public/terms.html:30
+msgid "1. Your account"
+msgstr "1. Tu cuenta"
+
+#: src/public/terms.html:32
+msgid ""
+"You sign up with your name and an email address, which we confirm by sending "
+"a code. You may also set a password. You must be at least [16] years old, or "
+"the age of digital consent where you live, to have an account. Keep your "
+"sign-in codes, password and signed-in devices safe; you are responsible for "
+"what is done with your account."
+msgstr ""
+"Te registras con tu nombre y una dirección de correo electrónico, que "
+"confirmamos enviándote un código. También puedes configurar una contraseña. "
+"Para tener una cuenta debes tener al menos [16] años, o la edad de "
+"consentimiento digital de donde vives. Mantén seguros tus códigos de inicio "
+"de sesión, tu contraseña y tus dispositivos con sesión iniciada; eres "
+"responsable de lo que se haga con tu cuenta."
+
+#: src/public/terms.html:38
+msgid ""
+"You may try the service without an account. A trial on the web is deleted "
+"after two days unless you sign up. Data you keep in an app on a device "
+"before signing up stays on that device and is not sent to us."
+msgstr ""
+"Puedes probar el servicio sin cuenta. Una prueba en la web se elimina "
+"después de dos días a menos que te registres. Los datos que guardas en una "
+"app de un dispositivo antes de registrarte se quedan en ese dispositivo y no "
+"se nos envían."
+
+#: src/public/terms.html:42
+msgid "2. Your content"
+msgstr "2. Tu contenido"
+
+#: src/public/terms.html:44
+msgid ""
+"You keep ownership of what you put in the service: posts, files, pictures "
+"and anything else (\"your content\"). You give us a worldwide, non-"
+"exclusive, royalty-free license to store, copy, sync and show your content "
+"only as needed to run the service for you and for the people you share it "
+"with, such as the other members of a community. This license ends when your "
+"content is deleted from the service."
+msgstr ""
+"Conservas la propiedad de lo que pones en el servicio: publicaciones, "
+"archivos, imágenes y cualquier otra cosa («tu contenido»). Nos concedes una "
+"licencia mundial, no exclusiva y gratuita para guardar, copiar, sincronizar "
+"y mostrar tu contenido solo en la medida necesaria para prestarte el "
+"servicio a ti y a las personas con quienes lo compartes, como los demás "
+"miembros de una comunidad. Esta licencia termina cuando tu contenido se "
+"elimina del servicio."
+
+#: src/public/terms.html:50
+msgid ""
+"You are responsible for your content and must have the right to share it. "
+"Content you post in a community is visible to that community's members, and "
+"copies of it are kept on their devices so the apps work offline."
+msgstr ""
+"Eres responsable de tu contenido y debes tener derecho a compartirlo. El "
+"contenido que publicas en una comunidad es visible para sus miembros, y se "
+"guardan copias en sus dispositivos para que las apps funcionen sin conexión."
+
+#: src/public/terms.html:55
+msgid "3. Acceptable use"
+msgstr "3. Uso aceptable"
+
+#: src/public/terms.html:56
+msgid "You agree not to:"
+msgstr "Te comprometes a no:"
+
+#: src/public/terms.html:58
+msgid "break the law, or help anyone else to;"
+msgstr "infringir la ley ni ayudar a nadie a hacerlo;"
+
+#: src/public/terms.html:59
+msgid ""
+"post content that infringes others' rights, or that is abusive, harassing, "
+"hateful or sexual content involving minors;"
+msgstr ""
+"publicar contenido que vulnere los derechos de otros, o que sea abusivo, "
+"acosador, de odio o contenido sexual que involucre a menores;"
+
+#: src/public/terms.html:61
+msgid ""
+"send spam, malware, or anything meant to harm the service or other people;"
+msgstr ""
+"enviar spam, malware ni nada que pretenda dañar el servicio o a otras "
+"personas;"
+
+#: src/public/terms.html:62
+msgid ""
+"try to get into accounts or systems that are not yours, or test or overload "
+"the service without our written permission;"
+msgstr ""
+"intentar entrar en cuentas o sistemas que no son tuyos, ni probar o "
+"sobrecargar el servicio sin nuestro permiso por escrito;"
+
+#: src/public/terms.html:64
+msgid "resell the service or use it to build a competing one by copying it."
+msgstr "revender el servicio ni usarlo para crear uno competidor copiándolo."
+
+#: src/public/terms.html:67
+msgid ""
+"We may remove content or suspend or end an account that breaks these terms, "
+"and we will tell you when we can."
+msgstr ""
+"Podemos quitar contenido o suspender o cerrar una cuenta que incumpla estos "
+"términos, y te avisaremos cuando podamos."
+
+#: src/public/terms.html:71
+msgid "4. Plans and purchases"
+msgstr "4. Planes y compras"
+
+#: src/public/terms.html:73
+msgid ""
+"Some features need a paid plan or a one-time purchase. Prices and what each "
+"includes are shown before you buy. A purchase belongs to your account and "
+"works on the web, the desktop and phones."
+msgstr ""
+"Algunas funciones necesitan un plan de pago o una compra única. Los precios "
+"y lo que incluye cada uno se muestran antes de comprar. Una compra pertenece "
+"a tu cuenta y funciona en la web, el escritorio y los teléfonos."
+
+#: src/public/terms.html:78
+msgid ""
+"<strong>On the web and the desktop</strong> payments are taken by Stripe, "
+"which acts as the merchant of record (Stripe Managed Payments): it charges "
+"you, collects any sales tax or VAT, and its terms also apply to the payment."
+msgstr ""
+"<strong>En la web y en el escritorio</strong> los pagos los cobra Stripe, "
+"que actúa como comerciante registrado (Stripe Managed Payments): te cobra, "
+"recauda los impuestos sobre las ventas o el IVA que correspondan, y sus "
+"términos también se aplican al pago."
+
+#: src/public/terms.html:83
+msgid ""
+"<strong>In the iPhone and iPad app</strong> payments are taken by Apple "
+"through the App Store, under Apple's terms, and Apple's Licensed Application "
+"End User License Agreement applies to the app."
+msgstr ""
+"<strong>En la app de iPhone y iPad</strong> los pagos los cobra Apple a "
+"través del App Store, según los términos de Apple, y a la app se le aplica "
+"el Contrato de licencia de usuario final de aplicaciones con licencia de "
+"Apple."
+
+#: src/public/terms.html:88
+msgid ""
+"A plan is a subscription that renews automatically at the end of each "
+"period, monthly or yearly, at the price then shown, until you cancel it. You "
+"can cancel at any time: a plan bought on the web or desktop in your "
+"account's settings, a plan bought in the App Store in your Apple ID's "
+"subscription settings. After cancelling, the plan lasts until the end of the "
+"period already paid. A renewal that cannot be paid ends the plan's features "
+"until it is paid."
+msgstr ""
+"Un plan es una suscripción que se renueva automáticamente al final de cada "
+"período, mensual o anual, al precio que se muestre entonces, hasta que la "
+"canceles. Puedes cancelar en cualquier momento: un plan comprado en la web o "
+"en el escritorio, en la configuración de tu cuenta; un plan comprado en el "
+"App Store, en la configuración de suscripciones de tu Apple ID. Después de "
+"cancelar, el plan dura hasta el final del período ya pagado. Una renovación "
+"que no se puede pagar suspende las funciones del plan hasta que se pague."
+
+#: src/public/terms.html:95
+msgid ""
+"Except where the law requires otherwise, payments are not refunded. You may "
+"ask us for a refund of a Stripe payment at [Contact email]; refunds of App "
+"Store payments are made by Apple. We may change a plan's price with notice "
+"before your next renewal; you can cancel before it applies."
+msgstr ""
+"Salvo que la ley disponga otra cosa, los pagos no se reembolsan. Puedes "
+"pedirnos el reembolso de un pago de Stripe en [Contact email]; los "
+"reembolsos de pagos del App Store los hace Apple. Podemos cambiar el precio "
+"de un plan avisándote antes de tu próxima renovación; puedes cancelar antes "
+"de que se aplique."
+
+#: src/public/terms.html:100
+msgid "5. Deleting your account"
+msgstr "5. Eliminar tu cuenta"
+
+#: src/public/terms.html:102
+msgid ""
+"You can delete your account at any time in the app's account settings. This "
+"deletes your content in every community and on every device, cancels a plan "
+"bought through Stripe at once without a refund, and cannot be undone. A plan "
+"bought in the App Store must be cancelled in the App Store, or Apple keeps "
+"billing it. Deleted data is removed from our systems within 90 days, as the "
+"<a href=\"/privacy\" class=\"link\">Privacy Policy</a> describes."
+msgstr ""
+"Puedes eliminar tu cuenta en cualquier momento en la configuración de la "
+"cuenta de la app. Esto elimina tu contenido en todas las comunidades y en "
+"todos los dispositivos, cancela al instante y sin reembolso un plan comprado "
+"a través de Stripe, y no se puede deshacer. Un plan comprado en el App Store "
+"debe cancelarse en el App Store, o Apple seguirá cobrándolo. Los datos "
+"eliminados se quitan de nuestros sistemas en un plazo de 90 días, como "
+"describe la <a href=\"/privacy\" class=\"link\">Política de privacidad</a>."
+
+#: src/public/terms.html:109
+msgid "6. The service"
+msgstr "6. El servicio"
+
+#: src/public/terms.html:111
+msgid ""
+"We work to keep the service running and your data safe, and we may change, "
+"add or remove features. The apps sync with our servers when they are online; "
+"changes made offline are sent later and may conflict with others' changes."
+msgstr ""
+"Trabajamos para mantener el servicio en funcionamiento y tus datos seguros, "
+"y podemos cambiar, añadir o quitar funciones. Las apps se sincronizan con "
+"nuestros servidores cuando tienen conexión; los cambios hechos sin conexión "
+"se envían más tarde y pueden entrar en conflicto con los cambios de otros."
+
+#: src/public/terms.html:116
+msgid ""
+"THE SERVICE IS PROVIDED \"AS IS\" AND \"AS AVAILABLE\", WITHOUT WARRANTIES "
+"OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A "
+"PARTICULAR PURPOSE AND NON-INFRINGEMENT, TO THE EXTENT THE LAW ALLOWS. Keep "
+"your own copies of anything you cannot afford to lose."
+msgstr ""
+"EL SERVICIO SE PRESTA «TAL CUAL» Y «SEGÚN DISPONIBILIDAD», SIN GARANTÍAS DE "
+"NINGÚN TIPO, EXPRESAS O IMPLÍCITAS, INCLUIDAS LAS DE COMERCIABILIDAD, "
+"IDONEIDAD PARA UN FIN DETERMINADO Y NO INFRACCIÓN, EN LA MEDIDA EN QUE LA "
+"LEY LO PERMITA. Guarda tus propias copias de todo lo que no puedas "
+"permitirte perder."
+
+#: src/public/terms.html:121
+msgid "7. Limit of liability"
+msgstr "7. Limitación de responsabilidad"
+
+#: src/public/terms.html:123
+msgid ""
+"TO THE EXTENT THE LAW ALLOWS, [COMPANY NAME] IS NOT LIABLE FOR INDIRECT, "
+"INCIDENTAL, SPECIAL, CONSEQUENTIAL OR PUNITIVE DAMAGES, OR FOR LOST PROFITS, "
+"DATA OR GOODWILL, AND OUR TOTAL LIABILITY FOR ANY CLAIM ABOUT THE SERVICE IS "
+"LIMITED TO THE GREATER OF WHAT YOU PAID US IN THE TWELVE MONTHS BEFORE THE "
+"CLAIM AND [100 USD]. Nothing in these terms limits liability that cannot be "
+"limited by law."
+msgstr ""
+"EN LA MEDIDA EN QUE LA LEY LO PERMITA, [COMPANY NAME] NO ES RESPONSABLE DE "
+"DAÑOS INDIRECTOS, INCIDENTALES, ESPECIALES, CONSECUENTES O PUNITIVOS, NI DE "
+"LA PÉRDIDA DE BENEFICIOS, DATOS O REPUTACIÓN, Y NUESTRA RESPONSABILIDAD "
+"TOTAL POR CUALQUIER RECLAMACIÓN SOBRE EL SERVICIO SE LIMITA AL MAYOR DE LO "
+"QUE NOS PAGASTE EN LOS DOCE MESES ANTERIORES A LA RECLAMACIÓN Y [100 USD]. "
+"Nada en estos términos limita la responsabilidad que la ley no permite "
+"limitar."
+
+#: src/public/terms.html:129
+msgid ""
+"You will compensate [Company name] for claims by others arising from your "
+"content or your breach of these terms, to the extent the law allows."
+msgstr ""
+"Indemnizarás a [Company name] por las reclamaciones de terceros derivadas de "
+"tu contenido o de tu incumplimiento de estos términos, en la medida en que "
+"la ley lo permita."
+
+#: src/public/terms.html:133
+msgid "8. Changes to these terms"
+msgstr "8. Cambios en estos términos"
+
+#: src/public/terms.html:135
+msgid ""
+"We may update these terms. We will post the new terms here with their "
+"effective date and, for changes that matter, tell you by email or in the "
+"service before they apply. Using the service after that means you accept "
+"them."
+msgstr ""
+"Podemos actualizar estos términos. Publicaremos aquí los nuevos términos con "
+"su fecha de entrada en vigor y, si los cambios son importantes, te "
+"avisaremos por correo o en el servicio antes de que se apliquen. Usar el "
+"servicio después significa que los aceptas."
+
+#: src/public/terms.html:140
+msgid "9. Law and disputes"
+msgstr "9. Ley aplicable y disputas"
+
+#: src/public/terms.html:142
+msgid ""
+"These terms are governed by the laws of [Governing law, e.g. the State of "
+"Delaware, USA], without regard to its conflict-of-law rules, and disputes "
+"are settled in the courts of [Venue]. If you are a consumer, you keep the "
+"protections of the law where you live."
+msgstr ""
+"Estos términos se rigen por las leyes de [Governing law, e.g. the State of "
+"Delaware, USA], sin tener en cuenta sus normas sobre conflicto de leyes, y "
+"las disputas se resuelven en los tribunales de [Venue]. Si eres consumidor, "
+"conservas las protecciones de la ley de donde vives."
+
+#: src/public/terms.html:147
+msgid ""
+"If part of these terms cannot be enforced, the rest still applies. These "
+"terms and the Privacy Policy are the whole agreement between you and us "
+"about the service."
+msgstr ""
+"Si alguna parte de estos términos no se puede hacer cumplir, el resto sigue "
+"vigente. Estos términos y la Política de privacidad son el acuerdo completo "
+"entre tú y nosotros sobre el servicio."
+
+#: src/public/terms.html:151
+msgid "10. Contact"
+msgstr "10. Contacto"
+
+#: src/public/terms.html:152
+msgid "[Company name], [Postal address]. Email: [Contact email]."
+msgstr "[Company name], [Postal address]. Correo: [Contact email]."

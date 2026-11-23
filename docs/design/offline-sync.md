@@ -82,7 +82,8 @@ app's view of each person, their name and picture, one row per person,
 written by the server at sign-up and synced like any row, so a post can
 show who wrote it. Their email is their account's, `accounts_users`
 (`core/src/data/accounts_users/`), a row with the same id that never
-leaves the server: only `app_` tables sync, see `multi-app.md`.
+leaves the server: only `app_` tables sync, and `accounts_preferences`,
+a person's own choices, see `multi-app.md` and `locales.md`.
 Credentials never leave the server either: `accounts_credentials` holds the
 password hash (`core/src/data/accounts_credentials/`) and `accounts_tokens` the API
 tokens (`core/src/data/accounts_tokens/`), as hashes, good for a year, both by the
@@ -123,7 +124,8 @@ over a row it applies a change to, so a device's optimistic times are
 replaced by the server's when its answer comes back.
 
 The synced tables, parents first, which is the order a device writes
-them in: `app_users`, `app_communities`, `app_users_communities` (a
+them in: `app_users`, `accounts_preferences` (a person's own choices,
+to their devices alone, see `locales.md`), `app_communities`, `app_users_communities` (a
 membership), `app_posts`, `app_posts_communities` (a post in a
 community, under the owner's membership there), `app_files` (a file's
 row; its bytes travel apart, see `offline-files-decisions.md`),

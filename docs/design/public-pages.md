@@ -27,7 +27,45 @@ the file as it is; nothing is drawn by a script.
   it before the links paint. A stale hint costs a click: `/home` shows
   Sign in.
 
-To add a page, add its file. The web server finds it when it starts.
+To add a page, add its file, its English marked `<t>…</t>` (below). The
+web server finds it when it starts.
+
+## In other languages
+
+Each page is in every language the app is, `/es/about` for `es`, with
+its own catalog, `svelte/translations/public/`, apart from the app's
+pages' `svelte/translations/`, so neither writes over the other.
+
+- **A page marks its English**: `<t>…</t>` around each paragraph, heading
+  and list item, with the links and bold text inside it, so a sentence
+  stays one message; around a link's or a button's text; in the
+  `<title>` and the description's `content`. The marks never reach a
+  browser. Text that stays as it is, the app's name, has
+  `<!-- untranslated: why -->` before its element.
+- **The messages** are that English, its whitespace one space,
+  extracted to `translations/public/default.pot` by
+  `pnpm translations:extract`, merged into each `<locale>.po` by
+  `translations:update`, and checked by `translations:check` with the
+  app's: a page's English outside `<t>`, a stale `.pot`, a message
+  untranslated or fuzzy, all fail `bin/lint`. The links' HTML and the
+  `[placeholders]` stay as the English has them.
+- **The build** (`svelte/vite.config.js`, with
+  `svelte/scripts/public_pages_translations.js`) writes each page in
+  English at its place, and in each language to `dist/public/<locale>/`:
+  `<html lang>` set, its links to public pages in the same language
+  (`/es/terms`), and the footer's `<!-- public-languages -->` the page in
+  every other language, each in its own name. The dev server translates
+  a page as it answers it.
+- **The web server** answers `/<locale>` and `/<locale>/<name>` for each
+  language of `helpers::locales::SUPPORTED`, a core test keeping both
+  catalogs to that list.
+- **The app's links** to the terms and the privacy policy open them in
+  the language the app shows.
+
+Nothing sends a visitor to their language on its own: `/` is English,
+and the footer links each page's other languages. A translated legal
+page is a translation for a lawyer to review, as the English is a
+template.
 
 ## Which paths are the public website's
 
@@ -38,6 +76,7 @@ answers gets the app's `index.html`. The public website takes only:
 |---|---|
 | `/` | `public/index.html` |
 | `/<name>` | `public/<name>.html`, for each file the build has |
+| `/<locale>`, `/<locale>/<name>` | `public/<locale>/…`, the page in that language |
 
 The app's own home page is `/home`, on the web and in the apps alike,
 so `/` is never two pages. A public page must not be named like a path

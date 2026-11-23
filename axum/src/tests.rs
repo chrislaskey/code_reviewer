@@ -77,6 +77,17 @@ async fn test_router_with(
         "<html>public privacy</html>",
     )
     .expect("privacy");
+    fs::create_dir_all(dist.join("public/es")).expect("a language's dir");
+    fs::write(
+        dist.join("public/es/index.html"),
+        "<html>public home es</html>",
+    )
+    .expect("es home");
+    fs::write(
+        dist.join("public/es/about.html"),
+        "<html>public about es</html>",
+    )
+    .expect("es about");
     let database = app_core::database::Database::open_sqlite_in_memory()
         .await
         .expect("a database");

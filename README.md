@@ -574,10 +574,15 @@ The translations are `svelte/translations/`: `default.pot`, every
 message, and a `<locale>.po` per language. `src/lib/translations.js`'s
 `translationsUse(locale)` loads one, a file of its own in the build;
 until it does, and for a message with no translation or a fuzzy one, a
-page shows the English. Nothing picks a language yet. Every page is
-written through ttag, as are the messages the pages' own JavaScript
-shows; the errors the server sends are still English. The ops app
-(staff only) and the public pages (plain HTML) are left out.
+page shows the English. The pages are in English and Spanish (`es`,
+translated by an LLM, to review). Which one: the person's choice on the
+profile page, a preference synced to their devices, else the device's
+language, see `docs/design/locales.md`. Every page is written through
+ttag, as are the messages the pages' own JavaScript shows; the errors
+the server sends are still English. The public website is translated
+too, from its own catalog, `translations/public/`, its English marked
+`<t>…</t>` in the HTML, at `/es/about`, see
+`docs/design/public-pages.md`. The ops app (staff only) is left out.
 
 In `svelte/`, with GNU gettext (`brew install gettext`):
 
@@ -585,8 +590,12 @@ In `svelte/`, with GNU gettext (`brew install gettext`):
 pnpm translations:extract   # the messages into translations/default.pot
 pnpm translations:update    # that, then merged into every .po, changed English marked fuzzy
 pnpm translations:check     # what bin/lint runs, below
-msginit --no-translator -l es -i translations/default.pot -o translations/es.po   # a new language
+msginit --no-translator -l fr -i translations/default.pot -o translations/fr.po   # a new language
+msginit --no-translator -l fr -i translations/public/default.pot -o translations/public/fr.po   # and its public pages
 ```
+
+A new language also goes in `core/src/helpers/locales.rs`'s
+`SUPPORTED`, which a test keeps in step with both folders' `.po` files.
 
 `translations:check` fails on English in a page's markup written
 without ttag (text, the attributes a person reads such as `placeholder`

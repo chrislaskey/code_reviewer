@@ -8,6 +8,7 @@ pub mod accounts_app_store_notifications;
 #[cfg(feature = "stripe")]
 pub mod accounts_checkouts;
 pub mod accounts_credentials;
+pub mod accounts_preferences;
 #[cfg(feature = "stripe")]
 pub mod accounts_prices;
 #[cfg(feature = "stripe")]

@@ -28,6 +28,7 @@ use crate::data::ops_staff;
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::accounts::preferences;
 use crate::accounts::trial_users;
 use crate::accounts::{AccountError, MAX_CODE_ATTEMPTS};
 use crate::app::communities::{self, CommunityError};
@@ -145,6 +146,7 @@ async fn delete_in(tx: &mut Transaction, user: &User) -> Result<(), DeletionErro
         }
     }
     users::delete_in(tx, user.id).await?;
+    preferences::delete_of_user_in(tx, user.id).await?;
     ops_staff::delete(&mut *tx, user.id).await?;
     accounts_users::delete(tx, user.id).await?;
     Ok(())
@@ -341,6 +343,14 @@ mod tests {
             posts::create(&server, &bob.user, "bob's", &[shared.id])
                 .await
                 .expect("a post");
+            preferences::update(
+                &server,
+                &alice.user,
+                crate::data::accounts_preferences::LOCALE,
+                serde_json::json!("en"),
+            )
+            .await
+            .expect("a preference");
             let personal = memberships::list_mine(&server, &alice.user)
                 .await
                 .expect("the memberships")
@@ -373,7 +383,11 @@ mod tests {
                 .await
                 .expect("read")
                 .expect("kept until the purge");
+            let preferences_left = crate::data::accounts_preferences::list(&mut tx, alice.user.id)
+                .await
+                .expect("read");
             tx.commit().await.expect("committed");
+            assert!(preferences_left.is_empty(), "her preferences go at once");
             assert!(personal.deleted_at.is_some(), "her own community goes");
             assert!(deleted_user.deleted_at.is_some());
             assert_eq!(deleted_user.name, users::DELETED_NAME);
