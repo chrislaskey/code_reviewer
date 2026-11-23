@@ -121,7 +121,7 @@ body {
 /* The app's header (AppHeader): fixed across the window's top in the
    gutter's colour, above the title bar's strip; its items start where the
    page does, clear of the window controls, and a hairline parts it from
-   the page. */
+   the page. On small windows it scrolls away with the page, see below. */
 .app-header {
   position: fixed;
   inset: 0 0 auto 0;
@@ -142,6 +142,15 @@ body {
   height: 1px;
   background: var(--gutter-ring);
   pointer-events: none;
+}
+
+/* Small windows keep only the bottom bar fixed: the header is the top of
+   the page, at the same place, so the page's padding still clears it, and
+   still reaches under a phone's status bar while at the top. */
+@media (width < 40rem) {
+  .app-header {
+    position: absolute;
+  }
 }
 
 /* Back and Forward, only in the desktop app, which has no browser's
