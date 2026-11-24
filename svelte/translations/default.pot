@@ -3,7 +3,7 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Plural-Forms: nplurals=2; plural=(n!=1);\n"
 
-#: src/lib/layouts/AppNav.svelte:30
+#: src/lib/layouts/AppNav.svelte:42
 #: src/support/SupportIndexPage.svelte:9
 msgid "Support"
 msgstr ""
@@ -112,56 +112,56 @@ msgstr ""
 msgid "Save picture"
 msgstr ""
 
-#: src/posts/PostsShowPage.svelte:27
-#: src/posts/components/PostsForm.svelte:46
+#: src/posts/PostsShowPage.svelte:28
+#: src/posts/components/PostsForm.svelte:47
 msgid "Post"
 msgstr ""
 
-#: src/files/FilesIndexPage.svelte:111
-#: src/files/FilesShowPage.svelte:65
-#: src/posts/PostsIndexPage.svelte:19
-#: src/posts/PostsShowPage.svelte:31
+#: src/files/FilesIndexPage.svelte:112
+#: src/files/FilesShowPage.svelte:66
+#: src/posts/PostsIndexPage.svelte:20
+#: src/posts/PostsShowPage.svelte:32
 #, javascript-format
 msgid "in ${ communityNames }"
 msgstr ""
 
 #: src/communities/CommunitiesShowPage.svelte:42
-#: src/files/FilesShowPage.svelte:89
-#: src/posts/PostsShowPage.svelte:34
+#: src/files/FilesShowPage.svelte:90
+#: src/posts/PostsShowPage.svelte:35
 msgid "Edit"
 msgstr ""
 
 #: src/communities/CommunitiesShowPage.svelte:44
-#: src/files/FilesShowPage.svelte:91
-#: src/posts/PostsShowPage.svelte:36
+#: src/files/FilesShowPage.svelte:92
+#: src/posts/PostsShowPage.svelte:37
 msgid "Delete"
 msgstr ""
 
 #: src/conflicts/ConflictsIndexPage.svelte:67
-#: src/posts/PostsNewPage.svelte:32
-#: src/posts/PostsShowPage.svelte:38
+#: src/posts/PostsNewPage.svelte:47
+#: src/posts/PostsShowPage.svelte:39
 msgid "Back to posts"
 msgstr ""
 
-#: src/posts/PostsShowPage.svelte:17
+#: src/posts/PostsShowPage.svelte:18
 msgid "Delete this post?"
 msgstr ""
 
-#: src/posts/PostsIndexPage.svelte:14
-#: src/posts/PostsNewPage.svelte:28
+#: src/posts/PostsIndexPage.svelte:15
+#: src/posts/PostsNewPage.svelte:43
 msgid "New post"
 msgstr ""
 
-#: src/lib/layouts/AppNav.svelte:27
-#: src/posts/PostsIndexPage.svelte:12
+#: src/lib/layouts/AppNav.svelte:39
+#: src/posts/PostsIndexPage.svelte:13
 msgid "Posts"
 msgstr ""
 
-#: src/posts/PostsIndexPage.svelte:16
+#: src/posts/PostsIndexPage.svelte:17
 msgid "No posts yet."
 msgstr ""
 
-#: src/posts/PostsIndexPage.svelte:22
+#: src/posts/PostsIndexPage.svelte:23
 msgid "Show"
 msgstr ""
 
@@ -179,16 +179,16 @@ msgstr ""
 msgid "Back to the post"
 msgstr ""
 
-#: src/posts/components/PostsForm.svelte:47
+#: src/posts/components/PostsForm.svelte:48
 msgid "What's on your mind?"
 msgstr ""
 
-#: src/files/components/FilesCommunitiesField.svelte:37
-#: src/posts/components/PostsForm.svelte:48
+#: src/files/components/FilesCommunitiesField.svelte:39
+#: src/posts/components/PostsForm.svelte:49
 msgid "In"
 msgstr ""
 
-#: src/lib/router.js:75
+#: src/lib/router.js:69
 #, javascript-format
 msgid "Could not check who is signed in: ${ reason }"
 msgstr ""
@@ -353,7 +353,7 @@ msgid "No community"
 msgstr ""
 
 #: src/communities/CommunitiesIndexPage.svelte:13
-#: src/lib/layouts/AppNav.svelte:29
+#: src/lib/layouts/AppNav.svelte:41
 #: src/lib/layouts/CurrentCommunityMenu.svelte:63
 msgid "Communities"
 msgstr ""
@@ -389,46 +389,42 @@ msgstr ""
 msgid "Menu"
 msgstr ""
 
-#: src/lib/layouts/AppNav.svelte:69
+#: src/lib/layouts/AppNav.svelte:83
 #: src/lib/layouts/BottomBar.svelte:42
 msgid "Main"
 msgstr ""
 
-#: src/lib/layouts/AppHeader.svelte:18
 #: src/lib/layouts/AppHeader.svelte:19
+#: src/lib/layouts/AppHeader.svelte:20
 #: src/lib/layouts/BottomBar.svelte:49
 msgid "Back"
 msgstr ""
 
-#: src/lib/layouts/AppHeader.svelte:22
 #: src/lib/layouts/AppHeader.svelte:23
+#: src/lib/layouts/AppHeader.svelte:24
 #: src/lib/layouts/BottomBar.svelte:52
 msgid "Forward"
 msgstr ""
 
-#: src/lib/layouts/AppNav.svelte:24
-#. * @typedef {{ id: string, label: string, icon: string, href: string, target?: string }} Link 
+#: src/lib/layouts/AppNav.svelte:36
 #. * @type {Link[]} 
 msgid "Home"
 msgstr ""
 
-#: src/files/FilesIndexPage.svelte:88
+#: src/files/FilesIndexPage.svelte:89
 #: src/files/FilesNewPage.svelte:334
-#: src/lib/layouts/AppNav.svelte:28
-#. * @typedef {{ id: string, label: string, icon: string, href: string, target?: string }} Link 
+#: src/lib/layouts/AppNav.svelte:40
 #. * @type {Link[]} 
 msgid "Files"
 msgstr ""
 
 #: src/forum/ForumIndexPage.svelte:9
-#: src/lib/layouts/AppNav.svelte:31
-#. * @typedef {{ id: string, label: string, icon: string, href: string, target?: string }} Link 
+#: src/lib/layouts/AppNav.svelte:43
 #. * @type {Link[]} 
 msgid "Forum"
 msgstr ""
 
-#: src/lib/layouts/AppNav.svelte:35
-#. * @typedef {{ id: string, label: string, icon: string, href: string, target?: string }} Link 
+#: src/lib/layouts/AppNav.svelte:47
 #. * @type {Link[]} 
 msgid "Ops"
 msgstr ""
@@ -447,7 +443,7 @@ msgstr ""
 msgid "Account, as a guest"
 msgstr ""
 
-#: src/accounts/current/AccountsCurrentShowPage.svelte:23
+#: src/accounts/current/AccountsCurrentShowPage.svelte:25
 #: src/lib/layouts/AccountMenu.svelte:45
 msgid "Account"
 msgstr ""
@@ -546,58 +542,58 @@ msgstr ""
 msgid "Log in, then start with the ${ postsLink }."
 msgstr ""
 
-#: src/files/FilesShowPage.svelte:62
+#: src/files/FilesShowPage.svelte:63
 msgid "File"
 msgstr ""
 
-#: src/files/FilesShowPage.svelte:64
+#: src/files/FilesShowPage.svelte:65
 msgid "A former member"
 msgstr ""
 
-#: src/files/FilesShowPage.svelte:69
+#: src/files/FilesShowPage.svelte:70
 msgid "waiting to upload"
 msgstr ""
 
-#: src/files/FilesShowPage.svelte:70
+#: src/files/FilesShowPage.svelte:71
 msgid "not saved on the server"
 msgstr ""
 
-#: src/files/FilesShowPage.svelte:73
+#: src/files/FilesShowPage.svelte:74
 msgid "Try again or let it go"
 msgstr ""
 
-#: src/files/FilesShowPage.svelte:74
+#: src/files/FilesShowPage.svelte:75
 msgid "Copy to the clipboard"
 msgstr ""
 
 #: src/accounts/components/AccountsDeviceCode.svelte:28
-#: src/files/FilesShowPage.svelte:78
+#: src/files/FilesShowPage.svelte:79
 msgid "Copied"
 msgstr ""
 
-#: src/files/FilesShowPage.svelte:78
+#: src/files/FilesShowPage.svelte:79
 msgid "Click the image to copy it"
 msgstr ""
 
-#: src/files/FilesShowPage.svelte:85
+#: src/files/FilesShowPage.svelte:86
 msgid "This kind of file is not shown here."
 msgstr ""
 
-#: src/files/FilesShowPage.svelte:87
+#: src/files/FilesShowPage.svelte:88
 msgid "Download"
 msgstr ""
 
 #: src/files/FilesNewPage.svelte:365
-#: src/files/FilesShowPage.svelte:94
+#: src/files/FilesShowPage.svelte:95
 msgid "Back to files"
 msgstr ""
 
-#: src/files/FilesShowPage.svelte:45
+#: src/files/FilesShowPage.svelte:46
 #, javascript-format
 msgid "Saved to ${ path }"
 msgstr ""
 
-#: src/files/FilesShowPage.svelte:52
+#: src/files/FilesShowPage.svelte:53
 msgid "Delete this file from your communities? A community you are not in keeps it."
 msgstr ""
 
@@ -608,7 +604,7 @@ msgid_plural "A list holds ${ maxFiles } files; ${ leftOut } were left out."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/files/FilesIndexPage.svelte:90
+#: src/files/FilesIndexPage.svelte:91
 #: src/files/FilesNewPage.svelte:327
 msgid "New files"
 msgstr ""
@@ -665,55 +661,55 @@ msgstr[1] ""
 msgid "Retry failed"
 msgstr ""
 
-#: src/files/FilesIndexPage.svelte:17
+#: src/files/FilesIndexPage.svelte:18
 #. * @type {{ view: import("./files_view.js").FilesView, label: string, icon: string }[]} 
 msgid "List"
 msgstr ""
 
-#: src/files/FilesIndexPage.svelte:18
+#: src/files/FilesIndexPage.svelte:19
 #. * @type {{ view: import("./files_view.js").FilesView, label: string, icon: string }[]} 
 msgid "Grid"
 msgstr ""
 
-#: src/files/FilesIndexPage.svelte:92
+#: src/files/FilesIndexPage.svelte:93
 msgid "No files yet."
 msgstr ""
 
-#: src/files/FilesIndexPage.svelte:94
 #: src/files/FilesIndexPage.svelte:95
+#: src/files/FilesIndexPage.svelte:96
 msgid "Search by name"
 msgstr ""
 
-#: src/files/FilesIndexPage.svelte:101
+#: src/files/FilesIndexPage.svelte:102
 msgid "No files have that in their name."
 msgstr ""
 
-#: src/files/FilesIndexPage.svelte:113
+#: src/files/FilesIndexPage.svelte:114
 #: src/files/components/FilesGrid.svelte:23
 msgid "Waiting to upload"
 msgstr ""
 
-#: src/files/FilesIndexPage.svelte:114
+#: src/files/FilesIndexPage.svelte:115
 #: src/files/components/FilesGrid.svelte:24
 msgid "Not saved on the server"
 msgstr ""
 
-#: src/files/FilesIndexPage.svelte:116
+#: src/files/FilesIndexPage.svelte:117
 msgid "Show more"
 msgstr ""
 
-#: src/files/FilesIndexPage.svelte:117
+#: src/files/FilesIndexPage.svelte:118
 #, javascript-format
 msgid "${ cache.count } file kept on this device, ${ cachedSize }."
 msgid_plural "${ cache.count } files kept on this device, ${ cachedSize }."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/files/FilesIndexPage.svelte:122
+#: src/files/FilesIndexPage.svelte:123
 msgid "Removing them frees the space; each is fetched again when it is next shown."
 msgstr ""
 
-#: src/files/FilesIndexPage.svelte:125
+#: src/files/FilesIndexPage.svelte:126
 msgid "Remove cached files"
 msgstr ""
 
@@ -725,62 +721,67 @@ msgstr ""
 msgid "Back to the file"
 msgstr ""
 
-#: src/files/components/FilesNewRow.svelte:24
+#: src/files/components/FilesNewRow.svelte:25
 msgid "Put it in the communities chosen"
 msgstr ""
 
-#: src/files/components/FilesNewRow.svelte:24
+#: src/files/components/FilesNewRow.svelte:25
 msgid "Create a copy"
 msgstr ""
 
 #: src/accounts/AccountsIndexPage.svelte:231
-#: src/files/components/FilesNewRow.svelte:24
+#: src/files/components/FilesNewRow.svelte:25
 msgid "Skip"
 msgstr ""
 
-#: src/files/components/FilesNewRow.svelte:25
+#: src/files/components/FilesNewRow.svelte:26
 msgid "Waiting"
 msgstr ""
 
-#: src/files/components/FilesNewRow.svelte:25
+#: src/files/components/FilesNewRow.svelte:26
 msgid "Created"
 msgstr ""
 
-#: src/files/components/FilesNewRow.svelte:25
+#: src/files/components/FilesNewRow.svelte:26
 msgid "Put in"
 msgstr ""
 
-#: src/files/components/FilesNewRow.svelte:25
+#: src/files/components/FilesNewRow.svelte:26
 msgid "Skipped"
 msgstr ""
 
-#: src/files/components/FilesNewRow.svelte:49
+#: src/files/components/FilesNewRow.svelte:50
 msgid "Rename"
 msgstr ""
 
-#: src/files/components/FilesNewRow.svelte:60
+#: src/files/components/FilesNewRow.svelte:61
 msgid "Failed"
 msgstr ""
 
-#: src/files/components/FilesNewRow.svelte:63
+#: src/files/components/FilesNewRow.svelte:64
 msgid "Take it off the list"
 msgstr ""
 
-#: src/files/components/FilesNewRow.svelte:64
+#: src/files/components/FilesNewRow.svelte:65
 msgid "Remove"
-msgstr ""
-
-#: src/files/components/FilesNewRow.svelte:67
-#, javascript-format
-msgid "Already here, as ${ existingLink } in ${ communityNames }."
 msgstr ""
 
 #: src/files/components/FilesNewRow.svelte:68
 #, javascript-format
+msgid "Already here, as ${ existingLink }."
+msgstr ""
+
+#: src/files/components/FilesNewRow.svelte:71
+#, javascript-format
+msgid "Already here, as ${ existingLink } in ${ communityNames }."
+msgstr ""
+
+#: src/files/components/FilesNewRow.svelte:72
+#, javascript-format
 msgid "The same file as ${ earlier.name }, earlier in this list."
 msgstr ""
 
-#: src/files/components/FilesNewRow.svelte:73
+#: src/files/components/FilesNewRow.svelte:77
 #, javascript-format
 msgid "The same for ${ count } more"
 msgid_plural "The same for ${ count } more"
@@ -988,7 +989,7 @@ msgid "Email"
 msgstr ""
 
 #: src/accounts/AccountsSignInPage.svelte:96
-#: src/accounts/current/AccountsCurrentShowPage.svelte:30
+#: src/accounts/current/AccountsCurrentShowPage.svelte:32
 msgid "Password"
 msgstr ""
 
@@ -1170,7 +1171,7 @@ msgstr ""
 msgid "Cancel your plan at the end of this period?"
 msgstr ""
 
-#: src/accounts/current/AccountsCurrentShowPage.svelte:33
+#: src/accounts/current/AccountsCurrentShowPage.svelte:35
 #: src/accounts/subscriptions/AccountsSubscriptionsIndexPage.svelte:13
 msgid "Plans"
 msgstr ""
@@ -1206,7 +1207,7 @@ msgstr ""
 msgid "Back to purchases"
 msgstr ""
 
-#: src/accounts/current/AccountsCurrentShowPage.svelte:37
+#: src/accounts/current/AccountsCurrentShowPage.svelte:39
 #: src/accounts/purchases/AccountsPurchasesIndexPage.svelte:13
 msgid "Purchases"
 msgstr ""
@@ -1320,7 +1321,7 @@ msgid_plural "${ recorded } purchases restored."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/accounts/current/AccountsCurrentShowPage.svelte:39
+#: src/accounts/current/AccountsCurrentShowPage.svelte:41
 #: src/accounts/deletions/AccountsDeletionsNewPage.svelte:56
 #: src/accounts/deletions/AccountsDeletionsNewPage.svelte:75
 msgid "Delete my account"
@@ -1392,16 +1393,16 @@ msgstr ""
 msgid "Back to account"
 msgstr ""
 
-#: src/accounts/current/AccountsCurrentShowPage.svelte:27
+#: src/accounts/current/AccountsCurrentShowPage.svelte:29
 msgid "Delete what I made as a guest"
 msgstr ""
 
-#: src/accounts/current/AccountsCurrentShowPage.svelte:31
+#: src/accounts/current/AccountsCurrentShowPage.svelte:33
 #, javascript-format
 msgid "Your plan: ${ currentUser.value.plan.product_name }"
 msgstr ""
 
-#: src/accounts/current/AccountsCurrentShowPage.svelte:35
+#: src/accounts/current/AccountsCurrentShowPage.svelte:37
 msgid "Plans and products for sale"
 msgstr ""
 
@@ -1563,8 +1564,8 @@ msgstr ""
 
 #: src/accounts/components/AccountsMoveDialog.svelte:26
 #, javascript-format
-msgid "Move ${ offered.items } item into ${ offered.email }?"
-msgid_plural "Move ${ offered.items } items into ${ offered.email }?"
+msgid "Move ${ pendingMove.items } item into ${ pendingMove.email }?"
+msgid_plural "Move ${ pendingMove.items } items into ${ pendingMove.email }?"
 msgstr[0] ""
 msgstr[1] ""
 
@@ -1582,8 +1583,8 @@ msgstr ""
 #: src/accounts/components/AccountsMoveDialog.svelte:34
 #, javascript-format
 msgid ""
-"Keeping them separate adds ${ offered.email } beside it, and leaves what "
-"you made where it is, on this device only."
+"Keeping them separate adds ${ pendingMove.email } beside it, and leaves "
+"what you made where it is, on this device only."
 msgstr ""
 
 #: src/accounts/components/AccountsMoveDialog.svelte:38
@@ -1705,7 +1706,7 @@ msgstr ""
 msgid "This checkout expired, and nothing was charged."
 msgstr ""
 
-#: src/posts/PostsNewPage.svelte:29
+#: src/posts/PostsNewPage.svelte:44
 msgctxt "verb"
 msgid "Post"
 msgstr ""

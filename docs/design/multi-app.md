@@ -55,7 +55,9 @@ other app carries its name:
   load, and not in the desktop and phone apps, which bundle
   `svelte/dist`. A link to it loads the page in full.
 - **The nav** (`svelte/src/lib/layouts/AppNav.svelte`) links the apps: Support,
-  Forum, the person's email to their account, and Ops for staff.
+  Forum, the person's email to their account, and Ops for staff. A
+  server turns Support or Forum off with `features.support` or
+  `features.forum`, see "Server settings" in `multi-server.md`.
 - **Depends on**: `accounts`, then `app`, then every other app. Never
   the other way.
 

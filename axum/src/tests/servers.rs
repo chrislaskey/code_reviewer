@@ -35,6 +35,7 @@ async fn servers_settings_get_answers_the_settings_with_their_version_to_anyone(
             accounts_sign_up: false,
             ..app_core::app::features::Features::default()
         },
+        ..ServerSettings::default()
     };
     let (router, _) = test_router_with(TrialUsersMax(2), false, closed.clone()).await;
     let ask = |path: &'static str| {
@@ -52,7 +53,10 @@ async fn servers_settings_get_answers_the_settings_with_their_version_to_anyone(
                     "accounts_sign_up": false,
                     "accounts_sign_in_code": true,
                     "accounts_purchasing": true,
+                    "support": true,
+                    "forum": true,
                 },
+                "communities": "multiple",
             },
         })
     );

@@ -264,3 +264,24 @@ pub async fn delete_for_resync(connection: &mut PgConnection) -> Result<(), sqlx
     .await?;
     Ok(())
 }
+
+pub async fn move_rows_to_community(
+    connection: &mut PgConnection,
+    from_community_id: Uuid,
+    to_community_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "DELETE FROM app_files_communities WHERE community_id = $1 \
+         AND file_id IN (SELECT file_id FROM app_files_communities WHERE community_id = $2)",
+    )
+    .bind(from_community_id)
+    .bind(to_community_id)
+    .execute(&mut *connection)
+    .await?;
+    sqlx::query("UPDATE app_files_communities SET community_id = $2 WHERE community_id = $1")
+        .bind(from_community_id)
+        .bind(to_community_id)
+        .execute(connection)
+        .await?;
+    Ok(())
+}

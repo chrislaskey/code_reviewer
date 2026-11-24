@@ -15,13 +15,13 @@
 //! the code, and ends the same way. Each route is rate limited, see
 //! `rate_limits`. A
 //! sign-in from a trial user's browser may be theirs signing up, see
-//! `trial_users`. A server whose settings turn sign-ups off,
+//! `trial_users`. A server whose settings disable sign-ups,
 //! `features.accounts_sign_up`, makes no account for a new email,
-//! `sign_up_offered`; one that turns codes off,
+//! `sign_up_enabled`; one that disables codes,
 //! `features.accounts_sign_in_code`, signs in by password alone,
-//! `sign_in_code_offered`; one that turns purchasing off,
-//! `features.accounts_purchasing`, answers none of the routes that buy,
-//! `purchasing_offered`. The accounts app's other routes are its
+//! `sign_in_code_enabled`; one that disables purchasing,
+//! `features.accounts_purchasing`, refuses every route that buys,
+//! `purchasing_enabled`. The accounts app's other routes are its
 //! submodules, each at the path of the core module it calls.
 
 pub mod app_store_notifications;
@@ -98,9 +98,9 @@ pub struct DeviceCodeExchange {
     pub verifier: String,
 }
 
-/// Whether the server takes new sign-ups, trial users included; a 403
-/// when its settings say not.
-pub(crate) fn sign_up_offered(document: &SettingsDocument) -> Result<(), ApiError> {
+/// Whether sign-ups are enabled, trial users included; a 403 when the
+/// server's settings disable them.
+pub(crate) fn sign_up_enabled(document: &SettingsDocument) -> Result<(), ApiError> {
     if document.settings.features.accounts_sign_up {
         Ok(())
     } else {
@@ -111,9 +111,9 @@ pub(crate) fn sign_up_offered(document: &SettingsDocument) -> Result<(), ApiErro
     }
 }
 
-/// Whether the server signs in with an emailed code; a 403 when its
-/// settings say by password alone.
-pub(crate) fn sign_in_code_offered(document: &SettingsDocument) -> Result<(), ApiError> {
+/// Whether signing in with an emailed code is enabled; a 403 when the
+/// server's settings allow a password only.
+pub(crate) fn sign_in_code_enabled(document: &SettingsDocument) -> Result<(), ApiError> {
     if document.settings.features.accounts_sign_in_code {
         Ok(())
     } else {
@@ -124,9 +124,9 @@ pub(crate) fn sign_in_code_offered(document: &SettingsDocument) -> Result<(), Ap
     }
 }
 
-/// Whether the server sells plans and products; a 403 to every
-/// purchasing route, webhooks included, when its settings say not.
-pub(crate) async fn purchasing_offered(
+/// Whether purchasing is enabled; a 403 to every purchasing route,
+/// webhooks included, when the server's settings disable it.
+pub(crate) async fn purchasing_enabled(
     State(document): State<Arc<SettingsDocument>>,
     request: Request,
     next: Next,
@@ -150,10 +150,10 @@ pub async fn sign_in(
     RequestLocale(requested): RequestLocale,
     Json(sign_in): Json<SignIn>,
 ) -> Result<(StatusCode, Json<CodeSent>), ApiError> {
-    sign_in_code_offered(&settings)?;
+    sign_in_code_enabled(&settings)?;
     limits.check_email(&sign_in.email)?;
-    let offered = sign_up_offered(&settings).is_ok();
-    let trial = if offered {
+    let sign_up_is_enabled = sign_up_enabled(&settings).is_ok();
+    let trial = if sign_up_is_enabled {
         trial_user_of(&deployment, &jar).await?
     } else {
         None
@@ -163,7 +163,16 @@ pub async fn sign_in(
             accounts::sign_in_from_trial(&deployment, &mailer, &trial, &sign_in.email, requested)
                 .await?
         }
-        None => accounts::sign_in(&deployment, &mailer, &sign_in.email, offered, requested).await?,
+        None => {
+            accounts::sign_in(
+                &deployment,
+                &mailer,
+                &sign_in.email,
+                sign_up_is_enabled,
+                requested,
+            )
+            .await?
+        }
     };
     Ok((StatusCode::ACCEPTED, Json(sent)))
 }
@@ -193,7 +202,7 @@ pub async fn code_resend(
     RequestLocale(requested): RequestLocale,
     Json(resend): Json<Resend>,
 ) -> Result<StatusCode, ApiError> {
-    sign_in_code_offered(&settings)?;
+    sign_in_code_enabled(&settings)?;
     limits.check_resend(&resend.pending)?;
     let email = accounts::resend_code_to(&deployment, &resend.pending).await?;
     limits.check_email(&email)?;
@@ -208,7 +217,7 @@ pub async fn code(
     State(settings): State<Arc<SettingsDocument>>,
     Json(code): Json<Code>,
 ) -> Result<Json<CodeMatched>, ApiError> {
-    sign_in_code_offered(&settings)?;
+    sign_in_code_enabled(&settings)?;
     let matched = accounts::sign_in_with_code(&deployment, &code.pending, &code.code).await?;
     Ok(Json(matched))
 }
@@ -243,7 +252,7 @@ pub async fn sign_in_password(
     State(settings): State<Arc<SettingsDocument>>,
     Json(password): Json<Password>,
 ) -> Result<Response, ApiError> {
-    limits.check_password(&password.email, sign_in_code_offered(&settings).is_ok())?;
+    limits.check_password(&password.email, sign_in_code_enabled(&settings).is_ok())?;
     if let Some(challenge) = challenge_of(&password.challenge) {
         let device_code = accounts::sign_in_with_password_for_device(
             &deployment,

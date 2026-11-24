@@ -135,4 +135,19 @@ pub(crate) mod maintenance {
     pub(crate) async fn delete(tx: &mut Transaction, id: Uuid) -> Result<(), sqlx::Error> {
         query!(tx, delete_row(id))
     }
+
+    /// Moves every post from one community to another, through the
+    /// membership given, when a local user's communities are merged; a
+    /// post already in both keeps only its row in the second.
+    pub(crate) async fn move_rows_to_community(
+        tx: &mut Transaction,
+        from_community_id: Uuid,
+        to_community_id: Uuid,
+        to_membership_id: Uuid,
+    ) -> Result<(), sqlx::Error> {
+        query!(
+            tx,
+            move_rows_to_community(from_community_id, to_community_id, to_membership_id)
+        )
+    }
 }

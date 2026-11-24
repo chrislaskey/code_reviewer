@@ -4,6 +4,7 @@
   import { dateTimeFormat } from "../lib/formats.js";
   import { postsDelete, postsGet } from "../lib/core/index.js";
   import { loaded } from "../lib/loaded.svelte.js";
+  import { currentServerHasSingleCommunity } from "../lib/current_server.svelte.js";
   import { errorMessageOf } from "../lib/error_message.js";
   import { currentUser } from "../lib/current_user.svelte.js";
   import { navigateToUrl, pathParams } from "../lib/router.js";
@@ -34,7 +35,7 @@
     <Panel as="article">
       <Text tone="muted">
         {owner.name} · {dateTimeFormat(post.inserted_at)}
-        {#if communities.length > 0}
+        {#if communities.length > 0 && !currentServerHasSingleCommunity()}
           {@const communityNames = communities.map((community) => community.name).join(", ")}
           · {t`in ${communityNames}`}
         {/if}

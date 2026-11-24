@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// The features a server offers.
+/// The features a server enables or disables.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Features {
@@ -19,6 +19,12 @@ pub struct Features {
     /// Whether the server sells plans and products; off, it answers
     /// none of the purchasing routes and the pages offer nothing to buy.
     pub accounts_purchasing: bool,
+    /// Whether the support app is enabled; disabled, the pages show
+    /// neither its tab nor its pages.
+    pub support: bool,
+    /// Whether the forum app is enabled; disabled, the pages show
+    /// neither its tab nor its pages.
+    pub forum: bool,
 }
 
 impl Default for Features {
@@ -27,6 +33,8 @@ impl Default for Features {
             accounts_sign_up: true,
             accounts_sign_in_code: true,
             accounts_purchasing: true,
+            support: true,
+            forum: true,
         }
     }
 }

@@ -1,10 +1,11 @@
 <!-- The fields of a post, for the New and Edit pages: the body, bound to
      the page's `text`, the communities it is in among the ones the person
      is a member of, bound to `communityIds`, and the error the write came
-     back with. -->
+     back with. A server with a single community shows no choice. -->
 <script>
   import { t } from "ttag";
   import { communitiesList } from "../../lib/core/index.js";
+  import { currentServerHasSingleCommunity } from "../../lib/current_server.svelte.js";
   import { Button, Checkbox, ErrorMessage, Text, Textarea } from "../../lib/components/index.js";
 
   /**
@@ -49,7 +50,7 @@
 
 <form onsubmit={submit} class="flex flex-col gap-3">
   <Textarea bind:value={text} rows="4" aria-label={t`Post`} placeholder={t`What's on your mind?`} maxlength="10000" />
-  {#if mine.length > 0}
+  {#if mine.length > 0 && !currentServerHasSingleCommunity()}
     <fieldset class="flex flex-wrap gap-3">
       <Text as="legend" tone="muted">{t`In`}</Text>
       {#each mine as community (community.id)}

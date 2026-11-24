@@ -680,7 +680,7 @@ mod tests {
 
             let session =
                 accounts::tests::signed_up_for_a_device(&server, "alice@example.com").await;
-            let alice = local_users::move_to_account(&device, session)
+            let alice = local_users::move_to_account(&device, session, None)
                 .await
                 .expect("moved");
             synced(&device, &server).await;

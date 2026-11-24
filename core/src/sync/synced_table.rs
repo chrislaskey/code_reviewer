@@ -10,6 +10,7 @@ use uuid::Uuid;
 use crate::data::app_events::{Event, Fields};
 use crate::data::app_sync_state::{self, Cursor};
 use crate::data::app_users::User;
+use crate::data::app_users_communities::Membership;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role};
 use crate::sync::TableRow;
@@ -136,6 +137,22 @@ pub trait SyncedTable: Send + Sync {
         _limit: usize,
     ) -> Result<Vec<TableRow>, TableError> {
         Ok(Vec::new())
+    }
+
+    /// Moves the device's rows from one community to another, through the
+    /// account's membership of it, when a local user's communities are
+    /// merged into the account's on a server with a single community,
+    /// before the first community is deleted; nothing for a table not in
+    /// communities. A table that implements
+    /// `list_live_in_community_after` must implement this too, or its
+    /// rows are deleted with the community.
+    async fn move_rows_to_community(
+        &self,
+        _tx: &mut Transaction,
+        _from_community_id: Uuid,
+        _to: &Membership,
+    ) -> Result<(), TableError> {
+        Ok(())
     }
 
     /// Removes from a device the rows the user no longer sees, after a

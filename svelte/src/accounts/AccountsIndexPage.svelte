@@ -53,14 +53,14 @@
   let signInError = $state("");
   let canSkip = $state(false);
   /** @type {{email: string, items: number} | null} */
-  let moveOffered = $state(null);
+  let pendingMove = $state(null);
   let moveError = $state("");
   let busy = $state(false);
   let error = $state("");
   currentServerLoad().catch(() => {});
   /** Whether the server takes new sign-ups, as its settings say. */
-  let signUpOffered = $derived(currentServer.value?.settings.features.accounts_sign_up ?? true);
-  let signUpOrSignIn = $derived(signUpOffered ? t`Sign up or log in` : t`Log in`);
+  let signUpEnabled = $derived(currentServer.value?.settings.features.accounts_sign_up ?? true);
+  let signUpOrSignIn = $derived(signUpEnabled ? t`Sign up or log in` : t`Log in`);
   /** Whether the page was opened just after an account was deleted. */
   const accountDeleted = new URLSearchParams(window.location.search).has("account_deleted");
 
@@ -130,12 +130,12 @@
     });
   }
 
-  /** @param {{outcome: "signed_in"} | {outcome: "move_offered", email: string, items: number}} finished */
+  /** @param {{outcome: "signed_in"} | {outcome: "pending_move", email: string, items: number}} finished */
   async function signedIn(finished) {
     signingIn = null;
-    if (finished.outcome === "move_offered") {
+    if (finished.outcome === "pending_move") {
       moveError = "";
-      moveOffered = { email: finished.email, items: finished.items };
+      pendingMove = { email: finished.email, items: finished.items };
       return;
     }
     currentUserForget();
@@ -179,7 +179,7 @@
         moveError = errorMessageOf(problem);
         return;
       }
-      moveOffered = null;
+      pendingMove = null;
       currentUserForget();
       await navigateToUrl(postsIndexUrl());
     });
@@ -278,7 +278,7 @@
   />
 
   <AccountsMoveDialog
-    offered={moveOffered}
+    {pendingMove}
     error={moveError}
     {busy}
     onmove={() => answerMove(localUsersMove)}

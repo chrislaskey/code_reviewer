@@ -1,7 +1,8 @@
 <!-- The app's header, across the window's top above the gutter (AppNav)
      and the page: in the desktop app Back and Forward beside the window
      controls, which it has no browser's buttons for; the current
-     community to switch, for someone signed in; then on the right the
+     community to switch, for someone signed in on a server with more
+     than one community; then on the right the
      sync status (SyncMenu) and the person (AccountMenu). Its empty parts
      drag the window on the desktop. On small windows Back and Forward are
      the bottom bar's (BottomBar). -->
@@ -18,6 +19,7 @@
     trackNavigationHistory,
   } from "./navigation_history.svelte.js";
   import { currentUser } from "../current_user.svelte.js";
+  import { currentServerHasSingleCommunity } from "../current_server.svelte.js";
 
 
   $effect(() => trackNavigationHistory());
@@ -49,7 +51,7 @@
       <Icon name="hero-chevron-right" class="size-5" />
     </Button>
   </div>
-  {#if currentUser.value}
+  {#if currentUser.value && !currentServerHasSingleCommunity()}
     <CurrentCommunityMenu />
   {/if}
   <span class="grow self-stretch" data-tauri-drag-region></span>

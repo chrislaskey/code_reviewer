@@ -97,9 +97,9 @@ impl RateLimits {
 
     /// One more password try for the address, or 429, which points to
     /// the emailed code when the server offers one.
-    pub fn check_password(&self, email: &str, sign_in_code_offered: bool) -> Result<(), ApiError> {
+    pub fn check_password(&self, email: &str, sign_in_code_enabled: bool) -> Result<(), ApiError> {
         let key = email.trim().to_lowercase();
-        let message = if sign_in_code_offered {
+        let message = if sign_in_code_enabled {
             TOO_MANY_PASSWORDS
         } else {
             TOO_MANY_PASSWORDS_WITHOUT_CODE

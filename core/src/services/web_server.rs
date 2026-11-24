@@ -6,6 +6,8 @@
 use crate::accounts::{self, AccountError, Session};
 #[cfg(feature = "sync-http")]
 use crate::app::avatars::{AvatarUpdate, AvatarUpload, AvatarUploadNew};
+#[cfg(feature = "sync-http")]
+use crate::app::communities::CommunityAndMembership;
 use crate::app::users::{self, UserError};
 use crate::data::app_users::User;
 use crate::deployment::Deployment;
@@ -394,6 +396,16 @@ impl Http {
     pub async fn servers_current_settings_get(&self) -> Result<SettingsDocument, SyncError> {
         let path = "/api/servers/current/settings";
         self.send(reqwest::Method::GET, None, path, &()).await
+    }
+
+    /// Every community the token's user sees on the server, with their
+    /// membership when they are in it, `/api/communities`.
+    pub async fn communities_list(
+        &self,
+        token: &str,
+    ) -> Result<Vec<CommunityAndMembership>, SyncError> {
+        self.send(reqwest::Method::GET, Some(token), "/api/communities", &())
+            .await
     }
 
     /// The server this server lists by the name at the origin, or none,

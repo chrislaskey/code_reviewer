@@ -23,6 +23,7 @@
   import { navigateToUrl, pathParams } from "../lib/router.js";
   import { conflictsIndexUrl, filesEditUrl, filesIndexUrl } from "../lib/routes.js";
   import { fileSize } from "../lib/file_size.js";
+  import { currentServerHasSingleCommunity } from "../lib/current_server.svelte.js";
   import { Button, ErrorMessage, Heading, Link, Page, Text } from "../lib/components/index.js";
 
   const id = pathParams().id;
@@ -72,7 +73,8 @@
   {#if shown}
     {@const communityNames = shown.communities.map((community) => community.name).join(", ")}
     <Text tone="muted">
-      {shown.creator ? shown.creator.name : t`A former member`} · {t`in ${communityNames}`}
+      {shown.creator ? shown.creator.name : t`A former member`}
+      {#if !currentServerHasSingleCommunity()}· {t`in ${communityNames}`}{/if}
     </Text>
     <Text tone="muted">
       {shown.file.content_type} · {fileSize(shown.file.size)} · {dateTimeFormat(shown.file.inserted_at)}

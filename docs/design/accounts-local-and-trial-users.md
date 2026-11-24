@@ -253,6 +253,31 @@ person will ask for first.
     `Personal`, made by the sign-up, and "Chris's MacBook Pro" holding
     what they made locally; a trial that signs up keeps `Trial`. They
     rename or delete as they like, with the history plain to see.
+    **Since 2026-11-24, on a server with a single community** (the
+    `communities` setting, see "Server settings" in `multi-server.md`),
+    the local user's communities are merged into the account's when
+    they move to it, so the account still has one community and the
+    pages hide no other.
+    - Before the move, the device asks the server for its current
+      settings. It cannot use its stored copy: a device that never
+      synced has only the build's defaults.
+    - When the settings say `single`, the device asks for the
+      account's communities and picks the one the account has been a
+      member of the longest (`MergeTargetCommunity::oldest_membership`):
+      Personal for a sign-up, and the same one on every device.
+    - In the move's transaction, `local_users::merge_local_communities_into`
+      writes that community and the account's membership as the server
+      has them, moves every row in the local user's communities to it
+      (each synced table's `move_rows_to_community`; a row in two
+      communities is kept once), deletes those communities, which were
+      never synced to the server, and makes it the current community.
+      The creates queued afterwards leave out the two rows the server
+      already has.
+    - Nothing is merged or deleted on the server. An account in no
+      community keeps the device's.
+    - Turning an account back into a local user, if that is built
+      later, would create the device's community again at that point,
+      see `docs/suggestions/accounts.md`.
     To decide:
     - where the device's name comes from. Desktops give the name the
       person set. iOS since 16 answers only "iPhone" to apps without a

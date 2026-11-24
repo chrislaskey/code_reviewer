@@ -160,10 +160,10 @@ export function accountsSignInPending() {
  * Exchanges the code the browser showed for the session, which becomes
  * the active account: `{outcome: "signed_in", user}`. On a device with a
  * local user, and an account new to it, nothing is done yet and it
- * answers `{outcome: "move_offered", email, items}`: the person chooses
+ * answers `{outcome: "pending_move", email, items}`: the person chooses
  * localUsersMove or localUsersKeepSeparate.
  * @param {string} code
- * @returns {Promise<{outcome: "signed_in", user: object} | {outcome: "move_offered", email: string, items: number}>}
+ * @returns {Promise<{outcome: "signed_in", user: object} | {outcome: "pending_move", email: string, items: number}>}
  */
 export function accountsSignInFinish(code) {
   return invoke("accounts_sign_in_finish", { code });
@@ -234,7 +234,7 @@ export function deviceAccountsRemove(id, losingChanges) {
  * The server the pages are on: the active account's, else the app's own.
  * `default` is whether it is the app's own, the only one that sells;
  * `settings` what it offers, as the device last fetched them.
- * @returns {Promise<{display_name: string, host: string, default: boolean, settings: {features: {accounts_sign_up: boolean, accounts_sign_in_code: boolean, accounts_purchasing: boolean}}}>}
+ * @returns {Promise<{display_name: string, host: string, default: boolean, settings: {features: {accounts_sign_up: boolean, accounts_sign_in_code: boolean, accounts_purchasing: boolean, support: boolean, forum: boolean}, communities: "multiple" | "single"}}>}
  */
 export function serversCurrentGet() {
   return invoke("servers_current_get");
@@ -362,12 +362,12 @@ export function localUsersCreate() {
   return invoke("local_users_create");
 }
 
-/** Moves what the local user made into the account whose sign-in offered it. */
+/** Moves what the local user made into the account of the pending move. */
 export function localUsersMove() {
   return invoke("local_users_move");
 }
 
-/** Adds the account whose sign-in offered a move beside the local user. */
+/** Adds the account of the pending move beside the local user. */
 export function localUsersKeepSeparate() {
   return invoke("local_users_keep_separate");
 }

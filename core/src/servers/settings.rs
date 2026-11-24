@@ -24,6 +24,19 @@ pub const SETTINGS_VERSION_HEADER: &str = "x-settings-version";
 #[serde(default)]
 pub struct ServerSettings {
     pub features: Features,
+    pub communities: Communities,
+}
+
+/// How many communities the pages show a person: `Multiple`, every
+/// community, the switcher and the communities pages; `Single`, only
+/// the one they work in, with none of those, for an app that is not
+/// many groups' at once. The communities are made the same either way.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Communities {
+    #[default]
+    Multiple,
+    Single,
 }
 
 impl ServerSettings {
@@ -146,6 +159,17 @@ mod tests {
     }
 
     #[test]
+    fn servers_settings_communities_are_multiple_unless_set_to_single() {
+        assert_eq!(ServerSettings::default().communities, Communities::Multiple);
+        let single = ServerSettings::parse_strict(r#"{"communities": "single"}"#).expect("parsed");
+        assert_eq!(single.communities, Communities::Single);
+        assert!(matches!(
+            ServerSettings::parse_strict(r#"{"communities": "few"}"#),
+            Err(SettingsError::Malformed(_))
+        ));
+    }
+
+    #[test]
     fn servers_settings_the_server_refuses_sign_ups_without_sign_in_codes() {
         assert_eq!(
             ServerSettings::parse_strict(r#"{"features": {"accounts_sign_in_code": false}}"#),
@@ -167,6 +191,7 @@ mod tests {
                 accounts_sign_up: false,
                 ..Features::default()
             },
+            ..ServerSettings::default()
         };
         assert_ne!(defaults.version(), closed.version());
         assert_eq!(

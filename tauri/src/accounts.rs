@@ -215,7 +215,7 @@ pub async fn accounts_sign_in_cancel(
     device: State<'_, DeviceAccounts>,
 ) -> Result<(), CommandError> {
     stop_loopback(&app);
-    device.move_offered_forget().await;
+    device.pending_move_forget().await;
     Ok(device.sign_in_clear().await?)
 }
 

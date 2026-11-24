@@ -666,6 +666,21 @@ impl SyncedTable for Synced {
         let rows = list_live_of_community_after(tx, community_id, after, limit).await?;
         Ok(rows.iter().map(table_row).collect::<Result<_, _>>()?)
     }
+
+    async fn move_rows_to_community(
+        &self,
+        tx: &mut Transaction,
+        from_community_id: Uuid,
+        to: &Membership,
+    ) -> Result<(), TableError> {
+        Ok(app_posts_communities::maintenance::move_rows_to_community(
+            tx,
+            from_community_id,
+            to.community_id,
+            to.id,
+        )
+        .await?)
+    }
 }
 
 #[cfg(test)]

@@ -469,6 +469,7 @@ async fn accounts_sign_in_makes_no_account_and_trials_are_refused_when_the_setti
             accounts_sign_up: false,
             ..app_core::app::features::Features::default()
         },
+        ..ServerSettings::default()
     };
     let (router, _) = test_router_with(TrialUsersMax(2), false, closed).await;
     let ask = |method: Method, path: &'static str, body: Option<Value>| {
@@ -505,6 +506,7 @@ async fn accounts_sign_in_codes_are_refused_and_a_password_signs_in_when_the_set
             accounts_sign_in_code: false,
             ..app_core::app::features::Features::default()
         },
+        ..ServerSettings::default()
     };
     let (router, _) = test_router_with(TrialUsersMax(2), false, password_only).await;
     app_core::accounts::users::create(&router.deployment, "dana@example.com", PASSWORD)
@@ -1064,6 +1066,7 @@ async fn accounts_purchasing_routes_are_refused_when_the_settings_turn_purchasin
             accounts_purchasing: false,
             ..app_core::app::features::Features::default()
         },
+        ..ServerSettings::default()
     };
     let (router, _) = test_router_with(TrialUsersMax(2), false, selling_nothing).await;
     let refused = json!({ "error": "This server sells nothing" });

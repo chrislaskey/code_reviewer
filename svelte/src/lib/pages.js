@@ -48,3 +48,12 @@ export const APP_PAGES = {
   [TRACES_NEW_PATH]: () => import("../traces/TracesNewPage.svelte"),
   [TRACES_SHOW_PATH]: () => import("../traces/TracesShowPage.svelte"),
 };
+
+// The feature each app's pages require, by the path they are under: when
+// it is disabled in the server's settings, the nav shows no tab for them
+// and the router redirects their paths to Home.
+/** @type {Record<string, string>} */
+export const APP_PAGES_REQUIRED_FEATURES = {
+  [SUPPORT_INDEX_PATH]: "support",
+  [FORUM_INDEX_PATH]: "forum",
+};

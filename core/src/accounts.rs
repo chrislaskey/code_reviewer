@@ -184,7 +184,7 @@ pub async fn sign_in(
     deployment: &Deployment,
     mailer: &Mailer,
     email: &str,
-    sign_up_offered: bool,
+    sign_up_enabled: bool,
     requested: &str,
 ) -> Result<CodeSent, AccountError> {
     if deployment.role != Role::Server {
@@ -204,7 +204,7 @@ pub async fn sign_in(
                 pending,
             )
         }
-        None if sign_up_offered => {
+        None if sign_up_enabled => {
             let account = accounts_users::create(&mut tx, Uuid::now_v7(), &email, false).await?;
             let name = crate::app::users::name_from_email_in(&mut tx, &email, account.id).await?;
             crate::app::users::create_in(&mut tx, account.id, &name).await?;
