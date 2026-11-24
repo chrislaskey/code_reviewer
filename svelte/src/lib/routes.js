@@ -85,7 +85,7 @@ export function accountsSignInUrl(email = currentQuery("email"), challenge = cur
 }
 
 /** The iPhone app's scheme, its bundle identifier in tauri.conf.json. */
-const APP_URL_SCHEME = "com.starterpack.app";
+const APP_URL_SCHEME = "com.chrislaskey.codereviewer";
 
 /**
  * Where the browser returns a device code to the app that started the
