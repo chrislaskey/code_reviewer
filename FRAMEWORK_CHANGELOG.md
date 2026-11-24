@@ -18,6 +18,14 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-24: landing on Home after signing in, or the app's choice
+
+- **What changed**: signing in, signing up, starting as a guest and
+  switching account land on `pageAfterSignInUrl()`, in the seam
+  `svelte/src/lib/pages.js`, which returns Home; they landed on Posts.
+- **What an app does**: **Optional**: return another page from
+  `pageAfterSignInUrl()`, for everyone or person by person.
+
 ## 2026-11-24: Avatar, the initials when a picture doesn't load
 
 - **What changed**: the core component `Avatar` draws a person's

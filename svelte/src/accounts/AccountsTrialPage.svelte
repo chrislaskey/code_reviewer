@@ -8,7 +8,8 @@
   import { errorMessageOf } from "../lib/error_message.js";
   import { currentUserForget } from "../lib/current_user.svelte.js";
   import { navigateToUrl } from "../lib/router.js";
-  import { accountsSignInUrl, postsIndexUrl } from "../lib/routes.js";
+  import { accountsSignInUrl } from "../lib/routes.js";
+  import { pageAfterSignInUrl } from "../lib/pages.js";
   import { Button, ErrorMessage, Heading, Link, Page, Text } from "../lib/components/index.js";
 
   /** Whether a trial can start; null until the server answered. */
@@ -27,7 +28,7 @@
     try {
       await accountsTrialCreate();
       currentUserForget();
-      await navigateToUrl(postsIndexUrl());
+      await navigateToUrl(pageAfterSignInUrl());
     } catch (problem) {
       error = errorMessageOf(problem);
     } finally {

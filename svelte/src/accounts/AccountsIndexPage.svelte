@@ -31,7 +31,7 @@
   import { currentUserForget } from "../lib/current_user.svelte.js";
   import { currentServer, currentServerLoad } from "../lib/current_server.svelte.js";
   import { navigateToUrl } from "../lib/router.js";
-  import { postsIndexUrl } from "../lib/routes.js";
+  import { pageAfterSignInUrl } from "../lib/pages.js";
   import AccountsCustomServer from "./components/AccountsCustomServer.svelte";
   import AccountsMoveDialog from "./components/AccountsMoveDialog.svelte";
   import AccountsRemoveDialog from "./components/AccountsRemoveDialog.svelte";
@@ -93,7 +93,7 @@
     return doThen(async () => {
       await deviceAccountsSwitch(account.id);
       currentUserForget();
-      await navigateToUrl(postsIndexUrl());
+      await navigateToUrl(pageAfterSignInUrl());
     });
   }
 
@@ -139,7 +139,7 @@
       return;
     }
     currentUserForget();
-    await navigateToUrl(postsIndexUrl());
+    await navigateToUrl(pageAfterSignInUrl());
   }
 
   $effect(() =>
@@ -165,7 +165,7 @@
     return doThen(async () => {
       await localUsersCreate();
       currentUserForget();
-      await navigateToUrl(postsIndexUrl());
+      await navigateToUrl(pageAfterSignInUrl());
     });
   }
 
@@ -181,7 +181,7 @@
       }
       pendingMove = null;
       currentUserForget();
-      await navigateToUrl(postsIndexUrl());
+      await navigateToUrl(pageAfterSignInUrl());
     });
   }
 
