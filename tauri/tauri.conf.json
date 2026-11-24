@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Starter Pack",
+  "productName": "Code Reviewer",
   "version": "0.1.0",
-  "identifier": "com.starterpack.app",
+  "identifier": "com.chrislaskey.codereviewer",
   "build": {
     "beforeDevCommand": {
       "script": "pnpm dev",
@@ -54,7 +54,7 @@
     "starter-pack": {
       "syncServerUrl": "http://localhost:4000",
       "browserSignInUrl": "",
-      "multiServer": "none"
+      "multiServer": "any"
     }
   }
 }

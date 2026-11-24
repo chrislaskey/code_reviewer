@@ -29,7 +29,6 @@ bin/dev    starts a deployment in dev mode
 bin/lint   runs the checks a change passes before it is committed
 bin/reset  deletes the local SQLite files and drops the dev PostgreSQL database
 bin/storage runs Garage, the S3-style bucket uploads go to in dev
-phoenix/   the Phoenix version this one replaces in stages, kept as the reference
 ```
 
 Rust is here for the one language running on the web, the desktop and

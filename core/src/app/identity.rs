@@ -5,4 +5,4 @@
 //! app keeps equal to it.
 
 /// The app's identifier, its bundle identifier on the phones.
-pub const APP_IDENTIFIER: &str = "com.starterpack.app";
+pub const APP_IDENTIFIER: &str = "com.chrislaskey.codereviewer";

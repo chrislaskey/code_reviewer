@@ -15,11 +15,9 @@
   import { currentPathname } from "../router.js";
   import {
     communitiesIndexUrl,
-    filesIndexUrl,
     forumIndexUrl,
     homeUrl,
     opsHomeUrl,
-    postsIndexUrl,
     supportIndexUrl,
   } from "../routes.js";
   import { currentUser } from "../current_user.svelte.js";
@@ -32,8 +30,6 @@
     { id: "home", label: t`Home`, icon: "hero-home", href: homeUrl() },
     ...(currentUser.value
       ? [
-          { id: "posts", label: t`Posts`, icon: "hero-document-text", href: postsIndexUrl() },
-          { id: "files", label: t`Files`, icon: "hero-folder", href: filesIndexUrl() },
           { id: "communities", label: t`Communities`, icon: "hero-user-group", href: communitiesIndexUrl() },
           { id: "support", label: t`Support`, icon: "hero-lifebuoy", href: supportIndexUrl() },
           { id: "forum", label: t`Forum`, icon: "hero-chat-bubble-left-right", href: forumIndexUrl() },

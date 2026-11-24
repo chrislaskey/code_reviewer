@@ -1,6 +1,6 @@
 name: app_tauri
 options:
-  bundleIdPrefix: com.starterpack.app
+  bundleIdPrefix: com.chrislaskey.codereviewer
   deploymentTarget:
     iOS: 15.0
 fileGroups: [../../src]
@@ -10,8 +10,8 @@ configs:
 settingGroups:
   app:
     base:
-      PRODUCT_NAME: Starter Pack
-      PRODUCT_BUNDLE_IDENTIFIER: com.starterpack.app
+      PRODUCT_NAME: Code Reviewer
+      PRODUCT_BUNDLE_IDENTIFIER: com.chrislaskey.codereviewer
 targetTemplates:
   app:
     type: application

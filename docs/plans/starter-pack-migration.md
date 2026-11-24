@@ -273,6 +273,18 @@ In Code Reviewer, its own:
    taking its tree; Code Reviewer's `docs/` kept. Password only, sign-ups
    off, `multiServer = "any"`, the app's name and bundle id, the examples
    (posts, files) and purchasing removed, translations check off.
+   Merged 2026-11-23 (6d15290); `phoenix/` deleted. What it found:
+   - Sign-ups and codes are `SERVER_SETTINGS`, not `features.rs`
+     defaults, which framework tests rely on. Template: `bin/dev` reads
+     it from `.env` (T5).
+   - `bin/reinstall` named the template's app; it reads
+     `tauri.conf.json` now (T6). `APP_IDENTIFIER` in
+     `core/src/app/identity.rs` must match the bundle id.
+   - Purchasing is framework: turned off with
+     `features.accounts_purchasing` (T7), not deleted.
+   - The examples can't be deleted: framework code and tests name them,
+     and the quick picker, kept, uses files. Hidden from the nav only;
+     the template's fix is its `docs/suggestions/code-organization-examples.md`.
 3. Reviews and traces: read-only, no background tasks, the smallest
    feature that crosses every layer. The first proof of the host feature,
    the online-only calls and a phone signed in over the tailnet.
