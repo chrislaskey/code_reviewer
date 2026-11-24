@@ -3,4 +3,4 @@
 // to. To change in a fork.
 
 /** The app's name, which people read. */
-export const APP_NAME = "Starter Pack";
+export const APP_NAME = "Code Reviewer";
