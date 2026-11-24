@@ -15,7 +15,11 @@ import {
   POSTS_SHOW_PATH,
   PROFILE_EDIT_PATH,
   PUBLIC_HOME_PATH,
+  REVIEWS_NEW_PATH,
+  REVIEWS_SHOW_PATH,
   SUPPORT_INDEX_PATH,
+  TRACES_NEW_PATH,
+  TRACES_SHOW_PATH,
 } from "./routes.js";
 
 /** @type {Record<string, () => Promise<unknown>>} */
@@ -33,4 +37,8 @@ export const APP_PAGES = {
   [PROFILE_EDIT_PATH]: () => import("../profile/ProfileEditPage.svelte"),
   [SUPPORT_INDEX_PATH]: () => import("../support/SupportIndexPage.svelte"),
   [FORUM_INDEX_PATH]: () => import("../forum/ForumIndexPage.svelte"),
+  [REVIEWS_NEW_PATH]: () => import("../reviews/ReviewsNewPage.svelte"),
+  [REVIEWS_SHOW_PATH]: () => import("../reviews/ReviewsShowPage.svelte"),
+  [TRACES_NEW_PATH]: () => import("../traces/TracesNewPage.svelte"),
+  [TRACES_SHOW_PATH]: () => import("../traces/TracesShowPage.svelte"),
 };

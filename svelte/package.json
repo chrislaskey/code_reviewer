@@ -14,6 +14,10 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",
+    "@xyflow/svelte": "^1.7.0",
+    "d3-selection": "^3.0.0",
+    "d3-shape": "^3.2.0",
+    "highlight.js": "^11.12.0",
     "sv-router": "^0.19.0",
     "ttag": "1.8.12"
   },
@@ -23,6 +27,7 @@
     "daisyui": "5.5.20",
     "gettext-parser": "10.0.0",
     "heroicons": "2.2.0",
+    "lucide-static": "1.72.0",
     "svelte": "^5.57.2",
     "svelte-check": "^4.7.7",
     "tailwindcss": "4.3.3",

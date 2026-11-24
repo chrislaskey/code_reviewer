@@ -1,0 +1,19 @@
+/* Code Reviewer's own styles beside the template's (../../styles.css):
+   the full-page layout's insets and the choice menu's lines. */
+
+:root {
+  /* The inset of a full page's content and bars, and the room above its title. */
+  --page-gutter: 1.5rem;
+  --page-top: 2.5rem;
+}
+
+/* ChoiceMenu: a choice's label and the sentence under it */
+.choice-menu .choice {
+  font-weight: 600;
+}
+
+.choice-menu .explanation {
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.3;
+}
