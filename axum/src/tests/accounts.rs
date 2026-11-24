@@ -1417,7 +1417,8 @@ async fn accounts_mails_go_in_the_persons_language_else_the_requests_else_englis
         .last_sent_to("bob@example.com")
         .expect("mailed");
     assert_eq!(
-        mail.subject, "Tu código de Starter Pack",
+        mail.subject,
+        format!("Tu código de {}", app_core::app::identity::APP_NAME),
         "the request's language"
     );
 
@@ -1435,7 +1436,8 @@ async fn accounts_mails_go_in_the_persons_language_else_the_requests_else_englis
         .last_sent_to("carol@example.com")
         .expect("mailed");
     assert_eq!(
-        mail.subject, "Your Starter Pack code",
+        mail.subject,
+        format!("Your {} code", app_core::app::identity::APP_NAME),
         "English when the request names none"
     );
 
