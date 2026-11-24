@@ -34,7 +34,7 @@
 
 
 
-<Page>
+<Page wide>
   <Header>
     New review
     {#snippet subtitle()}

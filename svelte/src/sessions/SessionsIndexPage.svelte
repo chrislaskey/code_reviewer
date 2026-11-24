@@ -109,7 +109,7 @@
 
 
 
-<Page>
+<Page wide>
   <Header>
     Sessions
     {#snippet subtitle()}

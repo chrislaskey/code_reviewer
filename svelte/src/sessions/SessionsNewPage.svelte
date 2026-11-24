@@ -55,7 +55,7 @@
 
 
 
-<Page>
+<Page wide>
   <Header>
     New session
     {#snippet subtitle()}

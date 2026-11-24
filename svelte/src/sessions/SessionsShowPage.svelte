@@ -177,7 +177,7 @@
 
 
 
-<Page>
+<Page wide>
   <Header>
     <a href={sessionsIndexUrl()} class="title-link">
       <Icon name="hero-chevron-left" class="size-5" />

@@ -38,7 +38,7 @@
 
 
 
-<Page>
+<Page wide>
   <Header>
     New trace
     {#snippet subtitle()}
