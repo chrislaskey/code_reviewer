@@ -116,6 +116,7 @@ async fn main() -> Result<(), String> {
         server_description: config::server_description(&server_settings)?,
         server_settings: std::sync::Arc::new(SettingsDocument::of(server_settings)),
         listed_servers: std::sync::Arc::new(config::listed_servers()?),
+        server_state: std::sync::Arc::default(),
     };
 
     let address = SocketAddr::new(config::host()?, config::port()?);

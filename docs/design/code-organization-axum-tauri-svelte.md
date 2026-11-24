@@ -47,7 +47,9 @@ axum/src/
   router.rs         every route, grouped by app
   state.rs          AppState, what a handler may take
   api_error.rs      a core error as the API answers it
-  user_auth.rs      CurrentUser, from the token or the cookie
+  user_auth.rs      CurrentUser, from the token or the cookie;
+                    CurrentUserFromBearerToken, the token alone;
+                    CurrentUserFromCookie, the cookie alone
   rate_limits.rs    the accounts routes' limits
   config.rs         host, port, proxy, trial cap; config/: database,
   config/           mailer, storage, stripe, app_store, server_url
