@@ -315,6 +315,30 @@ In Code Reviewer, its own:
    them; the check should skip ignored files (template).
 6. iOS details; the web turned off but for signing in. Planned below.
 
+## Status at the merge into main, 2026-11-24
+
+Steps 1 to 5 built and checked in the desktop app and on the phone,
+signed in over the tailnet; step 6 mostly done, below. Checked: the
+pages against main's look, reviews, sessions, sign-in from the phone,
+single community, the header and spacing on small windows. Pulled from
+Starter Pack along the way, each through `bin/framework update` and its
+`FRAMEWORK_CHANGELOG.md`: single community and the support and forum
+switches, `APP_NAME` in the identity seam, the sign-in scheme test,
+`Avatar`, `pageAfterSignInUrl`, iOS field text, no bounce on the
+desktop, the see-through header, Wi-Fi sync icons and Lucide.
+
+Left, on main:
+- Traces on the desktop, and a notification arriving on the phone and
+  its tap opening the session (APNs files in `axum/data/`).
+- Artifacts on the phone; what a session's browser link opens there
+  (6b).
+- The keyboard bar on the phone; the webview's colour behind the status
+  bar (6c, template).
+- Translations: the pages through gettext (ttag), the check turned back
+  on.
+- A dev avatar's URL is `localhost`, so another device shows the
+  initials; real S3 has none of this.
+
 ## Step 6: the phone, and the web for signing in alone
 
 Planned 2026-11-24, to start after the verification pass of steps 3 to
