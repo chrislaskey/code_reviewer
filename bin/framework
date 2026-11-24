@@ -8,6 +8,7 @@ set -euo pipefail
 
 remote="template"
 branch="main"
+changelog="FRAMEWORK_CHANGELOG.md"
 
 help() {
   cat <<EOF
@@ -19,10 +20,12 @@ Usage: $0 COMMAND
 
 Commands:
   update             Fetch $remote/$branch and merge it into this branch, then
-                     check the template's files against framework.lock. Where
-                     the app deleted an example the template changed, the
-                     deletion stays. Any other conflict is left to resolve by
-                     hand, then \`git commit\` and \`$0 check\`.
+                     check the template's files against framework.lock, and
+                     print the entries of $changelog the merge brings
+                     in, with the steps an app takes. Where the app deleted
+                     an example the template changed, the deletion stays.
+                     Any other conflict is left to resolve by hand, then
+                     \`git commit\` and \`$0 check\`.
 
   contribute         List this branch's commits since $remote/$branch that touch
                      framework files or start with "template:": the changes
@@ -71,13 +74,30 @@ check() {
   framework_check check
 }
 
+# The changelog's lines the template has and the branch had not at $1
+changelog_show() {
+  local added
+  added="$(git diff --no-color -U0 "$1" "$remote/$branch" -- "$changelog" | sed -n '/^+++/d; s/^+//p')"
+  echo
+  if [[ -z "$added" ]]; then
+    echo "No new entries in $changelog."
+    return
+  fi
+  echo "New in $changelog; do the steps under \"What an app does\" that apply:"
+  echo
+  echo "$added"
+}
+
 update() {
   require_remote
   require_clean_tree
   git fetch "$remote"
   require_template_branch
+  local before
+  before="$(git rev-parse HEAD)"
   if git merge --no-edit "$remote/$branch"; then
     check
+    changelog_show "$before"
     return
   fi
 
@@ -94,6 +114,7 @@ update() {
   fi
 
   if [[ -n "$(git diff --name-only --diff-filter=U)" ]]; then
+    changelog_show "$before"
     echo
     echo "These still conflict; resolve them, then \`git commit\` and \`$0 check\`:"
     git diff --name-only --diff-filter=U | sed 's/^/  /'
@@ -101,6 +122,7 @@ update() {
   fi
   git commit --no-edit
   check
+  changelog_show "$before"
 }
 
 # This branch's commits since the template that touch its files

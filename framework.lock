@@ -1,5 +1,6 @@
 # The SHA-256 of each framework file as the template ships it, see
 # framework.toml. Written by `cargo run -p framework_check -- lock`.
+e34957808a46f3e7488e29d3810396347960506c06c4116a2d0d1a76792617ab  FRAMEWORK_CHANGELOG.md
 dbded3dccbf128f2dafd95a761318f0338856fa9dae66173642d45db3fd63a23  axum/src/accounts.rs
 dfdf353a942c730f3c0cea40c9e89a737bcf5fbf06960b91baab16578564a327  axum/src/accounts/app_store_notifications.rs
 4440725170bdb3eeda5a1257a241671c748cb8069a42809f37f289bacef91187  axum/src/accounts/checkouts.rs

@@ -14,6 +14,7 @@
 # beside them, such as axum/src/app/recipes.rs, is the app's.
 
 framework = [
+    "FRAMEWORK_CHANGELOG.md",
     "bin/dev",
     "bin/framework",
     "bin/lint",
