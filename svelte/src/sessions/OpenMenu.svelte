@@ -4,6 +4,9 @@
 
   let { name, port, onOpen, onOpenInBrowser, onOpenArtifacts, onCopy, class: class_ = undefined } = $props();
 
+  // A phone has no terminal app of the server's to bring forward.
+  const onPhone = document.documentElement.dataset.app === "mobile";
+
   let attachCommand = $derived(`tmux attach -t ${name}`);
   let attachCommandElement;
 </script>
@@ -28,14 +31,16 @@
         onOpenArtifacts(name);
       }}
     />
-    <MenuChoice
-      label="Open in the terminal app"
-      explanation="Brings the session's window to the front, or opens a new window attached to it."
-      onclick={() => {
-        close();
-        onOpen(name);
-      }}
-    />
+    {#if !onPhone}
+      <MenuChoice
+        label="Open in the terminal app"
+        explanation="Brings the session's window to the front, or opens a new window attached to it."
+        onclick={() => {
+          close();
+          onOpen(name);
+        }}
+      />
+    {/if}
     <MenuChoice
       label="Copy attach command"
       explanation="To paste into any terminal:"

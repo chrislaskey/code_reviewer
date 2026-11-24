@@ -1,13 +1,15 @@
 <!-- The app's navigation on small windows, where the gutter is hidden: a
      bar along the window's bottom edge with Home, Back, Forward and Menu.
-     Menu slides up a sheet with the other tabs and the theme choices; it
-     closes on Menu, a tap above it, a choice and Escape. `links` and
+     Menu slides up a sheet with the other tabs, the sessions with their
+     agents' status (SessionChoices) for someone signed in, and the theme
+     choices; it closes on Menu, a tap above it, a choice and Escape. `links` and
      `current` are AppNav's; `current` marks the open tab in the sheet. -->
 <script>
   import { t } from "ttag";
   import { fade, fly } from "svelte/transition";
   import Icon from "../components/Icon.svelte";
   import ThemeChoices from "./ThemeChoices.svelte";
+  import SessionChoices from "../../sessions/SessionChoices.svelte";
   import {
     goBackInHistory,
     goForwardInHistory,
@@ -20,6 +22,8 @@
 
   let homeLink = $derived(links[0]);
   let linksInMenu = $derived(links.slice(1));
+  let showsSessions = $derived(links.some((link) => link.id === "sessions"));
+  let sessions = $state(null);
 
   let open = $state(false);
 
@@ -50,6 +54,14 @@
             </a>
           </li>
         {/each}
+      </ul>
+    {/if}
+    {#if showsSessions}
+      {#if sessions?.length}
+        <h2 class="sheet-heading">Sessions</h2>
+      {/if}
+      <ul class="menu w-full p-0">
+        <SessionChoices bind:sessions onchoose={close} />
       </ul>
     {/if}
     <h2 class="sheet-heading">{t`Theme`}</h2>

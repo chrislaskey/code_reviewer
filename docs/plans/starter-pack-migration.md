@@ -354,8 +354,10 @@ behind. Left to check with the phone:
 - **A session's browser link** is `http://localhost:<its PORT>` on the
   Mac, useless on the phone; on main the app pointed it at the paired
   computer's tailnet name. Decide later, with the phone in hand.
-- **The Terminal window** answers 403 over the tailnet: check the page
-  says so plainly, and hide the action on a phone.
+- **The Terminal window** answers 403 over the tailnet. Done
+  2026-11-24: the refusal says the terminal app opens only on the
+  server's computer and to copy the attach command; the phone doesn't
+  offer the action.
 
 ### 6c. The phone's look and feel
 
@@ -365,9 +367,12 @@ behind. Left to check with the phone:
   `webview_background.js`, which paints the webview in the theme's
   colour behind the status bar and home indicator (the template has
   none).
+- **The sessions in the Menu sheet**, as on main: done 2026-11-24,
+  `SessionChoices` in the seam `BottomBar.svelte`, for someone signed
+  in.
 - **The keyboard bar** (T3): confirm it is hidden on the phone.
-- **Code Reviewer's icons and launch screen** in place of Starter
-  Pack's (`tauri/icons`, `gen/apple/Assets.xcassets`).
+- **Code Reviewer's icons and launch screen**: nothing to do, the
+  icons are main's already, byte for byte.
 - **Notifications:** the APNs key copied to `axum/data/`, a push
   arriving, and a tap opening its session.
 
@@ -376,14 +381,15 @@ behind. Left to check with the phone:
 The host routes already refuse the browser's cookie, so the web cannot
 run anything; what is left is what a visitor sees.
 
-- **The public pages** (`svelte/src/public/`, Code Reviewer's to edit):
-  Starter Pack's home, about, privacy and terms. Recommended: one short
-  home page naming Code Reviewer and saying it runs in its apps, and the
-  rest removed from the build where that is easy.
+- **The public pages** (`svelte/src/public/`, Code Reviewer's to edit).
+  Done 2026-11-24: one short home page naming Code Reviewer and saying
+  it runs in its apps, Sign in its only action; About removed; Privacy
+  and Terms kept, the user's choice, still the template's text with its
+  [placeholders].
 - **The app's pages in a browser**: left as they are, each host page
   showing its 401 as a sign-in error. Recommended: no gating code (the
   user's guidance, 2026-11-24); the browser's home page says to use the
-  app.
+  app. Done 2026-11-24, an Alert on `HomePage` outside Tauri.
 - **Template features not used**: communities, posts and files stay out
   of the nav (step 2); trials are off with sign-ups.
 

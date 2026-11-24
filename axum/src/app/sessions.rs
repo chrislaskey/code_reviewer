@@ -193,7 +193,7 @@ pub async fn terminal_windows_create(
     if headers.contains_key(TAILSCALE_USER_LOGIN_HEADER) {
         return Err(ApiError::new(
             StatusCode::FORBIDDEN,
-            "Only the server's own machine shows a session in its terminal",
+            "The terminal app opens only on the computer running the server; copy the attach command to use the session from here",
         ));
     }
     Ok(Json(state.sessions.terminal_windows_create(&name).await?))
