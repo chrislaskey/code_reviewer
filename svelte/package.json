@@ -23,6 +23,7 @@
     "daisyui": "5.5.20",
     "gettext-parser": "10.0.0",
     "heroicons": "2.2.0",
+    "lucide-static": "1.72.0",
     "svelte": "^5.57.2",
     "svelte-check": "^4.7.7",
     "tailwindcss": "4.3.3",

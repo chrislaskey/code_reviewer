@@ -33,6 +33,9 @@ importers:
       heroicons:
         specifier: 2.2.0
         version: 2.2.0
+      lucide-static:
+        specifier: 1.72.0
+        version: 1.72.0
       svelte:
         specifier: ^5.57.2
         version: 5.57.3
@@ -1637,6 +1640,9 @@ packages:
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
+
+  lucide-static@1.72.0:
+    resolution: {integrity: sha512-QhdZ60O7Zcs/e8gw40uMfEn055xZTHBZoNi0xb+/1R2dTd0v4FXS46VL6rKSwC+V92tLBiqsAbCcijy7Wy4j4w==}
 
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
@@ -3828,6 +3834,8 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
+
+  lucide-static@1.72.0: {}
 
   magic-string@0.30.21:
     dependencies:

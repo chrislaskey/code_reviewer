@@ -9,5 +9,7 @@
 
 /* Makes the "hero-#{ICON}" classes the Icon component uses */
 @plugin "../vendor/heroicons.js";
+/* The "lucide-#{ICON}" classes, for the icons heroicons lacks */
+@plugin "../vendor/lucide.js";
 
 @import "./styles.css" layer(base);
