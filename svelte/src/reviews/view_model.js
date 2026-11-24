@@ -1,8 +1,14 @@
 // Maps the backend's file changes and group rows onto what the views draw.
-// Files get short ids, functions and callers get `name/arity` keys, and the
-// group rows name files by those ids.
+// Files get short ids, functions and callers get `module.name/arity` keys,
+// shown as `name/arity`, and the group rows name files by those ids.
 
-export function functionKey({ name, arity }) {
+/** Unique in a file: a Rust file can have `open/0` in two `impl` blocks, which the module tells apart. */
+export function functionKey({ module, name, arity }) {
+  return `${module}.${name}/${arity}`;
+}
+
+/** What a function is shown as in its file's ledger. */
+export function functionName({ name, arity }) {
   return `${name}/${arity}`;
 }
 
@@ -62,10 +68,11 @@ export function toViewFiles(files) {
     file_diff_target: file.kind === "unparsed" ? toFileDiffTarget(file) : null,
     functions: file.functions.map((change) => ({
       key: functionKey(change.function),
+      name: functionName(change.function),
       kind: change.kind,
       added_lines: change.added_line_count,
       removed_lines: change.removed_line_count,
-      previous_key: change.previous_function ? functionKey(change.previous_function) : null,
+      previous_name: change.previous_function ? functionName(change.previous_function) : null,
       diff_target: toFunctionDiffTarget(change),
     })),
     callers: file.callers.map((caller) => ({
@@ -73,6 +80,7 @@ export function toViewFiles(files) {
       file_path: caller.file_path,
       line: caller.line,
       calls: functionKey(caller.calls),
+      calls_name: functionName(caller.calls),
       stale: caller.is_stale,
       also_changed: caller.is_also_changed,
     })),
@@ -82,6 +90,7 @@ export function toViewFiles(files) {
       highlighted: callee.is_highlighted,
       file_path: callee.file_path,
       from: functionKey(callee.from),
+      from_name: functionName(callee.from),
       call_count: callee.call_count,
       also_changed: callee.is_also_changed,
     })),

@@ -32,7 +32,7 @@
       .map((callee, index) => ({
         id: `out:${callee.label}:${callee.from}:${index}`,
         label: callee.label,
-        detail: callee.call_count > 1 ? `×${callee.call_count}` : callee.from,
+        detail: callee.call_count > 1 ? `×${callee.call_count}` : callee.from_name,
         markers: callee.also_changed ? ["also_changed"] : [],
         dim: !callee.highlighted,
         hoverKey: callee.from,
@@ -44,7 +44,7 @@
     file.callers.map((caller, index) => ({
       id: `in:${caller.label}:${caller.line}:${index}`,
       label: caller.label,
-      detail: caller.calls,
+      detail: caller.calls_name,
       subdetail: `${shortPath(caller.file_path)}:${caller.line}`,
       markers: [...(caller.stale ? ["stale"] : []), ...(caller.also_changed ? ["also_changed"] : [])],
       stale: caller.stale,
@@ -93,8 +93,8 @@
           <LedgerLine label={fnStyle.label} onhover={hover(fn.key)} {...stateOf(fn.key)}>
             <span class={["w-3 text-center font-bold", fnStyle.text]}>{fnStyle.sign}</span>
             <span class="min-w-0 flex-1 truncate">
-              {fn.key}
-              {#if fn.previous_key}<span class="text-base-content/40">← {fn.previous_key}</span>{/if}
+              {fn.name}
+              {#if fn.previous_name}<span class="text-base-content/40">← {fn.previous_name}</span>{/if}
             </span>
             {#if fn.added_lines !== null || fn.removed_lines !== null}
               <LinesLabel added={fn.added_lines ?? 0} removed={fn.removed_lines ?? 0} class="text-[10px]" />
