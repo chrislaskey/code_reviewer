@@ -53,8 +53,10 @@ objc2-app-kit = { version = "0.3", features = ["NSImage", "NSImageRep", "NSBitma
 
 [target.'cfg(target_os = "ios")'.dependencies]
 objc2 = "0.6"
-objc2-foundation = { version = "0.3", features = ["NSData", "NSArray", "NSDictionary", "NSString"] }
-objc2-ui-kit = { version = "0.3", features = ["UIImage", "UIPasteboard"] }
+objc2-foundation = { version = "0.3", features = ["NSData", "NSArray", "NSDictionary", "NSString", "NSNotification", "NSOperation", "NSValue", "block2"] }
+objc2-ui-kit = { version = "0.3", features = ["UIImage", "UIPasteboard", "UIGeometry", "UIResponder", "UIView", "UIWindow"] }
+objc2-core-foundation = { version = "0.3", features = ["CFCGTypes"] }
+block2 = "0.6"
 # StoreKit 2, our own plugin, see plugins/storekit and docs/design/purchasing-phones.md
 tauri-plugin-storekit = { path = "plugins/storekit" }
 # The sign-in sheet, our own plugin, see plugins/web-auth-session and

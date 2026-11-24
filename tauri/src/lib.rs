@@ -10,7 +10,8 @@
 //! server, see `sync`. A sign-in happens in the system browser, see
 //! `accounts`. On macOS ⌃⌘T anywhere opens the quick picker, a second
 //! window, see `quick_picker`. On iOS the bar above the keyboard is
-//! hidden, see `keyboard_accessory_bar`.
+//! hidden, see `keyboard_accessory_bar`, and the web view is shortened
+//! to above the keyboard, see `web_view_keyboard_resize`.
 
 mod accounts;
 mod app;
@@ -28,6 +29,8 @@ mod server_urls;
 mod servers;
 mod sync;
 mod user_auth;
+#[cfg(target_os = "ios")]
+mod web_view_keyboard_resize;
 
 use tauri::{Manager, WindowEvent};
 
@@ -54,6 +57,8 @@ pub fn run() {
         .setup(|app| {
             #[cfg(target_os = "ios")]
             keyboard_accessory_bar::hide();
+            #[cfg(target_os = "ios")]
+            web_view_keyboard_resize::start(app)?;
             device_accounts::open_and_manage(app)?;
             #[cfg(desktop)]
             app.manage(accounts::sign_in_loopback::AccountsLoopback::default());

@@ -1110,3 +1110,18 @@ relies on a private class name, as Capacitor's `hideFormAccessoryBar` does.
 If a later iOS renames the class, a warning is logged and the bar is back;
 nothing breaks. Without the done button, the keyboard closes by tapping
 outside the text box.
+
+## 32. Phones: the web view ends above the keyboard
+
+When the keyboard opens, iOS keeps a web view its full height, and WebKit
+slides the visible part of the page above the keyboard instead. Sticky and
+fixed elements are placed against the full height. So a pinned prompt
+stayed where it was while the page scrolled, and what was typed in it
+went out of view. The viewport setting `interactive-widget=resizes-content`
+does this on Android, but iOS ignores it. **Decision:** the iOS app listens
+for UIKit's keyboard frame changes and makes the main window's web view
+shorter by the part the keyboard covers (`web_view_keyboard_resize.rs`), as
+Capacitor's Keyboard plugin does with `resize: native`. The pages then see
+a shorter window, and every sticky or fixed element stays above the
+keyboard. Only public UIKit APIs are used. Safari on a phone still shows
+the old behavior; following `visualViewport` in the page would fix it there.
