@@ -35,11 +35,11 @@ export const APP_PAGES = {
   [FORUM_INDEX_PATH]: () => import("../forum/ForumIndexPage.svelte"),
 };
 
-// The server feature each app's pages need, by the path they are under:
-// with it off in the server's settings, the nav shows no tab for them and
-// the router sends their paths home.
+// The feature each app's pages require, by the path they are under: when
+// it is disabled in the server's settings, the nav shows no tab for them
+// and the router redirects their paths to Home.
 /** @type {Record<string, string>} */
-export const APP_PAGES_FEATURES = {
+export const APP_PAGES_REQUIRED_FEATURES = {
   [SUPPORT_INDEX_PATH]: "support",
   [FORUM_INDEX_PATH]: "forum",
 };

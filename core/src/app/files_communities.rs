@@ -713,13 +713,13 @@ impl SyncedTable for Synced {
         Ok(rows.iter().map(table_row).collect::<Result<_, _>>()?)
     }
 
-    async fn move_to_community(
+    async fn move_rows_to_community(
         &self,
         tx: &mut Transaction,
         from_community_id: Uuid,
         to: &Membership,
     ) -> Result<(), TableError> {
-        Ok(app_files_communities::maintenance::move_to_community(
+        Ok(app_files_communities::maintenance::move_rows_to_community(
             tx,
             from_community_id,
             to.community_id,

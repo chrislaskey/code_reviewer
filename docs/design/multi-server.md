@@ -237,27 +237,31 @@ products or purchases. For an app that sells nothing; its code stays,
 since purchasing is the template's.
 
 The fourth and fifth, `features.support` and `features.forum`, true by
-default, one per app: off, the nav shows no tab for the app and the
-router sends its paths home, in the browser and the app alike. The
-pages under a path name the feature they need in `APP_PAGES_FEATURES`
-(`svelte/src/lib/pages.js`). Both apps are placeholder pages for now,
-with no routes; their first route refuses when the key is off.
+default, one per app. Disabled, the nav shows no tab for the app and
+the router redirects its paths to Home, in the browser and the app
+alike. `APP_PAGES_REQUIRED_FEATURES` (`svelte/src/lib/pages.js`) maps
+each path to the feature its pages require. Both apps are placeholder
+pages for now, with no routes; their first route must refuse requests
+while its feature is disabled.
 
-The first key beside `features`, `communities`, `"multiple"` by
-default: `"single"` is for an app that is not many groups' at once.
-Each person is still made a community of their own, as always, and
-everything is still put in communities; the pages only stop showing
-them: no Communities tab, no community menu in the header, no
-community choice on the post and file forms (a new post or file goes
-in the current community), no community names beside posts and files,
-and the router sends the communities pages home, so a community cannot
-be deleted from the pages. A setting on the server, not the build,
-since a device's accounts may be on servers that differ. The server
-refuses nothing yet: creating, joining, leaving or deleting a
-community through the API still works, to be thought through on its
-own. A local user who signs up or signs in brings their communities,
-which fold into the account's at the move, see 10a in
-`accounts-local-and-trial-users.md`.
+The first key beside `features` is `communities`, `"multiple"` by
+default. `"single"` is for an app with no need for several groups of
+people (multi-tenancy). Each person still gets a community of their
+own, and everything is still put in a community; only the pages
+change:
+- no Communities tab and no community menu in the header;
+- no community choice on the post and file forms: a new post or file
+  goes in the current community;
+- no community names beside posts and files;
+- the communities pages redirect to Home, so a community cannot be
+  deleted from the pages.
+
+It is a server setting, not a build setting, because a device's
+accounts may be on different servers. The server refuses nothing yet:
+creating, joining, leaving or deleting a community through the API
+still works, to be designed separately. When a local user signs up
+or signs in, their communities are merged into the account's, see 10a
+in `accounts-local-and-trial-users.md`.
 
 Later, for settings: files a document names, a logo, fetched when their
 content hash changes and kept under `servers/<id>/`, with limits on

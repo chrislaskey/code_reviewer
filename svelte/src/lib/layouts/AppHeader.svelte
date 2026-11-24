@@ -19,7 +19,7 @@
     trackNavigationHistory,
   } from "./navigation_history.svelte.js";
   import { currentUser } from "../current_user.svelte.js";
-  import { currentServerCommunitiesSingle } from "../current_server.svelte.js";
+  import { currentServerHasSingleCommunity } from "../current_server.svelte.js";
 
 
   $effect(() => trackNavigationHistory());
@@ -51,7 +51,7 @@
       <Icon name="hero-chevron-right" class="size-5" />
     </Button>
   </div>
-  {#if currentUser.value && !currentServerCommunitiesSingle()}
+  {#if currentUser.value && !currentServerHasSingleCommunity()}
     <CurrentCommunityMenu />
   {/if}
   <span class="grow self-stretch" data-tauri-drag-region></span>

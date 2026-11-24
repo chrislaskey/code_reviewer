@@ -4,7 +4,7 @@
   import { c, t } from "ttag";
   import { postsCreate } from "../lib/core/index.js";
   import { currentCommunityLoad } from "../lib/current_community.svelte.js";
-  import { currentServerCommunitiesSingle, currentServerLoad } from "../lib/current_server.svelte.js";
+  import { currentServerHasSingleCommunity, currentServerLoad } from "../lib/current_server.svelte.js";
   import { errorMessageOf } from "../lib/error_message.js";
   import { navigateToUrl } from "../lib/router.js";
   import { postsShowUrl, postsIndexUrl } from "../lib/routes.js";
@@ -19,7 +19,7 @@
   async function load() {
     try {
       await currentServerLoad();
-      if (!currentServerCommunitiesSingle()) return;
+      if (!currentServerHasSingleCommunity()) return;
       const current = await currentCommunityLoad();
       if (current && communityIds.length === 0) communityIds = [current.id];
     } catch {

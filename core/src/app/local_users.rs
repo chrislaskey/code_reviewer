@@ -11,10 +11,11 @@
 //! they made to that account, in one transaction: every row becomes
 //! the account's and is queued as a create, as if the account had made
 //! it all on this device while offline, and the standard sync pushes
-//! it. Nothing a local user made exists anywhere else, so there is
-//! nothing to merge. On a server with a single community, the move is
-//! given the account's own community, and the local user's communities
-//! fold into it before anything is pushed, so the account stays in one.
+//! it. Nothing a local user made exists anywhere else, so none of it
+//! conflicts with the server's rows. On a server with a single
+//! community, the local user's communities are merged into the
+//! account's community before anything is pushed, so the account still
+//! has one community.
 
 use crate::data::app_communities::{self, Community};
 use crate::data::app_users_communities::{self, Membership};
@@ -53,19 +54,20 @@ pub const COMMUNITY_NAME_WITHOUT_A_DEVICE_NAME: &str = "This device";
 const NAME_PREFIX: &str = "local_";
 const EMAIL_DOMAIN: &str = "example.com";
 
-/// The account's community a local user's communities fold into at a
-/// move, on a server with a single community, as the server has it.
+/// The account's community that a local user's communities are merged
+/// into when they move to the account on a server with a single
+/// community, as the server has it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AccountCommunity {
+pub struct MergeTargetCommunity {
     pub community: Community,
     pub membership: Membership,
 }
 
-impl AccountCommunity {
-    /// Of the communities the server lists for the account, the one it
-    /// joined first, the same on each of its devices; none when it is
-    /// in none.
-    pub fn first_joined(listed: Vec<CommunityAndMembership>) -> Option<AccountCommunity> {
+impl MergeTargetCommunity {
+    /// The community the account has been a member of the longest, so
+    /// every device of the account picks the same one; none when the
+    /// account is in no community.
+    pub fn oldest_membership(listed: Vec<CommunityAndMembership>) -> Option<MergeTargetCommunity> {
         listed
             .into_iter()
             .filter_map(
@@ -75,7 +77,7 @@ impl AccountCommunity {
                  }| {
                     let membership =
                         membership.filter(|membership| membership.deleted_at.is_none())?;
-                    Some(AccountCommunity {
+                    Some(MergeTargetCommunity {
                         community,
                         membership,
                     })
@@ -211,13 +213,13 @@ pub async fn count_items(deployment: &Deployment) -> Result<i64, LocalUserError>
 /// every row of the local user becomes the account's, the local user
 /// and every deleted row go, and each row left is queued as a create,
 /// made when the row was, for the next sync to push. The account's
-/// name and picture stay the account's. Given the account's community,
-/// the local user's communities fold into it first, see
-/// `fold_communities_in`.
+/// name and picture stay the account's. With a merge target, the
+/// local user's communities are merged into it first, see
+/// `merge_local_communities_into`.
 pub async fn move_to_account(
     deployment: &Deployment,
     session: Session,
-    account_community: Option<AccountCommunity>,
+    merge_target: Option<MergeTargetCommunity>,
 ) -> Result<User, LocalUserError> {
     if deployment.role != Role::Device {
         return Err(LocalUserError::DeviceOnly);
@@ -236,13 +238,10 @@ pub async fn move_to_account(
         .collect();
     local_users::maintenance::delete_deleted_rows(&mut tx, &children_first).await?;
     local_users::maintenance::delete_user(&mut tx, local).await?;
-    let on_server = match &account_community {
-        Some(account_community) => {
-            fold_communities_in(&mut tx, &account, account_community).await?;
-            vec![
-                account_community.community.id,
-                account_community.membership.id,
-            ]
+    let on_server = match &merge_target {
+        Some(merge_target) => {
+            merge_local_communities_into(&mut tx, &account, merge_target).await?;
+            vec![merge_target.community.id, merge_target.membership.id]
         }
         None => Vec::new(),
     };
@@ -279,18 +278,18 @@ pub async fn moved_forget(deployment: &Deployment) -> Result<(), LocalUserError>
 }
 
 /// Writes the account's community and membership as the server has
-/// them, puts every row of the local user's communities in it, removes
-/// those communities, which never reached the server, and makes it the
-/// current one.
-async fn fold_communities_in(
+/// them, moves every row in the local user's communities to it, deletes
+/// those communities, which were never synced to the server, and makes
+/// it the current community.
+async fn merge_local_communities_into(
     tx: &mut Transaction,
     account: &User,
-    account_community: &AccountCommunity,
+    merge_target: &MergeTargetCommunity,
 ) -> Result<(), LocalUserError> {
-    let AccountCommunity {
+    let MergeTargetCommunity {
         community,
         membership,
-    } = account_community;
+    } = merge_target;
     communities::apply_server_row(
         tx,
         &serde_json::to_value(community).map_err(CommunityError::from)?,
@@ -301,17 +300,17 @@ async fn fold_communities_in(
         &serde_json::to_value(membership).map_err(MembershipError::from)?,
     )
     .await?;
-    let folded: Vec<Uuid> =
+    let local_community_ids: Vec<Uuid> =
         app_users_communities::list(&mut *tx, app_users_communities::Filter::User(account.id))
             .await?
             .into_iter()
             .map(|local| local.community_id)
             .filter(|community_id| *community_id != community.id)
             .collect();
-    for from_community_id in folded {
+    for from_community_id in local_community_ids {
         for synced in synced_tables::list() {
             synced
-                .move_to_community(tx, from_community_id, membership)
+                .move_rows_to_community(tx, from_community_id, membership)
                 .await?;
         }
         communities::delete_row(tx, from_community_id).await?;
@@ -340,8 +339,8 @@ fn owner_columns() -> Vec<(&'static str, &'static str)> {
         .collect()
 }
 
-/// Queues a create for every row the device holds but those the server
-/// has already, table by table, parents first, see `synced_tables`. The
+/// Queues a create for every row on the device, except those already on
+/// the server, table by table, parents first, see `synced_tables`. The
 /// queue is pushed in the order the events were made, so each is made at
 /// the time its row was, and after the rows it points at.
 async fn queue_creates_in(
@@ -676,17 +675,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn local_users_move_to_a_single_community_account_folds_every_community_into_its_own() {
+    async fn local_users_move_to_a_single_community_account_merges_every_community_into_its_own() {
         with_each_database(|database| async move {
             let (server, _storage) = server(database);
             let session =
                 accounts::tests::signed_up_for_a_device(&server, "alice@example.com").await;
             let alice = session.user.clone();
-            let account_community = AccountCommunity::first_joined(
+            let merge_target = MergeTargetCommunity::oldest_membership(
                 communities::list(&server, &alice).await.expect("listed"),
             )
             .expect("her sign-up's community");
-            assert_eq!(account_community.community.name, "Personal");
+            assert_eq!(merge_target.community.name, "Personal");
 
             let (device, local, _folder) = device_with_a_local_user().await;
             let made = made_by(&device, &local).await;
@@ -699,7 +698,7 @@ mod tests {
             let in_both = posts::create(&device, &local, "in both", &in_both)
                 .await
                 .expect("a post");
-            move_to_account(&device, session, Some(account_community.clone()))
+            move_to_account(&device, session, Some(merge_target.clone()))
                 .await
                 .expect("moved");
             assert_eq!(names_of_communities(&device, &alice).await, ["Personal"]);
@@ -707,7 +706,7 @@ mod tests {
                 crate::app::current_community::get_on_device(&device, &alice)
                     .await
                     .expect("asked"),
-                Some(account_community.community.clone())
+                Some(merge_target.community.clone())
             );
 
             let report = sync::run(&device, &InProcess { server: &server })
@@ -744,7 +743,7 @@ mod tests {
     }
 
     #[test]
-    fn local_users_account_community_is_the_one_joined_first_and_live() {
+    fn local_users_merge_target_community_is_the_oldest_live_membership() {
         let at = |seconds| DateTime::from_timestamp(seconds, 0).expect("a time");
         let listed = |name: &str, joined: Option<(i64, bool)>| {
             let community = Community {
@@ -774,7 +773,7 @@ mod tests {
                 membership,
             }
         };
-        let first = AccountCommunity::first_joined(vec![
+        let first = MergeTargetCommunity::oldest_membership(vec![
             listed("Baking", Some((20, false))),
             listed("Left", Some((5, true))),
             listed("Not mine", None),
@@ -785,7 +784,7 @@ mod tests {
             Some("Personal".to_string())
         );
         assert_eq!(
-            AccountCommunity::first_joined(vec![listed("Not mine", None)]),
+            MergeTargetCommunity::oldest_membership(vec![listed("Not mine", None)]),
             None
         );
     }

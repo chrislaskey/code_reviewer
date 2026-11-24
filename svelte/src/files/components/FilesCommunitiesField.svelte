@@ -5,7 +5,7 @@
 <script>
   import { t } from "ttag";
   import { communitiesList } from "../../lib/core/index.js";
-  import { currentServerCommunitiesSingle } from "../../lib/current_server.svelte.js";
+  import { currentServerHasSingleCommunity } from "../../lib/current_server.svelte.js";
   import { Checkbox, FieldErrors, Text } from "../../lib/components/index.js";
 
   /**
@@ -40,7 +40,7 @@
   load();
 </script>
 
-{#if currentServerCommunitiesSingle()}
+{#if currentServerHasSingleCommunity()}
   <FieldErrors {errors} fields={["community_ids"]} />
 {:else}
   <fieldset class="flex flex-col gap-1">

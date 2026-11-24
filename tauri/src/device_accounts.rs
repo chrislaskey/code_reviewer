@@ -31,7 +31,7 @@ use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
 use app_core::accounts::{self, AccountError, Session};
-use app_core::app::local_users::{self, AccountCommunity, LocalUserError, Moved};
+use app_core::app::local_users::{self, LocalUserError, MergeTargetCommunity, Moved};
 use app_core::app::users::{self, UserError};
 use app_core::data::app_users::User;
 use app_core::data::device_settings::{self, DeviceSettingsError};
@@ -566,12 +566,12 @@ impl DeviceAccounts {
 
     /// The person chose to move: everything the local user made becomes
     /// the account's, which takes the local user's place in the list
-    /// and is active. The next sync pushes it. Given the account's
-    /// community, `local_user_move_account_community`, the local user's
-    /// communities fold into it.
+    /// and is active. The next sync pushes it. With a merge target, from
+    /// `local_user_merge_target_community`, the local user's communities
+    /// are merged into it.
     pub async fn local_user_move(
         &self,
-        account_community: Option<AccountCommunity>,
+        merge_target: Option<MergeTargetCommunity>,
     ) -> Result<User, DeviceAccountsError> {
         let local = self
             .local_account()
@@ -593,7 +593,7 @@ impl DeviceAccounts {
             .execute(&self.list)
             .await?;
         let deployment = self.active().await?;
-        let user = local_users::move_to_account(&deployment, session, account_community).await?;
+        let user = local_users::move_to_account(&deployment, session, merge_target).await?;
         self.name_moved_account(local.id, &deployment).await?;
         self.mark(local.id, true, true).await?;
         self.set_active(local.id, Some(server_id), deployment)
@@ -601,14 +601,16 @@ impl DeviceAccounts {
         Ok(user)
     }
 
-    /// The community of the account whose sign-in offered a move that the
-    /// local user's fold into: on a server with a single community, as
-    /// it says now, the one the account joined first; none on a server
-    /// with many, or for an account in none. Asked of the server, which
-    /// the sign-in just reached; the offer stays.
-    pub async fn local_user_move_account_community(
+    /// The account's community to merge the local user's communities
+    /// into: on a server with a single community, by its current
+    /// settings, the one the account has been a member of the longest;
+    /// none on a server with multiple communities, or for an account in
+    /// none. Asks the server, which the sign-in just connected to, and
+    /// leaves the pending move in place, so a failed request can be
+    /// tried again.
+    pub async fn local_user_merge_target_community(
         &self,
-    ) -> Result<Option<AccountCommunity>, DeviceAccountsError> {
+    ) -> Result<Option<MergeTargetCommunity>, DeviceAccountsError> {
         let (server_id, token) = match self.move_offered.lock().await.as_ref() {
             Some(offered) => (offered.server_id, offered.session.token.clone()),
             None => return Err(DeviceAccountsError::NoMoveOffered),
@@ -619,7 +621,7 @@ impl DeviceAccounts {
             return Ok(None);
         }
         let listed = transport.communities_list(&token).await?;
-        Ok(AccountCommunity::first_joined(listed))
+        Ok(MergeTargetCommunity::oldest_membership(listed))
     }
 
     /// The person chose to keep them apart: the account is added beside

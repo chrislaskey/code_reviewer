@@ -21,7 +21,7 @@
   import { filesView, setFilesView } from "./files_view.js";
   import { Badge, Button, ErrorMessage, Heading, Icon, Input, Link, Page, Panel, Text } from "../lib/components/index.js";
   import { PAGE_SIZE, PagedSearch } from "../lib/paged_search.svelte.js";
-  import { currentServerCommunitiesSingle } from "../lib/current_server.svelte.js";
+  import { currentServerHasSingleCommunity } from "../lib/current_server.svelte.js";
 
   /** @type {{ view: import("./files_view.js").FilesView, label: string, icon: string }[]} */
   const VIEW_CHOICES = [
@@ -146,7 +146,7 @@
             <Link class="truncate" href={filesShowUrl(file.id)}>{file.name}</Link>
             <Text as="span" tone="muted">
               {fileSize(file.size)} · {dateTimeFormat(file.inserted_at)}
-              {#if !currentServerCommunitiesSingle()}· {t`in ${communityNames}`}{/if}
+              {#if !currentServerHasSingleCommunity()}· {t`in ${communityNames}`}{/if}
             </Text>
             {#if problem}
               <Text as="span" tone="error" size="sm">{problem}</Text>

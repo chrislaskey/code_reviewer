@@ -8,15 +8,15 @@
 // the app never shows the sign-in pages themselves. When it cannot tell,
 // or a page's code does not load, the page says so above it rather than
 // going nowhere (page_load_error.svelte.js). The template's own pages are
-// listed here, the app's in pages.js. A page under a path whose server
-// feature is off (APP_PAGES_FEATURES) sends the person home, as do the
-// communities pages on a server with a single community.
+// listed here, the app's in pages.js. A page whose required feature is
+// disabled on the server (APP_PAGES_REQUIRED_FEATURES) redirects to Home,
+// as do the communities pages on a server with a single community.
 import { Navigation, createRouter } from "sv-router";
 import { t } from "ttag";
 import AppLayout from "./layouts/AppLayout.svelte";
-import { APP_PAGES, APP_PAGES_FEATURES } from "./pages.js";
+import { APP_PAGES, APP_PAGES_REQUIRED_FEATURES } from "./pages.js";
 import { hasDeviceAccounts } from "./core/index.js";
-import { currentServerCommunitiesSingle, currentServerLoad } from "./current_server.svelte.js";
+import { currentServerHasSingleCommunity, currentServerLoad } from "./current_server.svelte.js";
 import { currentUserLoad } from "./current_user.svelte.js";
 import { errorMessageOf } from "./error_message.js";
 import { pageLoadErrorClear, pageLoadErrorShow } from "./page_load_error.svelte.js";
@@ -70,9 +70,12 @@ const { navigate, route } = createRouter({
         return;
       }
       if (!user) throw navigateToUrl(hasDeviceAccounts ? accountsIndexUrl() : accountsSignInUrl());
-      const feature = featureOfPath(pathname);
-      if (feature && !(await featureOffered(feature))) throw navigateToUrl(homeUrl());
-      if (isCommunitiesPath(pathname) && (await communitiesSingle())) throw navigateToUrl(homeUrl());
+      const feature = featureRequiredByPath(pathname);
+      if (feature && !(await featureEnabled(feature))) throw navigateToUrl(homeUrl());
+      if (isCommunitiesPath(pathname)) {
+        await currentServerLoad().catch(() => {});
+        if (currentServerHasSingleCommunity()) throw navigateToUrl(homeUrl());
+      }
     },
     onError(problem) {
       // A redirect from beforeLoad arrives here too
@@ -108,17 +111,17 @@ const { navigate, route } = createRouter({
  * @param {string} pathname
  * @returns {string | undefined}
  */
-function featureOfPath(pathname) {
-  const path = Object.keys(APP_PAGES_FEATURES).find((path) => pathname === path || pathname.startsWith(`${path}/`));
-  return path && APP_PAGES_FEATURES[path];
+function featureRequiredByPath(pathname) {
+  const path = Object.keys(APP_PAGES_REQUIRED_FEATURES).find((path) => pathname === path || pathname.startsWith(`${path}/`));
+  return path && APP_PAGES_REQUIRED_FEATURES[path];
 }
 
 /**
- * Whether the current server offers a feature; when its settings cannot
- * be read, the page shows, and the server refuses what is off.
+ * Whether a feature is enabled on the current server; when its settings
+ * cannot be read, true, and the server refuses what is disabled.
  * @param {string} feature
  */
-async function featureOffered(feature) {
+async function featureEnabled(feature) {
   try {
     const server = await currentServerLoad();
     return /** @type {Record<string, boolean>} */ (server.settings.features)[feature] ?? true;
@@ -130,16 +133,6 @@ async function featureOffered(feature) {
 /** @param {string} pathname */
 function isCommunitiesPath(pathname) {
   return pathname === COMMUNITIES_INDEX_PATH || pathname.startsWith(`${COMMUNITIES_INDEX_PATH}/`);
-}
-
-/** Whether the current server shows a single community; not when unknown. */
-async function communitiesSingle() {
-  try {
-    await currentServerLoad();
-  } catch {
-    return false;
-  }
-  return currentServerCommunitiesSingle();
 }
 
 /**

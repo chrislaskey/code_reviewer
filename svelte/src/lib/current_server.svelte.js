@@ -41,7 +41,7 @@ export function currentServerLoad() {
  * Whether the server shows each person only the community they work in,
  * with no switcher and no communities pages; reactive.
  */
-export function currentServerCommunitiesSingle() {
+export function currentServerHasSingleCommunity() {
   return currentServer.value?.settings.communities === "single";
 }
 

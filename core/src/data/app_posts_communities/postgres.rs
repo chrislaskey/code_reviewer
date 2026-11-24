@@ -250,7 +250,7 @@ pub async fn delete_row(connection: &mut PgConnection, id: Uuid) -> Result<(), s
     Ok(())
 }
 
-pub async fn move_to_community(
+pub async fn move_rows_to_community(
     connection: &mut PgConnection,
     from_community_id: Uuid,
     to_community_id: Uuid,

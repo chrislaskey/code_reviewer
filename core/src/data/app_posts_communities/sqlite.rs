@@ -258,7 +258,7 @@ pub async fn delete_row(connection: &mut SqliteConnection, id: Uuid) -> Result<(
     Ok(())
 }
 
-pub async fn move_to_community(
+pub async fn move_rows_to_community(
     connection: &mut SqliteConnection,
     from_community_id: Uuid,
     to_community_id: Uuid,

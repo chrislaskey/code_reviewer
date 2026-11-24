@@ -139,12 +139,14 @@ pub trait SyncedTable: Send + Sync {
         Ok(Vec::new())
     }
 
-    /// Puts the device's rows in one community in another, through the
-    /// account's membership of it, at a local user's move to an account
-    /// on a server with a single community, before the first community
-    /// is removed; nothing for a table not in communities. A table that
-    /// answers `list_live_in_community_after` moves its rows here too.
-    async fn move_to_community(
+    /// Moves the device's rows from one community to another, through the
+    /// account's membership of it, when a local user's communities are
+    /// merged into the account's on a server with a single community,
+    /// before the first community is deleted; nothing for a table not in
+    /// communities. A table that implements
+    /// `list_live_in_community_after` must implement this too, or its
+    /// rows are deleted with the community.
+    async fn move_rows_to_community(
         &self,
         _tx: &mut Transaction,
         _from_community_id: Uuid,

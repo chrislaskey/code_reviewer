@@ -265,7 +265,7 @@ pub async fn delete_for_resync(connection: &mut PgConnection) -> Result<(), sqlx
     Ok(())
 }
 
-pub async fn move_to_community(
+pub async fn move_rows_to_community(
     connection: &mut PgConnection,
     from_community_id: Uuid,
     to_community_id: Uuid,
