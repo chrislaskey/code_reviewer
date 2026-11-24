@@ -6,7 +6,7 @@
 //! of the Tauri app keeps equal to them.
 
 /// The app's name, in its emails, its window and its server's name.
-pub const APP_NAME: &str = "Starter Pack";
+pub const APP_NAME: &str = "Code Reviewer";
 
 /// The app's identifier, its bundle identifier on the phones.
 pub const APP_IDENTIFIER: &str = "com.chrislaskey.codereviewer";
