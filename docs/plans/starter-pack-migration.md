@@ -296,6 +296,13 @@ In Code Reviewer, its own:
    components in `svelte/src/lib/code_reviewer/`. Main's waves and
    background pattern left out for now. The first proof of the host feature,
    the online-only calls and a phone signed in over the tailnet.
-4. Sessions, without notifications.
+4. Sessions, without notifications. Built 2026-11-24, all but the check
+   on a running app: `core/src/services/` (tmux, git worktrees and status,
+   processes, terminal app, `agents/`), `core/src/app/sessions/` with
+   `SessionHost` in `ServerState`, routes under `/api/sessions` (the
+   terminal window refused over the tailnet), online calls, Tauri
+   commands, pages. Artifacts kept as on main (template `bin/dev` passes
+   `PAGES_DEV_URL`); the server serving them itself is
+   `docs/suggestions/artifacts.md`.
 5. Notifications: desktop, then APNs.
 6. iOS details; the web turned off but for signing in.
