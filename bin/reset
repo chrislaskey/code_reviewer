@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+#
+# Resets every local database of this worktree's deployments, so the next
+# start rebuilds each from nothing: deletes the web server's SQLite file
+# under axum/data/ and the Tauri app's files, device.db and accounts/, each
+# account's database and the bytes of its files, in
+# DATA_DIR when set, else in the app data directory; and drops the dev
+# PostgreSQL database, the one
+# DATABASE_URL names when it is a postgres URL, else starter_pack, then
+# creates it again, empty, so a postgres DATABASE_URL still starts.
+#
+# Stop bin/dev first: a running server would recreate its file at once
+# and hold the PostgreSQL database open, which stops the drop.
+#
+# Run `bin/reset --help` for the options.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+APP_DATA_DIR="$HOME/Library/Application Support/com.starterpack.app"
+DEFAULT_POSTGRES_URL="postgres://postgres@localhost/starter_pack"
+
+help() {
+  cat <<USAGE
+Resets every local database of this worktree's deployments.
+
+Usage: $0 [--dry-run]
+
+  --dry-run   Print what would be done and do nothing.
+
+Deleted, when present:
+  axum/data/*.db*                              the web server's SQLite file
+  \$DATA_DIR/device.db*, \$DATA_DIR/accounts/    the Tauri app's files, when set
+  $APP_DATA_DIR/device.db*
+  $APP_DATA_DIR/accounts/
+                                               the Tauri app's files otherwise
+
+Dropped and created again, empty, when the server is reachable:
+  the PostgreSQL database \$DATABASE_URL names when it is a postgres URL,
+  else $DEFAULT_POSTGRES_URL
+USAGE
+}
+
+dry_run=false
+case "${1:-}" in
+  -h|--help) help; exit 0 ;;
+  --dry-run) dry_run=true ;;
+  "") ;;
+  *) echo "unknown option: $1" >&2; help >&2; exit 2 ;;
+esac
+
+delete() {
+  local path
+  for path in "$@"; do
+    [ -e "$path" ] || continue
+    if $dry_run; then
+      echo "would delete $path"
+    else
+      echo "deleting $path"
+      rm -rf "$path"
+    fi
+  done
+}
+
+reset_postgres() {
+  local url="$1"
+  if ! command -v dropdb >/dev/null; then
+    echo "skipping PostgreSQL: dropdb is not installed"
+    return
+  fi
+  # dropdb and createdb take a maintenance URL: the server, with the
+  # database to act on named apart from it.
+  local server="${url%/*}/postgres"
+  local name="${url##*/}"
+  name="${name%%\?*}"
+  if ! psql "$server" -At -c "select 1" >/dev/null 2>&1; then
+    echo "skipping PostgreSQL: no server at ${server%/postgres}"
+    return
+  fi
+  if $dry_run; then
+    echo "would drop and create PostgreSQL database $name"
+  else
+    echo "dropping and creating PostgreSQL database $name"
+    dropdb --if-exists --maintenance-db="$server" "$name"
+    createdb --maintenance-db="$server" "$name"
+  fi
+}
+
+shopt -s nullglob
+delete "$ROOT"/axum/data/*.db*
+app_dir="${DATA_DIR:-$APP_DATA_DIR}"
+delete "$app_dir"/*.db* "$app_dir/accounts"
+
+case "${DATABASE_URL:-}" in
+  postgres://*|postgresql://*) reset_postgres "$DATABASE_URL" ;;
+  *) reset_postgres "$DEFAULT_POSTGRES_URL" ;;
+esac

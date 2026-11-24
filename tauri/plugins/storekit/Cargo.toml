@@ -1,0 +1,16 @@
+[package]
+name = "tauri-plugin-storekit"
+description = "Starter Pack's StoreKit 2 calls for the iPhone app: the App Store's sheet, its transactions, and finishing them only when asked"
+version.workspace = true
+edition.workspace = true
+links = "tauri-plugin-storekit"
+exclude = ["/ios/.build", "/ios/.tauri"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tauri = { version = "2", features = [] }
+thiserror = { workspace = true }
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

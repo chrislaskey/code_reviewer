@@ -1,0 +1,14 @@
+# Kept out of the Docker build context: build output, dependencies the
+# image installs itself, local databases, and the Phoenix reference.
+.git
+.claude
+.worktrees
+target
+axum/data
+phoenix
+svelte/node_modules
+svelte/dist
+svelte/dist-ops
+tauri/gen
+**/.DS_Store
+**/.env*

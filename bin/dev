@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# Starts one or more of the apps in dev mode against one Vite dev server,
-# on a port taken from PORT so several worktrees can run at the same time.
+# Starts one or more deployments in dev mode against one Svelte dev server,
+# on ports taken from PORT so several worktrees can run at the same time.
 #
-# Run `bin/dev --help` for the targets.
+# Run `bin/dev --help` for the commands.
 
 set -eo pipefail
 
@@ -11,60 +11,57 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 help() {
   cat <<USAGE
-Starts one or more of the apps in dev mode against one Vite dev server,
-on a port taken from PORT so several worktrees can run at the same time.
+Starts one or more deployments in dev mode against one Svelte dev server,
+on ports taken from PORT so several worktrees can run at the same time.
 
 Usage: $0 [TARGET...] [ARGS...]
 
-Targets, any number of them, \`desktop\` when none:
-  desktop   The desktop app (\`cargo tauri dev\`), which starts the backend
-            server on localhost (decision 25).
+Targets, any number of them, \`web\` when none:
+  web       The web server (\`cargo run -p app_web\`), with the dev server
+            sending /api to it.
+  desktop   The desktop app (\`cargo tauri dev\`).
   ios       The iOS app in a simulator (\`cargo tauri ios dev\`), after
-            \`cargo tauri ios init\` the first time. Needs Xcode. It starts no
-            server: pair it with a desktop app on its Remote page.
+            \`cargo tauri ios init\` the first time. Needs Xcode, see README.md.
   android   The Android app in an emulator (\`cargo tauri android dev\`),
             after \`cargo tauri android init\` the first time. Needs Android
-            Studio. Not tried yet.
-  ports     Print the port the targets would use, without starting anything.
+            Studio, see README.md.
+  ports     Print the ports the targets would use, without starting anything.
   help      Show this help. Also -h and --help.
-
-There is no \`web\` target: the backend runs inside the desktop app and the
-pages don't run in a plain browser (decision 25).
 
 ARGS, whatever follows the targets, go to the mobile app's dev command:
 \`bin/dev ios "iPhone 16"\` picks that simulator, booted first so the
-install does not race its start. Closing any target, or Ctrl-C, stops
-every target and the dev server.
+install does not race its start. Closing the dev server (Ctrl-C) stops
+every target.
 
-The Vite dev server is started once, here, and every target loads its
+The Svelte dev server is started once, here, and every target loads its
 pages from it, so the desktop and the iOS app can run side by side on one
 server. A Tauri target then builds with an empty \`beforeDevCommand\`, which
 the Tauri CLI skips. Two Tauri targets compile in turn: Cargo locks the
 workspace's target/ while it builds, so the second waits for the first.
 
 Ports:
-  PORT unset   The Vite dev server on 1420. When another program holds it,
-               a warning, then 2420; an error when that is taken too.
-  PORT set     The Vite dev server on PORT; an error when it is taken. The
-               app's sessions set a distinct PORT in each worktree's tmux
-               environment, so each worktree's apps run on a port of their own.
+  PORT unset   The web server on 4000 and the Svelte dev server on 1420, as
+               the README says. When another program holds one of them, a
+               warning, then 4010 and 5010; an error when those are taken too.
+  PORT set     The web server on PORT and the Svelte dev server on
+               PORT + 1000, so consecutive ports never meet; an error when
+               either is taken.
+  Trials       The web server starts with TRIAL_USERS_MAX=100, so "Try it
+               now" works; set TRIAL_USERS_MAX=0 to see the pages without it.
+  Storage      Garage on the web server's port + 2000 to + 2003, see
+               \`bin/storage --help\`. Code Reviewer sets a distinct PORT in each
+               session's tmux environment, so each worktree's apps run on
+               ports of their own.
 
-Artifacts:
-  The dev server serves the checkout's artifacts/ at /artifacts/
-  (artifacts/README.md). Run in the main checkout, where every worktree's
-  artifacts are kept, it also tells the desktop app where they are, for
-  each session's Open artifacts; run in a worktree, it doesn't.
-
-Tailscale:
-  When the tailscale CLI is installed and connected, the dev server also
-  answers to this machine's names on the tailnet, read at each start and
-  never stored, and the addresses a phone on the tailnet opens are
-  printed: the pages, and the worktree's artifacts (artifacts/README.md).
+Other servers:
+  MULTI_SERVER   none, listed_only or any: the app's multiServer setting
+                 for the session, in place of tauri.conf.json's, so the
+                 accounts page offers Custom server.
 
 Examples:
-  bin/dev                               # the desktop app, its pages on 1420
-  bin/dev desktop ios "iPhone 16"       # both apps, side by side
-  PORT=4003 bin/dev desktop             # the desktop app, its pages on 4003
+  bin/dev                          # the web, on 4000 and 1420
+  bin/dev desktop                  # the desktop app, its pages on 1420
+  PORT=4003 bin/dev desktop ios    # both apps, their pages on 5003
 USAGE
 }
 
@@ -73,17 +70,17 @@ fail() {
   exit 1
 }
 
+DEFAULT_WEB_PORT=4000
 DEFAULT_VITE_PORT=1420
-FALLBACK_VITE_PORT=2420
+FALLBACK_PORT=4010
 
 # The targets are the leading arguments; the rest go to the mobile dev command.
 targets=()
 only_print_ports=false
 while [ $# -gt 0 ]; do
   case "$1" in
-    desktop|ios|android) targets+=("$1"); shift ;;
+    web|desktop|ios|android) targets+=("$1"); shift ;;
     ports) only_print_ports=true; shift ;;
-    web) fail "there is no web target: the backend runs inside the desktop app (decision 25); run \`$0 --help\`" ;;
     help|-h|--help) help; exit 0 ;;
     -*) fail "unknown option '$1'; run \`$0 --help\`" ;;
     *) break ;;
@@ -93,26 +90,51 @@ if [ ${#targets[@]} -eq 0 ]; then
   if [ $# -gt 0 ]; then
     fail "unknown target '$1'; run \`$0 --help\`"
   fi
-  targets=(desktop)
+  targets=(web)
 fi
 
+starts_web=false
+for target in "${targets[@]}"; do
+  [ "$target" = web ] && starts_web=true
+done
+
 # The programs listening on a port, by name, or nothing when it is free.
-# lsof exits 1 when nothing listens, which pipefail would turn into a failure.
 list_port_listeners() {
-  { lsof -nP -iTCP:"$1" -sTCP:LISTEN -Fc 2>/dev/null || true; } | sed -n 's/^c//p' | sort -u | tr '\n' ' '
+  lsof -nP -iTCP:"$1" -sTCP:LISTEN -Fc 2>/dev/null | sed -n 's/^c//p' | sort -u | tr '\n' ' '
+}
+
+# The ports this run listens on that another program holds, with the
+# programs, one per line. The web port and Garage's only when the web
+# target runs: the apps alone send to a web server started elsewhere.
+list_taken_ports() {
+  local port listeners storage_port=$((web_port + 2000)) ports=("$vite_port")
+  if [ "$starts_web" = true ]; then
+    ports+=("$web_port")
+    command -v garage > /dev/null &&
+      ports+=("$storage_port" $((storage_port + 1)) $((storage_port + 2)) $((storage_port + 3)))
+  fi
+  for port in "${ports[@]}"; do
+    listeners=$(list_port_listeners "$port")
+    [ -z "$listeners" ] || echo "  $port, held by ${listeners% }"
+  done
 }
 
 case "${PORT:-}" in
   '')
+    web_port=$DEFAULT_WEB_PORT
     vite_port=$DEFAULT_VITE_PORT
-    listeners=$(list_port_listeners "$vite_port")
-    if [ -n "$listeners" ]; then
-      echo "bin/dev: warning: port $vite_port is held by ${listeners% }" >&2
-      vite_port=$FALLBACK_VITE_PORT
-      echo "bin/dev: trying $vite_port; set PORT to pick, like \`PORT=4020 $0 ...\`" >&2
-      listeners=$(list_port_listeners "$vite_port")
-      if [ -n "$listeners" ]; then
-        fail "port $vite_port is held too, by ${listeners% }; set PORT to a free one, like \`PORT=4020 $0 ...\`"
+    taken=$(list_taken_ports)
+    if [ -n "$taken" ]; then
+      web_port=$FALLBACK_PORT
+      vite_port=$((FALLBACK_PORT + 1000))
+      echo "bin/dev: warning: the default ports are taken:" >&2
+      echo "$taken" >&2
+      echo "bin/dev: trying $web_port and $vite_port; set PORT to pick, like \`PORT=4020 $0 ...\`" >&2
+      taken=$(list_taken_ports)
+      if [ -n "$taken" ]; then
+        fail "the fallback ports are taken too:
+$taken
+Set PORT to free ones, like \`PORT=4020 $0 ...\` (the pages on PORT + 1000)"
       fi
     fi
     ;;
@@ -120,92 +142,28 @@ case "${PORT:-}" in
     fail "PORT must be a number, got '$PORT'"
     ;;
   *)
-    vite_port="$PORT"
-    if [ "$vite_port" -lt 1024 ] || [ "$vite_port" -gt 65535 ]; then
-      fail "PORT must be between 1024 and 65535, got '$vite_port'"
+    web_port="$PORT"
+    vite_port=$((PORT + 1000))
+    if [ "$web_port" -lt 1024 ] || [ "$vite_port" -gt 65535 ]; then
+      fail "PORT must be between 1024 and 64535, got '$web_port'"
     fi
-    listeners=$(list_port_listeners "$vite_port")
-    if [ -n "$listeners" ]; then
-      fail "port $vite_port from PORT is held by ${listeners% }; set PORT to a free one"
+    taken=$(list_taken_ports)
+    if [ -n "$taken" ]; then
+      fail "the ports from PORT=$PORT are taken:
+$taken
+Set PORT to free ones (the pages on PORT + 1000)"
     fi
     ;;
 esac
 
-# This machine's names on the tailnet, short and full, comma separated, when
-# Tailscale is installed and connected; nothing otherwise.
-list_tailnet_host_names() {
-  command -v tailscale >/dev/null 2>&1 || return 0
-  { tailscale status --json 2>/dev/null || true; } | python3 -c '
-import json, sys
-try:
-    status = json.load(sys.stdin)
-except ValueError:
-    sys.exit()
-if status.get("BackendState") != "Running":
-    sys.exit()
-own = status.get("Self", {})
-names = [own.get("HostName", ""), own.get("DNSName", "").rstrip(".")]
-print(",".join(name for name in names if name))'
-}
-
-# Whether this runs in the repository's main checkout, not a linked worktree.
-is_main_checkout() {
-  [ "$(git -C "$ROOT" rev-parse --path-format=absolute --git-dir)" = \
-    "$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir)" ]
-}
-
-artifacts_environment=()
-if is_main_checkout; then
-  artifacts_environment=(
-    "CODE_REVIEWER_ARTIFACTS_DIRECTORY=$ROOT/artifacts"
-    "CODE_REVIEWER_ARTIFACTS_PORT=$vite_port"
-  )
-fi
-
-tailnet_host_names=$(list_tailnet_host_names)
-tailnet_host=${tailnet_host_names%%,*}
-
-print_addresses() {
-  echo "Vite dev   http://localhost:$vite_port"
-  echo "Artifacts  http://localhost:$vite_port/artifacts/"
-  if [ -n "$tailnet_host" ]; then
-    echo "Tailnet    http://$tailnet_host:$vite_port"
-    echo "           http://$tailnet_host:$vite_port/artifacts/"
-  fi
-  if ! is_main_checkout; then
-    echo "           (a worktree: its sessions' artifacts are served by bin/dev in the main checkout)"
-  fi
-}
+storage_port=$((web_port + 2000))
 
 if [ "$only_print_ports" = true ]; then
-  print_addresses
+  echo "Web server  http://localhost:$web_port"
+  echo "Svelte dev  http://localhost:$vite_port"
+  echo "Storage     http://127.0.0.1:$storage_port, files on $((storage_port + 2))"
   exit 0
 fi
-
-# The tools in .tool-versions and the Tauri CLI, when missing, and the node
-# packages.
-if command -v asdf >/dev/null 2>&1; then
-  while read -r tool versions; do
-    case "$tool" in ''|'#'*) continue ;; esac
-    if ! asdf plugin list | grep -qx "$tool"; then
-      asdf plugin add "$tool"
-    fi
-    for version in $versions; do
-      asdf install "$tool" "$version"
-    done
-  done < "$ROOT/.tool-versions"
-fi
-
-command -v cargo >/dev/null 2>&1 || fail "cargo not found; install Rust (https://rustup.rs) or asdf"
-
-if ! cargo tauri --version >/dev/null 2>&1; then
-  echo "bin/dev: installing tauri-cli..."
-  cargo install tauri-cli --version '^2' --locked
-fi
-
-# Every start, so node_modules follows the lockfile after a merge or a pull;
-# a second or so when nothing changed.
-(cd "$ROOT/tauri" && pnpm install --frozen-lockfile)
 
 # The Tauri CLI opens the Simulator app on the device and installs the
 # app at once, without waiting for the device to boot, so a run from a
@@ -237,7 +195,7 @@ print(sorted(found)[-1][1] if found else "")' "$name")
 pids=()
 # Stops every target and the dev server when one of them is closed, or this
 # script is interrupted, and waits for them, so a run started right after
-# finds the port free.
+# finds the ports free.
 stop_all() {
   trap - EXIT INT TERM
   for pid in ${pids[@]+"${pids[@]}"}; do
@@ -250,21 +208,75 @@ stop_all() {
 }
 trap stop_all EXIT INT TERM
 
-# The Vite dev server, listening on every address so a simulator or a
-# phone on the network or the tailnet reaches it too.
-print_addresses | sed 's/^/bin\/dev: /'
-(cd "$ROOT/tauri" && DEV_SERVER_ALLOWED_HOSTS="$tailnet_host_names" exec pnpm dev --port "$vite_port" --strictPort --host) &
+if [ ! -d "$ROOT/svelte/node_modules" ]; then
+  (cd "$ROOT/svelte" && pnpm install)
+fi
+
+# The Svelte dev server, listening on every address so a simulator or a
+# phone on the network reaches it too, sending /api to the web server.
+echo "bin/dev: the pages on http://localhost:$vite_port"
+(cd "$ROOT/svelte" && WEB_SERVER_URL="http://localhost:$web_port" exec pnpm dev --port "$vite_port" --host) &
 pids+=($!)
 
-# The Tauri CLI's config override: the pages from the dev server above, and
-# no dev server of the CLI's own.
-tauri_config="{\"build\":{\"devUrl\":\"http://localhost:$vite_port\",\"beforeDevCommand\":\"\"}}"
+# Where an app sends the browser to sign in: the pages on the dev server,
+# which send /api to the web server, so `bin/dev web desktop` is the pair.
+sign_in_url="http://localhost:$vite_port/accounts/sign-in"
+
+# The Tauri CLI's config override: the pages from the dev server above, no
+# dev server of the CLI's own, and the two URLs the app needs, under the
+# starter-pack entry of plugins, since a phone build gets no environment
+# from here (tauri/src/server_urls.rs).
+# MULTI_SERVER, when set, is the build's multiServer setting for this
+# session, see docs/design/multi-server.md.
+multi_server_config=""
+case "${MULTI_SERVER:-}" in
+  "") ;;
+  none|listed_only|any) multi_server_config=",\"multiServer\":\"$MULTI_SERVER\"" ;;
+  *) echo "bin/dev: MULTI_SERVER must be none, listed_only or any, got '$MULTI_SERVER'" >&2; exit 1 ;;
+esac
+tauri_config="{\"build\":{\"devUrl\":\"http://localhost:$vite_port\",\"beforeDevCommand\":\"\"},\"plugins\":{\"starter-pack\":{\"syncServerUrl\":\"http://localhost:$web_port\",\"browserSignInUrl\":\"$sign_in_url\"$multi_server_config}}}"
+
+# Up once set up, its key written, and its S3 API answering; a failure
+# when bin/storage exits first or is not up in 30 seconds.
+wait_for_storage() {
+  local pid=$1 tries=0
+  until STORAGE_PORT="$storage_port" "$ROOT/bin/storage" env > /dev/null 2>&1 &&
+    curl -s -o /dev/null "http://127.0.0.1:$storage_port/"; do
+    kill -0 "$pid" 2>/dev/null || fail "bin/storage stopped before Garage was up; see its output above"
+    tries=$((tries + 1))
+    [ "$tries" -lt 150 ] || fail "Garage was not up after 30 seconds; see its output above"
+    sleep 0.2
+  done
+}
+
+# Garage, the web server's bucket, when it is installed; without it the
+# server runs with uploads off. Its STORAGE_* variables go to the server
+# once it is set up and answering.
+storage_env=()
+if [ "$starts_web" = true ]; then
+  if command -v garage > /dev/null; then
+    (STORAGE_PORT="$storage_port" exec "$ROOT/bin/storage" start) &
+    storage_pid=$!
+    pids+=("$storage_pid")
+    wait_for_storage "$storage_pid"
+    while IFS= read -r line; do
+      storage_env+=("$line")
+    done < <(STORAGE_PORT="$storage_port" "$ROOT/bin/storage" env)
+  else
+    echo "bin/dev: warning: garage is not installed, so uploads are off; \`brew install garage\`" >&2
+  fi
+fi
 
 for target in "${targets[@]}"; do
   case "$target" in
+    web)
+      echo "bin/dev: the web server on http://localhost:$web_port"
+      (cd "$ROOT" && exec env ${storage_env[@]+"${storage_env[@]}"} PORT="$web_port" TRIAL_USERS_MAX="${TRIAL_USERS_MAX:-100}" cargo run -p app_web) &
+      pids+=($!)
+      ;;
     desktop)
       echo "bin/dev: the desktop app"
-      (cd "$ROOT/tauri" && exec env ${artifacts_environment[@]+"${artifacts_environment[@]}"} cargo tauri dev --config "$tauri_config") &
+      (cd "$ROOT/tauri" && exec cargo tauri dev --config "$tauri_config") &
       pids+=($!)
       ;;
     ios|android)
@@ -273,10 +285,10 @@ for target in "${targets[@]}"; do
         cd "$ROOT/tauri"
         case "$target" in
           ios)
-            [ -d src-tauri/gen/apple ] || cargo tauri ios init
+            [ -d gen/apple ] || cargo tauri ios init
             boot_simulator "${1:-}"
             ;;
-          android) [ -d src-tauri/gen/android ] || cargo tauri android init ;;
+          android) [ -d gen/android ] || cargo tauri android init ;;
         esac
         exec cargo tauri "$target" dev --config "$tauri_config" ${1+"$@"}
       ) &

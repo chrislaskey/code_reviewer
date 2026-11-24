@@ -1,0 +1,13 @@
+/* Tailwind and daisyUI with the themes and the font (lib/theme.css), then
+   the pages' styles: the pages share one document, so one stylesheet. The
+   app's own styles go in the base layer, so utility classes in markup win
+   over them. */
+
+@import "tailwindcss" source(none);
+@import "./lib/theme.css";
+@source "./";
+
+/* Makes the "hero-#{ICON}" classes the Icon component uses */
+@plugin "../vendor/heroicons.js";
+
+@import "./styles.css" layer(base);

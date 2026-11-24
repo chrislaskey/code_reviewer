@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+#
+# Runs Garage, an S3-compatible object store, as the web server's buckets
+# in dev, set up on every start, each step only when it is missing. Its
+# files, its config and its dev key are under axum/data/garage/, which git
+# ignores.
+#
+# Run `bin/storage --help` for the commands.
+
+set -eo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DIR="$ROOT/axum/data/garage"
+BUCKET="starter-pack"
+PRIVATE_BUCKET="starter-pack-private"
+REGION="garage"
+
+help() {
+  cat <<USAGE
+Runs Garage, an S3-compatible object store, as the web server's buckets in
+dev, set up on every start, each step only when it is missing: one node,
+the bucket $BUCKET readable by anyone, for pictures, the bucket
+$PRIVATE_BUCKET read through signed URLs only, for files, CORS open for
+uploads from the pages, and a key for the server.
+
+Usage: $0 COMMAND
+
+Commands:
+  start   Run Garage in the foreground, setting it up first if needed.
+          bin/dev starts it along with the web server.
+  env     Print the STORAGE_* variables the web server reads, once set up.
+  help    Show this help. Also -h and --help.
+
+Ports, from STORAGE_PORT, 6000 when unset: the S3 API on STORAGE_PORT,
+Garage's own RPC on +1, the public reads on +2 and its admin API on +3.
+The public bucket is read at http://$BUCKET.web.localhost:<STORAGE_PORT + 2>/.
+
+Needs garage on the PATH: \`brew install garage\`.
+USAGE
+}
+
+fail() {
+  echo "$0: $*" >&2
+  exit 1
+}
+
+STORAGE_PORT="${STORAGE_PORT:-6000}"
+S3_PORT=$STORAGE_PORT
+RPC_PORT=$((STORAGE_PORT + 1))
+WEB_PORT=$((STORAGE_PORT + 2))
+ADMIN_PORT=$((STORAGE_PORT + 3))
+export GARAGE_CONFIG_FILE="$DIR/garage.toml"
+
+# The config, written on every start so the ports follow STORAGE_PORT;
+# the RPC secret is made once and kept.
+write_config() {
+  mkdir -p "$DIR"
+  [ -f "$DIR/rpc_secret" ] || openssl rand -hex 32 > "$DIR/rpc_secret"
+  cat > "$GARAGE_CONFIG_FILE" <<CONFIG
+metadata_dir = "$DIR/meta"
+data_dir = "$DIR/data"
+db_engine = "sqlite"
+replication_factor = 1
+rpc_bind_addr = "127.0.0.1:$RPC_PORT"
+rpc_public_addr = "127.0.0.1:$RPC_PORT"
+rpc_secret = "$(cat "$DIR/rpc_secret")"
+
+[s3_api]
+s3_region = "$REGION"
+api_bind_addr = "127.0.0.1:$S3_PORT"
+
+[s3_web]
+bind_addr = "127.0.0.1:$WEB_PORT"
+root_domain = ".web.localhost"
+
+[admin]
+api_bind_addr = "127.0.0.1:$ADMIN_PORT"
+CONFIG
+}
+
+# Up once both the RPC the CLI uses and the S3 API the CORS goes to answer.
+wait_until_up() {
+  local tries=0
+  until garage status > /dev/null 2>&1 && curl -s -o /dev/null "http://127.0.0.1:$S3_PORT/"; do
+    tries=$((tries + 1))
+    [ "$tries" -lt 50 ] || fail "Garage did not start; see its output above"
+    sleep 0.2
+  done
+}
+
+# CORS for the pages' PUTs, which Garage's CLI does not set, so it is the
+# S3 API's PutBucketCors, signed by curl.
+allow_pages() {
+  local bucket=$1 key_id=$2 secret=$3 cors md5
+  cors='<CORSConfiguration><CORSRule><AllowedOrigin>*</AllowedOrigin><AllowedMethod>PUT</AllowedMethod><AllowedMethod>GET</AllowedMethod><AllowedHeader>*</AllowedHeader><ExposeHeader>ETag</ExposeHeader><MaxAgeSeconds>3600</MaxAgeSeconds></CORSRule></CORSConfiguration>'
+  md5=$(printf '%s' "$cors" | openssl md5 -binary | base64)
+  curl -sf --aws-sigv4 "aws:amz:$REGION:s3" --user "$key_id:$secret" -X PUT \
+    -H "Content-MD5: $md5" -H "Content-Type: application/xml" --data-binary "$cors" \
+    "http://127.0.0.1:$S3_PORT/$bucket?cors" > /dev/null || fail "could not set the CORS of $bucket"
+}
+
+# Each step checks what is there first, so a setup that stopped part
+# way, or one from before a bucket was added, is finished on the next
+# start. The key file is written last: it is what says the setup is done.
+set_up() {
+  local key_output key_id secret bucket
+  set_up_layout
+  key_output=$(garage key info starter-pack-dev --show-secret 2>/dev/null ||
+    garage key create starter-pack-dev)
+  key_id=$(echo "$key_output" | awk '/Key ID:/ {print $3}')
+  secret=$(echo "$key_output" | awk '/Secret key:/ {print $3}')
+  [ -n "$key_id" ] && [ -n "$secret" ] || fail "could not read the key starter-pack-dev"
+  for bucket in "$BUCKET" "$PRIVATE_BUCKET"; do
+    garage bucket info "$bucket" > /dev/null 2>&1 || garage bucket create "$bucket" > /dev/null
+    garage bucket allow --read --write --owner "$bucket" --key starter-pack-dev > /dev/null
+    allow_pages "$bucket" "$key_id" "$secret"
+  done
+  garage bucket website --allow "$BUCKET" > /dev/null
+  printf '%s\n%s\n' "$key_id" "$secret" > "$DIR/key.new"
+  mv "$DIR/key.new" "$DIR/key"
+}
+
+# One node with a role, on a cluster with no layout yet.
+set_up_layout() {
+  local version node
+  version=$(garage layout show | awk -F': *' '/Current cluster layout version/ {print $2}')
+  [ -n "$version" ] || fail "could not read the cluster layout version"
+  [ "$version" -eq 0 ] || return 0
+  node=$(garage node id -q 2>/dev/null | cut -d@ -f1)
+  [ -n "$node" ] || fail "could not find this Garage node"
+  garage layout assign -z dev -c 1G "$node" > /dev/null
+  garage layout apply --version 1 > /dev/null
+}
+
+start() {
+  command -v garage > /dev/null || fail "garage is not installed: \`brew install garage\`"
+  write_config
+  garage server &
+  local pid=$!
+  # Waits for Garage to exit, so its ports are free for the next start.
+  trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true' EXIT INT TERM
+  wait_until_up
+  set_up
+  echo "bin/storage: Garage on http://127.0.0.1:$S3_PORT, public reads at http://$BUCKET.web.localhost:$WEB_PORT"
+  wait "$pid"
+}
+
+print_env() {
+  [ -f "$DIR/key" ] ||
+    fail "not set up yet: run \`$0 start\` first"
+  local key_id secret
+  key_id=$(sed -n 1p "$DIR/key")
+  secret=$(sed -n 2p "$DIR/key")
+  echo "STORAGE_ENDPOINT=http://127.0.0.1:$S3_PORT"
+  echo "STORAGE_REGION=$REGION"
+  echo "STORAGE_BUCKET=$BUCKET"
+  echo "STORAGE_PRIVATE_BUCKET=$PRIVATE_BUCKET"
+  echo "STORAGE_ACCESS_KEY_ID=$key_id"
+  echo "STORAGE_SECRET_ACCESS_KEY=$secret"
+  echo "STORAGE_PUBLIC_URL=http://$BUCKET.web.localhost:$WEB_PORT"
+}
+
+case "${1:-}" in
+  start) start ;;
+  env) print_env ;;
+  help|-h|--help) help ;;
+  '') help; exit 1 ;;
+  *) fail "unknown command '$1'; run \`$0 --help\`" ;;
+esac

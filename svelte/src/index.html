@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Starter Pack</title>
+    <link rel="stylesheet" href="/app.css" />
+    <script type="module" src="/main.js"></script>
+    <!-- The theme script, inlined here by vite.config.js so it runs before the first paint -->
+    <!-- theme-script -->
+  </head>
+  <body>
+    <!-- The title bar's strip on the desktop: the window has no title bar of
+         its own (tauri.conf.json), so this empty strip over the page drags it.
+         Hidden elsewhere, see styles.css -->
+    <div class="title-bar-drag" data-tauri-drag-region></div>
+    <div id="app"></div>
+  </body>
+</html>

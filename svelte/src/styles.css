@@ -1,0 +1,536 @@
+/* The pages' own styles, in Tailwind's base layer so utility classes in
+   markup win. Colours come from the daisyUI theme (lib/theme.css). */
+
+:root {
+  --fg: var(--color-base-content);
+  --muted: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  --card: var(--color-base-100);
+  --border-color: var(--color-base-300);
+  --accent: var(--color-primary);
+  /* The page runs under the window chrome, full bleed, and keeps its
+     content clear of it: on the desktop the macOS title bar, an overlay
+     (tauri.conf.json) whose window controls are drawn over the page; on a
+     phone the status bar and the home indicator, which `viewport-fit=cover`
+     in index.html lets the page run under. main.js sets `data-app`. */
+  --title-bar-height: 28px;
+  --page-inset-top: 0px;
+  --page-inset-bottom: 0px;
+  /* The app's header across the window's top (AppHeader), below a phone's
+     status bar; on the desktop the window controls sit inside it, at its
+     left, see `trafficLightPosition` in tauri.conf.json. */
+  --app-header-height: 44px;
+  --app-header-inset-top: var(--page-inset-top);
+  --window-controls-width: 0px;
+  /* The navigation gutter down the window's left edge (AppNav): half a
+     shade darker than the page, which sits on top of it with the open
+     tab. On small windows the bar along the bottom (BottomBar) takes its
+     place, see below. */
+  --gutter-width: 84px;
+  /* The page's top left corner, rounded as the tabs' corners are
+     (CORNER_RADIUS in AppNav). */
+  --page-corner-radius: 10px;
+  --bottom-bar-height: 0px;
+  --gutter-bg: color-mix(in oklab, var(--color-base-100) 55%, var(--color-base-200));
+  --gutter-ring: light-dark(rgb(0 0 0 / 0.06), rgb(255 255 255 / 0.08));
+  --gutter-shadow: light-dark(rgb(0 0 0 / 0.1), rgb(0 0 0 / 0.55));
+  --raised-shadow:
+    0 0 0 1px light-dark(rgb(0 0 0 / 0.04), rgb(255 255 255 / 0.06)),
+    0 4px 14px -2px light-dark(rgb(0 0 0 / 0.08), rgb(0 0 0 / 0.5)),
+    inset 0 1px 0 light-dark(transparent, rgb(255 255 255 / 0.07));
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+
+[data-app="desktop"] {
+  --page-inset-top: var(--title-bar-height);
+  --app-header-inset-top: 0px;
+  --window-controls-width: 84px;
+}
+
+[data-app="mobile"] {
+  --page-inset-top: env(safe-area-inset-top, 0px);
+  --page-inset-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* The body paints the background and fills the window: WebKit leaves the
+   old colour on the root background below short pages after a theme
+   change. */
+body {
+  margin: 0;
+  padding-top: var(--page-inset-top);
+  padding-bottom: var(--page-inset-bottom);
+  min-height: 100vh;
+  box-sizing: border-box;
+  background: var(--color-base-100);
+  color: var(--fg);
+}
+
+/* The title bar's strip over the page on the desktop: nothing of ours, so
+   it drags the window. */
+.title-bar-drag {
+  display: none;
+}
+
+[data-app="desktop"] .title-bar-drag {
+  display: block;
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 20;
+  height: var(--title-bar-height);
+}
+
+/* Small windows (below Tailwind's sm) have no gutter: the bottom bar
+   takes its place, and runs under a phone's home indicator, so its height
+   takes in the part of the inset the buttons must keep clear of. */
+@media (width < 40rem) {
+  :root {
+    --gutter-width: 0px;
+    --page-corner-radius: 0px;
+    --bottom-bar-inset: max(0px, calc(env(safe-area-inset-bottom, 0px) - 16px));
+    --bottom-bar-height: calc(66px + var(--bottom-bar-inset));
+  }
+}
+
+/* The app's pages (AppLayout), clear of the header, the gutter and the
+   bottom bar; the body already keeps clear of the window chrome. */
+.app-layout {
+  padding-top: calc(var(--app-header-inset-top) + var(--app-header-height) - var(--page-inset-top));
+  padding-left: var(--gutter-width);
+  padding-bottom: max(0px, var(--bottom-bar-height) - var(--page-inset-bottom));
+}
+
+.page {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Against the gutter, as the open tab joins it. */
+.app-layout .page {
+  margin: 0;
+}
+
+/* A banner above every page, such as the trial's (AppLayout). */
+.app-banner {
+  padding: 1rem 1.5rem 0;
+}
+
+/* The app's header (AppHeader): fixed across the window's top in the
+   gutter's colour, above the title bar's strip; its items start where the
+   page does, clear of the window controls, and a hairline parts it from
+   the page. On small windows it scrolls away with the page, see below. */
+.app-header {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 21;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: calc(var(--app-header-inset-top) + var(--app-header-height));
+  padding: var(--app-header-inset-top) 0.75rem 0
+    calc(max(var(--gutter-width), var(--window-controls-width)) + 0.75rem);
+  background: var(--gutter-bg);
+}
+
+.app-header::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 calc(var(--gutter-width) + var(--page-corner-radius));
+  height: 1px;
+  background: var(--gutter-ring);
+  pointer-events: none;
+}
+
+/* Small windows keep only the bottom bar fixed: the header is the top of
+   the page, at the same place, so the page's padding still clears it, and
+   still reaches under a phone's status bar while at the top. */
+@media (width < 40rem) {
+  .app-header {
+    position: absolute;
+  }
+}
+
+/* Back and Forward, only in the desktop app, which has no browser's
+   buttons; on small windows they are the bottom bar's. */
+.app-header-history {
+  display: none;
+}
+
+[data-app="desktop"] .app-header-history {
+  display: flex;
+  gap: 2px;
+}
+
+@media (width < 40rem) {
+  [data-app="desktop"] .app-header-history {
+    display: none;
+  }
+}
+
+/* A header menu's panel (HeaderMenu), below its button, at its right. */
+.header-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  width: 17rem;
+  padding: 0.25rem;
+  border-radius: var(--radius-box);
+  background: var(--color-base-100);
+  box-shadow: var(--raised-shadow);
+}
+
+/* The person's initials in place of an avatar (AccountMenu). */
+.avatar-initials {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--color-primary) 18%, transparent);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* The navigation gutter (AppNav): fixed down the window's left edge below
+   the header, so it stays put while the page scrolls. */
+.app-gutter {
+  position: fixed;
+  inset: calc(var(--app-header-inset-top) + var(--app-header-height)) auto 0 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: var(--gutter-width);
+  padding-bottom: calc(10px + var(--page-inset-bottom));
+  background: var(--gutter-bg);
+}
+
+@media (width < 40rem) {
+  .app-gutter,
+  .app-header .page-corner {
+    display: none;
+  }
+}
+
+/* Above the tabs, the page's top padding. */
+.app-gutter .gutter-top {
+  flex-shrink: 0;
+  height: 1.5rem;
+}
+
+/* The page's edge and the open tab as one shape, so one shadow follows the
+   whole outline, curves included; the page's colour, behind the tiles. */
+.app-gutter .tab-shape {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  overflow: visible;
+  pointer-events: none;
+  fill: var(--color-base-100);
+  filter: drop-shadow(-1px 0 0 var(--gutter-ring)) drop-shadow(0 -1px 0 var(--gutter-ring))
+    drop-shadow(0 1px 0 var(--gutter-ring)) drop-shadow(-3px 1px 7px var(--gutter-shadow));
+}
+
+/* The page's top left corner, rounded: the gutter's colour and ring
+   painted around a curve, over the page, from the header so it is above
+   the gutter too. It starts a pixel up and left, so its ring meets the
+   header's and the gutter's. */
+.app-header .page-corner {
+  position: absolute;
+  top: calc(100% - 1px);
+  left: calc(var(--gutter-width) - 1px);
+  width: calc(var(--page-corner-radius) + 1px);
+  height: calc(var(--page-corner-radius) + 1px);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.app-header .page-corner::before {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: calc(2 * var(--page-corner-radius));
+  height: calc(2 * var(--page-corner-radius));
+  border-top-left-radius: var(--page-corner-radius);
+  box-shadow:
+    0 0 0 1px var(--gutter-ring),
+    0 0 0 var(--page-corner-radius) var(--gutter-bg);
+}
+
+/* A tab: an icon over one word. */
+.app-gutter .tile {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  height: 62px;
+  color: color-mix(in oklab, var(--color-base-content) 62%, transparent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.app-gutter .tile-icon {
+  width: 22px;
+  height: 22px;
+}
+
+/* A tab that is not open lights up as an inset rounded square, while
+   hovered or while its menu is open. */
+.app-gutter .tile:not(.current):hover,
+.app-gutter details[open] > .tile {
+  color: var(--fg);
+}
+
+.app-gutter .tile:not(.current):hover::before,
+.app-gutter details[open] > .tile::before {
+  content: "";
+  position: absolute;
+  inset: 4px 7px;
+  z-index: -1;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--color-base-content) 7%, transparent);
+}
+
+.app-gutter .tile.current {
+  color: var(--fg);
+}
+
+.app-gutter .tile.current .tile-icon {
+  color: var(--color-primary);
+}
+
+.app-gutter .spacer {
+  flex: 1;
+}
+
+/* The navigation on small windows (BottomBar): fixed along the bottom in
+   the gutter's colour, a hairline above it; the buttons keep clear of
+   the phone's home indicator. */
+.bottom-bar {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 20;
+  display: none;
+  gap: 6px;
+  height: var(--bottom-bar-height);
+  padding: 12px 8px calc(6px + var(--bottom-bar-inset));
+  background: var(--gutter-bg);
+  box-shadow: 0 -1px 0 var(--gutter-ring);
+}
+
+@media (width < 40rem) {
+  .bottom-bar {
+    display: flex;
+  }
+}
+
+/* A button: flat, an icon over one word, sharing the bar evenly; it
+   shrinks a little while pressed. Raised only under a hovering pointer,
+   so never on a touch screen. */
+.bar-button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  border-radius: 10px;
+  color: var(--fg);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform 80ms,
+    background-color 80ms;
+}
+
+@media (hover: hover) {
+  .bar-button:not(:disabled):hover {
+    background: var(--color-base-100);
+    box-shadow: var(--raised-shadow);
+  }
+}
+
+.bar-button:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+.bar-button:disabled {
+  color: color-mix(in oklab, var(--color-base-content) 30%, transparent);
+  cursor: default;
+}
+
+.bar-button .bar-icon {
+  width: 26px;
+  height: 26px;
+}
+
+/* The page above the menu's sheet, dimmed; a tap on it closes the sheet. */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0 0 var(--bottom-bar-height) 0;
+  z-index: 18;
+  background: rgb(0 0 0 / 0.35);
+}
+
+/* Rises from the bottom bar, below a phone's status bar; scrolls when
+   the theme list runs long. */
+.sheet {
+  position: fixed;
+  inset: auto 0 var(--bottom-bar-height) 0;
+  z-index: 19;
+  max-height: calc(100% - var(--bottom-bar-height) - env(safe-area-inset-top, 0px) - 3rem);
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem 1rem;
+  border-radius: 16px 16px 0 0;
+  background: var(--color-base-100);
+  box-shadow: var(--raised-shadow);
+}
+
+.sheet-links {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+/* A tab in the sheet: an icon over its name, a large touch target. */
+.sheet-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 1rem 0.5rem;
+  border-radius: 12px;
+  background: var(--gutter-bg);
+  color: var(--fg);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sheet-link.current {
+  outline: 2px solid var(--color-primary);
+}
+
+.sheet-link.current .size-6 {
+  color: var(--color-primary);
+}
+
+.sheet-heading {
+  margin: 1.25rem 0 0.25rem;
+  padding: 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* The public website's pages (src/public) */
+.public-page {
+  max-width: 880px;
+}
+
+/* The header's links for a visitor or for someone signed in, see
+   public/partials/header.html. Important, to win over a button's display
+   from this base layer. */
+[data-signed-in] .public-signed-out,
+:root:not([data-signed-in]) .public-signed-in {
+  display: none !important;
+}
+
+/* "Try it now" on the public home page, until the server says a trial
+   can start, see public/index.html. */
+:root:not([data-trial-available]) .public-trial,
+[data-signed-in] .public-trial {
+  display: none !important;
+}
+
+h1 {
+  font-size: 1.4rem;
+  font-weight: bold;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.error {
+  color: var(--color-error);
+}
+
+/* The core components' styles (lib/components). */
+
+.heading {
+  margin: 0;
+  font-weight: 600;
+}
+
+.heading-1 {
+  font-size: 1.4rem;
+  font-weight: bold;
+}
+
+.heading-2 {
+  font-size: 1.1rem;
+}
+
+.heading-3 {
+  font-size: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.panel {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+  background: var(--card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.panel-stack {
+  flex-direction: column;
+}
+
+.panel-row {
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+/* A file's bytes on its page: an image at its own size up to the page's
+   width, a text or PDF file in a frame tall enough to read. */
+.file-shown {
+  max-width: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+iframe.file-shown {
+  width: 100%;
+  height: 70vh;
+  background: white;
+}

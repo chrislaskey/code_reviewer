@@ -1,0 +1,59 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=utf-8\n"
+"Plural-Forms: nplurals=2; plural=(n!=1);\n"
+
+#: core/src/services/mailer/mails.rs:16
+msgid "Your {app} code"
+msgstr ""
+
+#: core/src/services/mailer/mails.rs:17
+msgid ""
+"Your code is {code}. It expires in ten minutes.\n"
+"\n"
+"If you did not ask for it, ignore this email."
+msgstr ""
+
+#: core/src/services/mailer/mails.rs:32
+msgid "No {app} account for this email"
+msgstr ""
+
+#: core/src/services/mailer/mails.rs:33
+msgid ""
+"Someone, likely you, tried to log in to {app} with this email. There is no account for it, and {app} is not taking new sign-ups right now: log in with the email you signed up with.\n"
+"\n"
+"If this was not you, ignore this email."
+msgstr ""
+
+#: core/src/services/mailer/mails.rs:49
+msgid "Your code to delete your {app} account"
+msgstr ""
+
+#: core/src/services/mailer/mails.rs:54
+msgid ""
+"Your code is {code}. It expires in ten minutes. Entering it deletes your account and everything in it, and cannot be undone.\n"
+"\n"
+"If you did not ask for it, someone is logged in to your account: log in and change your password."
+msgstr ""
+
+#: core/src/services/mailer/mails.rs:69
+msgid "Your {app} account was deleted"
+msgstr ""
+
+#: core/src/services/mailer/mails.rs:70
+msgid ""
+"Your {app} account and everything in it were deleted, as you asked. A plan bought in the App Store is billed by Apple until you cancel it in your Apple ID's subscriptions.\n"
+"\n"
+"You can sign up again with this email at any time."
+msgstr ""
+
+#: core/src/services/mailer/mails.rs:86
+msgid "Your password was changed"
+msgstr ""
+
+#: core/src/services/mailer/mails.rs:87
+msgid ""
+"The password of your {app} account was just set.\n"
+"\n"
+"If this was not you, log in with a code sent to this email and change it, then check who else can read your email."
+msgstr ""

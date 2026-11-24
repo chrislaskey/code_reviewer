@@ -1,0 +1,23 @@
+{
+  "elements": [
+    {
+      "isRequired": true,
+      "name": "body",
+      "title": "Write a post",
+      "type": "comment",
+      "validators": [
+        {
+          "maxLength": 10000,
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "choices": [],
+      "name": "community_ids",
+      "title": "In these communities",
+      "type": "checkbox"
+    }
+  ],
+  "id": "post-form"
+}

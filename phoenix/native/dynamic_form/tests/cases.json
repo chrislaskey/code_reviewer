@@ -1,0 +1,3395 @@
+{
+  "cases": [
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "agree",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ],
+        [
+          "name",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ],
+        [
+          "tags",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ]
+      ],
+      "name": "nothing submitted",
+      "params": {}
+    },
+    {
+      "definition": "every_rule",
+      "errors": [],
+      "name": "everything valid",
+      "params": {
+        "about": "hi",
+        "age": "36",
+        "agree": "true",
+        "code": "ABC",
+        "color": "red",
+        "contact": "a@b.co",
+        "email": "ada@example.com",
+        "labels": [
+          "",
+          "x"
+        ],
+        "name": "Ada",
+        "score": "2",
+        "size": "m",
+        "stars": "5",
+        "tags": [
+          "",
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "agree",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ],
+        [
+          "name",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ],
+        [
+          "tags",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ]
+      ],
+      "name": "blank strings are missing",
+      "params": {
+        "agree": "",
+        "name": "   ",
+        "tags": [
+          ""
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [],
+      "name": "whitespace in a list",
+      "params": {
+        "agree": "true",
+        "name": "Ada",
+        "tags": [
+          "",
+          " "
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [],
+      "name": "false is an answer to a required boolean",
+      "params": {
+        "agree": "false",
+        "name": "Ada",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "name",
+          "should be at least %{count} character(s)",
+          [
+            [
+              "count",
+              2
+            ],
+            [
+              "validation",
+              "length"
+            ],
+            [
+              "kind",
+              "min"
+            ],
+            [
+              "type",
+              "string"
+            ]
+          ]
+        ]
+      ],
+      "name": "too short",
+      "params": {
+        "agree": "true",
+        "name": "A",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "about",
+          "should be at most %{count} character(s)",
+          [
+            [
+              "count",
+              10
+            ],
+            [
+              "validation",
+              "length"
+            ],
+            [
+              "kind",
+              "max"
+            ],
+            [
+              "type",
+              "string"
+            ]
+          ]
+        ],
+        [
+          "name",
+          "should be at most %{count} character(s)",
+          [
+            [
+              "count",
+              5
+            ],
+            [
+              "validation",
+              "length"
+            ],
+            [
+              "kind",
+              "max"
+            ],
+            [
+              "type",
+              "string"
+            ]
+          ]
+        ]
+      ],
+      "name": "too long",
+      "params": {
+        "about": "more than ten",
+        "agree": "true",
+        "name": "Adaline",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [],
+      "name": "graphemes count as characters",
+      "params": {
+        "agree": "true",
+        "name": "👍🏽é",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "contact",
+          "must be an email",
+          [
+            [
+              "validation",
+              "format"
+            ]
+          ]
+        ],
+        [
+          "email",
+          "has invalid format",
+          [
+            [
+              "validation",
+              "format"
+            ]
+          ]
+        ]
+      ],
+      "name": "emails",
+      "params": {
+        "agree": "true",
+        "contact": "a b@c.d",
+        "email": "nope",
+        "name": "Ada",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "contact",
+          "must be an email",
+          [
+            [
+              "validation",
+              "format"
+            ]
+          ]
+        ],
+        [
+          "email",
+          "has invalid format",
+          [
+            [
+              "validation",
+              "format"
+            ]
+          ]
+        ]
+      ],
+      "name": "an email with a final newline",
+      "params": {
+        "agree": "true",
+        "contact": "a@b\n",
+        "email": "a@b.c\n",
+        "name": "Ada",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "email",
+          "has invalid format",
+          [
+            [
+              "validation",
+              "format"
+            ]
+          ]
+        ]
+      ],
+      "name": "an email without a dot after the at",
+      "params": {
+        "agree": "true",
+        "email": "a@b",
+        "name": "Ada",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "age",
+          "is invalid",
+          [
+            [
+              "type",
+              "decimal"
+            ],
+            [
+              "validation",
+              "cast"
+            ]
+          ]
+        ]
+      ],
+      "name": "a number that is not one",
+      "params": {
+        "age": "abc",
+        "agree": "true",
+        "name": "Ada",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "age",
+          "must be an adult",
+          [
+            [
+              "validation",
+              "number"
+            ],
+            [
+              "kind",
+              "greater_than_or_equal_to"
+            ],
+            [
+              "number",
+              18
+            ]
+          ]
+        ]
+      ],
+      "name": "a number below the minimum",
+      "params": {
+        "age": "17.5",
+        "agree": "true",
+        "name": "Ada",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "age",
+          "must be an adult",
+          [
+            [
+              "validation",
+              "number"
+            ],
+            [
+              "kind",
+              "less_than_or_equal_to"
+            ],
+            [
+              "number",
+              120
+            ]
+          ]
+        ]
+      ],
+      "name": "a number above the maximum",
+      "params": {
+        "age": "121",
+        "agree": "true",
+        "name": "Ada",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [],
+      "name": "a decimal in range",
+      "params": {
+        "age": "18.5",
+        "agree": "true",
+        "name": "Ada",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "code",
+          "must be three capital letters",
+          [
+            [
+              "validation",
+              "format"
+            ]
+          ]
+        ]
+      ],
+      "name": "a pattern",
+      "params": {
+        "agree": "true",
+        "code": "abc",
+        "name": "Ada",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "changes": {
+        "agree": true,
+        "labels": [],
+        "name": "Ada",
+        "tags": []
+      },
+      "definition": "every_rule",
+      "errors": [],
+      "name": "choices not offered are dropped, which leaves a required group empty but present",
+      "params": {
+        "agree": "true",
+        "color": "green",
+        "labels": [
+          "q"
+        ],
+        "name": "Ada",
+        "size": "xl",
+        "tags": [
+          "zzz"
+        ]
+      }
+    },
+    {
+      "changes": {
+        "agree": true,
+        "color": "b",
+        "labels": [
+          "x"
+        ],
+        "name": "Ada",
+        "size": "m",
+        "tags": [
+          "a"
+        ]
+      },
+      "definition": "every_rule",
+      "errors": [],
+      "name": "offered choices are kept beside dropped ones",
+      "params": {
+        "agree": "true",
+        "color": "b",
+        "labels": [
+          "x",
+          "q"
+        ],
+        "name": "Ada",
+        "size": "m",
+        "tags": [
+          "a",
+          "zzz"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "labels",
+          "is invalid",
+          [
+            [
+              "type",
+              {
+                "array": "string"
+              }
+            ],
+            [
+              "validation",
+              "cast"
+            ]
+          ]
+        ],
+        [
+          "tags",
+          "is invalid",
+          [
+            [
+              "type",
+              {
+                "array": "string"
+              }
+            ],
+            [
+              "validation",
+              "cast"
+            ]
+          ]
+        ]
+      ],
+      "name": "a list given as a string",
+      "params": {
+        "agree": "true",
+        "labels": "x",
+        "name": "Ada",
+        "tags": "a"
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "labels",
+          "should have at most %{count} item(s)",
+          [
+            [
+              "count",
+              1
+            ],
+            [
+              "validation",
+              "length"
+            ],
+            [
+              "kind",
+              "max"
+            ],
+            [
+              "type",
+              "list"
+            ]
+          ]
+        ]
+      ],
+      "name": "a list too long",
+      "params": {
+        "agree": "true",
+        "labels": [
+          "x",
+          "y"
+        ],
+        "name": "Ada",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "agree",
+          "is invalid",
+          [
+            [
+              "type",
+              "boolean"
+            ],
+            [
+              "validation",
+              "cast"
+            ]
+          ]
+        ]
+      ],
+      "name": "a boolean that is not one",
+      "params": {
+        "agree": "on",
+        "name": "Ada",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "score",
+          "must be greater than or equal to %{number}",
+          [
+            [
+              "validation",
+              "number"
+            ],
+            [
+              "kind",
+              "greater_than_or_equal_to"
+            ],
+            [
+              "number",
+              1
+            ]
+          ]
+        ],
+        [
+          "stars",
+          "must be less than or equal to %{number}",
+          [
+            [
+              "validation",
+              "number"
+            ],
+            [
+              "kind",
+              "less_than_or_equal_to"
+            ],
+            [
+              "number",
+              5
+            ]
+          ]
+        ]
+      ],
+      "name": "ratings out of range",
+      "params": {
+        "agree": "true",
+        "name": "Ada",
+        "score": "0",
+        "stars": "6",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "score",
+          "is invalid",
+          [
+            [
+              "type",
+              "integer"
+            ],
+            [
+              "validation",
+              "cast"
+            ]
+          ]
+        ]
+      ],
+      "name": "a rating that is not a number",
+      "params": {
+        "agree": "true",
+        "name": "Ada",
+        "score": "x",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "name",
+          "is invalid",
+          [
+            [
+              "type",
+              "string"
+            ],
+            [
+              "validation",
+              "cast"
+            ]
+          ]
+        ]
+      ],
+      "name": "a string field given a number",
+      "params": {
+        "agree": "true",
+        "name": 5,
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [],
+      "name": "params that are not questions are ignored",
+      "params": {
+        "admin": "true",
+        "agree": "true",
+        "name": "Ada",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "post_form",
+      "errors": [],
+      "name": "a post",
+      "params": {
+        "body": "Hello",
+        "community_ids": [
+          "",
+          "0194d3b0-0000-7000-8000-000000000001"
+        ]
+      }
+    },
+    {
+      "definition": "post_form",
+      "errors": [
+        [
+          "body",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ]
+      ],
+      "name": "a post without a body",
+      "params": {
+        "body": "",
+        "community_ids": [
+          ""
+        ]
+      }
+    },
+    {
+      "definition": "post_form",
+      "errors": [
+        [
+          "body",
+          "should be at most %{count} character(s)",
+          [
+            [
+              "count",
+              10000
+            ],
+            [
+              "validation",
+              "length"
+            ],
+            [
+              "kind",
+              "max"
+            ],
+            [
+              "type",
+              "string"
+            ]
+          ]
+        ]
+      ],
+      "name": "a post too long",
+      "params": {
+        "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+    },
+    {
+      "changes": {
+        "agree": true,
+        "name": "Ada",
+        "steps": 3,
+        "tags": [
+          "a"
+        ]
+      },
+      "definition": "every_rule",
+      "errors": [],
+      "name": "a rating on a step",
+      "params": {
+        "agree": "true",
+        "name": "Ada",
+        "steps": "3",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "steps",
+          "is invalid",
+          [
+            [
+              "validation",
+              "rate_step"
+            ]
+          ]
+        ]
+      ],
+      "name": "a rating between steps",
+      "params": {
+        "agree": "true",
+        "name": "Ada",
+        "steps": "4",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "every_rule",
+      "errors": [
+        [
+          "steps",
+          "is invalid",
+          [
+            [
+              "validation",
+              "rate_step"
+            ]
+          ]
+        ],
+        [
+          "steps",
+          "must be less than or equal to %{number}",
+          [
+            [
+              "validation",
+              "number"
+            ],
+            [
+              "kind",
+              "less_than_or_equal_to"
+            ],
+            [
+              "number",
+              5
+            ]
+          ]
+        ]
+      ],
+      "name": "a rating out of range and between steps",
+      "params": {
+        "agree": "true",
+        "name": "Ada",
+        "steps": "6",
+        "tags": [
+          "a"
+        ]
+      }
+    },
+    {
+      "definition": "conditions",
+      "errors": [
+        [
+          "slider",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ]
+      ],
+      "name": "conditions: nothing",
+      "params": {}
+    },
+    {
+      "definition": "conditions",
+      "errors": [
+        [
+          "card_number",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ],
+        [
+          "slider",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ]
+      ],
+      "name": "conditions: a hidden question isn't required, a shown one is",
+      "params": {
+        "pay": "card"
+      }
+    },
+    {
+      "definition": "conditions",
+      "errors": [
+        [
+          "agreed_on",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ],
+        [
+          "id_number",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ],
+        [
+          "reason",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ],
+        [
+          "slider",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ]
+      ],
+      "name": "conditions: requiredIf",
+      "params": {
+        "age": "20",
+        "agree": "true",
+        "pay": "cash"
+      }
+    },
+    {
+      "definition": "conditions",
+      "errors": [
+        [
+          "slider",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ]
+      ],
+      "name": "conditions: requiredIf reads raw params",
+      "params": {
+        "age": "17",
+        "agree": "false"
+      }
+    },
+    {
+      "definition": "panels",
+      "errors": [
+        [
+          "first",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ],
+        [
+          "team_name",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ]
+      ],
+      "name": "panels: questions in panels are the form's, and a hidden panel's still required",
+      "params": {
+        "kind": "person"
+      }
+    },
+    {
+      "changes": {
+        "b": true
+      },
+      "definition": "pages",
+      "errors": [
+        [
+          "a",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ]
+      ],
+      "name": "pages: flattened",
+      "params": {
+        "b": "true"
+      }
+    },
+    {
+      "definition": "nested",
+      "errors": [
+        [
+          "rooms",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ],
+        [
+          "rooms",
+          "should have at least %{count} item(s)",
+          [
+            [
+              "count",
+              1
+            ],
+            [
+              "validation",
+              "length"
+            ],
+            [
+              "kind",
+              "min"
+            ],
+            [
+              "type",
+              "list"
+            ]
+          ]
+        ]
+      ],
+      "name": "nested: no entries",
+      "params": {
+        "rooms": []
+      }
+    },
+    {
+      "definition": "nested",
+      "errors": [
+        [
+          "rooms",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ]
+      ],
+      "name": "nested: not submitted at all",
+      "params": {}
+    },
+    {
+      "changes": {
+        "rooms": [
+          {
+            "name": "A",
+            "size": "l"
+          },
+          {
+            "name": "A"
+          }
+        ]
+      },
+      "definition": "nested",
+      "errors": [
+        [
+          "rooms",
+          "is invalid",
+          [
+            [
+              "validation",
+              "paneldynamic"
+            ]
+          ]
+        ],
+        [
+          "rooms.0.kind",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ],
+        [
+          "rooms.0.name",
+          "value must be unique",
+          [
+            [
+              "validation",
+              "key_duplication"
+            ]
+          ]
+        ],
+        [
+          "rooms.1.name",
+          "value must be unique",
+          [
+            [
+              "validation",
+              "key_duplication"
+            ]
+          ]
+        ]
+      ],
+      "name": "nested: entries from the browser",
+      "params": {
+        "rooms": {
+          "0": {
+            "name": "A",
+            "size": "l"
+          },
+          "1": {
+            "name": "A",
+            "size": "xl"
+          },
+          "__empty__": ""
+        }
+      }
+    },
+    {
+      "definition": "nested",
+      "errors": [
+        [
+          "rooms",
+          "should have at most %{count} item(s)",
+          [
+            [
+              "count",
+              3
+            ],
+            [
+              "validation",
+              "length"
+            ],
+            [
+              "kind",
+              "max"
+            ],
+            [
+              "type",
+              "list"
+            ]
+          ]
+        ]
+      ],
+      "name": "nested: too many",
+      "params": {
+        "rooms": [
+          {
+            "name": "a"
+          },
+          {
+            "name": "b"
+          },
+          {
+            "name": "c"
+          },
+          {
+            "name": "d"
+          }
+        ]
+      }
+    },
+    {
+      "changes": {
+        "rooms": [
+          {
+            "name": "a",
+            "size": "s"
+          }
+        ],
+        "tags": []
+      },
+      "definition": "nested",
+      "errors": [],
+      "name": "nested: valid",
+      "params": {
+        "rooms": [
+          {
+            "name": "a",
+            "size": "s"
+          }
+        ],
+        "tags": {
+          "__empty__": ""
+        }
+      }
+    },
+    {
+      "changes": {
+        "colors": [
+          "red"
+        ],
+        "groups": [
+          {
+            "dynamic_form_id": "g1",
+            "label": "Kids",
+            "min": "3"
+          },
+          {
+            "dynamic_form_id": "g2",
+            "label": "Teens"
+          }
+        ],
+        "others": [
+          "green"
+        ],
+        "ranges": [
+          "Kids",
+          "Teens"
+        ],
+        "size": "3"
+      },
+      "definition": "carry",
+      "errors": [
+        [
+          "favorite",
+          "can't be blank",
+          [
+            [
+              "validation",
+              "required"
+            ]
+          ]
+        ]
+      ],
+      "name": "carry: values the sources don't offer are dropped",
+      "params": {
+        "assign": "g3",
+        "colors": [
+          "red",
+          ""
+        ],
+        "favorite": "blue",
+        "groups": [
+          {
+            "dynamic_form_id": "g1",
+            "label": "Kids",
+            "min": "3"
+          },
+          {
+            "dynamic_form_id": "g2",
+            "label": "Teens"
+          }
+        ],
+        "others": [
+          "red",
+          "green"
+        ],
+        "ranges": [
+          "Kids",
+          "Teens",
+          "Adults"
+        ],
+        "size": "3"
+      }
+    },
+    {
+      "changes": {
+        "assign": "g3",
+        "favorite": "blue",
+        "others": [
+          "red"
+        ]
+      },
+      "definition": "carry",
+      "errors": [],
+      "name": "carry: a source not submitted can't be judged",
+      "params": {
+        "assign": "g3",
+        "favorite": "blue",
+        "others": [
+          "red"
+        ]
+      }
+    }
+  ],
+  "definitions": {
+    "carry": {
+      "elements": [
+        {
+          "name": "groups",
+          "templateElements": [
+            {
+              "name": "label",
+              "type": "text"
+            },
+            {
+              "name": "min",
+              "type": "text"
+            }
+          ],
+          "type": "paneldynamic"
+        },
+        {
+          "choiceTextsFromQuestion": "label",
+          "choicesFromQuestion": "groups",
+          "name": "assign",
+          "noChoicesText": "Add a group first",
+          "type": "dropdown"
+        },
+        {
+          "choiceTextsFromQuestion": "{label} from {min}",
+          "choiceValuesFromQuestion": "label",
+          "choicesFromQuestion": "groups",
+          "name": "ranges",
+          "type": "checkbox"
+        },
+        {
+          "choices": [
+            "red",
+            "green",
+            "blue"
+          ],
+          "name": "colors",
+          "type": "checkbox"
+        },
+        {
+          "choicesFromQuestion": "colors",
+          "choicesFromQuestionMode": "selected",
+          "isRequired": true,
+          "name": "favorite",
+          "type": "radiogroup"
+        },
+        {
+          "choicesFromQuestion": "colors",
+          "choicesFromQuestionMode": "unselected",
+          "name": "others",
+          "type": "tagbox"
+        },
+        {
+          "choices": [
+            1,
+            2,
+            {
+              "text": "Three",
+              "value": 3
+            }
+          ],
+          "name": "size",
+          "type": "dropdown"
+        }
+      ]
+    },
+    "conditions": {
+      "elements": [
+        {
+          "choices": [
+            "card",
+            "cash"
+          ],
+          "name": "pay",
+          "type": "radiogroup"
+        },
+        {
+          "isRequired": true,
+          "name": "card_number",
+          "type": "text",
+          "visibleIf": "{pay} = 'card'"
+        },
+        {
+          "name": "reason",
+          "requiredIf": "{pay} = 'cash'",
+          "type": "comment"
+        },
+        {
+          "inputType": "number",
+          "name": "age",
+          "type": "text"
+        },
+        {
+          "name": "id_number",
+          "requiredIf": "{age} >= 18",
+          "type": "text"
+        },
+        {
+          "name": "senior_discount",
+          "type": "boolean",
+          "visibleIf": "{age} > 60"
+        },
+        {
+          "name": "agree",
+          "type": "boolean"
+        },
+        {
+          "isRequired": true,
+          "name": "agreed_on",
+          "type": "text",
+          "visibleIf": "{agree} = true"
+        },
+        {
+          "enableIf": "{pay} notempty",
+          "name": "note",
+          "placeholder": "Anything else?",
+          "type": "text"
+        },
+        {
+          "choices": [
+            "free",
+            "paid"
+          ],
+          "name": "plan",
+          "readOnly": true,
+          "type": "dropdown"
+        },
+        {
+          "choices": [
+            "a",
+            "b"
+          ],
+          "metadata": {
+            "style": "horizontal"
+          },
+          "name": "extras",
+          "readOnly": true,
+          "type": "checkbox"
+        },
+        {
+          "name": "locked",
+          "readOnly": true,
+          "type": "text"
+        },
+        {
+          "isRequired": true,
+          "name": "slider",
+          "type": "slider",
+          "validators": [
+            {
+              "expression": "1",
+              "type": "expression"
+            }
+          ]
+        }
+      ]
+    },
+    "every_rule": {
+      "elements": [
+        {
+          "isRequired": true,
+          "name": "name",
+          "type": "text",
+          "validators": [
+            {
+              "maxLength": 5,
+              "minLength": 2,
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "inputType": "email",
+          "name": "email",
+          "type": "text"
+        },
+        {
+          "inputType": "number",
+          "name": "age",
+          "type": "text",
+          "validators": [
+            {
+              "maxValue": 120,
+              "minValue": 18,
+              "text": "must be an adult",
+              "type": "numeric"
+            }
+          ]
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "validators": [
+            {
+              "regex": "^[A-Z]{3}$",
+              "text": "must be three capital letters",
+              "type": "regex"
+            }
+          ]
+        },
+        {
+          "name": "contact",
+          "type": "text",
+          "validators": [
+            {
+              "text": "must be an email",
+              "type": "email"
+            }
+          ]
+        },
+        {
+          "name": "about",
+          "type": "comment",
+          "validators": [
+            {
+              "maxLength": 10,
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "choices": [
+            "red",
+            {
+              "text": "Blue",
+              "value": "b"
+            }
+          ],
+          "name": "color",
+          "type": "dropdown"
+        },
+        {
+          "choices": [
+            "s",
+            "m",
+            "l"
+          ],
+          "name": "size",
+          "type": "radiogroup"
+        },
+        {
+          "choices": [
+            "a",
+            "b"
+          ],
+          "isRequired": true,
+          "name": "tags",
+          "type": "checkbox"
+        },
+        {
+          "choices": [
+            "x",
+            "y"
+          ],
+          "name": "labels",
+          "type": "tagbox",
+          "validators": [
+            {
+              "maxLength": 1,
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "isRequired": true,
+          "name": "agree",
+          "type": "boolean"
+        },
+        {
+          "name": "score",
+          "rateMax": 3,
+          "rateMin": 1,
+          "type": "rating"
+        },
+        {
+          "name": "stars",
+          "type": "rating"
+        },
+        {
+          "name": "steps",
+          "rateStep": 2,
+          "type": "rating"
+        }
+      ]
+    },
+    "lifecycle": {
+      "elements": [
+        {
+          "defaultValue": "Ada",
+          "isRequired": true,
+          "name": "name",
+          "type": "text"
+        },
+        {
+          "name": "more",
+          "title": "More",
+          "type": "boolean"
+        },
+        {
+          "name": "extra",
+          "type": "text",
+          "visibleIf": "{more} = true"
+        },
+        {
+          "defaultPanelValue": {
+            "size": "m"
+          },
+          "maxPanelCount": 2,
+          "minPanelCount": 1,
+          "name": "rooms",
+          "panelCount": 1,
+          "templateElements": [
+            {
+              "defaultValue": "Room",
+              "isRequired": true,
+              "name": "label",
+              "type": "text"
+            },
+            {
+              "choices": [
+                "s",
+                "m"
+              ],
+              "name": "size",
+              "type": "dropdown"
+            }
+          ],
+          "templateTitle": "Room {panelIndex}",
+          "type": "paneldynamic"
+        }
+      ]
+    },
+    "nested": {
+      "elements": [
+        {
+          "addPanelText": "Add a room",
+          "confirmDelete": true,
+          "generateIds": false,
+          "isRequired": true,
+          "keyName": "name",
+          "maxPanelCount": 3,
+          "minPanelCount": 1,
+          "name": "rooms",
+          "noEntriesText": "No rooms yet",
+          "removePanelText": "Remove room",
+          "templateElements": [
+            {
+              "isRequired": true,
+              "name": "name",
+              "type": "text"
+            },
+            {
+              "choices": [
+                "s",
+                "m",
+                "l"
+              ],
+              "name": "size",
+              "type": "dropdown"
+            },
+            {
+              "isRequired": true,
+              "name": "kind",
+              "type": "text",
+              "visibleIf": "{panel.size} = 'l'"
+            }
+          ],
+          "templateTitle": "Room {panelIndex}",
+          "title": "Rooms",
+          "type": "paneldynamic"
+        },
+        {
+          "name": "tags",
+          "templateElements": [
+            {
+              "name": "label",
+              "type": "text"
+            }
+          ],
+          "type": "paneldynamic"
+        }
+      ]
+    },
+    "pages": {
+      "pages": [
+        {
+          "elements": [
+            {
+              "isRequired": true,
+              "name": "a",
+              "type": "text"
+            }
+          ],
+          "name": "one",
+          "title": "Step one"
+        },
+        {
+          "elements": [
+            {
+              "description": "More about B",
+              "name": "b",
+              "title": "B",
+              "type": "boolean"
+            }
+          ],
+          "name": "two"
+        }
+      ]
+    },
+    "panels": {
+      "elements": [
+        {
+          "html": "<p>Tell us about you</p>",
+          "name": "intro",
+          "type": "html"
+        },
+        {
+          "elements": [
+            {
+              "isRequired": true,
+              "name": "first",
+              "type": "text"
+            },
+            {
+              "choices": [
+                "person",
+                "team"
+              ],
+              "metadata": {
+                "style": "horizontal"
+              },
+              "name": "kind",
+              "type": "radiogroup"
+            }
+          ],
+          "groupType": "vertical",
+          "name": "about",
+          "title": "About you",
+          "type": "panel"
+        },
+        {
+          "elements": [
+            {
+              "isRequired": true,
+              "name": "team_name",
+              "type": "text"
+            }
+          ],
+          "name": "team",
+          "title": "Team",
+          "type": "panel",
+          "visibleIf": "{kind} = 'team'"
+        },
+        {
+          "elements": [
+            {
+              "name": "secret",
+              "type": "text"
+            },
+            {
+              "choices": [
+                "1",
+                "2"
+              ],
+              "name": "level",
+              "type": "dropdown"
+            }
+          ],
+          "enableIf": "{first} = 'admin'",
+          "name": "locked_panel",
+          "type": "panel"
+        },
+        {
+          "imageLink": "/logo.png",
+          "imageWidth": "40px",
+          "name": "logo",
+          "type": "image"
+        },
+        {
+          "elements": [
+            {
+              "description": "Optional",
+              "name": "notes",
+              "type": "comment"
+            }
+          ],
+          "name": "notes_panel",
+          "title": "",
+          "type": "panel"
+        }
+      ]
+    },
+    "post_form": {
+      "elements": [
+        {
+          "isRequired": true,
+          "name": "body",
+          "title": "Write a post",
+          "type": "comment",
+          "validators": [
+            {
+              "maxLength": 10000,
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "choices": [],
+          "name": "community_ids",
+          "title": "In these communities",
+          "type": "checkbox"
+        }
+      ]
+    }
+  },
+  "expressions": [
+    {
+      "expected": true,
+      "expression": "{a} = 'x'",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{a} == 'x'",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{a} = \"x\"",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{a} <> 'x'",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{a} != 'x'",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{n} = 5",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{n} = 5.0",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{n} > 4",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{n} >= 5 and {n} <= 5",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{n} < '10'",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{s} > 'b'",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{s} < 10",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{a} empty",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{a} notempty",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{missing} empty",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{list} notempty",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{empty_list} empty",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{blanks} notempty",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{a}",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{missing}",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{list} contains 'b'",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{list} notcontains 'z'",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{a} contains 'x'",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{a} contain ''",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{list} anyof ['z', 'b']",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{list} allof ['a', 'b']",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{list} allof ['a', 'z']",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{list} noneof ['z']",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{a} anyof ['x']",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{missing} anyof ['x']",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{flag} = true",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{flag} = 'true'",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{off} = false",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{missing} = false",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{missing} = true",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{a} = 'x' or {n} = 1",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{a} = 'y' or ({n} = 5 and {s} = 'c')",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{a} = 'x' AND {n} = 5",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{panel.a} = 'x'",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{n} = 1e1",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{neg} < -1.5",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{a} = x",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{a} = 'x",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{a",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{a} = (1)",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{a} = 'x' {b}",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{a} = [1, 2",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{n} = 5,",
+      "params": {
+        "a": "x",
+        "blanks": [
+          ""
+        ],
+        "empty_list": [],
+        "flag": "true",
+        "list": [
+          "a",
+          "b"
+        ],
+        "n": "5",
+        "neg": "-2",
+        "off": "false",
+        "s": "c"
+      }
+    },
+    {
+      "expected": false,
+      "expression": "{agree} notempty",
+      "params": {
+        "agree": false
+      }
+    },
+    {
+      "expected": true,
+      "expression": "{agree} = false",
+      "params": {
+        "agree": false
+      }
+    }
+  ],
+  "flows": [
+    {
+      "data": {},
+      "definition": "lifecycle",
+      "name": "defaults, entries, a hidden field kept, and submits",
+      "outlines": [
+        [
+          "input text f[name]=Ada",
+          "input hidden f[more]=false",
+          "input checkbox f[more]=true",
+          "h3 Rooms",
+          "button Add new",
+          "input hidden f[rooms][__empty__]=",
+          "h4 Room 1",
+          "input hidden f[rooms][0][dynamic_form_id]=<id>",
+          "input text f[rooms][0][label]=Room",
+          "select f[rooms][0][size] [m]",
+          "button Submit"
+        ],
+        [
+          "input text f[name]=Ada",
+          "input hidden f[more]=false",
+          "input checkbox f[more]=true checked",
+          "input text f[extra]=kept",
+          "h3 Rooms",
+          "button Add new",
+          "input hidden f[rooms][__empty__]=",
+          "h4 Room 1",
+          "input hidden f[rooms][0][dynamic_form_id]=<id>",
+          "input text f[rooms][0][label]=Room",
+          "select f[rooms][0][size] [m]",
+          "button Submit"
+        ],
+        [
+          "input text f[name]=Ada",
+          "input hidden f[more]=false",
+          "input checkbox f[more]=true",
+          "h3 Rooms",
+          "button Add new",
+          "input hidden f[rooms][__empty__]=",
+          "h4 Room 1",
+          "input hidden f[rooms][0][dynamic_form_id]=<id>",
+          "input text f[rooms][0][label]=Room",
+          "select f[rooms][0][size] [m]",
+          "button Submit"
+        ],
+        [
+          "input text f[name]=Ada",
+          "input hidden f[more]=false",
+          "input checkbox f[more]=true",
+          "h3 Rooms",
+          "input hidden f[rooms][__empty__]=",
+          "h4 Room 1",
+          "input hidden f[rooms][0][dynamic_form_id]=<id>",
+          "input text f[rooms][0][label]=Room",
+          "select f[rooms][0][size] [m]",
+          "button Remove",
+          "h4 Room 2",
+          "input hidden f[rooms][1][dynamic_form_id]=<id>",
+          "input text f[rooms][1][label]=Room",
+          "select f[rooms][1][size] [m]",
+          "button Remove",
+          "button Submit"
+        ],
+        [
+          "input text f[name]=Ada",
+          "input hidden f[more]=false",
+          "input checkbox f[more]=true",
+          "h3 Rooms",
+          "button Add new",
+          "input hidden f[rooms][__empty__]=",
+          "h4 Room 1",
+          "input hidden f[rooms][0][dynamic_form_id]=<id>",
+          "input text f[rooms][0][label]=Room",
+          "select f[rooms][0][size] [m]",
+          "button Submit"
+        ],
+        [
+          "input text f[name]=",
+          "error can't be blank",
+          "input hidden f[more]=false",
+          "input checkbox f[more]=true",
+          "h3 Rooms",
+          "button Add new",
+          "input hidden f[rooms][__empty__]=",
+          "h4 Room 1",
+          "input hidden f[rooms][0][dynamic_form_id]=<id>",
+          "input text f[rooms][0][label]=Room",
+          "select f[rooms][0][size] [m]",
+          "button Submit",
+          "result invalid"
+        ],
+        [
+          "input text f[name]=",
+          "error can't be blank",
+          "input hidden f[more]=false",
+          "input checkbox f[more]=true checked",
+          "input text f[extra]=kept",
+          "h3 Rooms",
+          "button Add new",
+          "input hidden f[rooms][__empty__]=",
+          "h4 Room 1",
+          "input hidden f[rooms][0][dynamic_form_id]=<id>",
+          "input text f[rooms][0][label]=Room",
+          "select f[rooms][0][size] [m]",
+          "button Submit"
+        ],
+        [
+          "input text f[name]=",
+          "error can't be blank",
+          "input hidden f[more]=false",
+          "input checkbox f[more]=true checked",
+          "input text f[extra]=kept",
+          "h3 Rooms",
+          "button Add new",
+          "input hidden f[rooms][__empty__]=",
+          "h4 Room 1",
+          "input hidden f[rooms][0][dynamic_form_id]=<id>",
+          "input text f[rooms][0][label]=Room",
+          "select f[rooms][0][size] [m]",
+          "button Submit",
+          "result {\"extra\":\"kept\",\"more\":false,\"name\":\"Bea\",\"rooms\":[{\"label\":\"Room\",\"size\":\"m\",\"dynamic_form_id\":\"<id>\"}]}"
+        ]
+      ],
+      "steps": [
+        {
+          "change": {
+            "extra": "kept",
+            "more": "true",
+            "name": "Ada"
+          }
+        },
+        {
+          "change": {
+            "more": "false",
+            "name": "Ada"
+          }
+        },
+        {
+          "add": "rooms"
+        },
+        {
+          "remove": [
+            "rooms",
+            0
+          ]
+        },
+        {
+          "submit": {
+            "more": "false",
+            "name": ""
+          }
+        },
+        {
+          "change": {
+            "more": "true",
+            "name": ""
+          }
+        },
+        {
+          "submit": {
+            "more": "false",
+            "name": "Bea"
+          }
+        }
+      ]
+    },
+    {
+      "data": {
+        "name": "Cy",
+        "owner_id": "o1",
+        "rooms": [
+          {
+            "id": "0194d3b0-0000-7000-8000-000000000001",
+            "label": "Den",
+            "size": "s"
+          }
+        ]
+      },
+      "definition": "lifecycle",
+      "name": "editing a stored record",
+      "outlines": [
+        [
+          "input text f[name]=Cy",
+          "input hidden f[more]=false",
+          "input checkbox f[more]=true",
+          "h3 Rooms",
+          "button Add new",
+          "input hidden f[rooms][__empty__]=",
+          "h4 Room 1",
+          "input hidden f[rooms][0][dynamic_form_id]=<id>",
+          "input text f[rooms][0][label]=Den",
+          "select f[rooms][0][size] [s]",
+          "button Submit"
+        ],
+        [
+          "input text f[name]=Cy",
+          "input hidden f[more]=false",
+          "input checkbox f[more]=true",
+          "h3 Rooms",
+          "button Add new",
+          "input hidden f[rooms][__empty__]=",
+          "h4 Room 1",
+          "input hidden f[rooms][0][dynamic_form_id]=<id>",
+          "input text f[rooms][0][label]=Den",
+          "select f[rooms][0][size] [s]",
+          "button Submit",
+          "result {\"more\":false,\"name\":\"Cy\",\"rooms\":[{\"label\":\"Den\",\"size\":\"s\",\"dynamic_form_id\":\"<id>\"}]}"
+        ]
+      ],
+      "steps": [
+        {
+          "submit": {
+            "name": "Cy"
+          }
+        }
+      ]
+    }
+  ],
+  "views": [
+    {
+      "definition": "conditions",
+      "name": "conditions: untouched",
+      "outline": [
+        "input radio f[pay]=card",
+        "input radio f[pay]=cash",
+        "textarea f[reason]=",
+        "input number f[age]=",
+        "input text f[id_number]=",
+        "input hidden f[agree]=false",
+        "input checkbox f[agree]=true",
+        "input text f[note]= disabled",
+        "select f[plan] [] disabled",
+        "input hidden f[extras][]= disabled",
+        "input checkbox f[extras][]=a disabled",
+        "input checkbox f[extras][]=b disabled",
+        "input text f[locked]= readonly",
+        "button Submit"
+      ],
+      "params": {},
+      "submitted": false
+    },
+    {
+      "definition": "conditions",
+      "name": "conditions: shown, hidden and disabled by the cast values",
+      "outline": [
+        "input radio f[pay]=card checked",
+        "input radio f[pay]=cash",
+        "input text f[card_number]=",
+        "textarea f[reason]=",
+        "input number f[age]=70",
+        "input text f[id_number]=",
+        "input hidden f[agree]=false",
+        "input checkbox f[agree]=true checked",
+        "input text f[agreed_on]=",
+        "input text f[note]=",
+        "select f[plan] [paid] disabled",
+        "input hidden f[plan]=paid",
+        "input hidden f[extras][]= disabled",
+        "input checkbox f[extras][]=a disabled",
+        "input checkbox f[extras][]=b checked disabled",
+        "input hidden f[extras][]=b",
+        "input text f[locked]=L readonly",
+        "button Submit"
+      ],
+      "params": {
+        "age": "70",
+        "agree": "true",
+        "extras": [
+          "b"
+        ],
+        "locked": "L",
+        "pay": "card",
+        "plan": "paid"
+      },
+      "submitted": false
+    },
+    {
+      "definition": "conditions",
+      "name": "conditions: errors once submitted",
+      "outline": [
+        "input radio f[pay]=card checked",
+        "input radio f[pay]=cash",
+        "input text f[card_number]=",
+        "error can't be blank",
+        "textarea f[reason]=",
+        "input number f[age]=",
+        "input text f[id_number]=",
+        "input hidden f[agree]=false",
+        "input checkbox f[agree]=true checked",
+        "input text f[agreed_on]=",
+        "input text f[note]=",
+        "select f[plan] [] disabled",
+        "input hidden f[extras][]= disabled",
+        "input checkbox f[extras][]=a disabled",
+        "input checkbox f[extras][]=b disabled",
+        "input text f[locked]= readonly",
+        "button Submit"
+      ],
+      "params": {
+        "agree": "true",
+        "card_number": "",
+        "pay": "card"
+      },
+      "submitted": true
+    },
+    {
+      "definition": "panels",
+      "name": "panels",
+      "outline": [
+        "p Tell us about you",
+        "h3 About you",
+        "input text f[first]=admin",
+        "input radio f[kind]=person",
+        "input radio f[kind]=team checked",
+        "h3 Team",
+        "input text f[team_name]=",
+        "input text f[secret]=",
+        "select f[level] []",
+        "textarea f[notes]=",
+        "p Optional",
+        "button Submit"
+      ],
+      "params": {
+        "first": "admin",
+        "kind": "team"
+      },
+      "submitted": true
+    },
+    {
+      "definition": "panels",
+      "name": "panels: a disabled group",
+      "outline": [
+        "p Tell us about you",
+        "h3 About you",
+        "input text f[first]=x",
+        "input radio f[kind]=person",
+        "input radio f[kind]=team",
+        "input text f[secret]= disabled",
+        "select f[level] [] disabled",
+        "textarea f[notes]=",
+        "p Optional",
+        "button Submit"
+      ],
+      "params": {
+        "first": "x"
+      },
+      "submitted": false
+    },
+    {
+      "definition": "pages",
+      "name": "pages",
+      "outline": [
+        "h2 Step one",
+        "input text f[a]=",
+        "input hidden f[b]=false",
+        "input checkbox f[b]=true checked",
+        "button Submit"
+      ],
+      "params": {
+        "b": "true"
+      },
+      "submitted": false
+    },
+    {
+      "definition": "nested",
+      "name": "nested: entries, titles and buttons",
+      "outline": [
+        "h3 Rooms*",
+        "button Add a room",
+        "input hidden f[rooms][__empty__]=",
+        "h4 Room 1",
+        "input text f[rooms][0][name]=A",
+        "error value must be unique",
+        "select f[rooms][0][size] [l]",
+        "input text f[rooms][0][kind]=",
+        "button Remove room",
+        "h4 Room 2",
+        "input text f[rooms][1][name]=A",
+        "error value must be unique",
+        "select f[rooms][1][size] []",
+        "button Remove room",
+        "h3 Tags",
+        "button Add new",
+        "input hidden f[tags][__empty__]=",
+        "p No entries yet.",
+        "button Submit"
+      ],
+      "params": {
+        "rooms": [
+          {
+            "name": "A",
+            "size": "l"
+          },
+          {
+            "name": "A"
+          }
+        ]
+      },
+      "submitted": true
+    },
+    {
+      "definition": "nested",
+      "name": "nested: none",
+      "outline": [
+        "h3 Rooms*",
+        "button Add a room",
+        "input hidden f[rooms][__empty__]=",
+        "p No rooms yet",
+        "error should have at least 1 item(s)",
+        "error can't be blank",
+        "h3 Tags",
+        "button Add new",
+        "input hidden f[tags][__empty__]=",
+        "p No entries yet.",
+        "button Submit"
+      ],
+      "params": {
+        "rooms": []
+      },
+      "submitted": true
+    },
+    {
+      "definition": "nested",
+      "name": "nested: at the maximum",
+      "outline": [
+        "h3 Rooms*",
+        "input hidden f[rooms][__empty__]=",
+        "h4 Room 1",
+        "input text f[rooms][0][name]=a",
+        "select f[rooms][0][size] []",
+        "button Remove room",
+        "h4 Room 2",
+        "input text f[rooms][1][name]=b",
+        "select f[rooms][1][size] []",
+        "button Remove room",
+        "h4 Room 3",
+        "input text f[rooms][2][name]=c",
+        "select f[rooms][2][size] []",
+        "button Remove room",
+        "h3 Tags",
+        "button Add new",
+        "input hidden f[tags][__empty__]=",
+        "p No entries yet.",
+        "button Submit"
+      ],
+      "params": {
+        "rooms": [
+          {
+            "name": "a"
+          },
+          {
+            "name": "b"
+          },
+          {
+            "name": "c"
+          }
+        ]
+      },
+      "submitted": false
+    },
+    {
+      "definition": "carry",
+      "name": "carry: choices from entries and choices",
+      "outline": [
+        "h3 Groups",
+        "button Add new",
+        "input hidden f[groups][__empty__]=",
+        "input hidden f[groups][0][dynamic_form_id]=g1",
+        "input text f[groups][0][label]=Kids",
+        "input text f[groups][0][min]=3",
+        "button Remove",
+        "input hidden f[groups][1][dynamic_form_id]=g2",
+        "input text f[groups][1][label]=Teens",
+        "input text f[groups][1][min]=",
+        "button Remove",
+        "select f[assign] []",
+        "input hidden f[ranges][]=",
+        "input checkbox f[ranges][]=Kids",
+        "input hidden f[colors][]=",
+        "input checkbox f[colors][]=red checked",
+        "input checkbox f[colors][]=green",
+        "input checkbox f[colors][]=blue checked",
+        "input radio f[favorite]=red checked",
+        "input radio f[favorite]=blue",
+        "select f[others][] []",
+        "select f[size] [2]",
+        "button Submit"
+      ],
+      "params": {
+        "colors": [
+          "red",
+          "blue"
+        ],
+        "favorite": "red",
+        "groups": [
+          {
+            "dynamic_form_id": "g1",
+            "label": "Kids",
+            "min": "3"
+          },
+          {
+            "dynamic_form_id": "g2",
+            "label": "Teens"
+          }
+        ],
+        "size": "2"
+      },
+      "submitted": false
+    },
+    {
+      "definition": "carry",
+      "name": "carry: nothing to choose yet",
+      "outline": [
+        "h3 Groups",
+        "button Add new",
+        "input hidden f[groups][__empty__]=",
+        "p No entries yet.",
+        "p Add a group first",
+        "input hidden f[ranges][]=",
+        "input hidden f[colors][]=",
+        "input checkbox f[colors][]=red",
+        "input checkbox f[colors][]=green",
+        "input checkbox f[colors][]=blue",
+        "select f[others][] []",
+        "select f[size] []",
+        "button Submit"
+      ],
+      "params": {},
+      "submitted": false
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && cargo run -q -p framework_check -- hook 2>/dev/null || true",
+            "timeout": 120,
+            "statusMessage": "Checking framework.toml"
+          }
+        ]
+      }
+    ]
+  }
+}

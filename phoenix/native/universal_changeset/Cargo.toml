@@ -1,0 +1,13 @@
+[package]
+name = "universal_changeset"
+version = "0.1.0"
+edition = "2024"
+description = "The Phoenix app's universal changesets as a NIF. src/lib.rs is written by mix app.rust"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ecto_changeset = { path = "../ecto_changeset" }
+rustler = "0.38"
+serde_json = "1"

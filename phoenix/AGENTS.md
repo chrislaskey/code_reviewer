@@ -1,0 +1,564 @@
+This is a web application written using the Phoenix web framework.
+
+## Project guidelines
+
+- Use `mix check` when you are done with all changes and fix any pending issues
+- Multi-tenancy and offline sync are designed in `docs/design/`. Read `docs/design/build-order.md` before working on app users, communities, posts, or sync, then the phase's "Builds" and "Proves" lists. Decisions at the top of `multi-tenancy.md` and `offline-sync.md` are settled; do not re-open them. Vocabulary: a post is **in** a community and its owner **adds** or **removes** it; never say "share". One deployment is one tenant with one database and one repo, `App.Repo`
+- Schema conventions, set in phase 0 of `docs/design/build-order.md`: primary keys are `{:id, Ecto.UUID, autogenerate: [version: 7]}` with `@foreign_key_type Ecto.UUID` and `:uuid` columns in migrations; every datetime column is `:utc_datetime_usec`, so build values with `DateTime.utc_now()` and never `DateTime.utc_now(:second)`; enumerated columns are strings with `Ecto.Enum`, never a database enum or check constraint; a schema with `deleted_at` is soft-deleted and `App.Data.Context` leaves deleted rows out of every read, so a unique index on such a table is partial, `where: "deleted_at IS NULL"`, except on a join table whose row is revived rather than inserted again (`app_users_communities`, `app_posts_communities`), which keeps a plain one
+- App users, set in phase 1: `users` and `users_tokens` are the accounts and stay on the server; every table the app owns is prefixed `app_`, like `app_posts`, so another product in the same database gets its own prefix. `app_users` is the app's view of a user, same id as `users`, written by `App.Data.Accounts.register_user/1`, and every foreign key of an `app_` table points at it, never at `users`. A data context is `use App.Data.Context, schema: ...` and takes no scope, like `Posts.get(id)`; flows such as `App.Data.Posting` take the scope first and check the user against it
+- Posts, set in phase 3: `App.Data.Posting` writes a post, adds it to and removes it from communities, deletes it, and reads a feed; `App.Data.Memberships` joins, leaves (cascading to the member's posts there) and rejoins. Flows over several contexts live in their own module under `lib/app/data/<flow>/`, like these and `App.Data.Accounts`; a data context under `lib/app/data/schemas` defines only the `App.Data.Context` callbacks, such as a custom `filter/3`
+- Sync, set in phase 4: `App.Data.Sync` is the sync server (pull, push, backfill) behind `App.Web.SyncController` at `/sync/*` with the API token as a bearer token. A synced schema says `use App.Data.Synced`, carries `updated_at`, `last_synced_at`, `deleted_at` and `deleted_by_id`, sets `last_synced_at` in every changeset, and its context has a `visible_to: scope` filter that says which rows a user receives; add new synced tables to `App.Data.Sync.tables/0` in dependency order. Posts and communities are last write wins on `updated_at`; memberships and `app_posts_communities` rows are server-wins and go through the flows. Test sync flows with `App.SyncClient` in `test/support`, a simulated device
+- Client migrations, set in phase 5: `priv/client_migrations/*.sql` are the migrations as the SQLite statements the adapter ran, for the synced tables only, written by `mix app.migrations` from `App.ClientMigrations`. **Always** run `mix app.migrations` after adding or changing a migration under `priv/repo/migrations` and commit the files; `mix test` fails while one is missing or stale. **Never** edit a `.sql` file there. `priv/client_migrations/README.md` says how clients apply them
+- Lifecycle, set in phase 7: nothing is hard-deleted by request. A data context's `delete/2`, `delete_by/2` and `delete_many/1` soft-delete a schema with `deleted_at` (pass `deleted_by_id:`); `hard: true` deletes for good and is only for admin tools and the purge. `App.Data.Accounts.delete_user/1` soft-deletes the account and its app user row, leaves every community and deletes the user's posts, in one transaction; `App.Data.Purge` (`mix app.purge`, `App.Release.purge/0`, run on a schedule) hard-deletes tombstones older than 90 days, children first, and records the purge horizon in `app_purges`, which `App.Data.Sync.pull/2` uses to tell a stale client to resync from nothing
+- Use the already included and available `:req` (`Req`) library for HTTP requests, **avoid** `:httpoison`, `:tesla`, and `:httpc`. Req is included by default and is the preferred HTTP client for Phoenix apps
+
+### Websocket API
+
+- Requests to `/api` are named `<domain>.<resource>.<action>`, like `auth.token.update`. Every request has all three parts
+  - The domain is the part of the product the request belongs to, like `auth` or `settings`
+  - The resource is plural, unless the domain only ever has one of it, like the connection's token in `auth`
+  - The action is `get`, `list`, `create`, `update` or `delete`
+- `App.Router.Api` routes each request to a handler module named after its domain and resource, like `App.Web.Api.Auth.Token` in `lib/app/web/api/auth/token.ex`. Add new requests there, not in `App.Web.ApiChannel`
+
+### Code generators
+
+- Code generators live in `priv/code_generators`, one Mix task per file. **Always** run the matching generator instead of writing the code by hand, then edit what it wrote:
+  - `mix app.gen.live Dashboard /dashboard` for a new page: the LiveView, its route and its test
+  - `mix app.gen.component card` for a new function component in `CoreComponents`
+- Each file's moduledoc says when to use it and what it writes. Read it with `mix help app.gen.live` before running one for the first time
+- Pass `--yes` to write without a confirmation prompt, or `--dry-run` to see the changes without writing them
+- A generator refuses to overwrite and changes nothing when the module or function already exists. Treat that as a sign the code exists, not as something to work around
+- To add a generator, follow `priv/code_generators/README.md`
+
+### Svelte mirrors of function components
+
+- A function component marked `@universal_component true` has a generated `<PascalName>.svelte` copy in the same folder, used by the desktop and mobile apps. The web app keeps rendering the HEEx
+- **Always** run `mix app.svelte` after changing a marked component, and commit the `.svelte` file with it. `mix test` fails while a file is out of date with its component
+- **Never** edit a generated `.svelte` file instead of its component. When the generator can't mirror a template, or mirrors it wrong, edit the `.svelte` file by hand to match and run `mix app.svelte --accept PATH`
+- A marked component is generated when its whole body is one `~H` template using the HEEx listed in `priv/svelte/README.md`. `mix app.svelte` reports anything else in the template with its file and line
+- A marked component with logic before its template or more than one clause, like `button/1`, has a `.svelte` file written by hand instead. After changing the component, update that file to match and run `mix app.svelte --accept PATH`
+- `phx-click`, `phx-submit` and `phx-change` become `emit(name, payload, event)` calls, which each app handles itself. `phx-click={JS.dispatch(...)}` dispatches the same DOM event LiveView would. Other `phx-*` attributes and `JS` commands aren't supported
+- Read `mix help app.svelte` before marking a component for the first time
+
+### Universal changesets
+
+- A changeset function marked `@universal_changeset true`, in a schema that says `use App.Data.UniversalChangeset`, has a generated `<schema>.rs` next to it, the function written as Rust. The desktop and mobile apps compile it in to validate a record before saving it locally, and this app runs the same Rust: the Ecto pipeline stays in the source as the template the Rust is written from, and runs for the typed changes, while the errors come from the Rust. `App.Data.Post.changeset/3` is the example
+- **Always** run `mix app.rust` after changing a marked function, and commit the `.rs` file, `lib/app/data/universal_changeset/native.ex` and `native/universal_changeset/src/lib.rs` with it. `mix test` fails while a file is out of date with its function
+- **Never** edit a generated `.rs` file, the loader or the NIF crate's `lib.rs`. Change the function and run `mix app.rust`
+- A marked function is a pipeline of `cast/3`, `validate_*` with literal arguments, `unique_constraint/3` and `put_change/3`, piping into helpers that are such pipelines too. `mix app.rust` reports anything else with its file and line, so a function with logic of its own, such as `App.Data.User.email_changeset/3`, is not marked
+- A field the function puts, like the owner from the scope, is data to the Rust: it may be required but not otherwise validated, and the other apps pass it in `data`. The desktop app's `write_post` does
+- Every marked function has cases in `test/app/data/universal_changeset_test.exs`, which runs each through the template and the Rust and fails on any difference. Add a case for every rule you add
+- The first `@universal_changeset true` makes the Rust toolchain a requirement of every environment that compiles the app, the Dockerfile included; with none, nothing needs it. Read `mix help app.rust` and `priv/rust/README.md` before marking a function for the first time
+
+### Dynamic forms
+
+- A form is a function in its LiveView that returns the definition, the `dynamic_form` library's JSON as an Elixir map, rendered with `<DynamicForm.form instance={...} components={App.Web.CoreComponents}>`. Forms live beside the LiveView that uses them, never in a central module. `App.Web.PostsLive.post_form/0` is the example. Read `docs/design/dynamic-forms.md` first
+- A form the desktop app shows too is marked `@universal_dynamic_form true`: a public function with no arguments returning JSON data only. `mix app.dynamic_forms` writes it as `<function>.dynamic_form.json` next to the module, which the desktop app includes by path and validates with `native/dynamic_form`, which follows the library's rules. Fill in what changes at runtime, like choices, after calling it, with `App.Web.DynamicForms.put_choices/3`
+- **Always** run `mix app.dynamic_forms` after changing a marked form, and commit the `.json` file with it. **Never** edit the file. `mix test` fails while a file is out of date with its function
+- The Rust supports what the library reads in data mode except `file` questions, and copies the library's behavior, quirks included. A definition the library would crash on, or one with a `file` question, fails to load in the desktop app
+- The library renders its questions with `CoreComponents.input/1`, as the app's own forms do. `input/1` turns a form field into plain props for the `@universal_component` form field components, like `text_input/1`, which hold the markup. Run `mix app.svelte` after changing them
+- `native/dynamic_form/tests/cases.json` is what the library does: errors, conditions, rendered outlines and lifecycle flows, checked by `mix test` and `cargo test`. Add a case for any behavior the Rust gains: write the input, run `mix test --only record_cases` to fill in the library's result, read it, then make `cargo test` pass
+
+### Phoenix v1.8 guidelines
+
+- **Always** begin your LiveView templates with `<Layouts.app flash={@flash} ...>` which wraps all inner content
+- The `MyApp.Web.Layouts` module is aliased in the `my_app_web.ex` file, so you can use it without needing to alias it again
+- Anytime you run into errors with no `current_scope` assign:
+  - You failed to follow the Authenticated Routes guidelines, or you failed to pass `current_scope` to `<Layouts.app>`
+  - **Always** fix the `current_scope` error by moving your routes to the proper `live_session` and ensure you pass `current_scope` as needed
+- Phoenix v1.8 moved the `<.flash_group>` component to the `Layouts` module. You are **forbidden** from calling `<.flash_group>` outside of the `layouts.ex` module
+- Out of the box, `core_components.ex` imports an `<.icon name="hero-x-mark" class="w-5 h-5"/>` component for hero icons. **Always** use the `<.icon>` component for icons, **never** use `Heroicons` modules or similar
+- **Always** use the imported `<.input>` component for form inputs from `core_components.ex` when available. `<.input>` is imported and using it will save steps and prevent errors
+- If you override the default input classes (`<.input class="myclass px-2 py-1 rounded-lg">)`) class with your own values, no default classes are inherited, so your
+custom classes must fully style the input
+
+### JS and CSS guidelines
+
+- **Use Tailwind CSS classes and custom CSS rules** to create polished, responsive, and visually stunning interfaces.
+- Tailwindcss v4 **no longer needs a tailwind.config.js** and uses a new import syntax in `app.css`:
+
+      @import "tailwindcss" source(none);
+      @source "../css";
+      @source "../js";
+      @source "../../lib/my_app_web";
+
+- **Always use and maintain this import syntax** in the app.css file for projects generated with `phx.new`
+- **Never** use `@apply` when writing raw css
+- **Always** manually write your own tailwind-based components instead of using daisyUI for a unique, world-class design
+- Out of the box **only the app.js and app.css bundles are supported**
+  - You cannot reference an external vendor'd script `src` or link `href` in the layouts
+  - You must import the vendor deps into app.js and app.css to use them
+  - **Never write inline <script>custom js</script> tags within templates**
+
+### UI/UX & design guidelines
+
+- **Produce world-class UI designs** with a focus on usability, aesthetics, and modern design principles
+- Implement **subtle micro-interactions** (e.g., button hover effects, and smooth transitions)
+- Ensure **clean typography, spacing, and layout balance** for a refined, premium look
+- Focus on **delightful details** like hover effects, loading states, and smooth page transitions
+
+
+<!-- phoenix-gen-auth-start -->
+## Authentication
+
+- **Always** handle authentication flow at the router level with proper redirects
+- **Always** be mindful of where to place routes. `phx.gen.auth` creates multiple router plugs and `live_session` scopes:
+  - A plug `:fetch_current_scope_for_user` that is included in the default browser pipeline
+  - A plug `:require_authenticated_user` that redirects to the log in page when the user is not authenticated
+  - A `live_session :current_user` scope - for routes that need the current user but don't require authentication, similar to `:fetch_current_scope_for_user`
+  - A `live_session :require_authenticated_user` scope - for routes that require authentication, similar to the plug with the same name
+  - In both cases, a `@current_scope` is assigned to the Plug connection and LiveView socket
+  - A plug `redirect_if_user_is_authenticated` that redirects to a default path in case the user is authenticated - useful for a registration page that should only be shown to unauthenticated users
+- **Always let the user know in which router scopes, `live_session`, and pipeline you are placing the route, AND SAY WHY**
+- `phx.gen.auth` assigns the `current_scope` assign - it **does not assign a `current_user` assign**
+- Always pass the assign `current_scope` to context modules as first argument. When performing queries, use `current_scope.user` to filter the query results
+- To derive/access `current_user` in templates, **always use the `@current_scope.user`**, never use **`@current_user`** in templates or LiveViews
+- **Never** duplicate `live_session` names. A `live_session :current_user` can only be defined __once__ in the router, so all routes for the `live_session :current_user`  must be grouped in a single block
+- Anytime you hit `current_scope` errors or the logged in session isn't displaying the right content, **always double check the router and ensure you are using the correct plug and `live_session` as described below**
+
+### Routes that require authentication
+
+LiveViews that require login should **always be placed inside the __existing__ `live_session :require_authenticated_user` block**:
+
+    scope "/", App.Web do
+      pipe_through [:browser, :require_authenticated_user]
+
+      live_session :require_authenticated_user,
+        on_mount: [{App.Web.UserAuth, :require_authenticated}] do
+        # phx.gen.auth generated routes
+        live "/users/settings", UserLive.Settings, :edit
+        live "/users/settings/confirm-email/:token", UserLive.Settings, :confirm_email
+        # our own routes that require logged in user
+        live "/", MyLiveThatRequiresAuth, :index
+      end
+    end
+
+Controller routes must be placed in a scope that sets the `:require_authenticated_user` plug:
+
+    scope "/", App.Web do
+      pipe_through [:browser, :require_authenticated_user]
+
+      get "/", MyControllerThatRequiresAuth, :index
+    end
+
+### Routes that work with or without authentication
+
+LiveViews that can work with or without authentication, **always use the __existing__ `:current_user` scope**, ie:
+
+    scope "/", MyApp.Web do
+      pipe_through [:browser]
+
+      live_session :current_user,
+        on_mount: [{App.Web.UserAuth, :mount_current_scope}] do
+        # our own routes that work with or without authentication
+        live "/", PublicLive
+      end
+    end
+
+Controllers automatically have the `current_scope` available if they use the `:browser` pipeline.
+
+<!-- phoenix-gen-auth-end -->
+
+<!-- usage-rules-start -->
+
+<!-- phoenix:elixir-start -->
+## Elixir guidelines
+
+- Elixir lists **do not support index based access via the access syntax**
+
+  **Never do this (invalid)**:
+
+      i = 0
+      mylist = ["blue", "green"]
+      mylist[i]
+
+  Instead, **always** use `Enum.at`, pattern matching, or `List` for index based list access, ie:
+
+      i = 0
+      mylist = ["blue", "green"]
+      Enum.at(mylist, i)
+
+- Elixir variables are immutable, but can be rebound, so for block expressions like `if`, `case`, `cond`, etc
+  you *must* bind the result of the expression to a variable if you want to use it and you CANNOT rebind the result inside the expression, ie:
+
+      # INVALID: we are rebinding inside the `if` and the result never gets assigned
+      if connected?(socket) do
+        socket = assign(socket, :val, val)
+      end
+
+      # VALID: we rebind the result of the `if` to a new variable
+      socket =
+        if connected?(socket) do
+          assign(socket, :val, val)
+        end
+
+- **Never** nest multiple modules in the same file as it can cause cyclic dependencies and compilation errors
+- **Never** use map access syntax (`changeset[:field]`) on structs as they do not implement the Access behaviour by default. For regular structs, you **must** access the fields directly, such as `my_struct.field` or use higher level APIs that are available on the struct if they exist, `Ecto.Changeset.get_field/2` for changesets
+- Elixir's standard library has everything necessary for date and time manipulation. Familiarize yourself with the common `Time`, `Date`, `DateTime`, and `Calendar` interfaces by accessing their documentation as necessary. **Never** install additional dependencies unless asked or for date/time parsing (which you can use the `date_time_parser` package)
+- Don't use `String.to_atom/1` on user input (memory leak risk)
+- Predicate function names should not start with `is_` and should end in a question mark. Names like `is_thing` should be reserved for guards
+- Elixir's builtin OTP primitives like `DynamicSupervisor` and `Registry`, require names in the child spec, such as `{DynamicSupervisor, name: MyApp.MyDynamicSup}`, then you can use `DynamicSupervisor.start_child(MyApp.MyDynamicSup, child_spec)`
+- Use `Task.async_stream(collection, callback, options)` for concurrent enumeration with back-pressure. The majority of times you will want to pass `timeout: :infinity` as option
+
+## Mix guidelines
+
+- Read the docs and options before using tasks (by using `mix help task_name`)
+- To debug test failures, run tests in a specific file with `mix test test/my_test.exs` or run all previously failed tests with `mix test --failed`
+- `mix deps.clean --all` is **almost never needed**. **Avoid** using it unless you have good reason
+
+## Test guidelines
+
+- **Always use `start_supervised!/1`** to start processes in tests as it guarantees cleanup between tests
+- **Avoid** `Process.sleep/1` and `Process.alive?/1` in tests
+  - Instead of sleeping to wait for a process to finish, **always** use `Process.monitor/1` and assert on the DOWN message:
+
+      ref = Process.monitor(pid)
+      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
+
+   - Instead of sleeping to synchronize before the next call, **always** use `_ = :sys.get_state/1` to ensure the process has handled prior messages
+<!-- phoenix:elixir-end -->
+
+<!-- phoenix:phoenix-start -->
+## Phoenix guidelines
+
+- Remember Phoenix router `scope` blocks include an optional alias which is prefixed for all routes within the scope. **Always** be mindful of this when creating routes within a scope to avoid duplicate module prefixes.
+
+- You **never** need to create your own `alias` for route definitions! The `scope` provides the alias, ie:
+
+      scope "/admin", App.Web.Admin do
+        pipe_through :browser
+
+        live "/users", UserLive, :index
+      end
+
+  the UserLive route would point to the `App.Web.Admin.UserLive` module
+
+- `Phoenix.View` no longer is needed or included with Phoenix, don't use it
+<!-- phoenix:phoenix-end -->
+
+<!-- phoenix:ecto-start -->
+## Ecto Guidelines
+
+- **Always** preload Ecto associations in queries when they'll be accessed in templates, ie a message that needs to reference the `message.user.email`
+- Remember `import Ecto.Query` and other supporting modules when you write `seeds.exs`
+- `Ecto.Schema` fields always use the `:string` type, even for `:text`, columns, ie: `field :name, :string`
+- `Ecto.Changeset.validate_number/2` **DOES NOT SUPPORT the `:allow_nil` option**. By default, Ecto validations only run if a change for the given field exists and the change value is not nil, so such as option is never needed
+- You **must** use `Ecto.Changeset.get_field(changeset, :field)` to access changeset fields
+- Fields which are set programmatically, such as `user_id`, must not be listed in `cast` calls or similar for security purposes. Instead they must be explicitly set when creating the struct
+- **Always** invoke `mix ecto.gen.migration migration_name_using_underscores` when generating migration files, so the correct timestamp and conventions are applied
+<!-- phoenix:ecto-end -->
+
+<!-- phoenix:html-start -->
+## Phoenix HTML guidelines
+
+- Phoenix templates **always** use `~H` or .html.heex files (known as HEEx), **never** use `~E`
+- **Always** use the imported `Phoenix.Component.form/1` and `Phoenix.Component.inputs_for/1` function to build forms. **Never** use `Phoenix.HTML.form_for` or `Phoenix.HTML.inputs_for` as they are outdated
+- When building forms **always** use the already imported `Phoenix.Component.to_form/2` (`assign(socket, form: to_form(...))` and `<.form for={@form} id="msg-form">`), then access those forms in the template via `@form[:field]`
+- **Always** add unique DOM IDs to key elements (like forms, buttons, etc) when writing templates, these IDs can later be used in tests (`<.form for={@form} id="product-form">`)
+- For "app wide" template imports, you can import/alias into the `my_app_web.ex`'s `html_helpers` block, so they will be available to all LiveViews, LiveComponent's, and all modules that do `use MyApp.Web, :html` (replace "my_app" by the actual app name)
+
+- Elixir supports `if/else` but **does NOT support `if/else if` or `if/elsif`**. **Never use `else if` or `elseif` in Elixir**, **always** use `cond` or `case` for multiple conditionals.
+
+  **Never do this (invalid)**:
+
+      <%= if condition do %>
+        ...
+      <% else if other_condition %>
+        ...
+      <% end %>
+
+  Instead **always** do this:
+
+      <%= cond do %>
+        <% condition -> %>
+          ...
+        <% condition2 -> %>
+          ...
+        <% true -> %>
+          ...
+      <% end %>
+
+- HEEx require special tag annotation if you want to insert literal curly's like `{` or `}`. If you want to show a textual code snippet on the page in a `<pre>` or `<code>` block you *must* annotate the parent tag with `phx-no-curly-interpolation`:
+
+      <code phx-no-curly-interpolation>
+        let obj = {key: "val"}
+      </code>
+
+  Within `phx-no-curly-interpolation` annotated tags, you can use `{` and `}` without escaping them, and dynamic Elixir expressions can still be used with `<%= ... %>` syntax
+
+- HEEx class attrs support lists, but you must **always** use list `[...]` syntax. You can use the class list syntax to conditionally add classes, **always do this for multiple class values**:
+
+      <a class={[
+        "px-2 text-white",
+        @some_flag && "py-5",
+        if(@other_condition, do: "border-red-500", else: "border-blue-100"),
+        ...
+      ]}>Text</a>
+
+  and **always** wrap `if`'s inside `{...}` expressions with parens, like done above (`if(@other_condition, do: "...", else: "...")`)
+
+  and **never** do this, since it's invalid (note the missing `[` and `]`):
+
+      <a class={
+        "px-2 text-white",
+        @some_flag && "py-5"
+      }> ...
+      => Raises compile syntax error on invalid HEEx attr syntax
+
+- **Never** use `<% Enum.each %>` or non-for comprehensions for generating template content, instead **always** use `<%= for item <- @collection do %>`
+- HEEx HTML comments use `<%!-- comment --%>`. **Always** use the HEEx HTML comment syntax for template comments (`<%!-- comment --%>`)
+- HEEx allows interpolation via `{...}` and `<%= ... %>`, but the `<%= %>` **only** works within tag bodies. **Always** use the `{...}` syntax for interpolation within tag attributes, and for interpolation of values within tag bodies. **Always** interpolate block constructs (if, cond, case, for) within tag bodies using `<%= ... %>`.
+
+  **Always** do this:
+
+      <div id={@id}>
+        {@my_assign}
+        <%= if @some_block_condition do %>
+          {@another_assign}
+        <% end %>
+      </div>
+
+  and **Never** do this – the program will terminate with a syntax error:
+
+      <%!-- THIS IS INVALID NEVER EVER DO THIS --%>
+      <div id="<%= @invalid_interpolation %>">
+        {if @invalid_block_construct do}
+        {end}
+      </div>
+<!-- phoenix:html-end -->
+
+<!-- phoenix:liveview-start -->
+## Phoenix LiveView guidelines
+
+- **Never** use the deprecated `live_redirect` and `live_patch` functions, instead **always** use the `<.link navigate={href}>` and  `<.link patch={href}>` in templates, and `push_navigate` and `push_patch` functions LiveViews
+- **Avoid LiveComponent's** unless you have a strong, specific need for them
+- LiveViews should be named like `App.Web.WeatherLive`, with a `Live` suffix. When you go to add LiveView routes to the router, the default `:browser` scope is **already aliased** with the `App.Web` module, so you can just do `live "/weather", WeatherLive`
+
+### LiveView streams
+
+- **Always** use LiveView streams for collections for assigning regular lists to avoid memory ballooning and runtime termination with the following operations:
+  - basic append of N items - `stream(socket, :messages, [new_msg])`
+  - resetting stream with new items - `stream(socket, :messages, [new_msg], reset: true)` (e.g. for filtering items)
+  - prepend to stream - `stream(socket, :messages, [new_msg], at: -1)`
+  - deleting items - `stream_delete(socket, :messages, msg)`
+
+- When using the `stream/3` interfaces in the LiveView, the LiveView template must 1) always set `phx-update="stream"` on the parent element, with a DOM id on the parent element like `id="messages"` and 2) consume the `@streams.stream_name` collection and use the id as the DOM id for each child. For a call like `stream(socket, :messages, [new_msg])` in the LiveView, the template would be:
+
+      <div id="messages" phx-update="stream">
+        <div :for={{id, msg} <- @streams.messages} id={id}>
+          {msg.text}
+        </div>
+      </div>
+
+- LiveView streams are *not* enumerable, so you cannot use `Enum.filter/2` or `Enum.reject/2` on them. Instead, if you want to filter, prune, or refresh a list of items on the UI, you **must refetch the data and re-stream the entire stream collection, passing reset: true**:
+
+      def handle_event("filter", %{"filter" => filter}, socket) do
+        # re-fetch the messages based on the filter
+        messages = list_messages(filter)
+
+        {:noreply,
+         socket
+         |> assign(:messages_empty?, messages == [])
+         # reset the stream with the new messages
+         |> stream(:messages, messages, reset: true)}
+      end
+
+- LiveView streams *do not support counting or empty states*. If you need to display a count, you must track it using a separate assign. For empty states, you can use Tailwind classes:
+
+      <div id="tasks" phx-update="stream">
+        <div class="hidden only:block">No tasks yet</div>
+        <div :for={{id, task} <- @streams.tasks} id={id}>
+          {task.name}
+        </div>
+      </div>
+
+  The above only works if the empty state is the only HTML block alongside the stream for-comprehension.
+
+- When updating an assign that should change content inside any streamed item(s), you MUST re-stream the items
+  along with the updated assign:
+
+      def handle_event("edit_message", %{"message_id" => message_id}, socket) do
+        message = Chat.get_message!(message_id)
+        edit_form = to_form(Chat.change_message(message, %{content: message.content}))
+
+        # re-insert message so @editing_message_id toggle logic takes effect for that stream item
+        {:noreply,
+         socket
+         |> stream_insert(:messages, message)
+         |> assign(:editing_message_id, String.to_integer(message_id))
+         |> assign(:edit_form, edit_form)}
+      end
+
+  And in the template:
+
+      <div id="messages" phx-update="stream">
+        <div :for={{id, message} <- @streams.messages} id={id} class="flex group">
+          {message.username}
+          <%= if @editing_message_id == message.id do %>
+            <%!-- Edit mode --%>
+            <.form for={@edit_form} id="edit-form-#{message.id}" phx-submit="save_edit">
+              ...
+            </.form>
+          <% end %>
+        </div>
+      </div>
+
+- **Never** use the deprecated `phx-update="append"` or `phx-update="prepend"` for collections
+
+### LiveView JavaScript interop
+
+- Remember anytime you use `phx-hook="MyHook"` and that JS hook manages its own DOM, you **must** also set the `phx-update="ignore"` attribute
+- **Always** provide an unique DOM id alongside `phx-hook` otherwise a compiler error will be raised
+
+LiveView hooks come in two flavors, 1) colocated js hooks for "inline" scripts defined inside HEEx,
+and 2) external `phx-hook` annotations where JavaScript object literals are defined and passed to the `LiveSocket` constructor.
+
+#### Inline colocated js hooks
+
+**Never** write raw embedded `<script>` tags in heex as they are incompatible with LiveView.
+Instead, **always use a colocated js hook script tag (`:type={Phoenix.LiveView.ColocatedHook}`)
+when writing scripts inside the template**:
+
+    <input type="text" name="user[phone_number]" id="user-phone-number" phx-hook=".PhoneNumber" />
+    <script :type={Phoenix.LiveView.ColocatedHook} name=".PhoneNumber">
+      export default {
+        mounted() {
+          this.el.addEventListener("input", e => {
+            let match = this.el.value.replace(/\D/g, "").match(/^(\d{3})(\d{3})(\d{4})$/)
+            if(match) {
+              this.el.value = `${match[1]}-${match[2]}-${match[3]}`
+            }
+          })
+        }
+      }
+    </script>
+
+- colocated hooks are automatically integrated into the app.js bundle
+- colocated hooks names **MUST ALWAYS** start with a `.` prefix, i.e. `.PhoneNumber`
+
+#### External phx-hook
+
+External JS hooks (`<div id="myhook" phx-hook="MyHook">`) must be placed in `assets/js/` and passed to the
+LiveSocket constructor:
+
+    const MyHook = {
+      mounted() { ... }
+    }
+    let liveSocket = new LiveSocket("/live", Socket, {
+      hooks: { MyHook }
+    });
+
+#### Pushing events between client and server
+
+Use LiveView's `push_event/3` when you need to push events/data to the client for a phx-hook to handle.
+**Always** return or rebind the socket on `push_event/3` when pushing events:
+
+    # re-bind socket so we maintain event state to be pushed
+    socket = push_event(socket, "my_event", %{...})
+
+    # or return the modified socket directly:
+    def handle_event("some_event", _, socket) do
+      {:noreply, push_event(socket, "my_event", %{...})}
+    end
+
+Pushed events can then be picked up in a JS hook with `this.handleEvent`:
+
+    mounted() {
+      this.handleEvent("my_event", data => console.log("from server:", data));
+    }
+
+Clients can also push an event to the server and receive a reply with `this.pushEvent`:
+
+    mounted() {
+      this.el.addEventListener("click", e => {
+        this.pushEvent("my_event", { one: 1 }, reply => console.log("got reply from server:", reply));
+      })
+    }
+
+Where the server handled it via:
+
+    def handle_event("my_event", %{"one" => 1}, socket) do
+      {:reply, %{two: 2}, socket}
+    end
+
+### LiveView tests
+
+- `Phoenix.LiveViewTest` module and `LazyHTML` (included) for making your assertions
+- Form tests are driven by `Phoenix.LiveViewTest`'s `render_submit/2` and `render_change/2` functions
+- Come up with a step-by-step test plan that splits major test cases into small, isolated files. You may start with simpler tests that verify content exists, gradually add interaction tests
+- **Always reference the key element IDs you added in the LiveView templates in your tests** for `Phoenix.LiveViewTest` functions like `element/2`, `has_element/2`, selectors, etc
+- **Never** tests again raw HTML, **always** use `element/2`, `has_element/2`, and similar: `assert has_element?(view, "#my-form")`
+- Instead of relying on testing text content, which can change, favor testing for the presence of key elements
+- Focus on testing outcomes rather than implementation details
+- Be aware that `Phoenix.Component` functions like `<.form>` might produce different HTML than expected. Test against the output HTML structure, not your mental model of what you expect it to be
+- When facing test failures with element selectors, add debug statements to print the actual HTML, but use `LazyHTML` selectors to limit the output, ie:
+
+      html = render(view)
+      document = LazyHTML.from_fragment(html)
+      matches = LazyHTML.filter(document, "your-complex-selector")
+      IO.inspect(matches, label: "Matches")
+
+### Form handling
+
+#### Creating a form from params
+
+If you want to create a form based on `handle_event` params:
+
+    def handle_event("submitted", params, socket) do
+      {:noreply, assign(socket, form: to_form(params))}
+    end
+
+When you pass a map to `to_form/1`, it assumes said map contains the form params, which are expected to have string keys.
+
+You can also specify a name to nest the params:
+
+    def handle_event("submitted", %{"user" => user_params}, socket) do
+      {:noreply, assign(socket, form: to_form(user_params, as: :user))}
+    end
+
+#### Creating a form from changesets
+
+When using changesets, the underlying data, form params, and errors are retrieved from it. The `:as` option is automatically computed too. E.g. if you have a user schema:
+
+    defmodule MyApp.Users.User do
+      use Ecto.Schema
+      ...
+    end
+
+And then you create a changeset that you pass to `to_form`:
+
+    %MyApp.Users.User{}
+    |> Ecto.Changeset.change()
+    |> to_form()
+
+Once the form is submitted, the params will be available under `%{"user" => user_params}`.
+
+In the template, the form form assign can be passed to the `<.form>` function component:
+
+    <.form for={@form} id="todo-form" phx-change="validate" phx-submit="save">
+      <.input field={@form[:field]} type="text" />
+    </.form>
+
+Always give the form an explicit, unique DOM ID, like `id="todo-form"`.
+
+#### Avoiding form errors
+
+**Always** use a form assigned via `to_form/2` in the LiveView, and the `<.input>` component in the template. In the template **always access forms this**:
+
+    <%!-- ALWAYS do this (valid) --%>
+    <.form for={@form} id="my-form">
+      <.input field={@form[:field]} type="text" />
+    </.form>
+
+And **never** do this:
+
+    <%!-- NEVER do this (invalid) --%>
+    <.form for={@changeset} id="my-form">
+      <.input field={@changeset[:field]} type="text" />
+    </.form>
+
+- You are FORBIDDEN from accessing the changeset in the template as it will cause errors
+- **Never** use `<.form let={f} ...>` in the template, instead **always use `<.form for={@form} ...>`**, then drive all form references from the form assign as in `@form[:field]`. The UI should **always** be driven by a `to_form/2` assigned in the LiveView module that is derived from a changeset
+<!-- phoenix:liveview-end -->
+
+<!-- usage-rules-end -->

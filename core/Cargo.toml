@@ -1,23 +1,74 @@
 [package]
-name = "code_reviewer_core"
-version = "0.1.0"
-description = "Code Reviewer's analysis: git comparisons, function changes and call links"
-edition = "2021"
+name = "app_core"
+description = "Starter Pack's application logic, shared by the web server and the Tauri app"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = ["sqlite"]
+# The database each deployment keeps on its own device, and the web server's by default
+sqlite = ["sqlx/sqlite"]
+# The web server's database when it outgrows a file; never in the Tauri app
+postgres = ["sqlx/postgres"]
+# The HTTP transport to the web server's sync endpoints, for the apps; never on the server
+sync-http = ["dep:reqwest"]
+# Sending email through Resend, for the server in production
+mail-resend = ["dep:reqwest", "dep:secrecy"]
+# Uploads straight to S3-style object storage, for the server; never in the Tauri app
+object-storage = ["dep:object_store", "dep:secrecy", "dep:futures-util", "dep:reqwest", "dep:base64"]
+# Taking payments through Stripe, for the server; never in the Tauri app
+stripe = [
+    "dep:async-stripe",
+    "dep:async-stripe-billing",
+    "dep:async-stripe-checkout",
+    "dep:async-stripe-client-core",
+    "dep:async-stripe-core",
+    "dep:async-stripe-product",
+    "dep:async-stripe-shared",
+    "dep:async-stripe-types",
+    "dep:async-stripe-webhook",
+    "dep:futures-util",
+    "dep:secrecy",
+]
+# Selling in the iPhone app through the App Store, for the server; never in the Tauri app
+app-store = ["stripe", "dep:app-store-server-library"]
 
 [dependencies]
-comrak = { version = "0.56", default-features = false }
-globset = "0.4.20"
-indexmap = { version = "2.14.2", features = ["serde"] }
-rayon = "1.12.0"
-regex = "1.13.1"
-serde = { version = "1", features = ["derive"] }
-similar = "3.2.0"
-thiserror = "2"
-toml = { version = "1.1.8", features = ["preserve_order"] }
-tree-sitter = "0.27.1"
-tree-sitter-elixir = "0.3.5"
-tree-sitter-rust = "0.24"
+# Checked 2026-11-12, see docs/design/purchasing-phones.md
+app-store-server-library = { version = "=6.0.2", features = ["ring", "api-client-reqwest"], optional = true }
+argon2 = "0.6"
+# A synced table is a `dyn SyncedTable`, whose async methods need boxed futures
+async-trait = "0.1"
+# A release candidate, pinned exactly: the 1.0 line is the maintained one, see docs/design/purchasing.md
+async-stripe = { version = "=1.0.0-rc.10", default-features = false, features = ["rustls-tls-webpki-roots", "rustls-ring"], optional = true }
+async-stripe-billing = { version = "=1.0.0-rc.10", features = ["deserialize", "subscription", "subscription_schedule", "billing_portal_session"], optional = true }
+async-stripe-checkout = { version = "=1.0.0-rc.10", features = ["deserialize", "checkout_session"], optional = true }
+async-stripe-client-core = { version = "=1.0.0-rc.10", optional = true }
+async-stripe-core = { version = "=1.0.0-rc.10", features = ["deserialize", "customer", "charge"], optional = true }
+async-stripe-product = { version = "=1.0.0-rc.10", features = ["deserialize", "price", "product"], optional = true }
+async-stripe-shared = { version = "=1.0.0-rc.10", features = ["deserialize"], optional = true }
+async-stripe-types = { version = "=1.0.0-rc.10", optional = true }
+async-stripe-webhook = { version = "=1.0.0-rc.10", optional = true }
+base64 = { version = "0.22", optional = true }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
+futures-util = { version = "0.3", default-features = false, optional = true }
+garde = { version = "0.23", features = ["derive"] }
+# Reads the emails' translations, core/translations/<locale>.mo, see helpers::translations
+gettext = "0.4"
+object_store = { version = "0.14", default-features = false, features = ["aws"], optional = true }
+rand = "0.10"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"], optional = true }
+secrecy = { version = "0.10", optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = "0.10"
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "macros", "migrate", "chrono", "json", "uuid"] }
+thiserror = { workspace = true }
+tokio = { version = "1", features = ["rt", "fs", "io-util"] }
+tracing = "0.1"
+url = "2"
+uuid = { version = "1", features = ["v7", "serde"] }
 
 [dev-dependencies]
-serde_json = "1.0.154"
-tempfile = "3.27.0"
+tempfile = "3"
+tokio = { version = "1", features = ["rt", "macros"] }

@@ -1,0 +1,158 @@
+{
+  "appPolicies": {
+    "eula": "",
+    "policies": [
+      {
+        "locale": "en_US",
+        "policyText": "",
+        "policyURL": ""
+      }
+    ]
+  },
+  "identifier": "5A7E2C10",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "49.99",
+      "familyShareable": false,
+      "internalID": "6000000001",
+      "localizations": [
+        {
+          "description": "A license, bought once",
+          "displayName": "License",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "license",
+      "referenceName": "License",
+      "type": "NonConsumable"
+    },
+    {
+      "displayPrice": "4.99",
+      "familyShareable": false,
+      "internalID": "6000000002",
+      "localizations": [
+        {
+          "description": "Credits, bought as often as needed",
+          "displayName": "Credits",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "credits",
+      "referenceName": "Credits",
+      "type": "Consumable"
+    }
+  ],
+  "settings": {
+    "_applicationInternalID": "0000000000",
+    "_developerTeamID": "XXXXXXXXXX",
+    "_disableDialogs": false,
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storeKitErrors": [
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Load Products"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Purchase"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Verification"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "App Store Sync"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Subscription Status"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "App Transaction"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Manage Subscriptions Sheet"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Refund Request Sheet"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Offer Code Redeem Sheet"
+      }
+    ],
+    "_storefront": "USA"
+  },
+  "subscriptionGroups": [
+    {
+      "id": "6000000010",
+      "localizations": [],
+      "name": "Single user subscription",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "99.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "6000000011",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Single user subscription",
+              "displayName": "Single user subscription, yearly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "single_user_yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Single user subscription, yearly",
+          "subscriptionGroupID": "6000000010",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "9.99",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "6000000012",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Single user subscription",
+              "displayName": "Single user subscription, monthly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "single_user_monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Single user subscription, monthly",
+          "subscriptionGroupID": "6000000010",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 4,
+    "minor": 0
+  }
+}

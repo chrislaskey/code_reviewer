@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+#
+# Keep an app in step with the template it was copied from
+#
+# Run `bin/framework --help` for the commands and what each one does.
+
+set -euo pipefail
+
+remote="template"
+branch="main"
+
+help() {
+  cat <<EOF
+Keep an app in step with the template it was copied from, the git remote
+named "$remote". See docs/design/template-and-apps.md and
+docs/framework-changes.md. Run it from the app's checkout.
+
+Usage: $0 COMMAND
+
+Commands:
+  update             Fetch $remote/$branch and merge it into this branch, then
+                     check the template's files against framework.lock. Where
+                     the app deleted an example the template changed, the
+                     deletion stays. Any other conflict is left to resolve by
+                     hand, then \`git commit\` and \`$0 check\`.
+
+  contribute         List this branch's commits since $remote/$branch that touch
+                     framework files or start with "template:": the changes
+                     worth sending back.
+
+  contribute SHA...  Cherry-pick those commits onto a new branch from
+                     $remote/$branch, in a worktree of its own beside this
+                     checkout, ready to push to $remote.
+
+  check              Check the template's files against framework.lock.
+
+  help               Show this help. Also -h and --help.
+
+The app needs the remote once:
+  git remote add $remote git@github.com:chrislaskey/starter_pack.git
+EOF
+}
+
+die() {
+  echo "error: $*" >&2
+  exit 1
+}
+
+require_remote() {
+  git remote get-url "$remote" >/dev/null 2>&1 \
+    || die "no \"$remote\" remote; add it with: git remote add $remote <url of the template>"
+}
+
+require_template_branch() {
+  git rev-parse --verify -q "$remote/$branch" >/dev/null \
+    || die "no $remote/$branch; is the template's branch named $branch?"
+}
+
+require_clean_tree() {
+  [[ -z "$(git status --porcelain)" ]] \
+    || die "the working tree has changes; commit or set them aside first"
+}
+
+# The framework_check binary, built once, so each path is not a cargo run
+framework_check() {
+  cargo build -q -p framework_check
+  "${CARGO_TARGET_DIR:-$(git rev-parse --show-toplevel)/target}/debug/framework_check" "$@"
+}
+
+check() {
+  framework_check check
+}
+
+update() {
+  require_remote
+  require_clean_tree
+  git fetch "$remote"
+  require_template_branch
+  if git merge --no-edit "$remote/$branch"; then
+    check
+    return
+  fi
+
+  # Deleted here, changed in the template: an example the app removed
+  local deleted_here
+  deleted_here="$(git status --porcelain | awk '$1 == "DU" { print $2 }')"
+  if [[ -n "$deleted_here" ]]; then
+    while read -r kind path; do
+      if [[ "$kind" == "example" ]]; then
+        git rm -q -- "$path"
+        echo "kept the deletion of the example $path"
+      fi
+    done < <(framework_check classify $deleted_here)
+  fi
+
+  if [[ -n "$(git diff --name-only --diff-filter=U)" ]]; then
+    echo
+    echo "These still conflict; resolve them, then \`git commit\` and \`$0 check\`:"
+    git diff --name-only --diff-filter=U | sed 's/^/  /'
+    exit 1
+  fi
+  git commit --no-edit
+  check
+}
+
+# This branch's commits since the template that touch its files
+contributions() {
+  local sha subject paths kinds
+  while read -r sha subject; do
+    paths="$(git diff-tree --no-commit-id --name-only -r "$sha")"
+    kinds=""
+    if [[ -n "$paths" ]]; then
+      # shellcheck disable=SC2086
+      kinds="$(framework_check classify $paths | awk '$1 == "framework" { print $2 }')"
+    fi
+    if [[ "$subject" == template:* || -n "$kinds" ]]; then
+      echo "$sha $subject"
+      if [[ -n "$kinds" ]]; then
+        echo "$kinds" | sed 's/^/    /'
+      fi
+    fi
+  done < <(git log --reverse --format='%h %s' "$remote/$branch..HEAD")
+}
+
+contribute() {
+  require_remote
+  git fetch -q "$remote"
+  require_template_branch
+  if [[ $# -eq 0 ]]; then
+    local listed
+    listed="$(contributions)"
+    if [[ -z "$listed" ]]; then
+      echo "No commit since $remote/$branch touches the template's files."
+      return
+    fi
+    echo "Commits worth sending to $remote, with the framework files each touches:"
+    echo "$listed"
+    echo
+    echo "Send some with: $0 contribute SHA..."
+    return
+  fi
+
+  local root name folder
+  root="$(git rev-parse --show-toplevel)"
+  name="contribution-$(date +%Y%m%d-%H%M%S)"
+  folder="$(dirname "$root")/$(basename "$root")-$name"
+  git worktree add -q -b "$name" "$folder" "$remote/$branch"
+  if ! git -C "$folder" cherry-pick "$@"; then
+    echo
+    echo "The cherry-pick stopped on a conflict in $folder;"
+    echo "resolve it there and run \`git cherry-pick --continue\`."
+    exit 1
+  fi
+  echo
+  echo "Branch $name, in $folder, holds the commits on top of $remote/$branch."
+  echo "A change to a framework file also needs, in the template once merged:"
+  echo "  cargo run -p framework_check -- lock"
+  echo "Push it with: git -C \"$folder\" push $remote $name"
+  echo "Remove it afterwards with: git worktree remove \"$folder\""
+}
+
+case "${1:-help}" in
+  update) update ;;
+  contribute) shift; contribute "$@" ;;
+  check) check ;;
+  help | -h | --help) help ;;
+  *) echo "unknown command: $1" >&2; help >&2; exit 1 ;;
+esac

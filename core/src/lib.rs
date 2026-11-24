@@ -1,8 +1,35 @@
-//! Code Reviewer's shared logic: reads a git repository, indexes its Elixir
-//! and Rust code with tree-sitter and answers what a comparison changed, function by
-//! function and file by file. The desktop app wraps it in Tauri commands; a
-//! web server can wrap the same functions later.
+//! The application: what the web server (`../axum`) and the Tauri desktop
+//! and mobile app (`../tauri`) both run, organized as the project owner's
+//! Elixir applications are, see `docs/design/code-organization.md`:
+//!
+//! - `data`: each table's schema and low-level context, its baseline
+//!   validation and its reads and writes, borrowing the caller's
+//!   transaction. Only a context issues SQL, through private adapters.
+//! - `services`: clients for the services the application talks to.
+//! - `helpers`: generic functions any module may call.
+//! - `app`, `accounts`, `ops`: each app's high-level contexts, the
+//!   functions the server and the app both call, `posts::list`, which take
+//!   the `Deployment`, own the transaction and check the acting user.
+//! - `database`, `deployment`: the connection, its migrations, and the
+//!   role a deployment plays; `servers`: what a server says it is, for
+//!   a device signing in to another server, see
+//!   `docs/design/multi-server.md`.
+//! - `jobs`, `server_tasks`: what the server runs by itself, recurring
+//!   jobs and the tasks it runs while it is up, see `docs/design/jobs.md`.
+//!
+//! Synced writes are events so devices and the server converge. Bulk
+//! maintenance exceptions are documented in
+//! `docs/design/low-level-contexts.md`.
 
-pub mod analysis;
-pub mod git;
-pub mod groups;
+pub mod accounts;
+pub mod app;
+pub mod data;
+pub mod database;
+pub mod deployment;
+pub mod helpers;
+pub mod jobs;
+pub mod ops;
+pub mod server_tasks;
+pub mod servers;
+pub mod services;
+pub mod sync;

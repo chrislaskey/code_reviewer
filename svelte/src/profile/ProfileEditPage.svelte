@@ -1,0 +1,198 @@
+<!-- The person's profile, at /profile/edit: their name and their picture. A
+     name is written where the page runs, so the app changes it offline
+     and syncs it later; a picture goes straight to object storage, see
+     avatarsUpload in lib/core/. A local user is told their account is
+     only on this device; they and a trial user have no picture, which
+     needs an account on the server. Their language, when the pages are in
+     more than one: a preference, synced, which reloads the page in it. -->
+<script>
+  import { t } from "ttag";
+  import {
+    FormError,
+    accountsPreferencesUpdate,
+    avatarsUpload,
+    currentUserGet,
+    currentUserUpdate,
+  } from "../lib/core/index.js";
+  import { errorMessageOf } from "../lib/error_message.js";
+  import { currentUserForget } from "../lib/current_user.svelte.js";
+  import { accountsIndexUrl } from "../lib/routes.js";
+  import AccountsGuestNotice from "../lib/AccountsGuestNotice.svelte";
+  import { TRANSLATIONS_LOCALES, translationsFollow, translationsLocaleShown } from "../lib/translations.js";
+  import {
+    Alert,
+    Button,
+    ErrorMessage,
+    FieldErrors,
+    FileInput,
+    Heading,
+    Input,
+    Label,
+    Page,
+    Select,
+    Text,
+  } from "../lib/components/index.js";
+
+  /** @type {{name: string, kind?: string, avatar_url?: string | null, trial_expires_at?: string | null, preferences?: {locale: string | null}} | null} */
+  let currentUser = $state(null);
+  /** @type {File | null} */
+  let file = $state(null);
+  /** @type {Record<string, string[]>} */
+  let errors = $state({});
+  let error = $state("");
+  let busy = $state(false);
+  let name = $state("");
+  let nameError = $state("");
+  let nameBusy = $state(false);
+  /** From 0 to 1 while the file uploads, else null. */
+  let progress = $state(null);
+  let localeError = $state("");
+  let localeBusy = $state(false);
+
+  /** @param {string} locale */
+  function languageName(locale) {
+    const name = new Intl.DisplayNames([locale], { type: "language" }).of(locale) ?? locale;
+    return name.charAt(0).toLocaleUpperCase(locale) + name.slice(1);
+  }
+
+  /** @param {Event & {currentTarget: HTMLSelectElement}} event */
+  async function chooseLocale(event) {
+    localeBusy = true;
+    localeError = "";
+    try {
+      const preferences = await accountsPreferencesUpdate("locale", event.currentTarget.value || null);
+      translationsFollow(preferences.locale);
+    } catch (problem) {
+      localeError = errorMessageOf(problem);
+    } finally {
+      localeBusy = false;
+    }
+  }
+
+  async function load() {
+    try {
+      currentUser = await currentUserGet();
+      name = currentUser?.name ?? "";
+    } catch (problem) {
+      error = errorMessageOf(problem);
+    }
+  }
+
+  /** @param {Event & {currentTarget: HTMLInputElement}} event */
+  function pick(event) {
+    file = event.currentTarget.files?.[0] ?? null;
+    errors = {};
+    error = "";
+  }
+
+  /** @param {SubmitEvent} event */
+  async function save(event) {
+    event.preventDefault();
+    if (!file) return;
+    busy = true;
+    errors = {};
+    error = "";
+    try {
+      currentUser = await avatarsUpload(file, (fraction) => (progress = fraction));
+      currentUserForget();
+    } catch (problem) {
+      if (problem instanceof FormError) errors = problem.errors;
+      error = errorMessageOf(problem);
+    } finally {
+      busy = false;
+      progress = null;
+    }
+  }
+
+  /** @param {SubmitEvent} event */
+  async function saveName(event) {
+    event.preventDefault();
+    nameBusy = true;
+    nameError = "";
+    try {
+      currentUser = await currentUserUpdate(name);
+      name = currentUser?.name ?? "";
+      currentUserForget();
+    } catch (problem) {
+      nameError = errorMessageOf(problem);
+    } finally {
+      nameBusy = false;
+    }
+  }
+
+  load();
+</script>
+
+<Page>
+  <Heading level={1}>{t`Profile`}</Heading>
+  {#if currentUser}
+    {#if currentUser.kind === "local"}
+      <Alert tone="warning" class="flex flex-col items-start gap-2" data-local-user>
+        <Text>
+          <strong>{t`This account is only on this device.`}</strong>
+          {t`Nothing is backed up: if the device is lost or reset, or the app is removed, what you made is gone. Sign up or log in to keep it safe and use it on your other devices.`}
+        </Text>
+        <Button size="sm" href={accountsIndexUrl()}>{t`Sign up or log in`}</Button>
+      </Alert>
+    {:else if currentUser.kind === "trial" && currentUser.trial_expires_at}
+      <Alert tone="warning">
+        <AccountsGuestNotice trialExpiresAt={currentUser.trial_expires_at} />
+      </Alert>
+    {/if}
+    <div class="flex items-center gap-4">
+      {#if currentUser.avatar_url}
+        <img src={currentUser.avatar_url} alt={currentUser.name} class="size-20 rounded-full object-cover" />
+      {:else}
+        <div class="bg-base-300 flex size-20 items-center justify-center rounded-full text-2xl uppercase">
+          {currentUser.name.slice(0, 1)}
+        </div>
+      {/if}
+      <span>{currentUser.name}</span>
+    </div>
+    <form onsubmit={saveName} class="flex flex-col gap-3">
+      <Label text={t`Name`}>
+        <Input bind:value={name} autocomplete="name" maxlength="80" required />
+      </Label>
+      <ErrorMessage message={nameError} />
+      <div>
+        <Button variant="primary" type="submit" disabled={nameBusy || name.trim() === currentUser.name}>{t`Save name`}</Button>
+      </div>
+    </form>
+    {#if TRANSLATIONS_LOCALES.length > 1}
+      {@const systemLanguage = languageName(translationsLocaleShown(null))}
+      <Label text={t`Language`}>
+        <Select value={currentUser.preferences?.locale ?? ""} onchange={chooseLocale} disabled={localeBusy}>
+          <option value="">{t`Follow the system (${systemLanguage})`}</option>
+          {#each TRANSLATIONS_LOCALES as locale (locale)}
+            <!-- untranslated: each language in its own name -->
+            <option value={locale} lang={locale}>{languageName(locale)}</option>
+          {/each}
+        </Select>
+      </Label>
+      <ErrorMessage message={localeError} />
+    {/if}
+    {#if currentUser.kind === "full"}
+      <form onsubmit={save} class="flex flex-col gap-3">
+        <Label text={t`Picture`}>
+          <FileInput
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            onchange={pick}
+            disabled={busy}
+          />
+          <FieldErrors {errors} fields={["content_type", "size"]} />
+        </Label>
+        {#if progress !== null}
+          <progress class="progress w-full" value={progress} max="1"></progress>
+        {/if}
+        {#if error && Object.keys(errors).length === 0}
+          <ErrorMessage message={error} />
+        {/if}
+        <div>
+          <Button variant="primary" type="submit" disabled={busy || !file}>{t`Save picture`}</Button>
+        </div>
+      </form>
+    {/if}
+  {:else if error}
+    <ErrorMessage message={error} />
+  {/if}
+</Page>

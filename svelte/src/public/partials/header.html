@@ -1,0 +1,13 @@
+<header class="flex flex-wrap items-center gap-4">
+  <!-- Before the links paint: whether the app last saw someone signed in (src/lib/current_user.svelte.js) -->
+  <script>
+    if (localStorage.getItem("app:signed-in")) document.documentElement.dataset.signedIn = "true";
+  </script>
+  <!-- untranslated: the app's name -->
+  <a href="/" class="link font-semibold">Starter Pack</a>
+  <a href="/about" class="link"><t>About</t></a>
+  <span class="grow"></span>
+  <a href="/accounts/sign-in" class="link public-signed-out"><t>Sign in</t></a>
+  <a href="/accounts/sign-in" class="btn btn-primary btn-sm public-signed-out"><t>Sign up</t></a>
+  <a href="/home" class="btn btn-primary btn-sm public-signed-in"><t>Open the app</t></a>
+</header>

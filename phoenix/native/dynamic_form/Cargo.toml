@@ -1,0 +1,12 @@
+[package]
+name = "dynamic_form"
+version = "0.1.0"
+edition = "2024"
+description = "The dynamic_form Elixir library's data-mode forms for apps without the BEAM: the definition, its validation with Ecto's semantics, and the props of each field component"
+
+[dependencies]
+ecto_changeset = { path = "../ecto_changeset" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+regex = "1"
+uuid = { version = "1", features = ["v4"] }

@@ -1,0 +1,29 @@
+[package]
+name = "app_web"
+description = "Starter Pack's web server: app_core over HTTP, and the Svelte pages"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+app_core = { workspace = true, features = ["postgres", "mail-resend", "object-storage", "stripe", "app-store"] }
+axum = "0.8"
+axum-extra = { version = "0.12", features = ["cookie"] }
+chrono = { version = "0.4", default-features = false, features = ["serde"] }
+governor = "0.10"
+rpassword = "7"
+secrecy = "0.10"
+serde = { workspace = true }
+serde_json = { workspace = true }
+time = "0.3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
+tower-http = { version = "0.6", features = ["fs", "trace"] }
+tower_governor = { version = "0.8", default-features = false, features = ["axum"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["serde"] }
+
+[dev-dependencies]
+async-trait = "0.1"
+async-stripe-webhook = "=1.0.0-rc.10"
+http-body-util = "0.1"
+tower = { version = "0.5", features = ["util"] }

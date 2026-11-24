@@ -1,0 +1,57 @@
+//! The checkouts commands: buying a price on Stripe's page, opened in
+//! the system browser, which comes back to a page there that says to
+//! return to the app, whose pages ask again when it has the focus. A
+//! phone buys through its store instead, `store_transactions`. Each
+//! asks the server's API as the signed-in person, see
+//! `app_core::accounts::online`, and answers its JSON as it came. See
+//! `docs/design/purchasing.md`, step 7.
+
+use serde_json::{Value, json};
+use tauri::{AppHandle, State};
+use uuid::Uuid;
+
+use app_core::accounts::online;
+
+use crate::accounts::store_transactions::NOT_ON_THIS_SERVER;
+use crate::accounts::{plans, stripe_pages};
+use crate::command_error::CommandError;
+use crate::device_accounts::DeviceAccounts;
+use crate::sync;
+
+/// A checkout, its Stripe page opened in the browser: answers the
+/// checkout with no `url`, as the app has nothing to go to.
+#[tauri::command]
+pub async fn accounts_checkouts_create(
+    app: AppHandle,
+    device: State<'_, DeviceAccounts>,
+    price_id: Uuid,
+) -> Result<Value, CommandError> {
+    stripe_pages::refused_on_a_phone()?;
+    if !device.active_on_default_server().await {
+        return Err(NOT_ON_THIS_SERVER.into());
+    }
+    let (deployment, transport) = device.active_with_transport().await?;
+    let created = online::checkouts_create(&deployment, &transport, price_id)
+        .await
+        .map_err(|error| sync::online_error(&app, error))?;
+    stripe_pages::open(&app, created.get("url"))?;
+    Ok(json!({ "checkout": created.get("checkout"), "url": null }))
+}
+
+/// A checkout; once it is paid, the plan kept on the device is asked
+/// for again.
+#[tauri::command]
+pub async fn accounts_checkouts_get(
+    app: AppHandle,
+    device: State<'_, DeviceAccounts>,
+    id: Uuid,
+) -> Result<Value, CommandError> {
+    let (deployment, transport) = device.active_with_transport().await?;
+    let checkout = online::checkouts_get(&deployment, &transport, id)
+        .await
+        .map_err(|error| sync::online_error(&app, error))?;
+    if checkout.get("status") == Some(&json!("paid")) {
+        plans::refresh(&deployment, &transport).await;
+    }
+    Ok(checkout)
+}

@@ -1,0 +1,739 @@
+// app_core over the web server's JSON API (../../../../axum/src/). An
+// error answer, `{"error": "..."}`, is thrown with its message and its
+// `status`, as a FormError with the fields' messages when it has
+// `"errors"`. An answer that is not JSON is thrown too, naming the
+// request, so a server without the route never passes for one with it.
+import { t } from "ttag";
+import { FormError } from "./form_error.js";
+import { sha256Of } from "./checksums.js";
+import { putFile } from "./uploads.js";
+
+/**
+ * @param {string} method
+ * @param {string} path
+ * @param {unknown} [body] sent as JSON
+ */
+async function send(method, path, body) {
+  const response = await fetch(path, {
+    method,
+    headers: { Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!response.ok) throw await errorOf(response);
+  if (response.status === 204) return undefined;
+  const contentType = response.headers.get("Content-Type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(`The server answered ${method} ${path} with ${contentType || "nothing"}, not JSON`);
+  }
+  return response.json();
+}
+
+/** @param {Response} response */
+async function errorOf(response) {
+  return Object.assign(await errorWithMessageOf(response), { status: response.status });
+}
+
+/** @param {Response} response */
+async function errorWithMessageOf(response) {
+  try {
+    const { error, errors } = await response.json();
+    if (errors) return new FormError(error, errors);
+    if (typeof error === "string") return new Error(error);
+  } catch {
+    // Not the API's JSON: fall back to the status
+  }
+  return new Error(`${response.status} ${response.statusText}`);
+}
+
+/** @param {string} id */
+const postPath = (id) => `/api/posts/${encodeURIComponent(id)}`;
+
+/** The user signed in, whom the server takes the request to be from; null when nobody is. */
+export async function currentUserGet() {
+  try {
+    return await send("GET", "/api/users/current");
+  } catch (problem) {
+    // 410: the account of this browser's cookie was deleted
+    if ([401, 410].includes(/** @type {{status?: number}} */ (problem).status ?? 0)) return null;
+    throw problem;
+  }
+}
+
+/**
+ * The signed-in user's new name.
+ * @param {string} name
+ */
+export function currentUserUpdate(name) {
+  return send("PUT", "/api/users/current", { name });
+}
+
+/** The community the person works in, kept by this browser; null when they are in none. */
+export function currentCommunityGet() {
+  return send("GET", "/api/communities/current");
+}
+
+/** @param {string} communityId one the person is a member of */
+export function currentCommunityUpdate(communityId) {
+  return send("PUT", "/api/communities/current", { community_id: communityId });
+}
+
+/**
+ * Where to PUT the picture the person picked, once the server takes it.
+ * @param {string} contentType
+ * @param {number} size in bytes
+ * @returns {Promise<{upload_url: string, content_type: string, key: string}>}
+ */
+export function avatarsUploadsCreate(contentType, size) {
+  return send("POST", "/api/users/current/avatar/uploads", { content_type: contentType, size });
+}
+
+/**
+ * Makes the uploaded file the user's picture; answers the user.
+ * @param {string} key
+ */
+export function avatarsUpdate(key) {
+  return send("PUT", "/api/users/current/avatar", { key });
+}
+
+// A sign-in, a sign-up for an email with no account, emails a code and
+// answers `{pending}`. The code answers what the last step is, and that
+// step answers the user and sets the cookie the browser sends from then
+// on, or, with a device's challenge, `{code}` for the device and no
+// cookie. A sign-out clears the cookie.
+
+/**
+ * What finishes a sign-in: the session, or a device's code.
+ * @typedef {{user: {id: string, name: string}, email: string, token: string} | {code: string}} SignInFinished
+ */
+
+/**
+ * What a matched code answers: the last step's pending token, and
+ * whether it makes the account.
+ * @typedef {{pending: string, new_account: boolean}} CodeMatched
+ */
+
+/**
+ * @param {string} email
+ * @returns {Promise<{pending: string}>}
+ */
+export function accountsSignIn(email) {
+  return send("POST", "/api/accounts/sign-in", { email });
+}
+
+/**
+ * @param {string} pending
+ * @param {string} code the six digits emailed
+ * @returns {Promise<CodeMatched>}
+ */
+export function accountsCode(pending, code) {
+  return send("POST", "/api/accounts/code", { pending, code });
+}
+
+/**
+ * The last step: makes a new account, or signs in to one.
+ * @param {string} pending the one the code answered
+ * @param {string} [challenge] the device's, when it opened this page
+ * @param {boolean} [keepSignedIn] whether the browser stays signed in after it closes
+ * @returns {Promise<SignInFinished>}
+ */
+export function accountsSignInConfirm(pending, challenge, keepSignedIn = false) {
+  return send("POST", "/api/accounts/sign-in/confirm", { pending, challenge: challenge || null, keep_signed_in: keepSignedIn });
+}
+
+/**
+ * A sign-in with the account's password in place of an emailed code.
+ * @param {string} email
+ * @param {string} password
+ * @param {string} [challenge] the device's, when it opened this page
+ * @param {boolean} [keepSignedIn] whether the browser stays signed in after it closes
+ * @returns {Promise<SignInFinished>}
+ */
+export function accountsSignInPassword(email, password, challenge, keepSignedIn = false) {
+  return send("POST", "/api/accounts/sign-in/password", { email, password, challenge: challenge || null, keep_signed_in: keepSignedIn });
+}
+
+/**
+ * Whether the signed-in person has a password.
+ * @returns {Promise<{is_set: boolean}>}
+ */
+export function accountsPasswordGet() {
+  return send("GET", "/api/accounts/current/password");
+}
+
+/**
+ * The signed-in person's password, their first or a new one; their
+ * email is told.
+ * @param {string} password
+ */
+export function accountsPasswordUpdate(password) {
+  return send("PUT", "/api/accounts/current/password", { password });
+}
+
+/**
+ * The signed-in person's preferences: `locale`, the language chosen, or
+ * null to follow the device's.
+ * @returns {Promise<{locale: string | null}>}
+ */
+export function accountsPreferencesGet() {
+  return send("GET", "/api/accounts/current/preferences");
+}
+
+/**
+ * One of the signed-in person's preferences, null for its default, then
+ * all of them.
+ * @param {"locale"} key
+ * @param {unknown} value
+ * @returns {Promise<{locale: string | null}>}
+ */
+export function accountsPreferencesUpdate(key, value) {
+  return send("PUT", "/api/accounts/current/preferences", { key, value });
+}
+
+/**
+ * A new code emailed for the pending sign-in; the old one stops working.
+ * @param {string} pending
+ */
+export function accountsCodeResend(pending) {
+  return send("POST", "/api/accounts/code/resend", { pending });
+}
+
+// The browser is where a sign-in happens; nothing waits on it.
+
+/** @param {string} [_email] @param {string} [_serverId] */
+export function accountsSignInStart(_email, _serverId) {
+  return Promise.reject(new Error("the web signs in on its own page"));
+}
+
+export function accountsSignInPending() {
+  return Promise.resolve(null);
+}
+
+/** @param {string} _code */
+export function accountsSignInFinish(_code) {
+  return Promise.reject(new Error("the web signs in on its own page"));
+}
+
+export function accountsSignInCancel() {
+  return Promise.resolve(null);
+}
+
+/**
+ * @param {(returned: unknown) => void} _callback
+ * @returns {() => void} stops listening
+ */
+export function onAccountsSignInReturned(_callback) {
+  return () => {};
+}
+
+export function accountsSignOut() {
+  return send("DELETE", "/api/accounts/sign-out");
+}
+
+// The web is one browser session: sign in and sign out, no accounts kept
+// on the device. The accounts page is never linked.
+
+export const hasDeviceAccounts = false;
+
+export function deviceAccountsList() {
+  return Promise.resolve([]);
+}
+
+/** @param {string} _id */
+export function deviceAccountsSwitch(_id) {
+  return Promise.reject(new Error("no accounts are kept on the web"));
+}
+
+export function deviceAccountsDeactivate() {
+  return Promise.resolve(null);
+}
+
+/** @param {string} _id @param {boolean} _losingChanges */
+export function deviceAccountsRemove(_id, _losingChanges) {
+  return Promise.reject(new Error("no accounts are kept on the web"));
+}
+
+/**
+ * The server the pages are on, which on the web is the one they came from,
+ * with what it offers.
+ * @returns {Promise<{display_name: string, host: string, default: boolean, settings: {features: {accounts_sign_up: boolean, accounts_sign_in_code: boolean}}}>}
+ */
+export async function serversCurrentGet() {
+  const [server, document] = await Promise.all([
+    send("GET", "/api/servers/current"),
+    send("GET", "/api/servers/current/settings"),
+  ]);
+  return {
+    display_name: server.display_name,
+    host: window.location.host,
+    default: true,
+    settings: document.settings,
+  };
+}
+
+/**
+ * The web's server never changes under its pages.
+ * @param {() => void} _callback
+ * @returns {() => void} stops listening
+ */
+export function onServersCurrentChanged(_callback) {
+  return () => {};
+}
+
+/** @returns {Promise<"none" | "listed_only" | "any">} */
+export function multiServerGet() {
+  return Promise.resolve("none");
+}
+
+/** @param {string} _url */
+export function deviceServersCreate(_url) {
+  return Promise.reject(new Error("the web is on one server"));
+}
+
+/** @param {string} _url */
+export function serversGet(_url) {
+  return Promise.reject(new Error("the web is on one server"));
+}
+
+// A trial user: someone using the app on the web without signing up,
+// for a day, see docs/design/accounts-local-and-trial-users.md.
+
+/**
+ * Whether "Try it now" would make a trial user: the server has trials
+ * on and room for one.
+ * @returns {Promise<boolean>}
+ */
+export async function accountsTrialGet() {
+  return (await send("GET", "/api/accounts/trial")).available;
+}
+
+/**
+ * "Try it now": makes a trial user and signs this browser in as them.
+ * A browser already signed in stays as it is.
+ */
+export function accountsTrialCreate() {
+  return send("POST", "/api/accounts/trial");
+}
+
+/** What is for sale, plans first, each with the prices it sells at. */
+export function accountsProductsList() {
+  return send("GET", "/api/accounts/products");
+}
+
+/**
+ * One product for sale, with its prices.
+ * @param {string} id
+ */
+export function accountsProductsGet(id) {
+  return send("GET", `/api/accounts/products/${encodeURIComponent(id)}`);
+}
+
+/**
+ * A checkout for the price, answering `{checkout, url}`: Stripe's page to pay on.
+ * @param {string} priceId
+ */
+export function accountsCheckoutsCreate(priceId) {
+  return send("POST", "/api/accounts/checkouts", { price_id: priceId });
+}
+
+/**
+ * A checkout, asked of Stripe while it may still change.
+ * @param {string} id
+ */
+export function accountsCheckoutsGet(id) {
+  return send("GET", `/api/accounts/checkouts/${encodeURIComponent(id)}`);
+}
+
+/** The signed-in person's one-time purchases, newest first. */
+export function accountsPurchasesList() {
+  return send("GET", "/api/accounts/purchases");
+}
+
+/** @param {string} id */
+export function accountsPurchasesGet(id) {
+  return send("GET", `/api/accounts/purchases/${encodeURIComponent(id)}`);
+}
+
+/** The signed-in person's plans, newest first, ended ones too. */
+export function accountsSubscriptionsList() {
+  return send("GET", "/api/accounts/subscriptions");
+}
+
+/** @param {string} id */
+export function accountsSubscriptionsGet(id) {
+  return send("GET", `/api/accounts/subscriptions/${encodeURIComponent(id)}`);
+}
+
+/**
+ * A change to a plan, answering the plan as it is now.
+ * @param {string} id
+ * @param {{action: "switch", price_id: string} | {action: "switch_undo" | "cancel" | "resume"}} change
+ */
+export function accountsSubscriptionsUpdate(id, change) {
+  return send("PUT", `/api/accounts/subscriptions/${encodeURIComponent(id)}`, change);
+}
+
+/**
+ * Stripe's Customer Portal for the plan's card and invoices, answering `{url}`.
+ * @param {string} id
+ */
+export function accountsSubscriptionsPortalCreate(id) {
+  return send("POST", `/api/accounts/subscriptions/${encodeURIComponent(id)}/portal`);
+}
+
+// Local users are a device's; the web has trial users instead.
+
+export function localUsersCanCreate() {
+  return Promise.resolve(false);
+}
+
+export function localUsersCreate() {
+  return Promise.reject(new Error("only the app has local users"));
+}
+
+export function localUsersMove() {
+  return Promise.reject(new Error("only the app has local users"));
+}
+
+export function localUsersKeepSeparate() {
+  return Promise.reject(new Error("only the app has local users"));
+}
+
+export function postsList() {
+  return send("GET", "/api/posts");
+}
+
+/** @param {string} id */
+export function postsGet(id) {
+  return send("GET", postPath(id));
+}
+
+/**
+ * @param {string} body
+ * @param {string[]} communityIds the communities the post is in
+ */
+export function postsCreate(body, communityIds) {
+  return send("POST", "/api/posts", { body, community_ids: communityIds });
+}
+
+/**
+ * @param {string} id
+ * @param {string} body
+ * @param {string[]} communityIds the communities the post is in, exactly
+ */
+export function postsUpdate(id, body, communityIds) {
+  return send("PUT", postPath(id), { body, community_ids: communityIds });
+}
+
+/** @param {string} id */
+export function postsDelete(id) {
+  return send("DELETE", postPath(id));
+}
+
+/** @param {string} id */
+const filePath = (id) => `/api/files/${encodeURIComponent(id)}`;
+
+/**
+ * A page of the files the user sees whose names contain `name` in any
+ * case, of one of `content_types` (any for none), newest first:
+ * `{total, files}`, each file
+ * `{file, creator, communities, shown_as, state, error}`.
+ * @param {{name?: string, content_types?: string[], offset?: number, limit: number}} filter at most 500 at once
+ */
+export function filesList({ name = "", content_types = [], offset = 0, limit }) {
+  const query = new URLSearchParams({
+    name,
+    content_types: content_types.join(","),
+    offset: String(offset),
+    limit: String(limit),
+  });
+  return send("GET", `/api/files?${query}`);
+}
+
+/** How long a list's name filter waits for a pause in typing: each asks the server. */
+export const filesListWaitMs = 200;
+
+/**
+ * The files the user sees with any of these checksums, up to 500 at once.
+ * @param {string[]} sha256s
+ */
+export function filesDuplicatesList(sha256s) {
+  return send("POST", "/api/files/duplicates", { sha256s });
+}
+
+/** @param {string} id */
+export function filesGet(id) {
+  return send("GET", filePath(id));
+}
+
+/** How many files a page creates at once: each waits on its upload. */
+export const filesCreateAtOnce = 3;
+
+/**
+ * Creates the file the person picked: its bytes go straight to object
+ * storage, checked against their SHA-256, then the server writes its
+ * row; answers the file.
+ * @param {File} file
+ * @param {string} name
+ * @param {string[]} communityIds the communities the file is in, one at least
+ * @param {(fraction: number) => void} [onProgress] from 0 to 1
+ * @param {string} [sha256] the file's, when the page already has it
+ */
+export async function filesCreate(file, name, communityIds, onProgress, sha256) {
+  sha256 ??= await sha256Of(file);
+  const upload = await send("POST", "/api/files/uploads", { content_type: file.type, size: file.size, sha256 });
+  if (!upload.uploaded) await putFile(upload, file, onProgress);
+  return send("POST", "/api/files", {
+    id: upload.id,
+    name,
+    content_type: upload.content_type,
+    size: file.size,
+    sha256,
+    community_ids: communityIds,
+  });
+}
+
+
+/**
+ * @param {string} id
+ * @param {string} name
+ * @param {string[]} communityIds its communities among the user's, exactly
+ */
+export function filesUpdate(id, name, communityIds) {
+  return send("PUT", filePath(id), { name, community_ids: communityIds });
+}
+
+/** @param {string} id */
+export function filesDelete(id) {
+  return send("DELETE", filePath(id));
+}
+
+/**
+ * Where a page reads the file's bytes from, for an `<img>` or a frame.
+ * @param {string} id
+ */
+export function filesContentUrl(id) {
+  return `${filePath(id)}/content`;
+}
+
+/** A browser keeps no copies of its own: null. */
+export function filesCacheGet() {
+  return Promise.resolve(null);
+}
+
+export function filesCacheDelete() {
+  return Promise.resolve(null);
+}
+
+/** Whether this browser writes images to the clipboard. */
+export function filesCopySupported() {
+  return Promise.resolve(typeof ClipboardItem !== "undefined" && Boolean(navigator.clipboard?.write));
+}
+
+/**
+ * Copies the image to the clipboard as a PNG, the one image type
+ * browsers write, so an animated GIF is copied as its first frame. The
+ * write starts before any await, inside the click, as Safari requires;
+ * the bytes come with no cache, since a copy the page's <img> left in
+ * the cache lacks the bucket's CORS headers this read needs.
+ * @param {string} id
+ */
+export function filesCopy(id) {
+  const png = fetch(`${filePath(id)}/content`, { cache: "no-store" }).then(async (response) => {
+    if (!response.ok) throw new Error(t`Could not read the image (${response.status})`);
+    return asPng(await response.blob());
+  });
+  return navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+}
+
+/**
+ * @param {Blob} image
+ * @returns {Promise<Blob>}
+ */
+async function asPng(image) {
+  if (image.type === "image/png") return image;
+  const bitmap = await createImageBitmap(image);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((png) => (png ? resolve(png) : reject(new Error(t`Could not copy the image`))), "image/png"),
+  );
+}
+
+export function filesDownloadSupported() {
+  return Promise.resolve(true);
+}
+
+/**
+ * Has the browser save the file under its name.
+ * @param {string} id
+ * @returns {Promise<string | null>} where it was saved, when known
+ */
+export function filesDownload(id) {
+  window.location.assign(`${filePath(id)}/content?download=1`);
+  return Promise.resolve(null);
+}
+
+/** Every community, each with the user's membership when they are in it. */
+export function communitiesList() {
+  return send("GET", "/api/communities");
+}
+
+/** @param {string} id */
+const communityPath = (id) => `/api/communities/${encodeURIComponent(id)}`;
+
+/** One community, `{community, membership}`. @param {string} id */
+export function communitiesGet(id) {
+  return send("GET", communityPath(id));
+}
+
+/** @param {string} name */
+export function communitiesCreate(name) {
+  return send("POST", "/api/communities", { name });
+}
+
+/**
+ * @param {string} id
+ * @param {string} name
+ */
+export function communitiesUpdate(id, name) {
+  return send("PUT", communityPath(id), { name });
+}
+
+/** @param {string} id */
+export function communitiesDelete(id) {
+  return send("DELETE", communityPath(id));
+}
+
+/** @param {string} communityId */
+export function membershipsCreate(communityId) {
+  return send("POST", `${communityPath(communityId)}/membership`);
+}
+
+/** @param {string} communityId */
+export function membershipsDelete(communityId) {
+  return send("DELETE", `${communityPath(communityId)}/membership`);
+}
+
+// The web has nothing to sync: it is the server. The nav shows no sync
+// status, and the conflicts page shows none.
+
+export function syncRun() {
+  return Promise.resolve(null);
+}
+
+export function syncStatus() {
+  return Promise.resolve(null);
+}
+
+/** @param {boolean} _offline */
+export function syncSetOffline(_offline) {
+  return Promise.resolve(null);
+}
+
+/**
+ * @param {(outcome: unknown) => void} _callback
+ * @returns {() => void} stops listening
+ */
+export function onSynced(_callback) {
+  return () => {};
+}
+
+export function conflictsList() {
+  return Promise.resolve([]);
+}
+
+export function pendingChangesList() {
+  return Promise.resolve([]);
+}
+
+/** @param {string} _id */
+export function conflictsReapply(_id) {
+  return Promise.reject(new Error("nothing to reapply on the web"));
+}
+
+/** @param {string} _id */
+export function conflictsTryAgain(_id) {
+  return Promise.reject(new Error("nothing to try again on the web"));
+}
+
+/** @param {string} _id */
+export function conflictsDelete(_id) {
+  return Promise.reject(new Error("nothing to let go on the web"));
+}
+
+// The quick picker is the desktop app's: a browser has none.
+
+/** @param {{name?: string, offset?: number, limit: number}} _filter */
+export function quickPickerFilesList(_filter) {
+  return Promise.reject(new Error("the quick picker is the desktop app's"));
+}
+
+/** @param {string} _id */
+export function quickPickerPaste(_id) {
+  return Promise.reject(new Error("the quick picker is the desktop app's"));
+}
+
+export function quickPickerClose() {
+  return Promise.resolve();
+}
+
+export function quickPickerOpenApp() {
+  return Promise.reject(new Error("the quick picker is the desktop app's"));
+}
+
+export function quickPickerAccessibilityRequest() {
+  return Promise.resolve(false);
+}
+
+/**
+ * @param {(opened: {accessibility_trusted: boolean}) => void} _callback
+ * @returns {() => void} stops listening
+ */
+export function onQuickPickerOpened(_callback) {
+  return () => {};
+}
+
+/**
+ * Opens a public page, `terms` or `privacy`, in a new tab, in the
+ * language the pages show: `/es/terms`, or `/terms` in English.
+ * @param {"terms" | "privacy"} page
+ * @param {string} locale
+ */
+export function publicPagesOpen(page, locale) {
+  window.open(locale === "en" ? `/${page}` : `/${locale}/${page}`, "_blank", "noopener");
+  return Promise.resolve();
+}
+
+/** Mails the signed-in person the code that confirms deleting their account. */
+export function accountsDeletionsCodeCreate() {
+  return send("POST", "/api/accounts/deletions/code");
+}
+
+/**
+ * Deletes the signed-in person's account with the mailed code, none for a trial.
+ * @param {string | null} code
+ */
+export function accountsDeletionsCreate(code) {
+  return send("POST", "/api/accounts/deletions", { code });
+}
+
+/** The store this app sells through: on the web, Stripe. */
+export function accountsStoreGet() {
+  return Promise.resolve("stripe");
+}
+
+/** A phone store's sheet: never on the web. */
+export function accountsStoreTransactionsCreate(_priceId) {
+  return Promise.reject(new Error(t`On the web, plans and products are bought through Stripe`));
+}
+
+export function accountsStoreTransactionsRestore() {
+  return Promise.reject(new Error(t`Restoring purchases is in the iPhone app`));
+}
+
+export function accountsSubscriptionsManageOpen() {
+  return Promise.reject(new Error(t`A plan from a phone's store is managed on the phone`));
+}

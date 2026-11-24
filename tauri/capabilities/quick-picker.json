@@ -1,0 +1,12 @@
+{
+  "$schema": "./gen/schemas/desktop-schema.json",
+  "identifier": "quick-picker",
+  "description": "The quick picker's window shows its Svelte page, which calls the app's commands and listens for its opening",
+  "platforms": ["macOS"],
+  "windows": [
+    "quick-picker"
+  ],
+  "permissions": [
+    "core:default"
+  ]
+}

@@ -1,0 +1,148 @@
+defmodule App.MixProject do
+  use Mix.Project
+
+  def project do
+    [
+      app: :app,
+      version: "0.1.0",
+      elixir: "~> 1.17",
+      elixirc_paths: elixirc_paths(Mix.env()),
+      start_permanent: Mix.env() == :prod,
+      aliases: aliases(),
+      deps: deps(),
+      compilers: [:phoenix_live_view] ++ Mix.compilers(),
+      listeners: [Phoenix.CodeReloader],
+      default_release: :app,
+      releases: releases()
+    ]
+  end
+
+  # Configuration for the OTP application.
+  #
+  # Type `mix help compile.app` for more information.
+  def application do
+    [
+      mod: {App.Application, []},
+      extra_applications: [:logger, :runtime_tools]
+    ]
+  end
+
+  def cli do
+    [
+      preferred_envs: [check: :test]
+    ]
+  end
+
+  # Specifies which paths to compile per environment.
+  # The code generators in priv/code_generators are Mix tasks that need the
+  # igniter dependency, which is only present in dev and test. The Svelte
+  # mirroring in priv/svelte is a dev tool too, see priv/svelte/README.md,
+  # as is the Rust mirroring of changesets in priv/rust, see priv/rust/README.md,
+  # and the JSON of forms in priv/dynamic_form_json, see its README.md.
+  defp elixirc_paths(:test),
+    do: ["lib", "test/support", "priv/code_generators", "priv/svelte", "priv/rust", "priv/dynamic_form_json"]
+
+  defp elixirc_paths(:dev),
+    do: ["lib", "priv/code_generators", "priv/svelte", "priv/rust", "priv/dynamic_form_json"]
+
+  defp elixirc_paths(_), do: ["lib"]
+
+  # Specifies your project dependencies.
+  #
+  # Type `mix help deps` for examples and options.
+  defp deps do
+    [
+      {:bcrypt_elixir, "~> 3.0"},
+      {:phoenix, "~> 1.8.15"},
+      {:phoenix_ecto, "~> 4.5"},
+      {:ecto_sql, "~> 3.13"},
+      {:ecto_sqlite3, ">= 0.0.0"},
+      {:phoenix_html, "~> 4.1"},
+      {:phoenix_live_reload, "~> 1.2", only: :dev},
+      {:phoenix_live_view, "~> 1.2.0"},
+      {:lazy_html, ">= 0.1.0", only: :test},
+      {:phoenix_live_dashboard, "~> 0.8.3"},
+      {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
+      {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
+      {:heroicons,
+       github: "tailwindlabs/heroicons",
+       tag: "v2.2.0",
+       sparse: "optimized",
+       app: false,
+       compile: false,
+       depth: 1},
+      {:daisyui,
+       github: "saadeghi/daisyui",
+       tag: "v5.5.20",
+       sparse: "packages/bundle",
+       app: false,
+       compile: false,
+       depth: 1},
+      {:swoosh, "~> 1.16"},
+      {:req, "~> 0.5"},
+      # Forms defined as SurveyJS JSON, rendered with App.Web.CoreComponents,
+      # see docs/design/dynamic-forms.md
+      {:dynamic_form, "~> 1.2"},
+      {:telemetry_metrics, "~> 1.0"},
+      {:telemetry_poller, "~> 1.0"},
+      {:gettext, "~> 1.0"},
+      {:jason, "~> 1.2"},
+      {:dns_cluster, "~> 0.2.0"},
+      {:dotenvy, "~> 1.2"},
+      {:bandit, "~> 1.14"},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:ex_check, "~> 0.17", only: [:dev, :test], runtime: false},
+      {:app_checks, github: "chrislaskey/app_checks", only: [:dev, :test], runtime: false},
+      {:igniter, "~> 0.8", only: [:dev, :test]},
+      {:burrito, "~> 1.6", runtime: false},
+      # Loads the Rust of changeset functions marked @universal_changeset true,
+      # see priv/rust/README.md. Plain Elixir until a function is marked: only
+      # the generated App.Data.UniversalChangeset.Native uses it, and that is
+      # what needs the Rust toolchain
+      {:rustler, "~> 0.38.0"}
+    ]
+  end
+
+  # `mix release` builds the regular `app` release used by the Docker image.
+  # `mix release app_standalone` wraps the same release into one executable
+  # per target with Burrito, written to burrito_out/. See
+  # docs/guides/standalone-binary.md.
+  defp releases do
+    [
+      app: [],
+      app_standalone: [
+        steps: [:assemble, &Burrito.wrap/1],
+        burrito: [
+          targets: [
+            macos_silicon: [os: :darwin, cpu: :aarch64],
+            macos_intel: [os: :darwin, cpu: :x86_64],
+            linux: [os: :linux, cpu: :x86_64],
+            linux_arm: [os: :linux, cpu: :aarch64]
+          ]
+        ]
+      ]
+    ]
+  end
+
+  # Aliases are shortcuts or tasks specific to the current project.
+  # For example, to install project dependencies and perform other setup tasks, run:
+  #
+  #     $ mix setup
+  #
+  # See the documentation for `Mix` for more info on aliases.
+  defp aliases do
+    [
+      setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],
+      "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
+      "ecto.reset": ["ecto.drop", "ecto.setup"],
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
+      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
+      "assets.build": ["compile", "tailwind app", "esbuild app"],
+      "assets.deploy": [
+        "tailwind app --minify",
+        "esbuild app --minify",
+        "phx.digest"
+      ]
+    ]
+  end
+end
