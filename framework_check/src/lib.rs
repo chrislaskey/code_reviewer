@@ -13,16 +13,18 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use glob::{MatchOptions, Pattern};
+use ignore::WalkBuilder;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
-use walkdir::WalkDir;
 
 /// The manifest at the root of the repository.
 pub const MANIFEST: &str = "framework.toml";
 /// The hashes at the root of the repository.
 pub const LOCK: &str = "framework.lock";
-/// Folders never walked: builds, dependencies, git's own.
+/// Folders never walked: builds, dependencies, git's own. Besides these,
+/// what the repository's `.gitignore` files ignore is never hashed, such
+/// as what a build writes beside the template's files.
 const SKIPPED_FOLDERS: &[&str] = &[".git", "target", "node_modules", "dist", ".worktrees"];
 /// Files never hashed: what an operating system leaves in a folder.
 const SKIPPED_FILES: &[&str] = &[".DS_Store"];
@@ -99,7 +101,7 @@ pub enum CheckError {
         source: std::io::Error,
     },
     #[error("could not walk the repository: {0}")]
-    Walk(#[from] walkdir::Error),
+    Walk(#[from] ignore::Error),
     #[error("{MANIFEST} is not valid: {0}")]
     Manifest(#[from] toml::de::Error),
     #[error("{MANIFEST} has a glob that is not valid, {glob}: {source}")]
@@ -201,13 +203,21 @@ pub fn framework_hashes(
     let framework = patterns(&manifest.framework)?;
     let exceptions = patterns(manifest.seams.iter().chain(&manifest.examples))?;
     let mut hashes = BTreeMap::new();
-    let walk = WalkDir::new(root).into_iter().filter_entry(|entry| {
-        !(entry.file_type().is_dir()
-            && SKIPPED_FOLDERS.contains(&entry.file_name().to_string_lossy().as_ref()))
-    });
+    // The repository's own .gitignore files alone, not a person's global
+    // ones, so every machine hashes the same files
+    let walk = WalkBuilder::new(root)
+        .hidden(false)
+        .git_global(false)
+        .git_exclude(false)
+        .require_git(false)
+        .filter_entry(|entry| {
+            !(entry.file_type().is_some_and(|kind| kind.is_dir())
+                && SKIPPED_FOLDERS.contains(&entry.file_name().to_string_lossy().as_ref()))
+        })
+        .build();
     for entry in walk {
         let entry = entry?;
-        if !entry.file_type().is_file()
+        if !entry.file_type().is_some_and(|kind| kind.is_file())
             || SKIPPED_FILES.contains(&entry.file_name().to_string_lossy().as_ref())
         {
             continue;
@@ -386,6 +396,28 @@ mod tests {
             }],
             ..Manifest::default()
         }
+    }
+
+    #[test]
+    fn framework_check_framework_hashes_skip_what_gitignore_ignores() {
+        let root = tempfile::tempdir().expect("a folder");
+        let plugin = root.path().join("plugins/kit");
+        std::fs::create_dir_all(plugin.join("ios")).expect("folders");
+        std::fs::write(plugin.join(".gitignore"), "/ios/Package.resolved\n").expect("written");
+        std::fs::write(plugin.join("ios/Plugin.swift"), "plugin").expect("written");
+        std::fs::write(plugin.join("ios/Package.resolved"), "resolved").expect("written");
+        let manifest = Manifest {
+            framework: vec!["plugins/**".to_string()],
+            ..Manifest::default()
+        };
+
+        let hashed = framework_hashes(root.path(), &manifest).expect("hashed");
+
+        let paths: Vec<&str> = hashed.keys().map(String::as_str).collect();
+        assert_eq!(
+            paths,
+            ["plugins/kit/.gitignore", "plugins/kit/ios/Plugin.swift"]
+        );
     }
 
     #[test]
