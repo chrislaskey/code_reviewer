@@ -37,12 +37,12 @@
   if (!challenge) accountsTrialGet().then((available) => (trialAvailable = available), () => {});
   currentServerLoad().catch(() => {});
   /** Whether the server takes new sign-ups, as its settings say. */
-  let signUpOffered = $derived(currentServer.value?.settings.features.accounts_sign_up ?? true);
+  let signUpEnabled = $derived(currentServer.value?.settings.features.accounts_sign_up ?? true);
   /** Whether the server signs in with an emailed code, else by password alone. */
-  let signInCodeOffered = $derived(currentServer.value?.settings.features.accounts_sign_in_code ?? true);
-  let withPassword = $derived(choseWithPassword || !signInCodeOffered);
-  /** A guest already is one, and comes here to sign up. */
-  let guestOffered = $derived(trialAvailable && currentUser.value?.kind !== "trial");
+  let signInCodeEnabled = $derived(currentServer.value?.settings.features.accounts_sign_in_code ?? true);
+  let withPassword = $derived(choseWithPassword || !signInCodeEnabled);
+  /** Whether the guest row shows: not to a guest, who comes here to sign up. */
+  let guestShown = $derived(trialAvailable && currentUser.value?.kind !== "trial");
   let pending = $state("");
   let deviceCode = $state("");
   let error = $state("");
@@ -99,14 +99,14 @@
   {#if deviceCode}
     <AccountsDeviceCode code={deviceCode} {appReturn} />
   {:else}
-    <Heading level={1}>{pending ? t`Check your email` : signUpOffered ? t`Log in or sign up` : t`Log in`}</Heading>
+    <Heading level={1}>{pending ? t`Check your email` : signUpEnabled ? t`Log in or sign up` : t`Log in`}</Heading>
     {#if challenge}
       <Text tone="muted">{t`Logging in for the app on your device.`}</Text>
     {/if}
     {#if pending}
       <AccountsSignInSteps {email} {pending} {challenge} bind:keepSignedIn onfinish={finish} onstartover={() => (pending = "")} />
     {:else}
-      {#if guestOffered && !withPassword}
+      {#if guestShown && !withPassword}
         <AccountsGuestRow />
         <div class="divider muted my-0 text-sm">{t`or`}</div>
       {/if}
@@ -120,13 +120,13 @@
           </Label>
           <ErrorMessage message={error} />
           <Button variant="primary" type="submit" disabled={busy}>{t`Log in`}</Button>
-          {#if signInCodeOffered}
+          {#if signInCodeEnabled}
             <Button onclick={emailCode} disabled={busy}>{t`Email a code instead`}</Button>
           {/if}
           {#if !challenge}
             <Checkbox bind:checked={keepSignedIn} size="sm" tone="muted">{t`Keep me logged in`}</Checkbox>
           {/if}
-          {#if signInCodeOffered}
+          {#if signInCodeEnabled}
             <Text tone="muted" size="sm">{t`Forgot your password? Use a code, then change it in Account settings.`}</Text>
           {:else}
             <Text tone="muted" size="sm">{t`Forgot your password? Ask whoever runs this server.`}</Text>
@@ -136,7 +136,7 @@
           <ErrorMessage message={error} />
           <Button variant="primary" type="submit" disabled={busy}>{t`Email a code`}</Button>
           <Button onclick={usePassword} disabled={busy}>{t`Use my password`}</Button>
-          {#if !signUpOffered}
+          {#if !signUpEnabled}
             <Text tone="muted" size="sm">{t`This server takes no new sign-ups.`}</Text>
           {/if}
         {/if}

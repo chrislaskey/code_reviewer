@@ -59,8 +59,8 @@
   let error = $state("");
   currentServerLoad().catch(() => {});
   /** Whether the server takes new sign-ups, as its settings say. */
-  let signUpOffered = $derived(currentServer.value?.settings.features.accounts_sign_up ?? true);
-  let signUpOrSignIn = $derived(signUpOffered ? t`Sign up or log in` : t`Log in`);
+  let signUpEnabled = $derived(currentServer.value?.settings.features.accounts_sign_up ?? true);
+  let signUpOrSignIn = $derived(signUpEnabled ? t`Sign up or log in` : t`Log in`);
   /** Whether the page was opened just after an account was deleted. */
   const accountDeleted = new URLSearchParams(window.location.search).has("account_deleted");
 

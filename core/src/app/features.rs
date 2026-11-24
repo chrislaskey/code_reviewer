@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// The features a server offers.
+/// The features a server enables or disables.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Features {

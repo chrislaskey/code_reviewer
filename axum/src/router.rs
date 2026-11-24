@@ -192,7 +192,7 @@ fn accounts_api(state: &AppState) -> Router<AppState> {
         )
         .route_layer(middleware::from_fn_with_state(
             state.server_settings.clone(),
-            accounts::purchasing_offered,
+            accounts::purchasing_enabled,
         ));
     Router::new().merge(sign_in).merge(purchasing)
 }
