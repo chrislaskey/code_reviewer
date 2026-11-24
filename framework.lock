@@ -1,6 +1,6 @@
 # The SHA-256 of each framework file as the template ships it, see
 # framework.toml. Written by `cargo run -p framework_check -- lock`.
-78235a826d6f407d6abbbd5a925d095164cf429e76523c27f595cd66532acbc5  FRAMEWORK_CHANGELOG.md
+9972ab1d6e0031bfaf37773c632d77c010dc5d64feda0e16a6fd44350aec71a1  FRAMEWORK_CHANGELOG.md
 dbded3dccbf128f2dafd95a761318f0338856fa9dae66173642d45db3fd63a23  axum/src/accounts.rs
 dfdf353a942c730f3c0cea40c9e89a737bcf5fbf06960b91baab16578564a327  axum/src/accounts/app_store_notifications.rs
 4440725170bdb3eeda5a1257a241671c748cb8069a42809f37f289bacef91187  axum/src/accounts/checkouts.rs
@@ -346,7 +346,7 @@ c12b2a5a3bde289c45dd6c348cc41d7072c81a1559eac76339ea061c4fa5d89c  tauri/plugins/
 f7feac47f05585761ab6d3616b422732751694619235c8c74bd7f0e47c106bd5  tauri/plugins/web-auth-session/ios/Package.swift
 27fa8d48ea2dccbbf9a20a7b6f96d2c874a95437bb3de39698575b0698953757  tauri/plugins/web-auth-session/ios/Sources/WebAuthSessionPlugin.swift
 36c63ed1a307349efa951d77444297a809f04a54d3c6465573c38f159d7b2c40  tauri/plugins/web-auth-session/src/lib.rs
-1c3894902ff5c290edefb415ab86005b474643cd247a4726f8a3176a5611151c  tauri/src/accounts.rs
+d57f98f21723f30be9d63d062f5f2b29cd64fcb6a64374eea9b4588ca7562fa0  tauri/src/accounts.rs
 4c891a7d2de20ca0defb088ac8c2f3bd5c6ef3e7c1ffe158fa590b99de50f72f  tauri/src/accounts/checkouts.rs
 5da914fd773c64d9abb44f6e72cd6699fc79456658319ba4a5617927bb13e1dc  tauri/src/accounts/deletions.rs
 b58f0d6461726fb31121ffe9c7eebcc5e5d7f0c1474d3a36ace14212c19be7dc  tauri/src/accounts/deletions/code.rs

@@ -84,7 +84,7 @@ export function accountsSignInUrl(email = currentQuery("email"), challenge = cur
   return withQuery(ACCOUNTS_SIGN_IN_PATH, { email, challenge, ...appReturnQuery() });
 }
 
-/** The iPhone app's scheme, its bundle identifier in tauri.conf.json. */
+/** The iPhone app's scheme, its bundle identifier: `APP_IDENTIFIER`, which a test keeps it equal to. */
 const APP_URL_SCHEME = "com.starterpack.app";
 
 /**

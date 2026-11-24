@@ -18,6 +18,15 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-24: the sign-in scheme checked against the app's identifier
+
+- **What changed**: a test of the Tauri app fails when `APP_URL_SCHEME`
+  in `svelte/src/lib/routes.js` differs from `APP_IDENTIFIER` in
+  `core/src/app/identity.rs`. Different, the iPhone's sign-in page
+  showed the code to paste instead of returning to the app.
+- **What an app does**: **Required**: set `APP_URL_SCHEME` to the app's
+  identifier, the bundle identifier in `tauri/tauri.conf.json`.
+
 ## 2026-11-24: landing on Home after signing in, or the app's choice
 
 - **What changed**: signing in, signing up, starting as a guest and
