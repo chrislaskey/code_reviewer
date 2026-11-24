@@ -14,6 +14,7 @@ pub mod locales;
 pub mod memberships;
 pub mod posts;
 pub mod posts_communities;
+pub mod server_state;
 pub mod server_tasks;
 pub mod synced_tables;
 pub mod users;

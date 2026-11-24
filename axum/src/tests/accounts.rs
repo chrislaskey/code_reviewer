@@ -1047,6 +1047,7 @@ async fn stripe_webhooks_create_is_not_found_without_a_secret() {
         server_description: test_server_description(&ServerSettings::default()),
         server_settings: std::sync::Arc::new(SettingsDocument::of(ServerSettings::default())),
         listed_servers: std::sync::Arc::new(test_listed_servers()),
+        server_state: std::sync::Arc::default(),
     };
     let dist = std::env::temp_dir().join(format!("app_web_test_{}", std::process::id()));
     let without_stripe = super::router(&dist, &dist.join("ops"), state);
@@ -1454,4 +1455,88 @@ async fn accounts_mails_go_in_the_persons_language_else_the_requests_else_englis
         "her choice: {}",
         mail.subject
     );
+}
+
+#[tokio::test]
+async fn accounts_current_user_from_bearer_token_takes_the_header_and_never_the_cookie() {
+    use crate::user_auth::CurrentUserFromBearerToken;
+    let (router, _) = test_router().await;
+    let probe = Router::new()
+        .route(
+            "/probe",
+            axum::routing::get(
+                |CurrentUserFromBearerToken(user): CurrentUserFromBearerToken| async move {
+                    axum::Json(json!({ "id": user.id }))
+                },
+            ),
+        )
+        .with_state(router.deployment.clone());
+    let ask = |token: Option<&str>, cookie: Option<&str>| {
+        let probe = probe.clone();
+        let token = token.map(str::to_string);
+        let cookie = cookie.map(str::to_string);
+        async move {
+            let (status, _, body) = send_with(
+                &probe,
+                token.as_deref(),
+                cookie.as_deref(),
+                Method::GET,
+                "/probe",
+                None,
+            )
+            .await;
+            (status, body)
+        }
+    };
+    let (status, body) = ask(Some(&router.token), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body["id"].is_string());
+    let cookie = format!("token={}", router.token);
+    let (status, body) = ask(None, Some(&cookie)).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "the cookie is not read");
+    assert_eq!(body, json!({ "error": "Sign in first" }));
+    let (status, _) = ask(Some("not-a-token"), None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn accounts_current_user_from_cookie_takes_the_cookie_and_never_the_header() {
+    use crate::user_auth::CurrentUserFromCookie;
+    let (router, _) = test_router().await;
+    let probe = Router::new()
+        .route(
+            "/probe",
+            axum::routing::get(
+                |CurrentUserFromCookie(user): CurrentUserFromCookie| async move {
+                    axum::Json(json!({ "id": user.id }))
+                },
+            ),
+        )
+        .with_state(router.deployment.clone());
+    let ask = |token: Option<&str>, cookie: Option<&str>| {
+        let probe = probe.clone();
+        let token = token.map(str::to_string);
+        let cookie = cookie.map(str::to_string);
+        async move {
+            let (status, _, body) = send_with(
+                &probe,
+                token.as_deref(),
+                cookie.as_deref(),
+                Method::GET,
+                "/probe",
+                None,
+            )
+            .await;
+            (status, body)
+        }
+    };
+    let cookie = format!("token={}", router.token);
+    let (status, body) = ask(None, Some(&cookie)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body["id"].is_string());
+    let (status, body) = ask(Some(&router.token), None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "the header is not read");
+    assert_eq!(body, json!({ "error": "Sign in first" }));
+    let (status, _) = ask(None, Some("token=not-a-token")).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
 }

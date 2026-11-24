@@ -119,6 +119,7 @@ async fn test_router_with(
         server_description: test_server_description(&settings),
         server_settings: std::sync::Arc::new(SettingsDocument::of(settings)),
         listed_servers: std::sync::Arc::new(test_listed_servers()),
+        server_state: std::sync::Arc::default(),
     };
     let test_router = TestRouter {
         router: router(&dist, &ops_dist, state),
