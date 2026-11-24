@@ -1,7 +1,10 @@
-<!-- Writing a post, at /posts/new; done, it shows the post -->
+<!-- Writing a post, at /posts/new; done, it shows the post. On a server
+     with a single community it goes in the current one. -->
 <script>
   import { c, t } from "ttag";
   import { postsCreate } from "../lib/core/index.js";
+  import { currentCommunityLoad } from "../lib/current_community.svelte.js";
+  import { currentServerCommunitiesSingle, currentServerLoad } from "../lib/current_server.svelte.js";
   import { errorMessageOf } from "../lib/error_message.js";
   import { navigateToUrl } from "../lib/router.js";
   import { postsShowUrl, postsIndexUrl } from "../lib/routes.js";
@@ -12,6 +15,17 @@
   let communityIds = $state([]);
   let error = $state("");
   let busy = $state(false);
+
+  async function load() {
+    try {
+      await currentServerLoad();
+      if (!currentServerCommunitiesSingle()) return;
+      const current = await currentCommunityLoad();
+      if (current && communityIds.length === 0) communityIds = [current.id];
+    } catch {
+      // The post is the person's alone
+    }
+  }
 
   async function save() {
     busy = true;
@@ -24,6 +38,8 @@
       busy = false;
     }
   }
+
+  load();
 </script>
 
 <Page>

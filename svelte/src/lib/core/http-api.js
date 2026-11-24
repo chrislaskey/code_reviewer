@@ -255,7 +255,7 @@ export function deviceAccountsRemove(_id, _losingChanges) {
 /**
  * The server the pages are on, which on the web is the one they came from,
  * with what it offers.
- * @returns {Promise<{display_name: string, host: string, default: boolean, settings: {features: {accounts_sign_up: boolean, accounts_sign_in_code: boolean, accounts_purchasing: boolean}}}>}
+ * @returns {Promise<{display_name: string, host: string, default: boolean, settings: {features: {accounts_sign_up: boolean, accounts_sign_in_code: boolean, accounts_purchasing: boolean, support: boolean, forum: boolean}, communities: "multiple" | "single"}}>}
  */
 export async function serversCurrentGet() {
   const [server, document] = await Promise.all([

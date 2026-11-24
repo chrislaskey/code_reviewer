@@ -12,9 +12,12 @@
 //! the account's and is queued as a create, as if the account had made
 //! it all on this device while offline, and the standard sync pushes
 //! it. Nothing a local user made exists anywhere else, so there is
-//! nothing to merge.
+//! nothing to merge. On a server with a single community, the move is
+//! given the account's own community, and the local user's communities
+//! fold into it before anything is pushed, so the account stays in one.
 
-use crate::data::app_communities;
+use crate::data::app_communities::{self, Community};
+use crate::data::app_users_communities::{self, Membership};
 use crate::data::local_users;
 use std::collections::BTreeMap;
 
@@ -25,12 +28,15 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::accounts::Session;
-use crate::app::communities::{self, CommunityError};
+use crate::app::communities::{self, CommunityAndMembership, CommunityError};
+use crate::app::memberships::{self, MembershipError};
 use crate::app::synced_tables;
 use crate::app::users::{self, SignedIn, UserError};
 use crate::data::app_events::Event;
 use crate::data::app_users::{self, User};
-use crate::data::device_settings::{self, DeviceSettingsError, LOCAL_USER_MOVED, SIGNED_IN};
+use crate::data::device_settings::{
+    self, CURRENT_COMMUNITY, DeviceSettingsError, LOCAL_USER_MOVED, SIGNED_IN,
+};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::random;
@@ -46,6 +52,38 @@ pub const COMMUNITY_NAME_WITHOUT_A_DEVICE_NAME: &str = "This device";
 
 const NAME_PREFIX: &str = "local_";
 const EMAIL_DOMAIN: &str = "example.com";
+
+/// The account's community a local user's communities fold into at a
+/// move, on a server with a single community, as the server has it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccountCommunity {
+    pub community: Community,
+    pub membership: Membership,
+}
+
+impl AccountCommunity {
+    /// Of the communities the server lists for the account, the one it
+    /// joined first, the same on each of its devices; none when it is
+    /// in none.
+    pub fn first_joined(listed: Vec<CommunityAndMembership>) -> Option<AccountCommunity> {
+        listed
+            .into_iter()
+            .filter_map(
+                |CommunityAndMembership {
+                     community,
+                     membership,
+                 }| {
+                    let membership =
+                        membership.filter(|membership| membership.deleted_at.is_none())?;
+                    Some(AccountCommunity {
+                        community,
+                        membership,
+                    })
+                },
+            )
+            .min_by_key(|joined| (joined.membership.inserted_at, joined.membership.id))
+    }
+}
 
 /// The account a local user's records moved to, kept in the device's
 /// database until the app has updated its list of accounts.
@@ -68,6 +106,8 @@ pub enum LocalUserError {
     User(#[from] UserError),
     #[error(transparent)]
     Community(#[from] CommunityError),
+    #[error(transparent)]
+    Membership(#[from] MembershipError),
     #[error(transparent)]
     DeviceSettings(#[from] DeviceSettingsError),
     /// A synced table's own module failed.
@@ -171,10 +211,13 @@ pub async fn count_items(deployment: &Deployment) -> Result<i64, LocalUserError>
 /// every row of the local user becomes the account's, the local user
 /// and every deleted row go, and each row left is queued as a create,
 /// made when the row was, for the next sync to push. The account's
-/// name and picture stay the account's.
+/// name and picture stay the account's. Given the account's community,
+/// the local user's communities fold into it first, see
+/// `fold_communities_in`.
 pub async fn move_to_account(
     deployment: &Deployment,
     session: Session,
+    account_community: Option<AccountCommunity>,
 ) -> Result<User, LocalUserError> {
     if deployment.role != Role::Device {
         return Err(LocalUserError::DeviceOnly);
@@ -193,6 +236,16 @@ pub async fn move_to_account(
         .collect();
     local_users::maintenance::delete_deleted_rows(&mut tx, &children_first).await?;
     local_users::maintenance::delete_user(&mut tx, local).await?;
+    let on_server = match &account_community {
+        Some(account_community) => {
+            fold_communities_in(&mut tx, &account, account_community).await?;
+            vec![
+                account_community.community.id,
+                account_community.membership.id,
+            ]
+        }
+        None => Vec::new(),
+    };
     let signed_in = SignedIn {
         user_id: account.id,
         token: Some(session.token),
@@ -204,7 +257,7 @@ pub async fn move_to_account(
         email: session.email,
     };
     device_settings::set(&mut tx, LOCAL_USER_MOVED, &Some(moved)).await?;
-    queue_creates_in(&mut tx, &account).await?;
+    queue_creates_in(&mut tx, &account, &on_server).await?;
     tx.commit().await?;
     Ok(account)
 }
@@ -222,6 +275,48 @@ pub async fn moved_forget(deployment: &Deployment) -> Result<(), LocalUserError>
     let mut tx = deployment.begin().await?;
     device_settings::set(&mut tx, LOCAL_USER_MOVED, &None::<Moved>).await?;
     tx.commit().await?;
+    Ok(())
+}
+
+/// Writes the account's community and membership as the server has
+/// them, puts every row of the local user's communities in it, removes
+/// those communities, which never reached the server, and makes it the
+/// current one.
+async fn fold_communities_in(
+    tx: &mut Transaction,
+    account: &User,
+    account_community: &AccountCommunity,
+) -> Result<(), LocalUserError> {
+    let AccountCommunity {
+        community,
+        membership,
+    } = account_community;
+    communities::apply_server_row(
+        tx,
+        &serde_json::to_value(community).map_err(CommunityError::from)?,
+    )
+    .await?;
+    memberships::apply_server_row(
+        tx,
+        &serde_json::to_value(membership).map_err(MembershipError::from)?,
+    )
+    .await?;
+    let folded: Vec<Uuid> =
+        app_users_communities::list(&mut *tx, app_users_communities::Filter::User(account.id))
+            .await?
+            .into_iter()
+            .map(|local| local.community_id)
+            .filter(|community_id| *community_id != community.id)
+            .collect();
+    for from_community_id in folded {
+        for synced in synced_tables::list() {
+            synced
+                .move_to_community(tx, from_community_id, membership)
+                .await?;
+        }
+        communities::delete_row(tx, from_community_id).await?;
+    }
+    device_settings::set(tx, CURRENT_COMMUNITY, &Some(community.id)).await?;
     Ok(())
 }
 
@@ -245,15 +340,22 @@ fn owner_columns() -> Vec<(&'static str, &'static str)> {
         .collect()
 }
 
-/// Queues a create for every row the device holds, table by table,
-/// parents first, see `synced_tables`. The queue is pushed in the order
-/// the events were made, so each is made at the time its row was, and
-/// after the rows it points at.
-async fn queue_creates_in(tx: &mut Transaction, user: &User) -> Result<(), LocalUserError> {
+/// Queues a create for every row the device holds but those the server
+/// has already, table by table, parents first, see `synced_tables`. The
+/// queue is pushed in the order the events were made, so each is made at
+/// the time its row was, and after the rows it points at.
+async fn queue_creates_in(
+    tx: &mut Transaction,
+    user: &User,
+    on_server: &[Uuid],
+) -> Result<(), LocalUserError> {
     let mut made_at_of: BTreeMap<Uuid, DateTime<Utc>> = BTreeMap::new();
     let mut queue = Vec::new();
     for synced in synced_tables::list() {
         for create in synced.local_user_creates(tx, user).await? {
+            if on_server.contains(&create.id) {
+                continue;
+            }
             let after_parents = create
                 .parents
                 .iter()
@@ -454,7 +556,7 @@ mod tests {
             let session =
                 accounts::tests::signed_up_for_a_device(&server, "alice@example.com").await;
 
-            let alice = move_to_account(&device, session.clone())
+            let alice = move_to_account(&device, session.clone(), None)
                 .await
                 .expect("moved");
             assert_eq!(alice, session.user, "the account's name, not the local one");
@@ -547,7 +649,9 @@ mod tests {
 
             let (device, local, _folder) = device_with_a_local_user().await;
             made_by(&device, &local).await;
-            move_to_account(&device, session).await.expect("moved");
+            move_to_account(&device, session, None)
+                .await
+                .expect("moved");
             let report = sync::run(&device, &InProcess { server: &server })
                 .await
                 .expect("a sync");
@@ -572,6 +676,121 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn local_users_move_to_a_single_community_account_folds_every_community_into_its_own() {
+        with_each_database(|database| async move {
+            let (server, _storage) = server(database);
+            let session =
+                accounts::tests::signed_up_for_a_device(&server, "alice@example.com").await;
+            let alice = session.user.clone();
+            let account_community = AccountCommunity::first_joined(
+                communities::list(&server, &alice).await.expect("listed"),
+            )
+            .expect("her sign-up's community");
+            assert_eq!(account_community.community.name, "Personal");
+
+            let (device, local, _folder) = device_with_a_local_user().await;
+            let made = made_by(&device, &local).await;
+            let in_both = communities::list(&device, &local)
+                .await
+                .expect("listed")
+                .into_iter()
+                .map(|listed| listed.community.id)
+                .collect::<Vec<_>>();
+            let in_both = posts::create(&device, &local, "in both", &in_both)
+                .await
+                .expect("a post");
+            move_to_account(&device, session, Some(account_community.clone()))
+                .await
+                .expect("moved");
+            assert_eq!(names_of_communities(&device, &alice).await, ["Personal"]);
+            assert_eq!(
+                crate::app::current_community::get_on_device(&device, &alice)
+                    .await
+                    .expect("asked"),
+                Some(account_community.community.clone())
+            );
+
+            let report = sync::run(&device, &InProcess { server: &server })
+                .await
+                .expect("a sync");
+            assert_eq!(report.push_error, None);
+            assert_eq!((report.rejected, report.conflicts), (0, 0));
+            assert_eq!(report.pending, 0);
+
+            assert_eq!(names_of_communities(&server, &alice).await, ["Personal"]);
+            for post in [&made.in_community, &in_both] {
+                let shown = posts::get(&server, &alice, post.id)
+                    .await
+                    .expect("the post");
+                let names: Vec<_> = shown.communities.iter().map(|c| c.name.as_str()).collect();
+                assert_eq!(names, ["Personal"], "{}", post.body);
+            }
+            let file = files::get(&server, &alice, made.file.id)
+                .await
+                .expect("the file");
+            let names: Vec<_> = file.communities.iter().map(|c| c.name.as_str()).collect();
+            assert_eq!(names, ["Personal"]);
+            assert_eq!(
+                posts_of(&device, &alice).await,
+                posts_of(&server, &alice).await
+            );
+            assert_eq!(
+                communities::list(&device, &alice).await.expect("listed"),
+                communities::list(&server, &alice).await.expect("listed"),
+                "the device matches the server"
+            );
+        })
+        .await;
+    }
+
+    #[test]
+    fn local_users_account_community_is_the_one_joined_first_and_live() {
+        let at = |seconds| DateTime::from_timestamp(seconds, 0).expect("a time");
+        let listed = |name: &str, joined: Option<(i64, bool)>| {
+            let community = Community {
+                id: Uuid::now_v7(),
+                name: name.to_string(),
+                inserted_at: at(0),
+                updated_at: at(0),
+                version: 1,
+                last_synced_at: None,
+                deleted_at: None,
+                deleted_by_id: None,
+            };
+            let membership = joined.map(|(seconds, left)| Membership {
+                id: Uuid::now_v7(),
+                user_id: Uuid::nil(),
+                community_id: community.id,
+                role: "member".to_string(),
+                inserted_at: at(seconds),
+                updated_at: at(seconds),
+                version: 1,
+                last_synced_at: None,
+                deleted_at: left.then(|| at(seconds + 1)),
+                deleted_by_id: None,
+            });
+            CommunityAndMembership {
+                community,
+                membership,
+            }
+        };
+        let first = AccountCommunity::first_joined(vec![
+            listed("Baking", Some((20, false))),
+            listed("Left", Some((5, true))),
+            listed("Not mine", None),
+            listed("Personal", Some((10, false))),
+        ]);
+        assert_eq!(
+            first.map(|joined| joined.community.name),
+            Some("Personal".to_string())
+        );
+        assert_eq!(
+            AccountCommunity::first_joined(vec![listed("Not mine", None)]),
+            None
+        );
+    }
+
+    #[tokio::test]
     async fn local_users_move_to_account_is_only_for_a_local_user() {
         with_each_database(|database| async move {
             let (server, _storage) = server(database);
@@ -582,7 +801,7 @@ mod tests {
                 .await
                 .expect("a post");
 
-            let error = move_to_account(&device, session)
+            let error = move_to_account(&device, session, None)
                 .await
                 .expect_err("she has an account");
             assert!(matches!(error, LocalUserError::NotLocal));

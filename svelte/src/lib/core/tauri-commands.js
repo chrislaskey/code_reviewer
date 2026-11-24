@@ -234,7 +234,7 @@ export function deviceAccountsRemove(id, losingChanges) {
  * The server the pages are on: the active account's, else the app's own.
  * `default` is whether it is the app's own, the only one that sells;
  * `settings` what it offers, as the device last fetched them.
- * @returns {Promise<{display_name: string, host: string, default: boolean, settings: {features: {accounts_sign_up: boolean, accounts_sign_in_code: boolean, accounts_purchasing: boolean}}}>}
+ * @returns {Promise<{display_name: string, host: string, default: boolean, settings: {features: {accounts_sign_up: boolean, accounts_sign_in_code: boolean, accounts_purchasing: boolean, support: boolean, forum: boolean}, communities: "multiple" | "single"}}>}
  */
 export function serversCurrentGet() {
   return invoke("servers_current_get");

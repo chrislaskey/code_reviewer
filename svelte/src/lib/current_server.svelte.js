@@ -7,7 +7,7 @@
 import { onServersCurrentChanged, serversCurrentGet } from "./core/index.js";
 
 /**
- * @typedef {{features: {accounts_sign_up: boolean, accounts_sign_in_code: boolean, accounts_purchasing: boolean}}} ServerSettings
+ * @typedef {{features: {accounts_sign_up: boolean, accounts_sign_in_code: boolean, accounts_purchasing: boolean, support: boolean, forum: boolean}, communities: "multiple" | "single"}} ServerSettings
  * @typedef {{display_name: string, host: string, default: boolean, settings: ServerSettings}} Server
  */
 
@@ -35,6 +35,14 @@ export function currentServerLoad() {
     },
   );
   return current;
+}
+
+/**
+ * Whether the server shows each person only the community they work in,
+ * with no switcher and no communities pages; reactive.
+ */
+export function currentServerCommunitiesSingle() {
+  return currentServer.value?.settings.communities === "single";
 }
 
 /**

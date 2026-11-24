@@ -5,7 +5,9 @@
      window. On small windows the gutter is hidden and BottomBar
      takes its place. A visitor sees Home only; staff on the web see Ops,
      another entry, which the router leaves to the browser (`target`).
-     The open tab is the one whose path the page's starts with. -->
+     The open tab is the one whose path the page's starts with. An app
+     whose server feature is off (APP_PAGES_FEATURES) has no tab, nor
+     Communities on a server with a single community. -->
 <script>
   import { t } from "ttag";
   import BottomBar from "./BottomBar.svelte";
@@ -23,12 +25,24 @@
     supportIndexUrl,
   } from "../routes.js";
   import { currentUser } from "../current_user.svelte.js";
+  import { currentServer, currentServerCommunitiesSingle, currentServerLoad } from "../current_server.svelte.js";
+  import { APP_PAGES_FEATURES } from "../pages.js";
 
   /** @typedef {{ id: string, label: string, icon: string, href: string, target?: string }} Link */
 
 
+  currentServerLoad().catch(() => {});
+
+  /** @param {Link} link */
+  function offered({ id, href }) {
+    if (id === "communities") return !currentServerCommunitiesSingle();
+    const feature = APP_PAGES_FEATURES[href];
+    const features = /** @type {Record<string, boolean> | undefined} */ (currentServer.value?.settings.features);
+    return !feature || (features?.[feature] ?? true);
+  }
+
   /** @type {Link[]} */
-  let links = $derived([
+  let allLinks = $derived([
     { id: "home", label: t`Home`, icon: "hero-home", href: homeUrl() },
     ...(currentUser.value
       ? [
@@ -43,6 +57,8 @@
       ? [{ id: "ops", label: t`Ops`, icon: "hero-wrench-screwdriver", href: opsHomeUrl(), target: "_self" }]
       : []),
   ]);
+
+  let links = $derived(allLinks.filter(offered));
 
   let current = $derived(
     links.find(({ href }) => currentPathname() === href || currentPathname().startsWith(`${href}/`))?.id ?? "",

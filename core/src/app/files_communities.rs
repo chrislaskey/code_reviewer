@@ -27,6 +27,7 @@ use crate::data::app_events::{self, Conflicts, Event, EventKind};
 use crate::data::app_files::File;
 use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
+use crate::data::app_users_communities::Membership;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;
@@ -710,6 +711,20 @@ impl SyncedTable for Synced {
     ) -> Result<Vec<TableRow>, TableError> {
         let rows = list_live_of_community_after(tx, community_id, after, limit).await?;
         Ok(rows.iter().map(table_row).collect::<Result<_, _>>()?)
+    }
+
+    async fn move_to_community(
+        &self,
+        tx: &mut Transaction,
+        from_community_id: Uuid,
+        to: &Membership,
+    ) -> Result<(), TableError> {
+        Ok(app_files_communities::maintenance::move_to_community(
+            tx,
+            from_community_id,
+            to.community_id,
+        )
+        .await?)
     }
 }
 

@@ -5,6 +5,7 @@
   import { dateTimeFormat } from "../lib/formats.js";
   import { postsList } from "../lib/core/index.js";
   import { loaded } from "../lib/loaded.svelte.js";
+  import { currentServerCommunitiesSingle } from "../lib/current_server.svelte.js";
   import { postsNewUrl, postsShowUrl } from "../lib/routes.js";
   import { Button, ErrorMessage, Heading, Link, Page, Panel, Text } from "../lib/components/index.js";
 
@@ -28,7 +29,7 @@
       <Panel as="li">
         <Text tone="muted">
           {owner.name} · {dateTimeFormat(post.inserted_at)}
-          {#if communities.length > 0}
+          {#if communities.length > 0 && !currentServerCommunitiesSingle()}
             {@const communityNames = communities.map((community) => community.name).join(", ")}
             · {t`in ${communityNames}`}
           {/if}

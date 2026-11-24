@@ -7,6 +7,7 @@
   import { filesShowUrl } from "../../lib/routes.js";
   import { Badge, Button, FieldErrors, Input, Link, Panel, Text, TranslatedParts } from "../../lib/components/index.js";
   import { fileSize } from "../../lib/file_size.js";
+  import { currentServerCommunitiesSingle } from "../../lib/current_server.svelte.js";
 
   /**
    * @typedef {"put" | "copy" | "skip"} Choice
@@ -90,7 +91,10 @@
   {#if offered.length > 0}
     <div class="flex flex-col gap-2">
       <Text size="sm">
-        {#if row.existing}
+        {#if row.existing && currentServerCommunitiesSingle()}
+          {#snippet existingLink()}<Link href={filesShowUrl(row.existing.file.id)}>{row.existing.file.name}</Link>{/snippet}
+          <TranslatedParts parts={jt`Already here, as ${existingLink}.`} />
+        {:else if row.existing}
           {@const communityNames = row.existing.communities.map((community) => community.name).join(", ")}
           {#snippet existingLink()}<Link href={filesShowUrl(row.existing.file.id)}>{row.existing.file.name}</Link>{/snippet}
           <TranslatedParts parts={jt`Already here, as ${existingLink} in ${communityNames}.`} />

@@ -253,6 +253,27 @@ person will ask for first.
     `Personal`, made by the sign-up, and "Chris's MacBook Pro" holding
     what they made locally; a trial that signs up keeps `Trial`. They
     rename or delete as they like, with the history plain to see.
+    **Since 2026-11-24, on a server with a single community** (its
+    settings' `communities`, see "Server settings" in
+    `multi-server.md`): the local user's communities fold into the
+    account's at the move, so the account stays in one, the pages
+    showing no other. Before the move the device asks the server, which
+    the sign-in just reached, for its settings, the build's defaults
+    being all a device that never synced holds, and when they say
+    `single`, for the account's communities; the one the account joined
+    first is kept (`AccountCommunity::first_joined`), the same on each
+    of its devices, Personal for a sign-up. In the move's transaction,
+    `local_users::fold_communities_in` writes that community and the
+    account's membership as the server has them, puts every row of the
+    local user's communities in it (each synced table's
+    `move_to_community`; a row in two keeps one), removes those
+    communities, which never reached the server, and makes it the
+    current one; the creates then queued leave out the two rows the
+    server has. Nothing is merged on the server, and no community is
+    deleted there. An account in no community keeps the device's. A
+    later way back to a device alone, when the person stops syncing,
+    would make the device's community again then, see
+    `docs/suggestions/accounts.md`.
     To decide:
     - where the device's name comes from. Desktops give the name the
       person set. iOS since 16 answers only "iPhone" to apps without a

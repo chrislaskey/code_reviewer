@@ -140,4 +140,14 @@ pub(crate) mod maintenance {
     pub(crate) async fn delete(tx: &mut Transaction, id: Uuid) -> Result<(), sqlx::Error> {
         query!(tx, delete_row(id))
     }
+
+    /// Puts every file in one community in another, at a local user's
+    /// move; a file already in both keeps the row it had in the other.
+    pub(crate) async fn move_to_community(
+        tx: &mut Transaction,
+        from_community_id: Uuid,
+        to_community_id: Uuid,
+    ) -> Result<(), sqlx::Error> {
+        query!(tx, move_to_community(from_community_id, to_community_id))
+    }
 }

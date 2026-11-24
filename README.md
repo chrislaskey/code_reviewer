@@ -201,7 +201,10 @@ with `accounts users password <email>` and deleted with `accounts users
 delete <email>`; see `docs/design/accounts-sign-in.md`.
 `bin/dev` reads `SERVER_SETTINGS` from `.env` when the environment has
 none (`.env.example`). A server that sells nothing adds
-`"accounts_purchasing": false`, see `docs/design/multi-server.md`.
+`"accounts_purchasing": false`, and one without support or a forum
+`"support": false` or `"forum": false`, and one whose people never see
+communities `"communities": "single"` beside `"features"`, see
+`docs/design/multi-server.md`.
 
 What was left out, changing the email and the rest of the Phoenix flow, is
 `docs/suggestions/accounts.md`.

@@ -1,9 +1,11 @@
 <!-- The communities a file is in, for the New and Edit pages: one
      checkbox for each community the person is a member of, bound to
-     `communityIds`. A file is in one at least. -->
+     `communityIds`. A file is in one at least. A server with a single
+     community shows no choice, only an error. -->
 <script>
   import { t } from "ttag";
   import { communitiesList } from "../../lib/core/index.js";
+  import { currentServerCommunitiesSingle } from "../../lib/current_server.svelte.js";
   import { Checkbox, FieldErrors, Text } from "../../lib/components/index.js";
 
   /**
@@ -38,18 +40,22 @@
   load();
 </script>
 
-<fieldset class="flex flex-col gap-1">
-  <Text as="legend" tone="muted">{t`In`}</Text>
-  <div class="flex flex-wrap gap-3">
-    {#each mine as community (community.id)}
-      <Checkbox
-        checked={communityIds.includes(community.id)}
-        {disabled}
-        onchange={(event) => communityChoose(community.id, event.currentTarget.checked)}
-      >
-        {community.name}
-      </Checkbox>
-    {/each}
-  </div>
+{#if currentServerCommunitiesSingle()}
   <FieldErrors {errors} fields={["community_ids"]} />
-</fieldset>
+{:else}
+  <fieldset class="flex flex-col gap-1">
+    <Text as="legend" tone="muted">{t`In`}</Text>
+    <div class="flex flex-wrap gap-3">
+      {#each mine as community (community.id)}
+        <Checkbox
+          checked={communityIds.includes(community.id)}
+          {disabled}
+          onchange={(event) => communityChoose(community.id, event.currentTarget.checked)}
+        >
+          {community.name}
+        </Checkbox>
+      {/each}
+    </div>
+    <FieldErrors {errors} fields={["community_ids"]} />
+  </fieldset>
+{/if}

@@ -32,16 +32,18 @@ pub async fn local_users_create(
 }
 
 /// Moves what the local user made into the account whose sign-in
-/// offered it, and syncs.
+/// offered it, and syncs; on a server with a single community, into the
+/// account's community.
 #[tauri::command]
 pub async fn local_users_move(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
 ) -> Result<User, CommandError> {
+    let account_community = device.local_user_move_account_community().await?;
     let user = {
         let _no_sync_meanwhile = server.hold().await;
-        device.local_user_move().await?
+        device.local_user_move(account_community).await?
     };
     sync::spawn(app);
     Ok(user)

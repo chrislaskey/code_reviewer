@@ -34,3 +34,12 @@ export const APP_PAGES = {
   [SUPPORT_INDEX_PATH]: () => import("../support/SupportIndexPage.svelte"),
   [FORUM_INDEX_PATH]: () => import("../forum/ForumIndexPage.svelte"),
 };
+
+// The server feature each app's pages need, by the path they are under:
+// with it off in the server's settings, the nav shows no tab for them and
+// the router sends their paths home.
+/** @type {Record<string, string>} */
+export const APP_PAGES_FEATURES = {
+  [SUPPORT_INDEX_PATH]: "support",
+  [FORUM_INDEX_PATH]: "forum",
+};

@@ -236,6 +236,29 @@ server answers every purchasing route, the webhooks included, with a
 products or purchases. For an app that sells nothing; its code stays,
 since purchasing is the template's.
 
+The fourth and fifth, `features.support` and `features.forum`, true by
+default, one per app: off, the nav shows no tab for the app and the
+router sends its paths home, in the browser and the app alike. The
+pages under a path name the feature they need in `APP_PAGES_FEATURES`
+(`svelte/src/lib/pages.js`). Both apps are placeholder pages for now,
+with no routes; their first route refuses when the key is off.
+
+The first key beside `features`, `communities`, `"multiple"` by
+default: `"single"` is for an app that is not many groups' at once.
+Each person is still made a community of their own, as always, and
+everything is still put in communities; the pages only stop showing
+them: no Communities tab, no community menu in the header, no
+community choice on the post and file forms (a new post or file goes
+in the current community), no community names beside posts and files,
+and the router sends the communities pages home, so a community cannot
+be deleted from the pages. A setting on the server, not the build,
+since a device's accounts may be on servers that differ. The server
+refuses nothing yet: creating, joining, leaving or deleting a
+community through the API still works, to be thought through on its
+own. A local user who signs up or signs in brings their communities,
+which fold into the account's at the move, see 10a in
+`accounts-local-and-trial-users.md`.
+
 Later, for settings: files a document names, a logo, fetched when their
 content hash changes and kept under `servers/<id>/`, with limits on
 their size and type settled when the first one is needed.

@@ -31,13 +31,14 @@ use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
 use app_core::accounts::{self, AccountError, Session};
-use app_core::app::local_users::{self, LocalUserError, Moved};
+use app_core::app::local_users::{self, AccountCommunity, LocalUserError, Moved};
 use app_core::app::users::{self, UserError};
 use app_core::data::app_users::User;
 use app_core::data::device_settings::{self, DeviceSettingsError};
 use app_core::database::{Database, DatabaseError};
 use app_core::deployment::{Deployment, FileStore, Role, now};
 use app_core::servers::ServerError;
+use app_core::servers::settings::Communities;
 use app_core::services::web_server::{Http, Transport};
 use app_core::sync::{self, SyncError};
 
@@ -565,8 +566,13 @@ impl DeviceAccounts {
 
     /// The person chose to move: everything the local user made becomes
     /// the account's, which takes the local user's place in the list
-    /// and is active. The next sync pushes it.
-    pub async fn local_user_move(&self) -> Result<User, DeviceAccountsError> {
+    /// and is active. The next sync pushes it. Given the account's
+    /// community, `local_user_move_account_community`, the local user's
+    /// communities fold into it.
+    pub async fn local_user_move(
+        &self,
+        account_community: Option<AccountCommunity>,
+    ) -> Result<User, DeviceAccountsError> {
         let local = self
             .local_account()
             .await?
@@ -587,12 +593,33 @@ impl DeviceAccounts {
             .execute(&self.list)
             .await?;
         let deployment = self.active().await?;
-        let user = local_users::move_to_account(&deployment, session).await?;
+        let user = local_users::move_to_account(&deployment, session, account_community).await?;
         self.name_moved_account(local.id, &deployment).await?;
         self.mark(local.id, true, true).await?;
         self.set_active(local.id, Some(server_id), deployment)
             .await?;
         Ok(user)
+    }
+
+    /// The community of the account whose sign-in offered a move that the
+    /// local user's fold into: on a server with a single community, as
+    /// it says now, the one the account joined first; none on a server
+    /// with many, or for an account in none. Asked of the server, which
+    /// the sign-in just reached; the offer stays.
+    pub async fn local_user_move_account_community(
+        &self,
+    ) -> Result<Option<AccountCommunity>, DeviceAccountsError> {
+        let (server_id, token) = match self.move_offered.lock().await.as_ref() {
+            Some(offered) => (offered.server_id, offered.session.token.clone()),
+            None => return Err(DeviceAccountsError::NoMoveOffered),
+        };
+        let transport = self.transport_for(&self.server_of(Some(server_id)).await?)?;
+        let settings = transport.servers_current_settings_get().await?.settings;
+        if settings.communities != Communities::Single {
+            return Ok(None);
+        }
+        let listed = transport.communities_list(&token).await?;
+        Ok(AccountCommunity::first_joined(listed))
     }
 
     /// The person chose to keep them apart: the account is added beside
@@ -1133,7 +1160,7 @@ mod tests {
         .await
         .expect("a post");
         assert!(matches!(
-            device.local_user_move().await,
+            device.local_user_move(None).await,
             Err(DeviceAccountsError::NoMoveOffered)
         ));
 
@@ -1156,7 +1183,7 @@ mod tests {
             "nothing was done yet"
         );
 
-        let alice = device.local_user_move().await.expect("moved");
+        let alice = device.local_user_move(None).await.expect("moved");
         assert_eq!(alice.id, alice_id);
         assert_eq!(active_user_id(&device).await, Some(alice.id));
         let listed = device.list().await.expect("listed");
@@ -1271,7 +1298,7 @@ mod tests {
             .await
             .expect("the server named, as a move starts");
         let deployment = device.active().await.expect("the local user's");
-        local_users::move_to_account(&deployment, session)
+        local_users::move_to_account(&deployment, session, None)
             .await
             .expect("the file changed, and the app stopped there");
         drop(deployment);
@@ -1581,6 +1608,7 @@ mod tests {
                 accounts_sign_up: false,
                 ..Features::default()
             },
+            ..ServerSettings::default()
         };
         let directory = tempfile::tempdir().expect("a directory");
         let server = server().await;

@@ -19,6 +19,12 @@ pub struct Features {
     /// Whether the server sells plans and products; off, it answers
     /// none of the purchasing routes and the pages offer nothing to buy.
     pub accounts_purchasing: bool,
+    /// Whether the server offers the support app; off, the pages show
+    /// neither its tab nor its pages.
+    pub support: bool,
+    /// Whether the server offers the forum app; off, the pages show
+    /// neither its tab nor its pages.
+    pub forum: bool,
 }
 
 impl Default for Features {
@@ -27,6 +33,8 @@ impl Default for Features {
             accounts_sign_up: true,
             accounts_sign_in_code: true,
             accounts_purchasing: true,
+            support: true,
+            forum: true,
         }
     }
 }

@@ -83,3 +83,15 @@ this one:
 - **Rate limits shared between several servers**: `governor`'s buckets
   are this process's; several copies of the server need a shared store
   or a limit at the proxy.
+
+- **Back to a device alone.** A person who stops paying, or stops
+  syncing through the web, may want what they made kept on one device
+  only, as a local user again. Nothing turns an account back into a
+  local user today. When it is built, on a server with a single
+  community, it makes the device's community again at that moment, as
+  `local_users::create` does for a new local user, and puts the
+  account's rows in it, rather than keeping the device's community
+  through the account's life, where it would be a second community
+  the pages hide and could become the current one. Before the device
+  leaves the server, every file's bytes must be on it, not only those
+  it happened to keep.
