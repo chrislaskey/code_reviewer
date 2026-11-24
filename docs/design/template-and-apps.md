@@ -43,7 +43,7 @@ Two things decide whether that stays smooth:
 | Kind | What | An app |
 |---|---|---|
 | **framework** | machinery an app uses as is: sync, events, conflicts, users, communities and memberships, the bytes of synced rows, accounts, purchasing, ops, `database.rs`, `deployment.rs`, `services/`, `helpers/`, the Svelte atoms, `loaded()`, `CommandError` | extends it, or changes it upstream |
-| **seams** | files every app edits to add a feature: `tauri/src/lib.rs`'s command list, `axum/src/router.rs`, `svelte/src/lib/core/*`, the page router, the nav | edits them, a line per feature |
+| **seams** | files every app edits to add a feature: `tauri/src/lib.rs`'s command list, `axum/src/router.rs`, `svelte/src/lib/core/*`, the page list (`svelte/src/lib/pages.js`), the nav | edits them, a line per feature |
 | **examples** | features that show the patterns: posts, and files as a resource (its name, search, duplicates, pages) | replaces or deletes them |
 
 Ownership is recorded in a manifest, not in directory names. A

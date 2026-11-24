@@ -434,7 +434,8 @@ SYNC_SERVER_URL=http://localhost:4000 TEST_SERVER_DATABASE_URL=sqlite:../axum/da
 
 The Svelte app is one document, `svelte/src/index.html`, and a client-side
 router (`svelte/src/lib/router.js`, [sv-router](https://sv-router.dev))
-shows the page at the path, swapped in place:
+shows the page at the path, swapped in place; the app's pages are listed
+in `svelte/src/lib/pages.js`, the template's own in the router:
 
 | Path | Shows |
 | --- | --- |
