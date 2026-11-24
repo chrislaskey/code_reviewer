@@ -8,11 +8,17 @@ pub mod artifacts;
 #[cfg(feature = "host")]
 pub mod continue_command;
 #[cfg(feature = "host")]
+pub mod finished_sessions;
+#[cfg(feature = "host")]
 pub mod host;
+#[cfg(feature = "host")]
+pub mod notifications;
 #[cfg(feature = "host")]
 mod on_host;
 #[cfg(feature = "sync-http")]
 pub mod online;
+#[cfg(feature = "host")]
+pub mod private_file;
 #[cfg(feature = "host")]
 pub mod summaries;
 

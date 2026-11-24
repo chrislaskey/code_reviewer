@@ -139,6 +139,18 @@ fn app_api() -> Router<AppState> {
             "/api/sessions/{name}/artifacts-url",
             get(sessions::artifacts_url_get),
         )
+        .route(
+            "/api/sessions/{name}/bell",
+            get(sessions::bell_get).put(sessions::bell_update),
+        )
+        .route(
+            "/api/notifications/waiting",
+            get(sessions::notifications_waiting_list),
+        )
+        .route(
+            "/api/devices/current/apple-push-token",
+            put(sessions::apple_push_token_update),
+        )
 }
 
 /// The sync API, `sync`, for the devices: every route requires the
