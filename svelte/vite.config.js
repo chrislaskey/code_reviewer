@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve, sep } from "node:path";
+import sirv from "sirv";
 import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import tailwindcss from "@tailwindcss/vite";
@@ -139,11 +140,63 @@ const TAURI_DEV_HOST = process.env.TAURI_DEV_HOST;
 // answers any other path with index.html, and so do the web server
 // (../axum) and the Tauri app, so every page is reloadable. `pnpm build` writes dist/, which the web server
 // serves and the Tauri app bundles.
+// The artifacts (artifacts/README.md): files made while working, such as
+// screenshots and previews, under artifacts/<project>/<worktree>/, at
+// /artifacts/ on the dev server only. A folder's address shows the index,
+// which lists the files below it from /artifacts/files.json, newest first.
+const ARTIFACTS_DIRECTORY = resolve(import.meta.dirname, "../artifacts");
+const ARTIFACTS_INDEX = join(ARTIFACTS_DIRECTORY, "index.html");
+
+function listArtifacts() {
+  return readdirSync(ARTIFACTS_DIRECTORY, { recursive: true })
+    .filter((path) => path.includes("/") && !path.split("/").some((part) => part.startsWith(".")))
+    .map((path) => ({ path, stats: statSync(join(ARTIFACTS_DIRECTORY, path)) }))
+    .filter(({ stats }) => stats.isFile())
+    .map(({ path, stats }) => ({ path, size: stats.size, modified: stats.mtimeMs }))
+    .sort((a, b) => b.modified - a.modified);
+}
+
+function isArtifactsFolder(url) {
+  let path;
+  try {
+    path = resolve(ARTIFACTS_DIRECTORY, "." + decodeURIComponent(url.split("?")[0]));
+  } catch {
+    return false;
+  }
+  if (path !== ARTIFACTS_DIRECTORY && !path.startsWith(ARTIFACTS_DIRECTORY + sep)) return false;
+  return existsSync(path) && statSync(path).isDirectory();
+}
+
+function artifacts() {
+  return {
+    name: "artifacts",
+    configureServer(server) {
+      const serveArtifact = sirv(ARTIFACTS_DIRECTORY, { dev: true });
+      server.middlewares.use("/artifacts", (request, response) => {
+        if (request.url === "/files.json") {
+          response.setHeader("Content-Type", "application/json");
+          response.end(JSON.stringify(listArtifacts()));
+          return;
+        }
+        if (isArtifactsFolder(request.url)) {
+          response.setHeader("Content-Type", "text/html; charset=utf-8");
+          response.end(readFileSync(ARTIFACTS_INDEX));
+          return;
+        }
+        serveArtifact(request, response, () => {
+          response.statusCode = 404;
+          response.end("No such artifact");
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => ({
   root: "src",
   base: mode === "ops" ? "/ops/" : "/",
   publicDir: "static",
-  plugins: [themeScript(), publicPages(), translationFiles(), tailwindcss(), svelte()],
+  plugins: [themeScript(), artifacts(), publicPages(), translationFiles(), tailwindcss(), svelte()],
   clearScreen: false,
   server: {
     port: 1420,
