@@ -1,7 +1,8 @@
 // The app's pages, each at its path from routes.js: the router (router.js)
 // shows them beside the template's own. A page is loaded the first time it
 // is visited, so each page's code stays a chunk of its own. Every app
-// edits this list, a line per page.
+// edits this list, a line per page, and may change where a person lands
+// after signing in, pageAfterSignInUrl.
 import {
   FILES_EDIT_PATH,
   FILES_INDEX_PATH,
@@ -23,6 +24,7 @@ import {
   SUPPORT_INDEX_PATH,
   TRACES_NEW_PATH,
   TRACES_SHOW_PATH,
+  homeUrl,
 } from "./routes.js";
 
 /** @type {Record<string, () => Promise<unknown>>} */
@@ -57,3 +59,12 @@ export const APP_PAGES_REQUIRED_FEATURES = {
   [SUPPORT_INDEX_PATH]: "support",
   [FORUM_INDEX_PATH]: "forum",
 };
+
+/**
+ * Where a person lands once signed in, signed up, or started as a guest:
+ * Home. An app may send them elsewhere, for everyone or person by person.
+ * @returns {string}
+ */
+export function pageAfterSignInUrl() {
+  return homeUrl();
+}

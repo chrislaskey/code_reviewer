@@ -21,6 +21,7 @@
   import { TRANSLATIONS_LOCALES, translationsFollow, translationsLocaleShown } from "../lib/translations.js";
   import {
     Alert,
+    Avatar,
     Button,
     ErrorMessage,
     FieldErrors,
@@ -140,13 +141,7 @@
       </Alert>
     {/if}
     <div class="flex items-center gap-4">
-      {#if currentUser.avatar_url}
-        <img src={currentUser.avatar_url} alt={currentUser.name} class="size-20 rounded-full object-cover" />
-      {:else}
-        <div class="bg-base-300 flex size-20 items-center justify-center rounded-full text-2xl uppercase">
-          {currentUser.name.slice(0, 1)}
-        </div>
-      {/if}
+      <Avatar user={currentUser} size="lg" />
       <span>{currentUser.name}</span>
     </div>
     <form onsubmit={saveName} class="flex flex-col gap-3">

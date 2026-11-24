@@ -18,6 +18,37 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-24: the sign-in scheme checked against the app's identifier
+
+- **What changed**: a test of the Tauri app fails when `APP_URL_SCHEME`
+  in `svelte/src/lib/routes.js` differs from `APP_IDENTIFIER` in
+  `core/src/app/identity.rs`. Different, the iPhone's sign-in page
+  showed the code to paste instead of returning to the app.
+- **What an app does**: **Required**: set `APP_URL_SCHEME` to the app's
+  identifier, the bundle identifier in `tauri/tauri.conf.json`.
+
+## 2026-11-24: landing on Home after signing in, or the app's choice
+
+- **What changed**: signing in, signing up, starting as a guest and
+  switching account land on `pageAfterSignInUrl()`, in the seam
+  `svelte/src/lib/pages.js`, which returns Home; they landed on Posts.
+- **What an app does**: **Optional**: return another page from
+  `pageAfterSignInUrl()`, for everyone or person by person.
+
+## 2026-11-24: Avatar, the initials when a picture doesn't load
+
+- **What changed**: the core component `Avatar` draws a person's
+  picture, else their initials, else a person icon, and the initials
+  when the picture doesn't load, such as a dev server's `localhost`
+  address seen from a phone, or a deleted file. `AccountMenu` and
+  `ProfileEditPage` use it. `.avatar-initials` no longer sets a size;
+  `.avatar-sm` (28px) and `.avatar-lg` (5rem) do.
+- **What an app does**:
+  - **Optional**: `<Avatar user={...} />` wherever the app shows a
+    person's picture, in place of an `<img>` of `avatar_url`.
+  - **Required**, for an app that used `.avatar-initials` itself: add
+    `.avatar-sm` beside it for its old size.
+
 ## 2026-11-24: the app's name in the identity seam
 
 1f7ddaa.

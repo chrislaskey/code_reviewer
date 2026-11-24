@@ -7,7 +7,7 @@
   import { errorMessageOf } from "../../lib/error_message.js";
   import { currentUserForget } from "../../lib/current_user.svelte.js";
   import { navigateToUrl } from "../../lib/router.js";
-  import { postsIndexUrl } from "../../lib/routes.js";
+  import { pageAfterSignInUrl } from "../../lib/pages.js";
   import { ErrorMessage, Icon } from "../../lib/components/index.js";
 
   let error = $state("");
@@ -19,7 +19,7 @@
     try {
       await accountsTrialCreate();
       currentUserForget();
-      await navigateToUrl(postsIndexUrl());
+      await navigateToUrl(pageAfterSignInUrl());
     } catch (problem) {
       error = errorMessageOf(problem);
     } finally {

@@ -16,7 +16,7 @@
   import { currentServer, currentServerLoad } from "../lib/current_server.svelte.js";
   import { currentUser, currentUserForget } from "../lib/current_user.svelte.js";
   import { navigateToUrl } from "../lib/router.js";
-  import { postsIndexUrl } from "../lib/routes.js";
+  import { pageAfterSignInUrl } from "../lib/pages.js";
   import AccountsDeviceCode from "./components/AccountsDeviceCode.svelte";
   import AccountsGuestRow from "./components/AccountsGuestRow.svelte";
   import AccountsSignInSteps from "./components/AccountsSignInSteps.svelte";
@@ -80,7 +80,7 @@
       return;
     }
     currentUserForget();
-    await navigateToUrl(postsIndexUrl());
+    await navigateToUrl(pageAfterSignInUrl());
   }
 
   /** @param {SubmitEvent} event */

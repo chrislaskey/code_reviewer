@@ -187,17 +187,32 @@ body {
   box-shadow: var(--raised-shadow);
 }
 
-/* The person's initials in place of an avatar (AccountMenu). */
+/* A person's picture, or their initials in its place (Avatar), small in
+   the header, large on the profile. */
+.avatar-picture {
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .avatar-initials {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
   border-radius: 50%;
   background: color-mix(in oklab, var(--color-primary) 18%, transparent);
   color: var(--color-primary);
-  font-size: 12px;
   font-weight: 700;
+}
+
+.avatar-sm {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+
+.avatar-lg {
+  width: 5rem;
+  height: 5rem;
+  font-size: 1.75rem;
 }
 
 /* The navigation gutter (AppNav): fixed down the window's left edge below

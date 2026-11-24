@@ -347,4 +347,14 @@ mod tests {
         assert_eq!(device_code_in("http://127.0.0.1:53122/favicon.ico"), None);
         assert_eq!(device_code_in("http://127.0.0.1:53122/?code="), None);
     }
+
+    #[test]
+    fn accounts_sign_in_page_returns_to_the_apps_own_scheme() {
+        let identifier = app_core::app::identity::APP_IDENTIFIER;
+        let routes = include_str!("../../svelte/src/lib/routes.js");
+        assert!(
+            routes.contains(&format!("const APP_URL_SCHEME = \"{identifier}\";")),
+            "set APP_URL_SCHEME in svelte/src/lib/routes.js to the app's identifier, {identifier}, or the iPhone's sign-in sheet never returns to the app"
+        );
+    }
 }
