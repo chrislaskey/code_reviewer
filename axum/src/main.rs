@@ -102,7 +102,8 @@ async fn main() -> Result<(), String> {
         }
     });
     jobs::spawn(deployment.clone());
-    server_tasks::spawn(deployment.clone());
+    let server_state = std::sync::Arc::default();
+    server_tasks::spawn(deployment.clone(), std::sync::Arc::clone(&server_state));
     let server_settings = config::server_settings()?;
     let state = AppState {
         deployment,
@@ -116,7 +117,7 @@ async fn main() -> Result<(), String> {
         server_description: config::server_description(&server_settings)?,
         server_settings: std::sync::Arc::new(SettingsDocument::of(server_settings)),
         listed_servers: std::sync::Arc::new(config::listed_servers()?),
-        server_state: std::sync::Arc::default(),
+        server_state,
     };
 
     let address = SocketAddr::new(config::host()?, config::port()?);

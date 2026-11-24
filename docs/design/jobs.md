@@ -90,6 +90,9 @@ the template.
 
 - **Started with the server**, by `axum/src/server_tasks.rs`, beside the
   jobs' loop; not for a command on the server's command line.
+- **Sharing the routes' state**: `run` gets the database and the app's
+  `ServerState` (`core/src/app/server_state.rs`), the one the handlers
+  take, so a watcher's findings reach the routes. Since 2026-11-24.
 - **Started again when it fails**, ten seconds later, with the error in
   the log; a task that returns `Ok` is done.
 - **Stopped with the server.** The server has no graceful shutdown, so a
