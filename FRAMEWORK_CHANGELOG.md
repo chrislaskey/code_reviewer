@@ -18,6 +18,19 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-24: the app's name in the header on a single-community server
+
+- **What changed**: on small windows, a server with a single community
+  shows the app's name in the header, a link to Home, where the
+  community menu would be. The pages read the name from the new seam
+  `svelte/src/lib/identity.js`, `APP_NAME`; a test of the Tauri app
+  keeps it, and the `<title>` of `svelte/src/index.html`, equal to
+  `APP_NAME` in `core/src/app/identity.rs`.
+- **What an app does**: **Required**: set `APP_NAME` in
+  `svelte/src/lib/identity.js` and the `<title>` in
+  `svelte/src/index.html` to the app's name; `cargo test --workspace`
+  fails until they agree.
+
 ## 2026-11-24: no bounce on the desktop, a see-through header on small windows
 
 - **What changed**: the desktop app's window no longer bounces past the

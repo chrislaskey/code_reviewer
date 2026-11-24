@@ -396,4 +396,18 @@ mod tests {
         assert_eq!(config["productName"], APP_NAME);
         assert_eq!(config["app"]["windows"][0]["title"], APP_NAME);
     }
+
+    #[test]
+    fn device_servers_app_name_is_the_pages_and_their_title() {
+        let identity = include_str!("../../../svelte/src/lib/identity.js");
+        assert!(
+            identity.contains(&format!("export const APP_NAME = \"{APP_NAME}\";")),
+            "set APP_NAME in svelte/src/lib/identity.js to {APP_NAME}"
+        );
+        let index = include_str!("../../../svelte/src/index.html");
+        assert!(
+            index.contains(&format!("<title>{APP_NAME}</title>")),
+            "set the <title> of svelte/src/index.html to {APP_NAME}"
+        );
+    }
 }
