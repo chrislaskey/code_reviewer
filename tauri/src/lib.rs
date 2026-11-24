@@ -145,7 +145,13 @@ pub fn run() {
             accounts::store_transactions::accounts_store_get,
             accounts::store_transactions::accounts_store_transactions_create,
             accounts::store_transactions::accounts_store_transactions_restore,
-            accounts::subscriptions::accounts_subscriptions_manage_open
+            accounts::subscriptions::accounts_subscriptions_manage_open,
+            app::reviews::reviews_branches_list,
+            app::reviews::reviews_file_changes_list,
+            app::reviews::reviews_function_diffs_list,
+            app::reviews::reviews_file_diffs_list,
+            app::traces::traces_tests_list,
+            app::traces::traces_call_stacks_get
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

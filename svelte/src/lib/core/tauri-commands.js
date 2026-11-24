@@ -712,3 +712,37 @@ export function accountsStoreTransactionsRestore() {
 export function accountsSubscriptionsManageOpen() {
   return invoke("accounts_subscriptions_manage_open");
 }
+
+// Reviews and traces run on the server's machine, against its git
+// repositories: these commands ask its API as the signed-in person
+// (../../../../tauri/src/app/reviews.rs and traces.rs).
+
+/** @param {string} repoPath */
+export function reviewsBranchesList(repoPath) {
+  return invoke("reviews_branches_list", { repoPath });
+}
+
+/** @param {object} request */
+export function reviewsFileChangesList(request) {
+  return invoke("reviews_file_changes_list", { request });
+}
+
+/** @param {object} request */
+export function reviewsFunctionDiffsList(request) {
+  return invoke("reviews_function_diffs_list", { request });
+}
+
+/** @param {object} request */
+export function reviewsFileDiffsList(request) {
+  return invoke("reviews_file_diffs_list", { request });
+}
+
+/** @param {object} request */
+export function tracesTestsList(request) {
+  return invoke("traces_tests_list", { request });
+}
+
+/** @param {object} request */
+export function tracesCallStacksGet(request) {
+  return invoke("traces_call_stacks_get", { request });
+}

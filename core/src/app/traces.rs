@@ -2,7 +2,11 @@
 //! tests, marking the ones a comparison added or modified, and the calls
 //! below one of them, each project function in full with its lines marked
 //! against the base. The work is `app::analysis`, run on a blocking
-//! thread; it needs the `host` feature, on the server alone.
+//! thread; it needs the `host` feature, on the server alone. A device
+//! asks the server instead, `online`.
+
+#[cfg(feature = "sync-http")]
+pub mod online;
 
 #[cfg(feature = "host")]
 pub use on_host::*;

@@ -737,3 +737,36 @@ export function accountsStoreTransactionsRestore() {
 export function accountsSubscriptionsManageOpen() {
   return Promise.reject(new Error(t`A plan from a phone's store is managed on the phone`));
 }
+
+// Reviews and traces take an app's bearer token alone, never the
+// browser's cookie, so in a browser these answer 401.
+
+/** @param {string} repoPath */
+export function reviewsBranchesList(repoPath) {
+  return send("GET", `/api/reviews/branches?${new URLSearchParams({ repo_path: repoPath })}`);
+}
+
+/** @param {object} request */
+export function reviewsFileChangesList(request) {
+  return send("POST", "/api/reviews/file-changes", request);
+}
+
+/** @param {object} request */
+export function reviewsFunctionDiffsList(request) {
+  return send("POST", "/api/reviews/function-diffs", request);
+}
+
+/** @param {object} request */
+export function reviewsFileDiffsList(request) {
+  return send("POST", "/api/reviews/file-diffs", request);
+}
+
+/** @param {object} request */
+export function tracesTestsList(request) {
+  return send("POST", "/api/traces/tests", request);
+}
+
+/** @param {object} request */
+export function tracesCallStacksGet(request) {
+  return send("POST", "/api/traces/call-stacks", request);
+}

@@ -3,6 +3,10 @@
 //! changed, by file and group, and the diffs of its functions and files.
 //! The work is `app::analysis`, run on a blocking thread, as it reads
 //! files and runs git; it needs the `host` feature, on the server alone.
+//! A device asks the server instead, `online`.
+
+#[cfg(feature = "sync-http")]
+pub mod online;
 
 #[cfg(feature = "host")]
 pub use on_host::*;
