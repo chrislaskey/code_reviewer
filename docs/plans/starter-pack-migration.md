@@ -304,5 +304,14 @@ In Code Reviewer, its own:
    commands, pages. Artifacts kept as on main (template `bin/dev` passes
    `PAGES_DEV_URL`); the server serving them itself is
    `docs/suggestions/artifacts.md`.
-5. Notifications: desktop, then APNs.
+5. Notifications: desktop, then APNs. Built 2026-11-24, all but the check
+   on a running app and a phone: template `ServerTask::run` gets
+   `ServerState`; bells per device, the hash of its bearer token, dropped
+   once its token no longer signs in; the bells, push tokens and APNs key
+   in `axum/data/`; the finished-sessions watcher a `ServerTask`; desktop
+   notifications with `tauri-plugin-notification`; the phone's push token
+   with `tauri-plugin-notifications` and the `aps-environment`
+   entitlement. Found: `framework_check` fails on the `Package.resolved`
+   files an iOS build writes in `tauri/plugins/*/ios/`, though git ignores
+   them; the check should skip ignored files (template).
 6. iOS details; the web turned off but for signing in.
