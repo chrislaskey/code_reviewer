@@ -1,0 +1,56 @@
+//! The coding agent running in a tmux session, Claude Code, Cursor's
+//! `agent` or Codex, with the status the pages show. How each one's status
+//! is found is in `claude_code.rs`, `cursor_agent.rs` and `codex.rs`.
+
+pub mod chat;
+pub mod claude_code;
+pub mod claude_code_chat;
+pub mod codex;
+pub mod codex_chat;
+#[cfg(unix)]
+pub mod codex_local;
+pub mod cursor_agent;
+pub mod cursor_agent_chat;
+pub mod recent_writes;
+
+use serde::{Deserialize, Serialize};
+
+use crate::services::agents::claude_code::ClaudeCodeSession;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentKind {
+    ClaudeCode,
+    CursorAgent,
+    Codex,
+}
+
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct AgentSession {
+    pub kind: AgentKind,
+    pub pid: u32,
+    /// The agent's own id for its chat, when it reports one. Claude Code's
+    /// names its transcript (see `claude_code_chat.rs`), as Codex's names
+    /// its rollout (see `codex_chat.rs`).
+    pub session_id: Option<String>,
+    /// The tmux pane the agent runs in, like `%60`, to send prompts to.
+    pub tmux_pane_id: Option<String>,
+    /// `busy` or `idle` (Claude Code also reports `shell`), or `None` when
+    /// it can't be told.
+    pub status: Option<String>,
+    /// Milliseconds since the Unix epoch.
+    pub status_updated_at: Option<u64>,
+}
+
+impl From<ClaudeCodeSession> for AgentSession {
+    fn from(session: ClaudeCodeSession) -> Self {
+        Self {
+            kind: AgentKind::ClaudeCode,
+            pid: session.pid,
+            session_id: session.session_id,
+            tmux_pane_id: session.tmux_pane_id,
+            status: session.status,
+            status_updated_at: session.status_updated_at,
+        }
+    }
+}

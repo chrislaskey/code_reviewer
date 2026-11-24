@@ -28,6 +28,7 @@ stripe = [
     "dep:async-stripe-types",
     "dep:async-stripe-webhook",
     "dep:futures-util",
+    "futures-util/std",
     "dep:secrecy",
 ]
 # Selling in the iPhone app through the App Store, for the server; never in the Tauri app
@@ -35,13 +36,23 @@ app-store = ["stripe", "dep:app-store-server-library"]
 # Code Reviewer's work on the server's machine: reviews and traces of its git
 # repositories; never in the Tauri app
 host = [
+    "dep:base64",
     "dep:comrak",
+    "dep:futures-util",
+    "futures-util/std",
     "dep:globset",
     "dep:indexmap",
+    "dep:md-5",
     "dep:rayon",
     "dep:regex",
     "dep:similar",
+    "dep:tokio-tungstenite",
     "dep:toml",
+    "tokio/macros",
+    "tokio/net",
+    "tokio/process",
+    "tokio/sync",
+    "tokio/time",
     "dep:tree-sitter",
     "dep:tree-sitter-elixir",
     "dep:tree-sitter-rust",
@@ -73,6 +84,7 @@ gettext = "0.4"
 globset = { version = "0.4.20", optional = true }
 indexmap = { version = "2.14.2", features = ["serde"], optional = true }
 object_store = { version = "0.14", default-features = false, features = ["aws"], optional = true }
+md-5 = { version = "0.11.0", optional = true }
 rand = "0.10"
 rayon = { version = "1.12.0", optional = true }
 regex = { version = "1.13.1", optional = true }
@@ -85,6 +97,7 @@ similar = { version = "3.2.0", optional = true }
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "macros", "migrate", "chrono", "json", "uuid"] }
 thiserror = { workspace = true }
 tokio = { version = "1", features = ["rt", "fs", "io-util"] }
+tokio-tungstenite = { version = "0.28", default-features = false, features = ["handshake"], optional = true }
 toml = { version = "1.1.8", features = ["preserve_order"], optional = true }
 tracing = "0.1"
 tree-sitter = { version = "0.27.1", optional = true }
