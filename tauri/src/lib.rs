@@ -151,7 +151,21 @@ pub fn run() {
             app::reviews::reviews_function_diffs_list,
             app::reviews::reviews_file_diffs_list,
             app::traces::traces_tests_list,
-            app::traces::traces_call_stacks_get
+            app::traces::traces_call_stacks_get,
+            app::sessions::sessions_settings_get,
+            app::sessions::sessions_default_port_get,
+            app::sessions::sessions_list,
+            app::sessions::sessions_create,
+            app::sessions::sessions_get,
+            app::sessions::sessions_delete,
+            app::sessions::sessions_chat_get,
+            app::sessions::sessions_prompts_create,
+            app::sessions::sessions_prompt_images_create,
+            app::sessions::sessions_continuations_create,
+            app::sessions::sessions_merges_create,
+            app::sessions::sessions_terminal_windows_create,
+            app::sessions::sessions_browser_url_get,
+            app::sessions::sessions_artifacts_url_get
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

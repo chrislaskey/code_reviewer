@@ -21,7 +21,6 @@ pub mod posts_communities;
 pub mod reviews;
 pub mod server_state;
 pub mod server_tasks;
-#[cfg(feature = "host")]
 pub mod sessions;
 pub mod synced_tables;
 pub mod traces;

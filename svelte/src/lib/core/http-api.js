@@ -770,3 +770,107 @@ export function tracesTestsList(request) {
 export function tracesCallStacksGet(request) {
   return send("POST", "/api/traces/call-stacks", request);
 }
+
+// Sessions take an app's bearer token alone, never the browser's cookie,
+// so in a browser these answer 401.
+
+/**
+ * A session's path, its name escaped as one segment.
+ * @param {string} name
+ * @param {string} [rest]
+ */
+function sessionPath(name, rest = "") {
+  return `/api/sessions/${encodeURIComponent(name)}${rest}`;
+}
+
+export function sessionsSettingsGet() {
+  return send("GET", "/api/sessions/settings");
+}
+
+export function sessionsDefaultPortGet() {
+  return send("GET", "/api/sessions/default-port");
+}
+
+export function sessionsList() {
+  return send("GET", "/api/sessions");
+}
+
+/**
+ * @param {object} request
+ */
+export function sessionsCreate(request) {
+  return send("POST", "/api/sessions", request);
+}
+
+/**
+ * @param {string} name
+ */
+export function sessionsGet(name) {
+  return send("GET", sessionPath(name));
+}
+
+/**
+ * @param {string} name
+ */
+export function sessionsDelete(name) {
+  return send("DELETE", sessionPath(name));
+}
+
+/**
+ * @param {string} name
+ */
+export function sessionsChatGet(name) {
+  return send("GET", sessionPath(name, "/chat"));
+}
+
+/**
+ * @param {string} name
+ * @param {object} request
+ */
+export function sessionsPromptsCreate(name, request) {
+  return send("POST", sessionPath(name, "/prompts"), request);
+}
+
+/**
+ * @param {string} name
+ * @param {object} request
+ */
+export function sessionsPromptImagesCreate(name, request) {
+  return send("POST", sessionPath(name, "/prompt-images"), request);
+}
+
+/**
+ * @param {string} name
+ */
+export function sessionsContinuationsCreate(name) {
+  return send("POST", sessionPath(name, "/continuation"));
+}
+
+/**
+ * @param {string} name
+ * @param {object} request
+ */
+export function sessionsMergesCreate(name, request) {
+  return send("POST", sessionPath(name, "/merge"), request);
+}
+
+/**
+ * @param {string} name
+ */
+export function sessionsTerminalWindowsCreate(name) {
+  return send("POST", sessionPath(name, "/terminal-window"));
+}
+
+/**
+ * @param {string} name
+ */
+export function sessionsBrowserUrlGet(name) {
+  return send("GET", sessionPath(name, "/browser-url"));
+}
+
+/**
+ * @param {string} name
+ */
+export function sessionsArtifactsUrlGet(name) {
+  return send("GET", sessionPath(name, "/artifacts-url"));
+}

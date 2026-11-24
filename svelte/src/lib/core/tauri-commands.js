@@ -746,3 +746,99 @@ export function tracesTestsList(request) {
 export function tracesCallStacksGet(request) {
   return invoke("traces_call_stacks_get", { request });
 }
+
+// Sessions run on the server's machine, in its tmux and git worktrees:
+// these commands ask its API as the signed-in person
+// (../../../../tauri/src/app/sessions.rs).
+
+export function sessionsSettingsGet() {
+  return invoke("sessions_settings_get");
+}
+
+export function sessionsDefaultPortGet() {
+  return invoke("sessions_default_port_get");
+}
+
+export function sessionsList() {
+  return invoke("sessions_list");
+}
+
+/**
+ * @param {object} request
+ */
+export function sessionsCreate(request) {
+  return invoke("sessions_create", { request });
+}
+
+/**
+ * @param {string} name
+ */
+export function sessionsGet(name) {
+  return invoke("sessions_get", { name });
+}
+
+/**
+ * @param {string} name
+ */
+export function sessionsDelete(name) {
+  return invoke("sessions_delete", { name });
+}
+
+/**
+ * @param {string} name
+ */
+export function sessionsChatGet(name) {
+  return invoke("sessions_chat_get", { name });
+}
+
+/**
+ * @param {string} name
+ * @param {object} request
+ */
+export function sessionsPromptsCreate(name, request) {
+  return invoke("sessions_prompts_create", { name, request });
+}
+
+/**
+ * @param {string} name
+ * @param {object} request
+ */
+export function sessionsPromptImagesCreate(name, request) {
+  return invoke("sessions_prompt_images_create", { name, request });
+}
+
+/**
+ * @param {string} name
+ */
+export function sessionsContinuationsCreate(name) {
+  return invoke("sessions_continuations_create", { name });
+}
+
+/**
+ * @param {string} name
+ * @param {object} request
+ */
+export function sessionsMergesCreate(name, request) {
+  return invoke("sessions_merges_create", { name, request });
+}
+
+/**
+ * @param {string} name
+ */
+export function sessionsTerminalWindowsCreate(name) {
+  return invoke("sessions_terminal_windows_create", { name });
+}
+
+/**
+ * @param {string} name
+ */
+export function sessionsBrowserUrlGet(name) {
+  return invoke("sessions_browser_url_get", { name });
+}
+
+/**
+ * @param {string} name
+ */
+export function sessionsArtifactsUrlGet(name) {
+  return invoke("sessions_artifacts_url_get", { name });
+}

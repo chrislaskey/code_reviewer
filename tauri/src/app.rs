@@ -11,4 +11,5 @@ pub mod local_users;
 pub mod memberships;
 pub mod posts;
 pub mod reviews;
+pub mod sessions;
 pub mod traces;
