@@ -19,12 +19,21 @@
 
 <style>
   /* Fixed, like the waves, so it stays put while the page scrolls; starts
-     where the page does, below the app's header and clear of the gutter. */
+     where the page does, below the app's header and clear of the gutter.
+     On small windows, where the header is see-through, it starts at the
+     window's top, behind the header and a phone's status bar, as on main. */
   .top-background-pattern {
     position: fixed;
     inset: calc(var(--app-header-inset-top) + var(--app-header-height)) 0 auto var(--gutter-width);
     height: 150px;
     z-index: 0;
+  }
+
+  @media (width < 40rem) {
+    .top-background-pattern {
+      inset: 0 0 auto 0;
+      height: calc(150px + var(--app-header-inset-top) + var(--app-header-height));
+    }
   }
 
   .faded-area {
