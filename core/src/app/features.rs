@@ -16,6 +16,9 @@ pub struct Features {
     /// Whether a person may sign in with an emailed code; off, by
     /// password alone, and the server sends no sign-in emails.
     pub accounts_sign_in_code: bool,
+    /// Whether the server sells plans and products; off, it answers
+    /// none of the purchasing routes and the pages offer nothing to buy.
+    pub accounts_purchasing: bool,
 }
 
 impl Default for Features {
@@ -23,6 +26,7 @@ impl Default for Features {
         Features {
             accounts_sign_up: true,
             accounts_sign_in_code: true,
+            accounts_purchasing: true,
         }
     }
 }

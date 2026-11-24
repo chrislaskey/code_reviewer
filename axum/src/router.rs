@@ -130,7 +130,8 @@ fn servers_api(state: &AppState) -> Router<AppState> {
 }
 
 /// The accounts app's API, `accounts`: signing in and out, rate limited
-/// per client IP, then the account and what it buys.
+/// per client IP, then the account and what it buys, refused when the
+/// server's settings turn purchasing off.
 fn accounts_api(state: &AppState) -> Router<AppState> {
     let sign_in = Router::new()
         .route("/api/accounts/sign-in", post(accounts::sign_in))
@@ -164,8 +165,7 @@ fn accounts_api(state: &AppState) -> Router<AppState> {
             get(trial_users::get).post(trial_users::create),
         )
         .layer(rate_limits::per_ip_layer(state.trust_proxy_headers));
-    Router::new()
-        .merge(sign_in)
+    let purchasing = Router::new()
         .route("/api/accounts/webhooks/stripe", post(stripe_events::create))
         .route(
             "/api/accounts/webhooks/app-store",
@@ -190,6 +190,11 @@ fn accounts_api(state: &AppState) -> Router<AppState> {
             "/api/accounts/subscriptions/{id}/portal",
             post(subscriptions::portal::create),
         )
+        .route_layer(middleware::from_fn_with_state(
+            state.server_settings.clone(),
+            accounts::purchasing_offered,
+        ));
+    Router::new().merge(sign_in).merge(purchasing)
 }
 
 /// An API path no route has: a JSON 404, so a page asking a server that

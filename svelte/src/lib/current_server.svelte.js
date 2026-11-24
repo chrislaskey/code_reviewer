@@ -7,7 +7,7 @@
 import { onServersCurrentChanged, serversCurrentGet } from "./core/index.js";
 
 /**
- * @typedef {{features: {accounts_sign_up: boolean, accounts_sign_in_code: boolean}}} ServerSettings
+ * @typedef {{features: {accounts_sign_up: boolean, accounts_sign_in_code: boolean, accounts_purchasing: boolean}}} ServerSettings
  * @typedef {{display_name: string, host: string, default: boolean, settings: ServerSettings}} Server
  */
 

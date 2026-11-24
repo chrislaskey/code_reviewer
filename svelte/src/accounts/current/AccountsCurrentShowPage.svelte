@@ -1,7 +1,8 @@
 <!-- The signed-in person's account, at /accounts/current: their email,
      the way to their password, and what they can buy, see
      docs/design/purchasing.md; nothing to buy on an account of a server
-     other than the app's own, see docs/design/multi-server.md. -->
+     other than the app's own, see docs/design/multi-server.md, or of one
+     whose settings turn purchasing off. -->
 <script>
   import { t } from "ttag";
   import PublicPagesLinks from "../../lib/PublicPagesLinks.svelte";
@@ -20,8 +21,10 @@
 
   let error = $state("");
   currentServerLoad().catch((problem) => (error = errorMessageOf(problem)));
-  /** Whether this account buys anywhere: on the app's own server alone. */
-  let sells = $derived(currentServer.value?.default ?? false);
+  /** Whether this account buys anywhere: on the app's own server alone, when it sells. */
+  let sells = $derived(
+    (currentServer.value?.default ?? false) && (currentServer.value?.settings.features.accounts_purchasing ?? true),
+  );
 </script>
 
 <Page>

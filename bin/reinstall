@@ -8,8 +8,12 @@
 set -eo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BUNDLE_IDENTIFIER="com.starterpack.app"
-APP_NAME="Starter Pack"
+# The app's name and bundle identifier, from tauri.conf.json
+read_tauri_config() {
+  python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' "$ROOT/tauri/tauri.conf.json" "$1"
+}
+BUNDLE_IDENTIFIER="$(read_tauri_config identifier)"
+APP_NAME="$(read_tauri_config productName)"
 IPA="$ROOT/tauri/gen/apple/build/arm64/$APP_NAME.ipa"
 XCODE_PROJECT="$ROOT/tauri/gen/apple/app_tauri.xcodeproj/project.pbxproj"
 DEFAULT_SYNC_SERVER_URL="https://starter-pack.fly.dev"

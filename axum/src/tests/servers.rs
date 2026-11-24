@@ -48,7 +48,11 @@ async fn servers_settings_get_answers_the_settings_with_their_version_to_anyone(
         json!({
             "settings_version": closed.version(),
             "settings": {
-                "features": { "accounts_sign_up": false, "accounts_sign_in_code": true },
+                "features": {
+                    "accounts_sign_up": false,
+                    "accounts_sign_in_code": true,
+                    "accounts_purchasing": true,
+                },
             },
         })
     );
