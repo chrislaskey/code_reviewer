@@ -7,10 +7,12 @@
 // the app to the accounts on the device, where sign-in is reached from;
 // the app never shows the sign-in pages themselves. When it cannot tell,
 // or a page's code does not load, the page says so above it rather than
-// going nowhere (page_load_error.svelte.js).
+// going nowhere (page_load_error.svelte.js). The template's own pages are
+// listed here, the app's in pages.js.
 import { Navigation, createRouter } from "sv-router";
 import { t } from "ttag";
 import AppLayout from "./layouts/AppLayout.svelte";
+import { APP_PAGES } from "./pages.js";
 import { hasDeviceAccounts } from "./core/index.js";
 import { currentUserLoad } from "./current_user.svelte.js";
 import { errorMessageOf } from "./error_message.js";
@@ -35,20 +37,9 @@ import {
   COMMUNITIES_NEW_PATH,
   COMMUNITIES_SHOW_PATH,
   CONFLICTS_INDEX_PATH,
-  FILES_EDIT_PATH,
-  FILES_INDEX_PATH,
-  FILES_NEW_PATH,
-  FILES_SHOW_PATH,
-  FORUM_INDEX_PATH,
   HOME_PATH,
   OPEN_PATHS,
-  POSTS_EDIT_PATH,
-  POSTS_INDEX_PATH,
-  POSTS_NEW_PATH,
-  POSTS_SHOW_PATH,
-  PROFILE_EDIT_PATH,
   PUBLIC_HOME_PATH,
-  SUPPORT_INDEX_PATH,
   accountsIndexUrl,
   accountsSignInUrl,
   homeUrl,
@@ -84,25 +75,15 @@ const { navigate, route } = createRouter({
       pageLoadErrorShow(t`This page could not load: ${reason}`);
     },
   },
-  [PUBLIC_HOME_PATH]: () => import("../home/HomePage.svelte"),
-  [HOME_PATH]: () => import("../home/HomePage.svelte"),
+  ...APP_PAGES,
   [ACCOUNTS_INDEX_PATH]: () => import("../accounts/AccountsIndexPage.svelte"),
   [ACCOUNTS_SIGN_IN_PATH]: () => import("../accounts/AccountsSignInPage.svelte"),
   [ACCOUNTS_TRIAL_PATH]: () => import("../accounts/AccountsTrialPage.svelte"),
-  [POSTS_INDEX_PATH]: () => import("../posts/PostsIndexPage.svelte"),
-  [POSTS_NEW_PATH]: () => import("../posts/PostsNewPage.svelte"),
-  [POSTS_SHOW_PATH]: () => import("../posts/PostsShowPage.svelte"),
-  [POSTS_EDIT_PATH]: () => import("../posts/PostsEditPage.svelte"),
-  [FILES_INDEX_PATH]: () => import("../files/FilesIndexPage.svelte"),
-  [FILES_NEW_PATH]: () => import("../files/FilesNewPage.svelte"),
-  [FILES_SHOW_PATH]: () => import("../files/FilesShowPage.svelte"),
-  [FILES_EDIT_PATH]: () => import("../files/FilesEditPage.svelte"),
   [COMMUNITIES_INDEX_PATH]: () => import("../communities/CommunitiesIndexPage.svelte"),
   [COMMUNITIES_NEW_PATH]: () => import("../communities/CommunitiesNewPage.svelte"),
   [COMMUNITIES_SHOW_PATH]: () => import("../communities/CommunitiesShowPage.svelte"),
   [COMMUNITIES_EDIT_PATH]: () => import("../communities/CommunitiesEditPage.svelte"),
   [CONFLICTS_INDEX_PATH]: () => import("../conflicts/ConflictsIndexPage.svelte"),
-  [PROFILE_EDIT_PATH]: () => import("../profile/ProfileEditPage.svelte"),
   [ACCOUNTS_CURRENT_SHOW_PATH]: () => import("../accounts/current/AccountsCurrentShowPage.svelte"),
   [ACCOUNTS_CURRENT_PASSWORD_EDIT_PATH]: () => import("../accounts/current/password/AccountsCurrentPasswordEditPage.svelte"),
   [ACCOUNTS_DELETIONS_NEW_PATH]: () => import("../accounts/deletions/AccountsDeletionsNewPage.svelte"),
@@ -114,8 +95,6 @@ const { navigate, route } = createRouter({
   [ACCOUNTS_PURCHASES_SHOW_PATH]: () => import("../accounts/purchases/AccountsPurchasesShowPage.svelte"),
   [ACCOUNTS_SUBSCRIPTIONS_INDEX_PATH]: () => import("../accounts/subscriptions/AccountsSubscriptionsIndexPage.svelte"),
   [ACCOUNTS_SUBSCRIPTIONS_SHOW_PATH]: () => import("../accounts/subscriptions/AccountsSubscriptionsShowPage.svelte"),
-  [SUPPORT_INDEX_PATH]: () => import("../support/SupportIndexPage.svelte"),
-  [FORUM_INDEX_PATH]: () => import("../forum/ForumIndexPage.svelte"),
 });
 
 /**
