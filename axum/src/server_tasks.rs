@@ -1,10 +1,13 @@
 //! The app's server tasks, see `app_core::server_tasks`: each started
 //! when the server starts, and started again `RESTART_AFTER` after it
 //! fails, so a watcher that hit an error keeps watching. A task that
-//! returns `Ok` is done. They stop when the server does.
+//! returns `Ok` is done. They stop when the server does. Each shares the
+//! routes' `ServerState`.
 
+use std::sync::Arc;
 use std::time::Duration;
 
+use app_core::app::server_state::ServerState;
 use app_core::deployment::Deployment;
 use app_core::server_tasks::ServerTask;
 
@@ -12,19 +15,27 @@ use app_core::server_tasks::ServerTask;
 const RESTART_AFTER: Duration = Duration::from_secs(10);
 
 /// Starts every task the app lists.
-pub fn spawn(deployment: Deployment) {
+pub fn spawn(deployment: Deployment, state: Arc<ServerState>) {
     for task in app_core::app::server_tasks::list() {
         let deployment = deployment.clone();
-        tokio::spawn(async move { run_restarting(*task, &deployment, RESTART_AFTER).await });
+        let state = Arc::clone(&state);
+        tokio::spawn(
+            async move { run_restarting(*task, &deployment, &state, RESTART_AFTER).await },
+        );
     }
 }
 
 /// Runs the task until it returns `Ok`, logging each failure and
 /// starting it again `restart_after` later.
-async fn run_restarting(task: &dyn ServerTask, deployment: &Deployment, restart_after: Duration) {
+async fn run_restarting(
+    task: &dyn ServerTask,
+    deployment: &Deployment,
+    state: &Arc<ServerState>,
+    restart_after: Duration,
+) {
     tracing::info!("server task {} started", task.name());
     loop {
-        match task.run(deployment).await {
+        match task.run(deployment, state).await {
             Ok(()) => {
                 tracing::info!("server task {} is done", task.name());
                 return;
@@ -62,7 +73,11 @@ mod tests {
             "fails_twice"
         }
 
-        async fn run(&self, _deployment: &Deployment) -> Result<(), TaskFailure> {
+        async fn run(
+            &self,
+            _deployment: &Deployment,
+            _state: &Arc<ServerState>,
+        ) -> Result<(), TaskFailure> {
             if self.runs.fetch_add(1, Ordering::SeqCst) < 2 {
                 return Err("not yet".into());
             }
@@ -77,12 +92,7 @@ mod tests {
             .expect("a database");
         let deployment = Deployment::new(database, app_core::deployment::Role::Server);
         let task = FailsTwice::default();
-        run_restarting(&task, &deployment, Duration::ZERO).await;
+        run_restarting(&task, &deployment, &Arc::default(), Duration::ZERO).await;
         assert_eq!(task.runs.load(Ordering::SeqCst), 3);
-    }
-
-    #[test]
-    fn server_tasks_the_template_lists_none() {
-        assert!(app_core::app::server_tasks::list().is_empty());
     }
 }

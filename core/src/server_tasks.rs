@@ -4,10 +4,14 @@
 //! Each is a `ServerTask`; the template has none of its own, and an
 //! app's are listed in `app::server_tasks`. The server starts each when
 //! it starts, not for a command on its command line, starts one that
-//! failed again after a pause, and stops them all when it stops.
+//! failed again after a pause, and stops them all when it stops. A task
+//! shares the app's `ServerState` with the routes.
+
+use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use crate::app::server_state::ServerState;
 use crate::deployment::Deployment;
 
 /// The error a task ended with, as the server logs it.
@@ -21,5 +25,9 @@ pub trait ServerTask: Send + Sync + std::fmt::Debug {
 
     /// Runs until the server stops. An error is logged and the task
     /// started again; `Ok` means it has nothing left to do.
-    async fn run(&self, deployment: &Deployment) -> Result<(), TaskFailure>;
+    async fn run(
+        &self,
+        deployment: &Deployment,
+        state: &Arc<ServerState>,
+    ) -> Result<(), TaskFailure>;
 }
