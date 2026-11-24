@@ -35,7 +35,7 @@
       ? [
           { id: "sessions", label: "Sessions", icon: "hero-command-line", href: sessionsIndexUrl() },
           { id: "reviews", label: "Reviews", icon: "hero-document-magnifying-glass", href: reviewsNewUrl() },
-          { id: "traces", label: "Traces", icon: "hero-arrow-trending-down", href: tracesNewUrl() },
+          { id: "traces", label: "Traces", icon: "hero-beaker", href: tracesNewUrl() },
           { id: "communities", label: t`Communities`, icon: "hero-user-group", href: communitiesIndexUrl() },
           { id: "support", label: t`Support`, icon: "hero-lifebuoy", href: supportIndexUrl() },
           { id: "forum", label: t`Forum`, icon: "hero-chat-bubble-left-right", href: forumIndexUrl() },
