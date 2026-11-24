@@ -1,6 +1,8 @@
-<!-- The app's home page, at /home: its features. -->
+<!-- The app's home page, at /home: its features, and in a browser, which
+     only signs in, that they are in the apps. -->
 <script>
-  import { Page } from "../lib/components/index.js";
+  import { isTauri } from "@tauri-apps/api/core";
+  import { Alert, Page } from "../lib/components/index.js";
   import Header from "../lib/code_reviewer/components/Header.svelte";
   import StillWaves from "../lib/code_reviewer/components/StillWaves.svelte";
   import TopBackgroundPattern from "../lib/code_reviewer/components/TopBackgroundPattern.svelte";
@@ -18,6 +20,13 @@
       Run Claude Code, Cursor or Codex agent sessions in tmux, review what a change did, and trace a test through it.
     {/snippet}
   </Header>
+
+  {#if !isTauri()}
+    <Alert class="mb-6">
+      Sessions, reviews and traces run in Code Reviewer's apps for the Mac and the iPhone. In a browser you can only
+      manage your account.
+    </Alert>
+  {/if}
 
   <section>
     <a class="raised-panel feature" href={sessionsIndexUrl()}>
