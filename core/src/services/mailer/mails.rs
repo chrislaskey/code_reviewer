@@ -2,12 +2,11 @@
 //! the `mailer`, in the language given: its English is in `t!`, see
 //! `helpers::translations`, and which language a mail goes in is the
 //! sender's, see `accounts::preferences::mail_locale_in`. The app's name
-//! is `APP_NAME`, to change in a fork, the `{app}` in each text.
+//! is `app::identity::APP_NAME`, the `{app}` in each text.
 
+use crate::app::identity::APP_NAME;
 use crate::helpers::translations::t;
 use crate::services::mailer::Mail;
-
-pub const APP_NAME: &str = "Starter Pack";
 
 /// The code a sign-in is finished with.
 pub fn sign_in_code(locale: &str, to: &str, code: &str) -> Mail {
