@@ -58,7 +58,7 @@
     {/if}
     {#if showsSessions}
       {#if sessions?.length}
-        <h2 class="sheet-heading">Sessions</h2>
+        <h2 class="sheet-heading">{t`Sessions`}</h2>
       {/if}
       <ul class="menu w-full p-0">
         <SessionChoices bind:sessions onchoose={close} />

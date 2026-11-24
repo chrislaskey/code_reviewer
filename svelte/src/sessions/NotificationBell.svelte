@@ -3,6 +3,7 @@
      permission the first time. -->
 <script>
   import { onMount } from "svelte";
+  import { t } from "ttag";
   import Icon from "../lib/components/Icon.svelte";
   import { sessionsBellGet, sessionsBellUpdate } from "../lib/core/index.js";
   import { log } from "../lib/code_reviewer/log.svelte.js";
@@ -19,16 +20,16 @@
   let enabled = $state(false);
   let saving = $state(false);
   let title = $derived(
-    enabled ? "Notifying when the agent finishes. Turn off" : "Notify me each time the agent finishes",
+    enabled ? t`Notifying when the agent finishes. Turn off` : t`Notify me each time the agent finishes`,
   );
 
   async function toggle() {
     saving = true;
     try {
       enabled = await sessionsBellUpdate(name, !enabled);
-      log(`${name}: ${enabled ? "Notifying when the agent finishes" : "Stopped notifying"}`);
+      log(enabled ? t`${name}: Notifying when the agent finishes` : t`${name}: Stopped notifying`);
     } catch (error) {
-      log(`Changing the notifications for ${name} failed: ${error}`);
+      log(t`Changing the notifications for ${name} failed: ${error}`);
     }
     saving = false;
   }
@@ -38,7 +39,7 @@
       enabled = await sessionsBellGet(name);
       shown = true;
     } catch (error) {
-      log(`Reading the notifications for ${name} failed: ${error}`);
+      log(t`Reading the notifications for ${name} failed: ${error}`);
     }
   });
 </script>

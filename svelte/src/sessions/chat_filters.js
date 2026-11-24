@@ -1,11 +1,15 @@
 // Which messages of an agent's chat a session's page shows.
+import { t } from "ttag";
 
-export const CHAT_FILTERS = [
-  { value: "all", label: "All", explanation: "Every message, with the notes the agent's CLI writes." },
-  { value: "last", label: "Last", explanation: "Each of your prompts with the agent's final reply to it." },
-  { value: "yours", label: "Yours", explanation: "Only the prompts you wrote." },
-  { value: "none", label: "None", explanation: "No messages, to bring the logs below into view." },
-];
+/** The filters to pick from, each labelled and explained. */
+export function chatFilters() {
+  return [
+    { value: "all", label: t`All`, explanation: t`Every message, with the notes the agent's CLI writes.` },
+    { value: "last", label: t`Last`, explanation: t`Each of your prompts with the agent's final reply to it.` },
+    { value: "yours", label: t`Yours`, explanation: t`Only the prompts you wrote.` },
+    { value: "none", label: t`None`, explanation: t`No messages, to bring the logs below into view.` },
+  ];
+}
 
 /** A message the user typed, not only tool results passed back to the agent. */
 function isPrompt(message) {

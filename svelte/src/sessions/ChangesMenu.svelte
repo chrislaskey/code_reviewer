@@ -3,6 +3,7 @@
      the branch committed since its base branch, or the main branch. Each choice is a plain link
      to the page `urlFor` names, such as the review or the trace show page. -->
 <script>
+  import { t } from "ttag";
   import ChoiceMenu from "../lib/code_reviewer/components/ChoiceMenu.svelte";
   import MenuChoice from "../lib/code_reviewer/components/MenuChoice.svelte";
 
@@ -34,14 +35,14 @@
 <ChoiceMenu {label} {title} class={class_}>
   {#snippet children({ close })}
     <MenuChoice
-      label="Uncommitted changes"
-      explanation="The uncommitted changes in the worktree, compared with its last commit."
+      label={t`Uncommitted changes`}
+      explanation={t`The uncommitted changes in the worktree, compared with its last commit.`}
       href={uncommittedChangesUrl}
       onclick={close}
     />
     <MenuChoice
-      label="Committed changes"
-      explanation="Everything the branch committed since it branched off {baseBranch}, like a pull request."
+      label={t`Committed changes`}
+      explanation={t`Everything the branch committed since it branched off ${baseBranch}, like a pull request.`}
       href={committedChangesUrl}
       onclick={close}
     />

@@ -3,14 +3,18 @@
 // `AnalyzeChangesRequest` fields (repo_path, base_ref, head_ref,
 // compare_from_merge_base) and back. See lib/routes.js for how a request
 // travels in a URL.
+import { t } from "ttag";
 
 /** @typedef {"working_tree" | "commit" | "branch"} CompareMode */
 
-export const COMPARE_MODE_OPTIONS = [
-  { value: "working_tree", label: "Uncommitted changes" },
-  { value: "commit", label: "One commit" },
-  { value: "branch", label: "Branch vs branch" },
-];
+/** The modes to pick from, labelled. */
+export function compareModeOptions() {
+  return [
+    { value: "working_tree", label: t`Uncommitted changes` },
+    { value: "commit", label: t`One commit` },
+    { value: "branch", label: t`Branch vs branch` },
+  ];
+}
 
 export const EMPTY_COMPARISON_FORM = {
   repoPath: "",
@@ -86,14 +90,17 @@ export function comparisonFormFromRequest(request) {
 export function describeComparison(form) {
   switch (form.mode) {
     case "working_tree":
-      return "Everything changed but not yet committed, compared with the last commit.";
+      return t`Everything changed but not yet committed, compared with the last commit.`;
     case "commit":
-      return "What the chosen commit changed, compared with the commit before it.";
-    case "branch":
+      return t`What the chosen commit changed, compared with the commit before it.`;
+    case "branch": {
       if (form.headBranch && form.headBranch === form.baseBranch) {
-        return "Pick two different branches.";
+        return t`Pick two different branches.`;
       }
-      return `What ${form.headBranch || "the branch"} changed since it branched off ${form.baseBranch || "the other branch"}, like a pull request.`;
+      const headBranch = form.headBranch || t`the branch`;
+      const baseBranch = form.baseBranch || t`the other branch`;
+      return t`What ${headBranch} changed since it branched off ${baseBranch}, like a pull request.`;
+    }
     default:
       return "";
   }
@@ -101,7 +108,11 @@ export function describeComparison(form) {
 
 /** What a request compares, for the summary line. */
 export function describeRequest(request) {
-  if (request.base_ref && request.head_ref) return `${request.head_ref} since it branched off ${request.base_ref}`;
-  if (request.head_ref) return `commit ${request.head_ref.slice(0, 8)}`;
-  return "uncommitted changes";
+  const { base_ref: baseRef, head_ref: headRef } = request;
+  if (baseRef && headRef) return t`${headRef} since it branched off ${baseRef}`;
+  if (headRef) {
+    const shortSha = headRef.slice(0, 8);
+    return t`commit ${shortSha}`;
+  }
+  return t`uncommitted changes`;
 }

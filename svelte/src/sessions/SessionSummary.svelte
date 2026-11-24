@@ -2,6 +2,7 @@
      agent status, glowing while the agent works. The whole card opens the
      session's page, where its actions are. -->
 <script>
+  import { t } from "ttag";
   import Icon from "../lib/components/Icon.svelte";
   import { sessionsShowUrl } from "../lib/routes.js";
   import AgentBadge from "./AgentBadge.svelte";
@@ -23,7 +24,7 @@
     {#if session.agent}
       <AgentBadge session={session.agent} />
     {:else}
-      <Badge text="no agent" title="No agent is running in the session" />
+      <Badge text={t`no agent`} title={t`No agent is running in the session`} />
     {/if}
     <Icon name="hero-chevron-right-micro" class="session-link-arrow size-4" />
   </div>

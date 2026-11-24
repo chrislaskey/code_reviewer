@@ -3,6 +3,7 @@
      tool calls folded, each call's result inside it, or a note the agent's
      CLI wrote, folded to one line. -->
 <script>
+  import { t } from "ttag";
   import { AGENT_NAMES, timeLater } from "./formatting.js";
 
   /**
@@ -11,15 +12,15 @@
    */
   let { message, previousTimestamp = null, agent, hasToolResults = true } = $props();
 
-  let roleLabels = $derived({ user: "You", assistant: "Agent", note: AGENT_NAMES[agent] ?? "Agent CLI" });
+  let roleLabels = $derived({ user: t`You`, assistant: t`Agent`, note: AGENT_NAMES[agent] ?? t`Agent CLI` });
   const NOTE_LABELS = {
-    context: "Context",
-    compact_summary: "Conversation summary",
-    command: "Command",
-    command_output: "Command output",
-    task_notification: "Background task",
-    interrupted: "Interrupted",
-    other: "Note",
+    context: t`Context`,
+    compact_summary: t`Conversation summary`,
+    command: t`Command`,
+    command_output: t`Command output`,
+    task_notification: t`Background task`,
+    interrupted: t`Interrupted`,
+    other: t`Note`,
   };
 
   let time = $derived(message.timestamp ? new Date(message.timestamp).toLocaleTimeString() : "");
@@ -29,7 +30,7 @@
 {#snippet toolText(toolText, isError = false)}
   <pre class="chat-tool-text" class:chat-tool-error={isError}>{toolText.text}</pre>
   {#if toolText.truncated}
-    <p class="muted text-sm">Cut short, the rest is in the transcript.</p>
+    <p class="muted text-sm">{t`Cut short, the rest is in the transcript.`}</p>
   {/if}
 {/snippet}
 
@@ -65,7 +66,7 @@
       {@render toolText(part.text)}
     {:else if part.type === "thinking"}
       <details class="chat-fold">
-        <summary>Thinking</summary>
+        <summary>{t`Thinking`}</summary>
         <p class="chat-thinking">{part.text}</p>
       </details>
     {:else if part.type === "tool_use"}
@@ -74,21 +75,21 @@
           <span class="chat-tool-name">{part.name}</span>
           <span class="chat-tool-summary">{part.summary}</span>
           {#if !part.result && hasToolResults}
-            <span class="chat-tool-status muted">· no result yet</span>
+            <span class="chat-tool-status muted">· {t`no result yet`}</span>
           {:else if part.result?.is_error}
-            <span class="chat-tool-status chat-tool-error">· failed</span>
+            <span class="chat-tool-status chat-tool-error">· {t`failed`}</span>
           {/if}
         </summary>
-        <p class="chat-fold-label">Input</p>
+        <p class="chat-fold-label">{t`Input`}</p>
         {@render toolText(part.input)}
         {#if part.result}
-          <p class="chat-fold-label">Result</p>
+          <p class="chat-fold-label">{t`Result`}</p>
           {@render toolText(part.result.output, part.result.is_error)}
         {/if}
       </details>
     {:else if part.type === "tool_result"}
       <details class="chat-fold">
-        <summary>Tool result</summary>
+        <summary>{t`Tool result`}</summary>
         {@render toolText(part.result.output, part.result.is_error)}
       </details>
     {/if}

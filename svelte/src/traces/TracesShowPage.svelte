@@ -6,25 +6,29 @@
      the tests, full width, or only the calls. Picking a test shows its calls. -->
 <script>
   import { onMount } from "svelte";
+  import { jt, msgid, ngettext, t } from "ttag";
   import ChoiceMenu from "../lib/code_reviewer/components/ChoiceMenu.svelte";
   import Icon from "../lib/components/Icon.svelte";
+  import TranslatedParts from "../lib/components/TranslatedParts.svelte";
   import InfoPopover from "../lib/code_reviewer/components/InfoPopover.svelte";
   import MenuChoice from "../lib/code_reviewer/components/MenuChoice.svelte";
   import SegmentedControl from "../lib/code_reviewer/components/SegmentedControl.svelte";
   import Toolbar from "../lib/code_reviewer/components/Toolbar.svelte";
   import { tracesCallStacksGet, tracesTestsList } from "../lib/core/index.js";
-  import { plural } from "../lib/code_reviewer/change_styles.js";
   import { describeRequest } from "../lib/code_reviewer/comparison_form.js";
   import { tracesNewUrl, traceRequestFromSearch, tracesShowUrl } from "../lib/routes.js";
-  import { STOP_LABELS, SYSTEM_CALL_CHOICES, UNCHANGED_CHOICES, frameCounts, testLabel } from "./call_stack.js";
+  import { frameCounts, stopLabels, systemCallChoices, testLabel, unchangedChoices } from "./call_stack.js";
   import CallStackView from "./CallStackView.svelte";
   import TestPicker from "./TestPicker.svelte";
   import TopBackgroundPattern from "../lib/code_reviewer/components/TopBackgroundPattern.svelte";
 
   const PHONE_TAB_OPTIONS = [
-    { value: "tests", label: "Tests" },
-    { value: "calls", label: "Calls" },
+    { value: "tests", label: t`Tests` },
+    { value: "calls", label: t`Calls` },
   ];
+  const SYSTEM_CALL_CHOICES = systemCallChoices();
+  const UNCHANGED_CHOICES = unchangedChoices();
+  const STOP_LABELS = stopLabels();
 
   const ICON_BUTTON = "btn btn-ghost btn-sm btn-square";
 
@@ -55,6 +59,10 @@
 
   function shortCommit(commit) {
     return commit.slice(0, 8);
+  }
+
+  function functionsCount(count) {
+    return ngettext(msgid`${count} function`, `${count} functions`, count);
   }
 
   async function selectTest(test) {
@@ -119,7 +127,7 @@
 
 <div class="full-page max-sm:h-auto">
   <div class="full-page-title">
-    <h1>Trace</h1>
+    <h1>{t`Trace`}</h1>
     {#if request}
       <span class="comparison font-mono text-[11px] text-base-content/70">
         <span class="text-base-content">{request.repo_path}</span>
@@ -128,16 +136,17 @@
     {/if}
     <a href={tracesNewUrl(request)} class="btn btn-ghost btn-sm ml-auto">
       <Icon name="hero-pencil-square-micro" class="size-4" />
-      Edit
+      {t`Edit`}
     </a>
   </div>
 
   {#if request === null}
+    {#snippet newTraceLink()}<a href={tracesNewUrl()}>{t`Start a new trace.`}</a>{/snippet}
     <p class="px-6 py-10 text-sm text-base-content/50">
-      This page needs a comparison to list the tests of. <a href={tracesNewUrl()}>Start a new trace.</a>
+      <TranslatedParts parts={jt`This page needs a comparison to list the tests of. ${newTraceLink}`} />
     </p>
   {:else if tests.state === "loading"}
-    <p class="px-6 py-10 text-sm text-base-content/50">Listing the tests…</p>
+    <p class="px-6 py-10 text-sm text-base-content/50">{t`Listing the tests…`}</p>
   {:else if tests.state === "failed"}
     <p class="border-b border-base-300 bg-error/10 px-4 py-3 font-mono text-xs text-error">{tests.message}</p>
   {:else if tests.state === "ready"}
@@ -148,44 +157,51 @@
       </div>
       {#if counts}
         <div class={["flex flex-wrap items-center gap-1", phoneTab === "tests" && "max-sm:hidden"]}>
-          {@render choiceMenu("Which calls the stack shows", "Show", systemCallsLabel, SYSTEM_CALL_CHOICES, (value) => (systemCalls = value))}
-          {@render choiceMenu("Which functions the stack shows", null, unchangedLabel, UNCHANGED_CHOICES, (value) => (unchanged = value))}
+          {@render choiceMenu(t`Which calls the stack shows`, t`Show`, systemCallsLabel, SYSTEM_CALL_CHOICES, (value) => (systemCalls = value))}
+          {@render choiceMenu(t`Which functions the stack shows`, null, unchangedLabel, UNCHANGED_CHOICES, (value) => (unchanged = value))}
           <div class="flex items-center">
-            {@render iconButton("lucide-chevrons-up-down", "Open the code of every function", () => callStackView?.setAllCode(true))}
-            {@render iconButton("lucide-chevrons-down-up", "Close the code of every function", () => callStackView?.setAllCode(false))}
+            {@render iconButton("lucide-chevrons-up-down", t`Open the code of every function`, () => callStackView?.setAllCode(true))}
+            {@render iconButton("lucide-chevrons-down-up", t`Close the code of every function`, () => callStackView?.setAllCode(false))}
           </div>
           <div class="flex items-center">
-            {@render iconButton("lucide-list-tree", "Show the calls below every function", () => callStackView?.setAllChildren(true))}
-            {@render iconButton("lucide-list-collapse", "Hide the calls below every function", () => callStackView?.setAllChildren(false))}
+            {@render iconButton("lucide-list-tree", t`Show the calls below every function`, () => callStackView?.setAllChildren(true))}
+            {@render iconButton("lucide-list-collapse", t`Hide the calls below every function`, () => callStackView?.setAllChildren(false))}
           </div>
           <div class="flex items-center">
-            {@render iconButton("hero-arrow-up-micro", "Previous change", () => callStackView?.stepChange(-1), counts.changed === 0)}
-            {@render iconButton("hero-arrow-down-micro", "Next change", () => callStackView?.stepChange(1), counts.changed === 0)}
+            {@render iconButton("hero-arrow-up-micro", t`Previous change`, () => callStackView?.stepChange(-1), counts.changed === 0)}
+            {@render iconButton("hero-arrow-down-micro", t`Next change`, () => callStackView?.stepChange(1), counts.changed === 0)}
           </div>
         </div>
       {/if}
       <div class="ml-auto flex items-center gap-3">
         {#if counts}
           <span class="font-mono text-[11px] text-base-content/50 max-sm:hidden">
-            {counts.changed} changed · {plural(counts.project, "function")}
+            {t`${counts.changed} changed`} · {functionsCount(counts.project)}
           </span>
         {/if}
-        <InfoPopover title="How to use this page, what its labels mean, and what was compared" class="dropdown-end">
-          <p>Pick a test to walk its calls. Click a function to close its code and the calls below it, again to open them.</p>
+        <InfoPopover title={t`How to use this page, what its labels mean, and what was compared`} class="dropdown-end">
+          <p>{t`Pick a test to walk its calls. Click a function to close its code and the calls below it, again to open them.`}</p>
           <ul class="mt-2 flex flex-col gap-1">
-            <li><span class="font-mono text-xs">shown above</span>: already walked above, its calls are listed there</li>
+            {#snippet shownAbove()}<span class="font-mono text-xs">{t`shown above`}</span>{/snippet}
+            <li><TranslatedParts parts={jt`${shownAbove}: already walked above, its calls are listed there`} /></li>
             {#each Object.values(STOP_LABELS) as label (label)}
-              <li><span class="font-mono text-xs">{label}</span>: the walk stopped here</li>
+              {#snippet stopLabel()}<span class="font-mono text-xs">{label}</span>{/snippet}
+              <li><TranslatedParts parts={jt`${stopLabel}: the walk stopped here`} /></li>
             {/each}
           </ul>
+          {@const testCount = tests.value.tests.length}
           <p class="mt-2 font-mono text-xs">
-            {plural(tests.value.tests.length, "test")} ·
-            {shortCommit(tests.value.base_commit)} → {tests.value.head_commit ? shortCommit(tests.value.head_commit) : "working tree"}
+            {ngettext(msgid`${testCount} test`, `${testCount} tests`, testCount)} ·
+            {shortCommit(tests.value.base_commit)} → {tests.value.head_commit ? shortCommit(tests.value.head_commit) : t`working tree`}
           </p>
           {#if selected && counts}
+            {@const projectFunctions = ngettext(msgid`${counts.project} project function`, `${counts.project} project functions`, counts.project)}
+            {@const systemCalls = ngettext(msgid`${counts.system} system call`, `${counts.system} system calls`, counts.system)}
             <p class="mt-2 font-mono text-xs">
               {selected.module} · {testLabel(selected)}:
-              {counts.changed} changed, {plural(counts.project, "project function")}, {plural(counts.system, "system call")}{truncated ? ", cut short by the limits" : ""}
+              {truncated
+                ? t`${counts.changed} changed, ${projectFunctions}, ${systemCalls}, cut short by the limits`
+                : t`${counts.changed} changed, ${projectFunctions}, ${systemCalls}`}
             </p>
           {/if}
         </InfoPopover>
@@ -203,9 +219,9 @@
       </aside>
       <div class={["full-page-content flex flex-col max-sm:overflow-y-visible", phoneTab === "tests" && "max-sm:hidden"]}>
         {#if stack.state === "idle"}
-          <p class="px-6 py-10 text-sm text-base-content/50">Pick a test to walk its calls.</p>
+          <p class="px-6 py-10 text-sm text-base-content/50">{t`Pick a test to walk its calls.`}</p>
         {:else if stack.state === "loading"}
-          <p class="px-6 py-10 text-sm text-base-content/50">Walking the calls…</p>
+          <p class="px-6 py-10 text-sm text-base-content/50">{t`Walking the calls…`}</p>
         {:else if stack.state === "failed"}
           <p class="border-b border-base-300 bg-error/10 px-4 py-3 font-mono text-xs text-error">{stack.message}</p>
         {:else}

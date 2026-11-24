@@ -1,6 +1,7 @@
 // Maps the backend's file changes and group rows onto what the views draw.
 // Files get short ids, functions and callers get `module.name/arity` keys,
 // shown as `name/arity`, and the group rows name files by those ids.
+import { t } from "ttag";
 
 /** Unique in a file: a Rust file can have `open/0` in two `impl` blocks, which the module tells apart. */
 export function functionKey({ module, name, arity }) {
@@ -30,6 +31,13 @@ export const ALL_CHANGES_ID = "@all";
 
 /** The implicit group of files no group holds. */
 export const UNGROUPED_ID = "ungrouped";
+
+/** A group's label, translated for the two groups the backend names itself. */
+export function groupLabel(group) {
+  if (group.id === ALL_CHANGES_ID) return t`All changes by group`;
+  if (group.id === UNGROUPED_ID) return t`Default group`;
+  return group.label;
+}
 
 function toFileDiffTarget(file) {
   switch (file.status) {

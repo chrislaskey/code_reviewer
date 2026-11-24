@@ -4,8 +4,8 @@
      closes all of it. The code comes from the backend, one request per file. -->
 <script>
   import { getContext } from "svelte";
+  import { msgid, ngettext, t } from "ttag";
   import Icon from "../../lib/components/Icon.svelte";
-  import { plural } from "../../lib/code_reviewer/change_styles.js";
   import CodeLines from "../../lib/code_reviewer/components/CodeLines.svelte";
   import { followOpenAllCommand } from "./open_all.svelte.js";
   import { languageForPath } from "../../lib/code_reviewer/syntax_highlight.js";
@@ -43,9 +43,9 @@
 </script>
 
 <div class="border-t border-base-content/10">
-  <div class="flex h-5 items-center px-3 pt-2 text-[10px] uppercase tracking-wide text-base-content/40">Code</div>
+  <div class="flex h-5 items-center px-3 pt-2 text-[10px] uppercase tracking-wide text-base-content/40">{t`Code`}</div>
   {#if loaded.state === "loading"}
-    <p class="px-3 py-2 font-mono text-[11px] text-base-content/50">Loading code…</p>
+    <p class="px-3 py-2 font-mono text-[11px] text-base-content/50">{t`Loading code…`}</p>
   {:else if loaded.state === "failed"}
     <p class="px-3 py-2 font-mono text-[11px] text-error">{loaded.message}</p>
   {:else}
@@ -55,7 +55,7 @@
       class={["flex h-8 w-full cursor-pointer items-center gap-2 px-3 text-left font-mono text-xs", previewing ? "bg-base-content/5" : ""]}
     >
       <Icon name="hero-chevron-right-micro" class={["size-3.5 text-base-content/50 transition-transform", open ? "rotate-90" : ""]} />
-      <span class="text-base-content/70">{plural(functions.length, "changed function")}</span>
+      <span class="text-base-content/70">{ngettext(msgid`${functions.length} changed function`, `${functions.length} changed functions`, functions.length)}</span>
     </button>
     {#if open}
       {#each shown as index (index)}

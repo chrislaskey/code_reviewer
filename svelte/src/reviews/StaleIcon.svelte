@@ -1,7 +1,7 @@
 <!-- A warning sign when callers still call something removed or renamed. -->
 <script>
+  import { msgid, ngettext } from "ttag";
   import Icon from "../lib/components/Icon.svelte";
-  import { plural } from "../lib/code_reviewer/change_styles.js";
 
   /** @type {{ count: number }} */
   let { count } = $props();
@@ -9,7 +9,11 @@
 
 {#if count > 0}
   <span
-    title="{plural(count, 'caller')} still calling a removed or renamed function"
+    title={ngettext(
+      msgid`${count} caller still calling a removed or renamed function`,
+      `${count} callers still calling a removed or renamed function`,
+      count,
+    )}
     class="inline-flex shrink-0 text-error"
   >
     <Icon name="hero-exclamation-triangle-micro" class="size-3.5" />

@@ -3,6 +3,7 @@
      transcript the agent writes, Claude Code's, Cursor's or Codex's. The session is
      named in the path, `/sessions/<name>`. Refreshes like the sessions page. -->
 <script>
+  import { msgid, ngettext, t } from "ttag";
   import NotificationBell from "./NotificationBell.svelte";
   import { Page } from "../lib/components/index.js";
   import { onMount } from "svelte";
@@ -24,7 +25,7 @@
   import ChoiceMenu from "../lib/code_reviewer/components/ChoiceMenu.svelte";
   import Icon from "../lib/components/Icon.svelte";
   import MenuChoice from "../lib/code_reviewer/components/MenuChoice.svelte";
-  import { CHAT_FILTERS, filterChatMessages } from "./chat_filters.js";
+  import { chatFilters, filterChatMessages } from "./chat_filters.js";
   import ChatMessage from "./ChatMessage.svelte";
   import ChatSummary from "./ChatSummary.svelte";
   import { contextUsagePercent } from "./formatting.js";
@@ -40,8 +41,8 @@
   const REFRESH_RIPPLE_STRENGTH = 20;
   // Toggles for the prompt box's layout, each on or off by itself.
   const CHAT_LAYOUT_TOGGLES = [
-    { value: "pinned", icon: "lucide-pin", title: "Pin the prompt in view while the chat scrolls" },
-    { value: "large", icon: "lucide-maximize-2", title: "Make the prompt box taller" },
+    { value: "pinned", icon: "lucide-pin", title: t`Pin the prompt in view while the chat scrolls` },
+    { value: "large", icon: "lucide-maximize-2", title: t`Make the prompt box taller` },
   ];
 
   const name = sessionNameFromPath(window.location.pathname);
@@ -54,6 +55,7 @@
   let chatFilter = $state("all");
   // `pinned` keeps the prompt in view while the chat scrolls; `large` makes it taller.
   let chatLayout = $state({ pinned: false, large: false });
+  const CHAT_FILTERS = chatFilters();
   let chatFilterLabel = $derived(CHAT_FILTERS.find((filter) => filter.value === chatFilter)?.label);
   let shownMessages = $derived(chat ? filterChatMessages(chat.messages, chatFilter) : []);
   // Newest first, each with the one shown before it in time, for "16 seconds later".
@@ -63,7 +65,7 @@
 
   let working = $derived(session?.agent?.status === "busy");
   let promptDisabledReason = $derived(
-    !session ? "No running session to write to" : !session.agent?.tmux_pane_id ? "No agent running in the session" : "",
+    !session ? t`No running session to write to` : !session.agent?.tmux_pane_id ? t`No agent running in the session` : "",
   );
 
   let waves;
@@ -87,7 +89,7 @@
     }
     // Refreshes repeat, so only log an error once until it changes.
     const refreshError = sessionError ?? chatError;
-    if (refreshError && refreshError !== lastRefreshError) log(`Refreshing ${name} failed: ${refreshError}`);
+    if (refreshError && refreshError !== lastRefreshError) log(t`Refreshing ${name} failed: ${refreshError}`);
     lastRefreshError = refreshError;
     refreshing = false;
     return !refreshError;
@@ -96,15 +98,15 @@
   async function refreshFromButton(event) {
     const box = event.currentTarget.getBoundingClientRect();
     waves.ripple(REFRESH_RIPPLE_STRENGTH, box.left + box.width / 2);
-    if (await refresh()) log(`${name}: Refreshed`);
+    if (await refresh()) log(t`${name}: Refreshed`);
   }
 
   async function sendPrompt(prompt) {
     try {
       await sessionsPromptsCreate(name, { prompt });
-      log(`${name}: Sent the prompt`);
+      log(t`${name}: Sent the prompt`);
     } catch (error) {
-      log(`Sending the prompt to ${name} failed: ${error}`);
+      log(t`Sending the prompt to ${name} failed: ${error}`);
       return false;
     }
     // The agent writes the prompt to its transcript as it reads it.
@@ -115,10 +117,10 @@
   async function attachImage(file) {
     try {
       const path = await sessionsPromptImagesCreate(name, { media_type: file.type, data_base64: await readFileAsBase64(file) });
-      log(`${name}: Saved the image at ${path}`);
+      log(t`${name}: Saved the image at ${path}`);
       return path;
     } catch (error) {
-      log(`Saving the image for ${name} failed: ${error}`);
+      log(t`Saving the image for ${name} failed: ${error}`);
       return null;
     }
   }
@@ -136,7 +138,7 @@
     let stopRefreshing;
     sessionsSettingsGet()
       .then((detected) => (mainBranch = detected.settings.main_branch))
-      .catch((error) => log(`Detecting the settings failed: ${error}`))
+      .catch((error) => log(t`Detecting the settings failed: ${error}`))
       .then(refresh)
       .then(() => (stopRefreshing = repeatWhileVisible(refresh, REFRESH_INTERVAL_MS)));
     return () => stopRefreshing?.();
@@ -159,9 +161,9 @@
         <Icon name={toggle.icon} class="size-4" />
       </button>
     {/each}
-    <ChoiceMenu title="Which messages the chat shows" class="btn btn-ghost btn-sm" align="start">
+    <ChoiceMenu title={t`Which messages the chat shows`} class="btn btn-ghost btn-sm" align="start">
       {#snippet buttonContent()}
-        <span class="max-sm:hidden">Show</span>
+        <span class="max-sm:hidden">{t`Show`}</span>
         {chatFilterLabel}
       {/snippet}
       {#snippet children({ close })}
@@ -188,10 +190,10 @@
   <Header>
     <a href={sessionsIndexUrl()} class="title-link">
       <Icon name="hero-chevron-left" class="size-5" />
-      {name ?? "No session"}
+      {name ?? t`No session`}
     </a>
     {#snippet subtitle()}
-      The session's status and actions, and the agent's chat history. Refreshes every 5 seconds.
+      {t`The session's status and actions, and the agent's chat history. Refreshes every 5 seconds.`}
     {/snippet}
     {#snippet actions()}
       {#if name !== null}<NotificationBell {name} />{/if}
@@ -200,43 +202,45 @@
 
   <section>
     {#if name === null}
-      <div class="raised-panel empty muted">The address names no session.</div>
+      <div class="raised-panel empty muted">{t`The address names no session.`}</div>
     {:else if session}
       <div class="raised-panel" class:working>
         <SessionStatusBar {session} {mainBranch} {actions} />
       </div>
       {#if sessionError}
-        <p class="hint muted">{sessionError}. Showing it as it was last seen.</p>
+        <p class="hint muted">{t`${sessionError}. Showing it as it was last seen.`}</p>
       {/if}
     {:else if sessionError}
       <div class="raised-panel empty muted">{sessionError}</div>
     {:else}
-      <div class="raised-panel empty muted">Loading…</div>
+      <div class="raised-panel empty muted">{t`Loading…`}</div>
     {/if}
   </section>
 
   <section class="mt-8">
     <div class="section-header">
       <div class="section-title">
-        <h2 class="section-heading">Chat</h2>
+        <h2 class="section-heading">{t`Chat`}</h2>
         {#if chat}
+          {@const total = chat.messages.length}
+          {@const shown = shownMessages.length}
           <span class="chat-count muted">
-            {chatFilter === "all" ? "" : `${shownMessages.length} of `}{chat.messages.length} messages
+            {chatFilter === "all"
+              ? ngettext(msgid`${total} message`, `${total} messages`, total)
+              : ngettext(msgid`${shown} of ${total} message`, `${shown} of ${total} messages`, total)}
           </span>
           {#if chat.context_usage}
-            <span class="chat-count muted" title="Context window used">{contextUsagePercent(chat.context_usage)}</span>
+            <span class="chat-count muted" title={t`Context window used`}>{contextUsagePercent(chat.context_usage)}</span>
           {/if}
         {/if}
-        <InfoPopover title="What the chat holds, and how prompts are sent">
+        <InfoPopover title={t`What the chat holds, and how prompts are sent`}>
           {#if chat}
             <ChatSummary {chat} />
           {:else}
-            Read from the transcript the agent writes as it works, once it has one.
+            {t`Read from the transcript the agent writes as it works, once it has one.`}
           {/if}
           <p class="mt-2">
-            A prompt is typed into the agent's tmux pane, then Enter, as if you typed it there. Nothing is sent until
-            you press Enter or Send, and Shift+Enter starts a new line. A pasted, dropped or attached image is saved in the
-            session's artifacts and its path put in the prompt, for the agent to read.
+            {t`A prompt is typed into the agent's tmux pane, then Enter, as if you typed it there. Nothing is sent until you press Enter or Send, and Shift+Enter starts a new line. A pasted, dropped or attached image is saved in the session's artifacts and its path put in the prompt, for the agent to read.`}
           </p>
         </InfoPopover>
       </div>
@@ -246,7 +250,7 @@
         {#if name !== null}
           <Button class="btn btn-ghost" onclick={refreshFromButton}>
             <Icon name="hero-arrow-path-micro" class="size-4" />
-            Refresh
+            {t`Refresh`}
           </Button>
         {/if}
       </div>
@@ -259,7 +263,7 @@
           disabledReason={promptDisabledReason}
           onSend={sendPrompt}
           onAttachImage={attachImage}
-          onAttachmentError={(message) => log(`${name}: ${message}`)}
+          onAttachmentError={(message) => log(t`${name}: ${message}`)}
           controls={chatControls}
         />
       </div>
@@ -278,11 +282,11 @@
     {:else if chatError}
       <div class="raised-panel empty muted">{chatError}</div>
     {:else if !session && sessionError}
-      <div class="raised-panel empty muted">No chat history without a running session.</div>
+      <div class="raised-panel empty muted">{t`No chat history without a running session.`}</div>
     {:else if session && !session.agent}
-      <div class="raised-panel empty muted">No agent is running in the session.</div>
+      <div class="raised-panel empty muted">{t`No agent is running in the session.`}</div>
     {:else}
-      <div class="raised-panel empty muted">Loading…</div>
+      <div class="raised-panel empty muted">{t`Loading…`}</div>
     {/if}
   </section>
 

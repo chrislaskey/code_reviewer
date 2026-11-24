@@ -62,9 +62,9 @@ the frontend and tooling (3).
   crate of its own; the feature keeps tmux, git and the tree-sitter
   grammars out of the phone build, and the compiler stops the app's side
   from calling them.
-- **English only at first.** The template's translation check is turned
-  off while the pages move over (a `[[divergence]]` if it lives in a
-  framework file); putting the pages through ttag is a later step.
+- **English only at first.** The template's translation check was turned
+  off while the pages moved over. Since 2026-11-24 the pages go through
+  ttag, the check is on again, and the pages are in Spanish too.
 - **Host operations are online only.** Reviews, traces, sessions, tmux and
   worktrees run on the server's machine; the apps ask the server, the
   template's pattern for online-only calls (`app_core::accounts::online`,
@@ -334,8 +334,6 @@ Left, on main:
   (6b).
 - The keyboard bar on the phone; the webview's colour behind the status
   bar (6c, template).
-- Translations: the pages through gettext (ttag), the check turned back
-  on.
 - A dev avatar's URL is `localhost`, so another device shows the
   initials; real S3 has none of this.
 

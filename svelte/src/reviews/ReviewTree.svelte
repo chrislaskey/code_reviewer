@@ -2,8 +2,9 @@
      at the top, every group under it, and the files of the chosen group under
      that group. What a click does is up to the page. -->
 <script>
+  import { t } from "ttag";
   import Icon from "../lib/components/Icon.svelte";
-  import { ALL_CHANGES_ID, UNGROUPED_ID, fileName, filesInGroup } from "./view_model.js";
+  import { ALL_CHANGES_ID, UNGROUPED_ID, fileName, filesInGroup, groupLabel } from "./view_model.js";
 
   /**
    * @type {{
@@ -23,7 +24,7 @@
   let items = $derived([
     {
       id: ALL_CHANGES_ID,
-      label: allChangesRow.group.label,
+      label: groupLabel(allChangesRow.group),
       depth: 0,
       icon: "hero-rectangle-stack-micro",
       detail: String(allChangesRow.stats.file_count),
@@ -32,7 +33,7 @@
     ...groups.flatMap((group) => {
       const item = {
         id: group.id,
-        label: group.label,
+        label: groupLabel(group),
         depth: 1,
         icon: "hero-folder-mini",
         detail: String(filesInGroup(files, group.id).length),
@@ -56,7 +57,7 @@
 </script>
 
 <nav class="py-2">
-  <div class="mb-1 px-6 pb-2 text-[10px] uppercase tracking-wide text-base-content/50">Groups</div>
+  <div class="mb-1 px-6 pb-2 text-[10px] uppercase tracking-wide text-base-content/50">{t`Groups`}</div>
   {#each items as item (item.id)}
     <button
       type="button"

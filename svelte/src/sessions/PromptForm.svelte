@@ -5,6 +5,7 @@
      With `onAttachImage`, images pasted, dropped or picked are saved by it and
      their paths put in the prompt where the cursor is. -->
 <script>
+  import { t } from "ttag";
   import Button from "../lib/components/Button.svelte";
   import Icon from "../lib/components/Icon.svelte";
   import { loadPromptDraft, savePromptDraft } from "./prompt_draft.js";
@@ -51,9 +52,9 @@
       try {
         const path = await onAttachImage(file);
         if (path) insertAtCursor(path);
-        else reportAttachmentError(`Could not add ${file.name}. See recent logs for details.`);
+        else reportAttachmentError(t`Could not add ${file.name}. See recent logs for details.`);
       } catch (error) {
-        reportAttachmentError(`Could not add ${file.name}: ${error}`);
+        reportAttachmentError(t`Could not add ${file.name}: ${error}`);
       } finally {
         attachingCount -= 1;
       }
@@ -69,7 +70,7 @@
     const files = imageFilesIn(source);
     const hasFiles = Array.from(source?.files ?? []).length > 0 || Array.from(source?.items ?? []).some((item) => item.kind === "file");
     if (files.length === 0 && hasFiles) {
-      reportAttachmentError("No readable image found. Choose a PNG, JPEG, GIF or WebP file.");
+      reportAttachmentError(t`No readable image found. Choose a PNG, JPEG, GIF or WebP file.`);
     }
     return files;
   }
@@ -110,7 +111,7 @@
   <textarea
     class="textarea prompt-input w-full"
     rows="3"
-    placeholder={disabled ? disabledReason : "Write to the agent. Enter sends, Shift+Enter starts a new line."}
+    placeholder={disabled ? disabledReason : t`Write to the agent. Enter sends, Shift+Enter starts a new line.`}
     bind:value={prompt}
     bind:this={textarea}
     onkeydown={sendOnEnter}
@@ -136,23 +137,23 @@
         <Button
           type="button"
           class="btn btn-ghost btn-sm"
-          title="Add an image: its path is put in the prompt. You can also paste or drop one."
+          title={t`Add an image: its path is put in the prompt. You can also paste or drop one.`}
           disabled={disabled || sending}
           onclick={() => imagePicker?.click()}
         >
           <Icon name="hero-plus-micro" class="size-4" />
-          {attachingCount > 0 ? "Adding…" : "Add"}
+          {attachingCount > 0 ? t`Adding…` : t`Add`}
         </Button>
       {/if}
       <!-- An arrow on small windows, to leave the row room for the controls. -->
       <Button
         type="submit"
         class="btn btn-primary text-base max-sm:btn-square max-sm:btn-sm"
-        title="Send"
-        aria-label="Send"
+        title={t`Send`}
+        aria-label={t`Send`}
         disabled={!canSend}
       >
-        <span class="max-sm:hidden">{sending ? "Sending…" : "Send"}</span>
+        <span class="max-sm:hidden">{sending ? t`Sending…` : t`Send`}</span>
         <Icon name="hero-paper-airplane-mini" class="size-5 sm:hidden" />
       </Button>
     </div>

@@ -5,6 +5,7 @@
      is bindable so the menu can show its heading only then. A choice opens
      the session's page, then calls `onchoose`. -->
 <script>
+  import { t } from "ttag";
   import { onMount } from "svelte";
   import { sessionsList } from "../lib/core/index.js";
   import { repeatWhileVisible } from "../lib/code_reviewer/repeat_while_visible.js";
@@ -50,7 +51,7 @@
         {#if session.agent}
           <AgentBadge session={session.agent} />
         {:else}
-          <Badge text="no agent" title="No agent is running in the session" />
+          <Badge text={t`no agent`} title={t`No agent is running in the session`} />
         {/if}
       </a>
     </li>

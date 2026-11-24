@@ -2,26 +2,38 @@
 // where each one hangs, and what is open. Changed project functions carry
 // their diff, unchanged ones only their name, calls outside the project are
 // small. Closing a frame hides its code and the frames below it.
+import { t } from "ttag";
 
 /** @typedef {"changed" | "unchanged" | "system"} FrameEmphasis */
 
-// Which calls the stack shows: `systemCalls` is "hidden" for Your code.
-export const SYSTEM_CALL_CHOICES = [
-  { value: "hidden", label: "Your code", explanation: "Calls into dependencies and the standard library are hidden." },
-  { value: "shown", label: "All calls", explanation: "Calls into dependencies and the standard library are shown, as slim rows." },
-];
+/** Which calls the stack shows: `systemCalls` is "hidden" for Your code. */
+export function systemCallChoices() {
+  return [
+    { value: "hidden", label: t`Your code`, explanation: t`Calls into dependencies and the standard library are hidden.` },
+    { value: "shown", label: t`All calls`, explanation: t`Calls into dependencies and the standard library are shown, as slim rows.` },
+  ];
+}
 
-// Which project functions the stack shows: `unchanged` is "hidden" for Changed only.
-export const UNCHANGED_CHOICES = [
-  { value: "shown", label: "All functions", explanation: "Unchanged functions are shown, as one-line cards." },
-  { value: "hidden", label: "Changed only", explanation: "Unchanged functions are hidden, and each change notes the calls left out above it." },
-];
+/** Which project functions the stack shows: `unchanged` is "hidden" for Changed only. */
+export function unchangedChoices() {
+  return [
+    { value: "shown", label: t`All functions`, explanation: t`Unchanged functions are shown, as one-line cards.` },
+    {
+      value: "hidden",
+      label: t`Changed only`,
+      explanation: t`Unchanged functions are hidden, and each change notes the calls left out above it.`,
+    },
+  ];
+}
 
-export const STOP_LABELS = {
-  cycle: "cycle",
-  max_depth: "depth limit",
-  max_node_count: "frame limit",
-};
+/** Why the walk stopped at a frame, by `stop_reason`. */
+export function stopLabels() {
+  return {
+    cycle: t`cycle`,
+    max_depth: t`depth limit`,
+    max_node_count: t`frame limit`,
+  };
+}
 
 /** @returns {FrameEmphasis} */
 export function frameEmphasis(frame) {

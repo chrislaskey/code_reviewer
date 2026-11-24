@@ -9,8 +9,9 @@
 </script>
 
 <script>
+  import { t } from "ttag";
   import { reviewsBranchesList } from "../../core/index.js";
-  import { COMPARE_MODE_OPTIONS, withValidChoices } from "../comparison_form.js";
+  import { compareModeOptions, withValidChoices } from "../comparison_form.js";
   import SegmentedControl from "./SegmentedControl.svelte";
 
   /** @type {{ form: any, onRefsError?: (message: string | null) => void }} */
@@ -64,20 +65,20 @@
 
 <div class="flex flex-wrap items-end gap-4">
   <label class="flex min-w-72 flex-1 flex-col gap-1.5 text-sm text-base-content/60">
-    Repository path
-    <input bind:value={form.repoPath} placeholder="/path/to/project" spellcheck="false" class={FIELD_CLASS} />
+    {t`Repository path`}
+    <input bind:value={form.repoPath} placeholder={t`/path/to/project`} spellcheck="false" class={FIELD_CLASS} />
   </label>
-  <SegmentedControl size="medium" value={form.mode} options={COMPARE_MODE_OPTIONS} onchange={(mode) => (form.mode = mode)} />
+  <SegmentedControl size="medium" value={form.mode} options={compareModeOptions()} onchange={(mode) => (form.mode = mode)} />
 </div>
 
 {#if form.mode === "commit"}
   <label class="flex flex-col gap-1.5 text-sm text-base-content/60">
-    Commit
+    {t`Commit`}
     <select bind:value={form.commitSha} class={FIELD_CLASS}>
       {#each withRemembered(form.commitSha, commitOptions) as option (option.value)}
         <option value={option.value}>{option.label}</option>
       {:else}
-        <option value="">None found</option>
+        <option value="">{t`None found`}</option>
       {/each}
     </select>
   </label>
@@ -85,22 +86,22 @@
 {#if form.mode === "branch"}
   <div class="flex flex-wrap items-end gap-4">
     <label class="flex min-w-48 flex-col gap-1.5 text-sm text-base-content/60">
-      This branch
+      {t`This branch`}
       <select bind:value={form.headBranch} class={FIELD_CLASS}>
         {#each withRemembered(form.headBranch, branchOptions) as option (option.value)}
           <option value={option.value}>{option.label}</option>
         {:else}
-          <option value="">None found</option>
+          <option value="">{t`None found`}</option>
         {/each}
       </select>
     </label>
     <label class="flex min-w-48 flex-col gap-1.5 text-sm text-base-content/60">
-      Against
+      {t`Against`}
       <select bind:value={form.baseBranch} class={FIELD_CLASS}>
         {#each withRemembered(form.baseBranch, branchOptions) as option (option.value)}
           <option value={option.value}>{option.label}</option>
         {:else}
-          <option value="">None found</option>
+          <option value="">{t`None found`}</option>
         {/each}
       </select>
     </label>

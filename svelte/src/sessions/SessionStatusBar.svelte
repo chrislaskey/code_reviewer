@@ -3,6 +3,7 @@
      second line of smaller buttons on small windows. On a session's page.
      `actions` comes from createSessionActions (session_actions.js). -->
 <script>
+  import { t } from "ttag";
   import { reviewsShowUrl, tracesShowUrl } from "../lib/routes.js";
   import AgentBadge from "./AgentBadge.svelte";
   import Badge from "./Badge.svelte";
@@ -26,10 +27,10 @@
   {#if session.agent}
     <AgentBadge session={session.agent} />
   {:else}
-    <Badge text="no agent" title="No agent is running in the session" />
+    <Badge text={t`no agent`} title={t`No agent is running in the session`} />
   {/if}
   {#if !attached}
-    <Badge text="detached" title="No terminal window is attached to the session, so Open starts a new one" />
+    <Badge text={t`detached`} title={t`No terminal window is attached to the session, so Open starts a new one`} />
   {/if}
   <div class="session-actions">
     <OpenMenu
@@ -42,8 +43,8 @@
       class={ACTION_BUTTON_CLASS}
     />
     {#if session.directory}
-      <ChangesMenu label="Review" title="Open the changes in Reviews" directory={session.directory} git={session.git} {mainBranch} urlFor={reviewsShowUrl} class={ACTION_BUTTON_CLASS} />
-      <ChangesMenu label="Trace" title="Trace a test through the changes in Traces" directory={session.directory} git={session.git} {mainBranch} urlFor={tracesShowUrl} class={ACTION_BUTTON_CLASS} />
+      <ChangesMenu label={t`Review`} title={t`Open the changes in Reviews`} directory={session.directory} git={session.git} {mainBranch} urlFor={reviewsShowUrl} class={ACTION_BUTTON_CLASS} />
+      <ChangesMenu label={t`Trace`} title={t`Trace a test through the changes in Traces`} directory={session.directory} git={session.git} {mainBranch} urlFor={tracesShowUrl} class={ACTION_BUTTON_CLASS} />
     {/if}
     <GitMenu name={session.name} git={session.git} {mainBranch} onMerge={actions.merge} onClose={actions.close} class={ACTION_BUTTON_CLASS} />
   </div>

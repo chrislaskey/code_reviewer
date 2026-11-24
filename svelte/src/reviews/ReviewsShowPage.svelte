@@ -11,12 +11,13 @@
      canvas, and on Code only the code. -->
 <script>
   import { onMount, setContext, tick } from "svelte";
+  import { jt, msgid, ngettext, t } from "ttag";
   import { reviewsFileChangesList, reviewsFileDiffsList, reviewsFunctionDiffsList } from "../lib/core/index.js";
   import { reviewsNewUrl, reviewRequestFromSearch } from "../lib/routes.js";
-  import { plural } from "../lib/code_reviewer/change_styles.js";
   import { describeRequest } from "../lib/code_reviewer/comparison_form.js";
   import ChoiceMenu from "../lib/code_reviewer/components/ChoiceMenu.svelte";
   import Icon from "../lib/components/Icon.svelte";
+  import TranslatedParts from "../lib/components/TranslatedParts.svelte";
   import InfoPopover from "../lib/code_reviewer/components/InfoPopover.svelte";
   import MenuChoice from "../lib/code_reviewer/components/MenuChoice.svelte";
   import MarkerIcon from "./MarkerIcon.svelte";
@@ -31,14 +32,14 @@
   import TopBackgroundPattern from "../lib/code_reviewer/components/TopBackgroundPattern.svelte";
 
   const VIEW_OPTIONS = [
-    { value: "nodes", label: "Files" },
-    { value: "ledger", label: "Code" },
+    { value: "nodes", label: t`Files` },
+    { value: "ledger", label: t`Code` },
   ];
 
   // How the Code tab draws calls into dependencies and the standard library.
   const OUTSIDE_CHOICES = [
-    { value: "hidden", label: "Your code", explanation: "Calls into dependencies and the standard library are hidden." },
-    { value: "dimmed", label: "All calls", explanation: "Calls into dependencies and the standard library are shown, dimmed." },
+    { value: "hidden", label: t`Your code`, explanation: t`Calls into dependencies and the standard library are hidden.` },
+    { value: "dimmed", label: t`All calls`, explanation: t`Calls into dependencies and the standard library are shown, dimmed.` },
   ];
 
   const request = reviewRequestFromSearch(window.location.search);
@@ -76,6 +77,14 @@
 
   function shortCommit(commit) {
     return commit.slice(0, 8);
+  }
+
+  function filesCount(count) {
+    return ngettext(msgid`${count} file`, `${count} files`, count);
+  }
+
+  function functionsCount(count) {
+    return ngettext(msgid`${count} function`, `${count} functions`, count);
   }
 
   /** Shows the Node view moved to a group, with its files in the tree. */
@@ -124,7 +133,7 @@
 
 <div class="full-page max-sm:h-auto">
   <div class="full-page-title">
-    <h1>Review</h1>
+    <h1>{t`Review`}</h1>
     {#if request}
       <span class="comparison font-mono text-[11px] text-base-content/70">
         <span class="text-base-content">{request.repo_path}</span>
@@ -133,29 +142,30 @@
     {/if}
     <a href={reviewsNewUrl(request)} class="btn btn-ghost btn-sm ml-auto">
       <Icon name="hero-pencil-square-micro" class="size-4" />
-      Edit
+      {t`Edit`}
     </a>
   </div>
 
   {#if request === null}
+    {#snippet newReviewLink()}<a href={reviewsNewUrl()}>{t`Start a new review.`}</a>{/snippet}
     <p class="px-6 py-10 text-sm text-base-content/50">
-      This page needs a review to show. <a href={reviewsNewUrl()}>Start a new review.</a>
+      <TranslatedParts parts={jt`This page needs a review to show. ${newReviewLink}`} />
     </p>
   {:else if loading}
-    <p class="px-6 py-10 text-sm text-base-content/50">Analyzing the changes…</p>
+    <p class="px-6 py-10 text-sm text-base-content/50">{t`Analyzing the changes…`}</p>
   {:else if error}
     <p class="border-b border-base-300 bg-error/10 px-4 py-3 font-mono text-xs text-error">{error}</p>
   {:else if result.files.length === 0}
-    <p class="px-6 py-10 text-sm text-base-content/50">Nothing changed between the two.</p>
+    <p class="px-6 py-10 text-sm text-base-content/50">{t`Nothing changed between the two.`}</p>
   {:else}
     <!-- On small windows the page scrolls as a whole, and the toolbar stays at the top. -->
     <Toolbar class="full-page-toolbar">
       <SegmentedControl value={view} options={VIEW_OPTIONS} onchange={changeView} />
       {#if view === "ledger"}
         <div class="flex items-center gap-1">
-          <ChoiceMenu title="Which calls the code shows" class="btn btn-ghost btn-sm" align="start">
+          <ChoiceMenu title={t`Which calls the code shows`} class="btn btn-ghost btn-sm" align="start">
             {#snippet buttonContent()}
-              <span class="max-sm:hidden">Show</span>
+              <span class="max-sm:hidden">{t`Show`}</span>
               {outsideLabel}
             {/snippet}
             {#snippet children({ close })}
@@ -176,26 +186,28 @@
       {/if}
       <div class="ml-auto flex items-center gap-3">
         <span class="font-mono text-[11px] text-base-content/50 max-sm:hidden">
-          {plural(result.files.length, "file")} · {plural(functionCount, "function")}
+          {filesCount(result.files.length)} · {functionsCount(functionCount)}
         </span>
-        <InfoPopover title="How to use this view, what its markers mean, and what was compared" class="dropdown-end">
+        <InfoPopover title={t`How to use this view, what its markers mean, and what was compared`} class="dropdown-end">
           <p>
             {#if view === "nodes"}
-              Click a group to show it, a file to open its group's code.
+              {t`Click a group to show it, a file to open its group's code.`}
             {:else}
-              Hover a function to see its code, click the code to keep it open.
+              {t`Hover a function to see its code, click the code to keep it open.`}
             {/if}
           </p>
           <ul class="mt-2 flex flex-col gap-1">
-            <li class="flex items-center gap-1.5"><MarkerIcon marker="stale" /> stale caller</li>
-            <li class="flex items-center gap-1.5"><MarkerIcon marker="also_changed" /> also changed, click to jump</li>
+            <li class="flex items-center gap-1.5"><MarkerIcon marker="stale" /> {t`stale caller`}</li>
+            <li class="flex items-center gap-1.5"><MarkerIcon marker="also_changed" /> {t`also changed, click to jump`}</li>
           </ul>
           <p class="mt-2 font-mono text-xs">
-            {plural(result.files.length, "changed file")}, {plural(functionCount, "changed function")} ·
-            {shortCommit(result.base_commit)} → {result.head_commit ? shortCommit(result.head_commit) : "working tree"}
+            {ngettext(msgid`${result.files.length} changed file`, `${result.files.length} changed files`, result.files.length)},
+            {ngettext(msgid`${functionCount} changed function`, `${functionCount} changed functions`, functionCount)} ·
+            {shortCommit(result.base_commit)} → {result.head_commit ? shortCommit(result.head_commit) : t`working tree`}
           </p>
           {#if result.skipped_files.length > 0}
-            <p class="mt-2">{plural(result.skipped_files.length, "skipped file")}:</p>
+            {@const skippedCount = result.skipped_files.length}
+            <p class="mt-2">{ngettext(msgid`${skippedCount} skipped file:`, `${skippedCount} skipped files:`, skippedCount)}</p>
             <ul class="max-h-40 overflow-auto font-mono text-xs">
               {#each result.skipped_files as skipped (skipped.path)}
                 <li>{skipped.path} · {skipped.reason}</li>

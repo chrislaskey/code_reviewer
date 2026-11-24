@@ -1,10 +1,10 @@
 <!-- The Ledger view: the files of one group, each as a ledger with its code,
      under a line with the group's stats. -->
 <script>
-  import { plural } from "../../lib/code_reviewer/change_styles.js";
+  import { msgid, ngettext } from "ttag";
   import LinesLabel from "../LinesLabel.svelte";
   import StaleIcon from "../StaleIcon.svelte";
-  import { filesInGroup } from "../view_model.js";
+  import { filesInGroup, groupLabel } from "../view_model.js";
   import LedgerFile from "./LedgerFile.svelte";
 
   /**
@@ -29,9 +29,9 @@
 </script>
 
 <div class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-base-300 px-6 py-2 text-[11px]">
-  <span class="text-xs font-semibold">{group.label}</span>
+  <span class="text-xs font-semibold">{groupLabel(group)}</span>
   {#if row}
-    <span class="font-mono text-[11px] text-base-content/70">{plural(row.stats.file_count, "file")}</span>
+    <span class="font-mono text-[11px] text-base-content/70">{ngettext(msgid`${row.stats.file_count} file`, `${row.stats.file_count} files`, row.stats.file_count)}</span>
     <LinesLabel added={row.stats.added_lines} removed={row.stats.removed_lines} />
     <StaleIcon count={row.stats.stale_caller_count} />
   {/if}

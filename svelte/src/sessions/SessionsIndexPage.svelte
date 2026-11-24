@@ -4,7 +4,8 @@
      list comes from the backend's cache (server/src/session_summaries.rs),
      so it shows at once and is at most a refresh old. -->
 <script>
-  import { Page } from "../lib/components/index.js";
+  import { jt, msgid, ngettext, t } from "ttag";
+  import { Page, TranslatedParts } from "../lib/components/index.js";
   import { sessionsNewUrl, sessionsShowUrl } from "../lib/routes.js";
   import { onMount } from "svelte";
   import Button from "../lib/components/Button.svelte";
@@ -16,8 +17,7 @@
   import LogList from "../lib/code_reviewer/LogList.svelte";
   import { repeatWhileVisible } from "../lib/code_reviewer/repeat_while_visible.js";
   import { navigateToUrl } from "../lib/router.js";
-  import { countOf } from "./formatting.js";
-  import { SHOW_OUTCOMES } from "./session_actions.js";
+  import { showOutcomeText } from "./session_actions.js";
   import { listSessionChanges } from "./session_changes.js";
   import SessionSummary from "./SessionSummary.svelte";
   import WorktreeWithNoSession from "./WorktreeWithNoSession.svelte";
@@ -42,11 +42,11 @@
     const { settings, terminal_apps } = detected;
     const terminalApp = terminal_apps.find((app) => app.id === settings.terminal_app)?.name ?? settings.terminal_app;
     return [
-      ["Shell", settings.shell],
-      ["Terminal app", terminalApp],
+      [t`Shell`, settings.shell],
+      [t`Terminal app`, terminalApp],
       ["tmux", settings.tmux_path],
-      ["Session prefix", `${settings.session_name_prefix}-…`],
-      ["Watched directories", settings.watched_directories.join(", ")],
+      [t`Session prefix`, `${settings.session_name_prefix}-…`],
+      [t`Watched directories`, settings.watched_directories.join(", ")],
     ];
   });
 
@@ -65,7 +65,7 @@
       return true;
     } catch (error) {
       // Refreshes repeat, so only log an error once until it changes.
-      if (String(error) !== lastRefreshError) log(`Listing the sessions failed: ${error}`);
+      if (String(error) !== lastRefreshError) log(t`Listing the sessions failed: ${error}`);
       lastRefreshError = String(error);
       return false;
     } finally {
@@ -74,7 +74,7 @@
   }
 
   function showSessionChanges(changes) {
-    for (const { name, from, to } of changes.statusChanged) log(`${name}: agent ${from} → ${to}`);
+    for (const { name, from, to } of changes.statusChanged) log(t`${name}: agent ${from} → ${to}`);
     for (const [change, entries] of Object.entries(changes)) {
       for (let i = 0; i < entries.length; i++) waves.ripple(RIPPLE_STRENGTHS[change]);
     }
@@ -88,9 +88,11 @@
   async function refreshFromButton(event) {
     rippleUnder(event.currentTarget, RIPPLE_STRENGTHS.refreshed);
     if (await refresh()) {
-      const sessions = countOf(sessionList.sessions.length, "session");
-      const worktrees = countOf(sessionList.worktrees.length, "worktree");
-      log(`Refreshed: ${sessions} and ${worktrees} with no session`);
+      const sessionCount = sessionList.sessions.length;
+      const worktreeCount = sessionList.worktrees.length;
+      const sessions = ngettext(msgid`${sessionCount} session`, `${sessionCount} sessions`, sessionCount);
+      const worktrees = ngettext(msgid`${worktreeCount} worktree`, `${worktreeCount} worktrees`, worktreeCount);
+      log(t`Refreshed: ${sessions} and ${worktrees} with no session`);
     }
   }
 
@@ -108,9 +110,10 @@
   async function continueInWorktree(name) {
     try {
       const outcome = await sessionsContinuationsCreate(name);
-      log(`${name}: ${SHOW_OUTCOMES[outcome] ?? outcome}`);
+      const outcomeText = showOutcomeText(outcome);
+      log(t`${name}: ${outcomeText}`);
     } catch (error) {
-      log(`Continuing ${name} failed: ${error}`);
+      log(t`Continuing ${name} failed: ${error}`);
       await refresh();
       return;
     }
@@ -129,40 +132,51 @@
 
 <svelte:window onfocus={refresh} />
 
+<!-- untranslated: code -->
+{#snippet claudeContinue()}<code>claude --continue</code>{/snippet}
+<!-- untranslated: code -->
+{#snippet codexResume()}<code>codex resume</code>{/snippet}
+<!-- untranslated: code -->
+{#snippet cursorResume()}<code>cursor-agent --resume</code>{/snippet}
+<!-- untranslated: code -->
+{#snippet cursorAgent()}<code>agent</code>{/snippet}
+<!-- untranslated: code -->
+{#snippet codex()}<code>codex</code>{/snippet}
+<!-- untranslated: code -->
+{#snippet claudeSessions()}<code>~/.claude/sessions</code>{/snippet}
+
 <StillWaves bind:this={waves} rippleOnLoad />
 
 <TopBackgroundPattern />
 
 <Page wide class="with-waves">
   <Header>
-    Sessions
+    {t`Sessions`}
     {#snippet subtitle()}
-      The tmux sessions started here, with the agent status in each, then the worktrees with no session running.
-      Refreshes every 2 seconds.
+      {t`The tmux sessions started here, with the agent status in each, then the worktrees with no session running. Refreshes every 2 seconds.`}
     {/snippet}
     {#snippet actions()}
-      <Button variant="primary" href={sessionsNewUrl()}>New<span class="max-sm:hidden">&nbsp;session</span></Button>
+      <Button variant="primary" href={sessionsNewUrl()} aria-label={t`New session`}>
+        <span class="sm:hidden">{t`New`}</span><span class="max-sm:hidden">{t`New session`}</span>
+      </Button>
     {/snippet}
   </Header>
 
   <section>
     <div class="section-header">
       <div class="section-title">
-        <h2 class="section-heading">Current sessions</h2>
-        <InfoPopover title="Which sessions are listed, and what the actions do">
-          Only tmux sessions named {prefix}-… are listed, and the worktrees named {prefix}-… of the repositories in
-          {watchedDirectories} that have no session, as after a restart. A session opens its page, with the agent's chat
-          and the Open, Review, Trace and Git menus. Open new tmux session starts a session in the worktree, types the command
-          that resumes the agent last chatting there (<code>claude --continue</code>, <code>codex resume</code> or
-          <code>cursor-agent --resume</code>) and opens its page. The agent is Claude Code, Cursor's <code>agent</code> or <code>codex</code>. Claude Code's status is read from
-          <code>~/.claude/sessions</code>, which it doesn't document, so it may change. <code>agent</code> and
-          <code>codex</code> report none, so each is busy when its chat was written to in the last few seconds, else idle.
+        <h2 class="section-heading">{t`Current sessions`}</h2>
+        <InfoPopover title={t`Which sessions are listed, and what the actions do`}>
+          {t`Only tmux sessions named ${prefix}-… are listed, and the worktrees named ${prefix}-… of the repositories in ${watchedDirectories} that have no session, as after a restart. A session opens its page, with the agent's chat and the Open, Review, Trace and Git menus.`}
+          <TranslatedParts
+            parts={jt`Open new tmux session starts a session in the worktree, types the command that resumes the agent last chatting there (${claudeContinue}, ${codexResume} or ${cursorResume}) and opens its page. The agent is Claude Code, Cursor's ${cursorAgent} or ${codex}. Claude Code's status is read from ${claudeSessions}, which it doesn't document, so it may change. ${cursorAgent} and ${codex} report none, so each is busy when its chat was written to in the last few seconds, else idle.`}
+          />
         </InfoPopover>
-        <InfoPopover icon="hero-cog-6-tooth" title="The settings detected on this Mac">
+        <InfoPopover icon="hero-cog-6-tooth" title={t`The settings detected on this Mac`}>
           {#if detectError}
-            Detecting failed: {detectError}
+            {t`Detecting failed: ${detectError}`}
           {:else if !detected}
-            Detecting…
+            {t`Detecting…`}
           {:else}
             <dl class="detected-settings">
               {#each detectedSettings as [name, value] (name)}
@@ -172,19 +186,18 @@
             </dl>
           {/if}
           <p class="mt-2">
-            The shell, terminal app and tmux the app found on this Mac, the prefix of the sessions and worktrees it
-            creates, and the directories whose repositories are looked in for worktrees. New sessions run the shell, and Open uses the terminal app.
+            {t`The shell, terminal app and tmux the app found on this Mac, the prefix of the sessions and worktrees it creates, and the directories whose repositories are looked in for worktrees. New sessions run the shell, and Open uses the terminal app.`}
           </p>
         </InfoPopover>
       </div>
       <Button class="btn btn-ghost" onclick={refreshFromButton}>
         <Icon name="hero-arrow-path-micro" class="size-4" />
-        Refresh
+        {t`Refresh`}
       </Button>
     </div>
     <div class="session-list" {@attach rippleOnActions}>
       {#if empty}
-        <div class="raised-panel empty muted">No sessions or worktrees. New session starts one, named {prefix}-…</div>
+        <div class="raised-panel empty muted">{t`No sessions or worktrees. New session starts one, named ${prefix}-…`}</div>
       {/if}
       {#each sessionList?.sessions ?? [] as session (session.name)}
         <SessionSummary {session} />

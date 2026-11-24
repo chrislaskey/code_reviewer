@@ -4,114 +4,47 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Plural-Forms: nplurals=2; plural=(n!=1);\n"
 
-#: src/public/about.html:7 src/public/about.html:16
-#: src/public/partials/footer.html:6 src/public/partials/header.html:8
-msgid "About"
-msgstr "Acerca de"
-
-#: src/public/about.html:8
-msgid ""
-"How Starter Pack runs one application on the web, the desktop and phones."
-msgstr ""
-"Cómo Starter Pack ejecuta una sola aplicación en la web, el escritorio y los "
-"teléfonos."
-
-#: src/public/about.html:18
-msgid ""
-"Starter Pack is one application written once and run in three places: a web "
-"server, a desktop app and a phone app. The web server is the system of "
-"record; each app keeps a copy of what you can see and syncs its changes when "
-"it is online."
-msgstr ""
-"Starter Pack es una aplicación escrita una sola vez que funciona en tres "
-"lugares: un servidor web, una app de escritorio y una app para el teléfono. "
-"El servidor web es la fuente de verdad; cada app guarda una copia de lo que "
-"puedes ver y sincroniza sus cambios cuando tiene conexión."
-
-#: src/public/about.html:23
-msgid ""
-"<a href=\"/accounts/sign-in\" class=\"link\">Sign up</a> on the web, then "
-"log in from the app on each of your devices."
-msgstr ""
-"<a href=\"/accounts/sign-in\" class=\"link\">Regístrate</a> en la web y "
-"luego inicia sesión desde la app en cada uno de tus dispositivos."
-
 #: src/public/index.html:8
 msgid ""
-"One Rust application on the web, on the desktop and on a phone, working "
-"offline."
+"Run coding agents in tmux, review what a change did, and trace a test "
+"through it, from a Mac or an iPhone."
 msgstr ""
-"Una aplicación en Rust en la web, en el escritorio y en el teléfono, que "
-"funciona sin conexión."
+"Ejecuta agentes de programación en tmux, revisa qué hizo un cambio y traza "
+"una prueba a través de él, desde un Mac o un iPhone."
 
-#: src/public/index.html:16
-msgid "One application, on the web, the desktop and your phone"
-msgstr "Una aplicación, en la web, el escritorio y tu teléfono"
-
-#: src/public/index.html:18
+#: src/public/index.html:19
 msgid ""
-"Starter Pack keeps your posts and files with you: the apps work offline and "
-"catch up with the web when they are back online."
+"Run Claude Code, Cursor or Codex agent sessions in tmux, review what a "
+"change did, and trace a test through it."
 msgstr ""
-"Starter Pack lleva tus publicaciones y archivos contigo: las apps funcionan "
-"sin conexión y se ponen al día con la web cuando vuelven a conectarse."
-
-#: src/public/index.html:22 src/public/partials/header.html:11
-msgid "Sign up"
-msgstr "Regístrate"
+"Ejecuta sesiones de agentes de Claude Code, Cursor o Codex en tmux, revisa "
+"qué hizo un cambio y traza una prueba a través de él."
 
 #: src/public/index.html:23
-msgid "Try it now"
-msgstr "Pruébalo ahora"
-
-#: src/public/index.html:24
-msgid "How it works"
-msgstr "Cómo funciona"
-
-#: src/public/index.html:38
-msgid "Everywhere"
-msgstr "En todas partes"
-
-#: src/public/index.html:39
-msgid "The same pages in a browser, in a desktop window and on a phone."
+msgid ""
+"Code Reviewer runs in its apps for the Mac and the iPhone. This website is "
+"only for signing in to your account."
 msgstr ""
-"Las mismas páginas en un navegador, en una ventana de escritorio y en un "
-"teléfono."
-
-#: src/public/index.html:42
-msgid "Offline"
-msgstr "Sin conexión"
-
-#: src/public/index.html:43
-msgid "Each app has its own copy, so it keeps working with no connection."
-msgstr ""
-"Cada app tiene su propia copia, así que sigue funcionando sin conexión."
-
-#: src/public/index.html:46
-msgid "Together"
-msgstr "Juntos"
-
-#: src/public/index.html:47
-msgid "Add what you write to a community and its members see it."
-msgstr "Añade lo que escribes a una comunidad y sus miembros lo verán."
+"Code Reviewer funciona en sus apps para Mac y iPhone. Este sitio web es solo "
+"para iniciar sesión en tu cuenta."
 
 #: src/public/partials/footer.html:5
 msgid "Home"
 msgstr "Inicio"
 
-#: src/public/partials/footer.html:7
+#: src/public/partials/footer.html:6
 msgid "Terms"
 msgstr "Términos"
 
-#: src/public/partials/footer.html:8
+#: src/public/partials/footer.html:7
 msgid "Privacy"
 msgstr "Privacidad"
 
-#: src/public/partials/header.html:10
+#: src/public/partials/header.html:9
 msgid "Sign in"
 msgstr "Iniciar sesión"
 
-#: src/public/partials/header.html:12
+#: src/public/partials/header.html:10
 msgid "Open the app"
 msgstr "Abrir la app"
 
@@ -121,9 +54,10 @@ msgstr "Política de privacidad"
 
 #: src/public/privacy.html:12
 msgid ""
-"What Starter Pack collects, why, who it shares it with, and how to delete it."
+"What Code Reviewer collects, why, who it shares it with, and how to delete "
+"it."
 msgstr ""
-"Qué recopila Starter Pack, por qué, con quién lo comparte y cómo eliminarlo."
+"Qué recopila Code Reviewer, por qué, con quién lo comparte y cómo borrarlo."
 
 #: src/public/privacy.html:21 src/public/terms.html:21
 msgid "Effective [Effective date]"
@@ -132,12 +66,12 @@ msgstr "Vigente desde [Effective date]"
 #: src/public/privacy.html:24
 msgid ""
 "This policy explains what [Company name] (\"we\", \"us\") collects when you "
-"use Starter Pack on the web, the desktop or a phone, why, who we share it "
+"use Code Reviewer on the web, the desktop or a phone, why, who we share it "
 "with, and the choices you have. We do not sell your personal data, and we do "
 "not use it for advertising."
 msgstr ""
 "Esta política explica qué recopila [Company name] («nosotros») cuando usas "
-"Starter Pack en la web, el escritorio o un teléfono, por qué, con quién lo "
+"Code Reviewer en la web, el escritorio o un teléfono, por qué, con quién lo "
 "compartimos y qué opciones tienes. No vendemos tus datos personales ni los "
 "usamos para publicidad."
 
@@ -450,21 +384,22 @@ msgid "Terms of Service"
 msgstr "Términos del servicio"
 
 #: src/public/terms.html:12
-msgid "The terms for using Starter Pack on the web, the desktop and phones."
+msgid "The terms for using Code Reviewer on the web, the desktop and phones."
 msgstr ""
-"Los términos para usar Starter Pack en la web, el escritorio y los teléfonos."
+"Las condiciones para usar Code Reviewer en la web, el escritorio y los "
+"teléfonos."
 
 #: src/public/terms.html:24
 msgid ""
 "These terms are an agreement between you and [Company name] (\"we\", \"us\") "
-"for using Starter Pack: the website, the web application, and the desktop "
+"for using Code Reviewer: the website, the web application, and the desktop "
 "and phone apps (together, \"the service\"). By creating an account or using "
 "the service you accept these terms and our <a href=\"/privacy\" "
 "class=\"link\">Privacy Policy</a>. If you do not accept them, do not use the "
 "service."
 msgstr ""
 "Estos términos son un acuerdo entre tú y [Company name] («nosotros») para "
-"usar Starter Pack: el sitio web, la aplicación web y las apps de escritorio "
+"usar Code Reviewer: el sitio web, la aplicación web y las apps de escritorio "
 "y de teléfono (en conjunto, «el servicio»). Al crear una cuenta o usar el "
 "servicio, aceptas estos términos y nuestra <a href=\"/privacy\" "
 "class=\"link\">Política de privacidad</a>. Si no los aceptas, no uses el "

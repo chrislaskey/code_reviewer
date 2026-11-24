@@ -4,8 +4,9 @@
      or hidden, as `outside` says. The code is under the columns.
      Hover any line to highlight the function it belongs to; the rest fades. -->
 <script>
+  import { msgid, ngettext, t } from "ttag";
   import Icon from "../../lib/components/Icon.svelte";
-  import { CHANGE_STYLES, plural } from "../../lib/code_reviewer/change_styles.js";
+  import { CHANGE_STYLES, changeLabel } from "../../lib/code_reviewer/change_styles.js";
   import LinesLabel from "../LinesLabel.svelte";
   import { findFileByPath, shortPath } from "../view_model.js";
   import CodeFooter from "./CodeFooter.svelte";
@@ -80,17 +81,17 @@
     <h3 class="text-sm font-semibold">{file.module}</h3>
     <span class="min-w-0 truncate font-mono text-[11px] text-base-content/50">{file.path}</span>
     <span class="ml-auto shrink-0 font-mono text-[11px] text-base-content/60">
-      {#if !file.plain}{plural(file.functions.length, "function")}{/if}
+      {#if !file.plain}{ngettext(msgid`${file.functions.length} function`, `${file.functions.length} functions`, file.functions.length)}{/if}
     </span>
   </button>
 
   {#if expanded.open && !file.plain}
     <div class="grid border-t border-base-content/10 p-3" style="grid-template-columns: {COLUMNS}; column-gap: 24px">
       <div>
-        <div class="h-5 text-[10px] font-semibold uppercase tracking-wide text-base-content/40">File</div>
+        <div class="h-5 text-[10px] font-semibold uppercase tracking-wide text-base-content/40">{t`File`}</div>
         {#each file.functions as fn (fn.key)}
           {@const fnStyle = CHANGE_STYLES[fn.kind]}
-          <LedgerLine label={fnStyle.label} onhover={hover(fn.key)} {...stateOf(fn.key)}>
+          <LedgerLine label={changeLabel(fn.kind)} onhover={hover(fn.key)} {...stateOf(fn.key)}>
             <span class={["w-3 text-center font-bold", fnStyle.text]}>{fnStyle.sign}</span>
             <span class="min-w-0 flex-1 truncate">
               {fn.name}
@@ -103,7 +104,7 @@
         {/each}
       </div>
       <div>
-        <div class="h-5 text-[10px] font-semibold uppercase tracking-wide text-base-content/40">Outputs</div>
+        <div class="h-5 text-[10px] font-semibold uppercase tracking-wide text-base-content/40">{t`Outputs`}</div>
         {#each outputs as entry (entry.id)}
           <LedgerLine
             label={entry.label}
@@ -116,11 +117,11 @@
             {...stateOf(entry.hoverKey)}
           />
         {:else}
-          <div class="flex items-center px-2 font-mono text-[10px] text-base-content/40" style="height: {LINE}px">none</div>
+          <div class="flex items-center px-2 font-mono text-[10px] text-base-content/40" style="height: {LINE}px">{t`none`}</div>
         {/each}
       </div>
       <div>
-        <div class="h-5 text-[10px] font-semibold uppercase tracking-wide text-base-content/40">Inputs</div>
+        <div class="h-5 text-[10px] font-semibold uppercase tracking-wide text-base-content/40">{t`Inputs`}</div>
         {#each inputs as entry (entry.id)}
           <LedgerLine
             label={entry.label}
@@ -139,7 +140,7 @@
           </LedgerLine>
         {:else}
           <div class="flex items-center px-2 font-mono text-[10px] text-base-content/40" style="height: {LINE}px">
-            none outside this file
+            {t`none outside this file`}
           </div>
         {/each}
       </div>

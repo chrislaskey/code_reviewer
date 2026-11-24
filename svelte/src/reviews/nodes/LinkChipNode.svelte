@@ -3,6 +3,7 @@
 <script>
   import { getContext } from "svelte";
   import { Handle, Position } from "@xyflow/svelte";
+  import { t } from "ttag";
   import { TONE_STYLES } from "../../lib/code_reviewer/change_styles.js";
   import MarkerIcon from "../MarkerIcon.svelte";
   import StartEllipsis from "../StartEllipsis.svelte";
@@ -15,9 +16,11 @@
   let dimmed = $derived(focus.key !== null && focus.key !== link.line_key);
   let isInput = $derived(link.side === "input");
   let markers = $derived([...(link.is_stale ? ["stale"] : []), ...(link.file_id ? ["also_changed"] : [])]);
-  let title = $derived(
-    `${link.module}\n${link.group_label} · ${isInput ? "calls" : "called from"} ${link.line_label}${link.file_id ? "\nClick to show its group" : ""}`,
-  );
+  let title = $derived.by(() => {
+    const { module, group_label: groupLabel, line_label: lineLabel } = link;
+    const where = isInput ? t`${groupLabel} · calls ${lineLabel}` : t`${groupLabel} · called from ${lineLabel}`;
+    return [module, where, ...(link.file_id ? [t`Click to show its group`] : [])].join("\n");
+  });
 </script>
 
 <svelte:element

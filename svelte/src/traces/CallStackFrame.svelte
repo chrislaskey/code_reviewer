@@ -4,16 +4,18 @@
      left, one for each level above it. A click closes the frame's code and
      the frames below it, or opens both again. -->
 <script>
-  import { CHANGE_STYLES } from "../lib/code_reviewer/change_styles.js";
+  import { msgid, ngettext, t } from "ttag";
+  import { CHANGE_STYLES, changeLabel } from "../lib/code_reviewer/change_styles.js";
   import CodeLines from "../lib/code_reviewer/components/CodeLines.svelte";
   import Icon from "../lib/components/Icon.svelte";
   import { languageForPath } from "../lib/code_reviewer/syntax_highlight.js";
-  import { STOP_LABELS, calledFrom, canClose, functionLabel, isClosed } from "./call_stack.js";
+  import { calledFrom, canClose, functionLabel, isClosed, stopLabels } from "./call_stack.js";
 
   /** @type {{ visible: import("./call_stack.js").VisibleFrame, current: boolean, ontoggle: () => void }} */
   let { visible, current, ontoggle } = $props();
 
   const INDENT = 24;
+  const STOP_LABELS = stopLabels();
 
   let frame = $derived(visible.frame);
   let change = $derived(frame.change ? CHANGE_STYLES[frame.change] : null);
@@ -45,15 +47,21 @@
 {/snippet}
 
 {#snippet badges()}
-  {#if change && !frame.repeated}<span class={BADGE_WARN}>{change.label}</span>{/if}
-  {#if frame.repeated}<span class={BADGE_PLAIN}>shown above</span>{/if}
+  {#if change && !frame.repeated}<span class={BADGE_WARN}>{changeLabel(frame.change)}</span>{/if}
+  {#if frame.repeated}<span class={BADGE_PLAIN}>{t`shown above`}</span>{/if}
   {#if frame.stop_reason}<span class={BADGE_PLAIN}>{STOP_LABELS[frame.stop_reason]}</span>{/if}
   {#if visible.skippedCallers > 0}
-    <span class={BADGE_PLAIN}>via {visible.skippedCallers} unchanged {visible.skippedCallers === 1 ? "call" : "calls"}</span>
+    <span class={BADGE_PLAIN}>
+      {ngettext(
+        msgid`via ${visible.skippedCallers} unchanged call`,
+        `via ${visible.skippedCallers} unchanged calls`,
+        visible.skippedCallers,
+      )}
+    </span>
   {/if}
   {#if visible.childrenHidden && visible.childCount > 0}
     <span class="shrink-0 rounded-full bg-base-content/10 px-2 py-px text-[10px] text-base-content/60">
-      {visible.childCount} hidden below
+      {t`${visible.childCount} hidden below`}
     </span>
   {/if}
 {/snippet}
@@ -72,7 +80,7 @@
       <span class="size-4 shrink-0"></span>
       <span class="w-3 text-center">·</span>
       <span class="truncate">{functionLabel(frame.function)}</span>
-      <span class={BADGE_PLAIN}>system</span>
+      <span class={BADGE_PLAIN}>{t`system`}</span>
       {#if from}<span class="truncate text-base-content/40">{from}</span>{/if}
     </div>
   {:else if visible.emphasis === "unchanged"}

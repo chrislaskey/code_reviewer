@@ -3,6 +3,7 @@
      a request in its URL, as from Edit trace, the form starts from it;
      otherwise from the last one submitted. -->
 <script>
+  import { t } from "ttag";
   import { Page } from "../lib/components/index.js";
   import Button from "../lib/components/Button.svelte";
   import ComparisonFields from "../lib/code_reviewer/components/ComparisonFields.svelte";
@@ -40,9 +41,9 @@
 
 <Page wide>
   <Header>
-    New trace
+    {t`New trace`}
     {#snippet subtitle()}
-      A git repository with Elixir or Rust code, and what to compare. The next page lists its tests to pick one from.
+      {t`A git repository with Elixir or Rust code, and what to compare. The next page lists its tests to pick one from.`}
     {/snippet}
   </Header>
 
@@ -50,10 +51,10 @@
     <ComparisonFields bind:form onRefsError={(message) => (refsError = message)} />
 
     <div class="flex flex-wrap items-center gap-3">
-      <Button variant="primary" type="submit" disabled={request === null}>List tests</Button>
+      <Button variant="primary" type="submit" disabled={request === null}>{t`List tests`}</Button>
       <p class="text-sm text-base-content/50">{describeComparison(form)}</p>
       {#if refsError && form.mode !== "working_tree"}
-        <p class="text-sm text-error">Could not read the branches: {refsError}</p>
+        <p class="text-sm text-error">{t`Could not read the branches: ${refsError}`}</p>
       {/if}
     </div>
   </form>

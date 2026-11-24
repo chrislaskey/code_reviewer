@@ -3,7 +3,234 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Plural-Forms: nplurals=2; plural=(n!=1);\n"
 
-#: src/lib/layouts/AppNav.svelte:42
+#: src/reviews/ReviewsShowPage.svelte:30
+#: src/traces/call_stack.js:12
+msgid "Your code"
+msgstr ""
+
+#: src/reviews/ReviewsShowPage.svelte:30
+#: src/traces/call_stack.js:12
+msgid "Calls into dependencies and the standard library are hidden."
+msgstr ""
+
+#: src/reviews/ReviewsShowPage.svelte:31
+#: src/traces/call_stack.js:13
+msgid "All calls"
+msgstr ""
+
+#: src/traces/call_stack.js:13
+msgid "Calls into dependencies and the standard library are shown, as slim rows."
+msgstr ""
+
+#: src/traces/call_stack.js:20
+msgid "All functions"
+msgstr ""
+
+#: src/traces/call_stack.js:20
+msgid "Unchanged functions are shown, as one-line cards."
+msgstr ""
+
+#: src/traces/call_stack.js:23
+msgid "Changed only"
+msgstr ""
+
+#: src/traces/call_stack.js:24
+msgid ""
+"Unchanged functions are hidden, and each change notes the calls left out "
+"above it."
+msgstr ""
+
+#: src/traces/call_stack.js:32
+msgid "cycle"
+msgstr ""
+
+#: src/traces/call_stack.js:33
+msgid "depth limit"
+msgstr ""
+
+#: src/traces/call_stack.js:34
+msgid "frame limit"
+msgstr ""
+
+#: src/traces/TracesShowPage.svelte:20
+msgid "Tests"
+msgstr ""
+
+#: src/traces/TracesShowPage.svelte:21
+msgid "Calls"
+msgstr ""
+
+#: src/reviews/ReviewsShowPage.svelte:76
+#: src/reviews/nodes/GroupCardNode.svelte:37
+#: src/traces/TracesShowPage.svelte:59
+#, javascript-format
+msgid "${ count } function"
+msgid_plural "${ count } functions"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/SessionStatusBar.svelte:38
+#: src/traces/TracesShowPage.svelte:103
+msgid "Trace"
+msgstr ""
+
+#: src/communities/CommunitiesShowPage.svelte:42
+#: src/files/FilesShowPage.svelte:90
+#: src/posts/PostsShowPage.svelte:35
+#: src/reviews/ReviewsShowPage.svelte:124
+#: src/traces/TracesShowPage.svelte:107
+msgid "Edit"
+msgstr ""
+
+#: src/traces/TracesShowPage.svelte:109
+msgid "Start a new trace."
+msgstr ""
+
+#: src/traces/TracesShowPage.svelte:110
+#, javascript-format
+msgid "This page needs a comparison to list the tests of. ${ newTraceLink }"
+msgstr ""
+
+#: src/traces/TracesShowPage.svelte:111
+msgid "Listing the tests…"
+msgstr ""
+
+#: src/traces/TracesShowPage.svelte:117
+#, javascript-format
+msgid "${ counts.changed } changed"
+msgstr ""
+
+#: src/traces/TracesShowPage.svelte:119
+msgid "How to use this page, what its labels mean, and what was compared"
+msgstr ""
+
+#: src/traces/TracesShowPage.svelte:120
+msgid ""
+"Pick a test to walk its calls. Click a function to close its code and the "
+"calls below it, again to open them."
+msgstr ""
+
+#: src/traces/CallStackFrame.svelte:32
+#: src/traces/TracesShowPage.svelte:121
+msgid "shown above"
+msgstr ""
+
+#: src/traces/TracesShowPage.svelte:122
+#, javascript-format
+msgid "${ shownAbove }: already walked above, its calls are listed there"
+msgstr ""
+
+#: src/traces/TracesShowPage.svelte:124
+#, javascript-format
+msgid "${ stopLabel }: the walk stopped here"
+msgstr ""
+
+#: src/traces/TracesShowPage.svelte:125
+#, javascript-format
+msgid "${ testCount } test"
+msgid_plural "${ testCount } tests"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/reviews/ReviewsShowPage.svelte:154
+#: src/traces/TracesShowPage.svelte:127
+msgid "working tree"
+msgstr ""
+
+#: src/traces/TracesShowPage.svelte:131
+#, javascript-format
+msgid ""
+"${ counts.changed } changed, ${ projectFunctions }, ${ systemCalls }, cut "
+"short by the limits"
+msgstr ""
+
+#: src/traces/TracesShowPage.svelte:132
+#, javascript-format
+msgid "${ counts.changed } changed, ${ projectFunctions }, ${ systemCalls }"
+msgstr ""
+
+#: src/traces/TracesShowPage.svelte:141
+msgid "Pick a test to walk its calls."
+msgstr ""
+
+#: src/traces/TracesShowPage.svelte:142
+msgid "Walking the calls…"
+msgstr ""
+
+#: src/traces/TracesNewPage.svelte:35
+msgid "New trace"
+msgstr ""
+
+#: src/traces/TracesNewPage.svelte:36
+msgid ""
+"A git repository with Elixir or Rust code, and what to compare. The next "
+"page lists its tests to pick one from."
+msgstr ""
+
+#: src/traces/TracesNewPage.svelte:40
+msgid "List tests"
+msgstr ""
+
+#: src/reviews/ReviewsNewPage.svelte:60
+#: src/traces/TracesNewPage.svelte:42
+#, javascript-format
+msgid "Could not read the branches: ${ refsError }"
+msgstr ""
+
+#: src/traces/TestPicker.svelte:35
+msgid "test added"
+msgstr ""
+
+#: src/traces/TestPicker.svelte:36
+msgid "test modified"
+msgstr ""
+
+#: src/traces/TestPicker.svelte:37
+msgid "test removed"
+msgstr ""
+
+#: src/traces/TestPicker.svelte:38
+msgid "test renamed"
+msgstr ""
+
+#: src/traces/TestPicker.svelte:39
+msgid "test unchanged"
+msgstr ""
+
+#: src/traces/TestPicker.svelte:42
+msgid "Find a test"
+msgstr ""
+
+#: src/traces/TestPicker.svelte:43
+msgid "LiveView tests only"
+msgstr ""
+
+#: src/traces/TestPicker.svelte:44
+#, javascript-format
+msgid "${ shown.length } of ${ tests.length } tests"
+msgstr ""
+
+#: src/traces/TestPicker.svelte:55
+msgid "No tests match."
+msgstr ""
+
+#: src/traces/CallStackFrame.svelte:36
+#, javascript-format
+msgid "via ${ visible.skippedCallers } unchanged call"
+msgid_plural "via ${ visible.skippedCallers } unchanged calls"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/traces/CallStackFrame.svelte:41
+#, javascript-format
+msgid "${ visible.childCount } hidden below"
+msgstr ""
+
+#: src/traces/CallStackFrame.svelte:48
+msgid "system"
+msgstr ""
+
+#: src/lib/layouts/AppNav.svelte:44
 #: src/support/SupportIndexPage.svelte:9
 msgid "Support"
 msgstr ""
@@ -12,6 +239,1395 @@ msgstr ""
 #: src/support/SupportIndexPage.svelte:11
 msgid "Nothing here yet."
 msgstr ""
+
+#: src/sessions/session_actions.js:17
+msgid "Brought its window to the front"
+msgstr ""
+
+#: src/sessions/session_actions.js:18
+msgid "Opened a new window"
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:109
+#: src/sessions/session_actions.js:43
+#, javascript-format
+msgid "${ name }: ${ outcomeText }"
+msgstr ""
+
+#: src/sessions/session_actions.js:45
+#, javascript-format
+msgid "Opening ${ name } failed: ${ error }"
+msgstr ""
+
+#: src/sessions/session_actions.js:53
+#, javascript-format
+msgid "${ name }: Opened in the browser"
+msgstr ""
+
+#: src/sessions/session_actions.js:55
+#, javascript-format
+msgid "Opening ${ name } in the browser failed: ${ error }"
+msgstr ""
+
+#: src/sessions/session_actions.js:62
+#, javascript-format
+msgid "${ name }: Opened its artifacts"
+msgstr ""
+
+#: src/sessions/session_actions.js:64
+#, javascript-format
+msgid "Opening the artifacts of ${ name } failed: ${ error }"
+msgstr ""
+
+#: src/sessions/session_actions.js:72
+#, javascript-format
+msgid "Merging ${ name } failed: ${ error }"
+msgstr ""
+
+#: src/sessions/session_actions.js:75
+#, javascript-format
+msgid "Closing ${ name } failed: ${ error }"
+msgstr ""
+
+#: src/sessions/session_actions.js:82
+#, javascript-format
+msgid "Copied: ${ text }"
+msgstr ""
+
+#: src/sessions/session_actions.js:86
+msgid "Could not copy, the command is selected instead"
+msgstr ""
+
+#: src/sessions/prompt_images.js:31
+#, javascript-format
+msgid "Reading ${ fileName } was cancelled"
+msgstr ""
+
+#: src/sessions/formatting.js:6
+#, javascript-format
+msgid "${ seconds }s ago"
+msgstr ""
+
+#: src/sessions/formatting.js:8
+#, javascript-format
+msgid "${ minutes }m ago"
+msgstr ""
+
+#: src/sessions/formatting.js:10
+#, javascript-format
+msgid "${ hours }h ago"
+msgstr ""
+
+#: src/sessions/formatting.js:12
+#, javascript-format
+msgid "${ days }d ago"
+msgstr ""
+
+#: src/sessions/formatting.js:20
+msgid "under a second later"
+msgstr ""
+
+#: src/sessions/formatting.js:21
+#, javascript-format
+msgid "${ seconds } second later"
+msgid_plural "${ seconds } seconds later"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/formatting.js:23
+#, javascript-format
+msgid "${ minutes } minute later"
+msgid_plural "${ minutes } minutes later"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/formatting.js:25
+#, javascript-format
+msgid "${ hours } hour later"
+msgid_plural "${ hours } hours later"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/formatting.js:27
+#, javascript-format
+msgid "${ days } day later"
+msgid_plural "${ days } days later"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/formatting.js:45
+#, javascript-format
+msgid "${ used } tokens"
+msgstr ""
+
+#: src/sessions/formatting.js:47
+#, javascript-format
+msgid "${ used } of ${ window } tokens (${ percent_used }%)"
+msgstr ""
+
+#: src/sessions/chat_filters.js:7
+msgid "All"
+msgstr ""
+
+#: src/sessions/chat_filters.js:7
+msgid "Every message, with the notes the agent's CLI writes."
+msgstr ""
+
+#: src/sessions/chat_filters.js:8
+msgid "Last"
+msgstr ""
+
+#: src/sessions/chat_filters.js:8
+msgid "Each of your prompts with the agent's final reply to it."
+msgstr ""
+
+#: src/sessions/chat_filters.js:9
+msgid "Yours"
+msgstr ""
+
+#: src/sessions/chat_filters.js:9
+msgid "Only the prompts you wrote."
+msgstr ""
+
+#: src/sessions/chat_filters.js:10
+msgid "None"
+msgstr ""
+
+#: src/sessions/chat_filters.js:10
+msgid "No messages, to bring the logs below into view."
+msgstr ""
+
+#: src/sessions/WorktreeWithNoSession.svelte:13
+msgid "no session"
+msgstr ""
+
+#: src/sessions/WorktreeWithNoSession.svelte:14
+msgid "No tmux session is running in the worktree"
+msgstr ""
+
+#: src/sessions/WorktreeWithNoSession.svelte:15
+msgid ""
+"Starts a tmux session in the worktree, opens it in the terminal app and "
+"resumes the agent last chatting there"
+msgstr ""
+
+#: src/sessions/WorktreeWithNoSession.svelte:17
+msgid "Open new tmux session"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:40
+#.  Toggles for the prompt box's layout, each on or off by itself.
+msgid "Pin the prompt in view while the chat scrolls"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:41
+#.  Toggles for the prompt box's layout, each on or off by itself.
+msgid "Make the prompt box taller"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:64
+msgid "No running session to write to"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:64
+msgid "No agent running in the session"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:45
+#: src/sessions/SessionsShowPage.svelte:137
+#, javascript-format
+msgid "Detecting the settings failed: ${ error }"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:150
+msgid "Which messages the chat shows"
+msgstr ""
+
+#: src/posts/PostsIndexPage.svelte:23
+#: src/reviews/ReviewsShowPage.svelte:135
+#: src/sessions/SessionsShowPage.svelte:151
+msgid "Show"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:160
+msgid "No session"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:161
+msgid ""
+"The session's status and actions, and the agent's chat history. Refreshes "
+"every 5 seconds."
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:162
+msgid "The address names no session."
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:163
+#, javascript-format
+msgid "${ sessionError }. Showing it as it was last seen."
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:165
+#: src/sessions/SessionsShowPage.svelte:192
+msgid "Loading…"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:166
+msgid "Chat"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:168
+#, javascript-format
+msgid "${ total } message"
+msgid_plural "${ total } messages"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/SessionsShowPage.svelte:169
+#, javascript-format
+msgid "${ shown } of ${ total } message"
+msgid_plural "${ shown } of ${ total } messages"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/SessionsShowPage.svelte:170
+msgid "Context window used"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:172
+msgid "What the chat holds, and how prompts are sent"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:173
+msgid "Read from the transcript the agent writes as it works, once it has one."
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:174
+msgid ""
+"A prompt is typed into the agent's tmux pane, then Enter, as if you typed "
+"it there. Nothing is sent until you press Enter or Send, and Shift+Enter "
+"starts a new line. A pasted, dropped or attached image is saved in the "
+"session's artifacts and its path put in the prompt, for the agent to read."
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:145
+#: src/sessions/SessionsShowPage.svelte:177
+msgid "Refresh"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:184
+#, javascript-format
+msgid "${ name }: ${ message }"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:190
+msgid "No chat history without a running session."
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:191
+msgid "No agent is running in the session."
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:88
+#, javascript-format
+msgid "Refreshing ${ name } failed: ${ refreshError }"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:97
+#, javascript-format
+msgid "${ name }: Refreshed"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:103
+#, javascript-format
+msgid "${ name }: Sent the prompt"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:105
+#, javascript-format
+msgid "Sending the prompt to ${ name } failed: ${ error }"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:116
+#, javascript-format
+msgid "${ name }: Saved the image at ${ path }"
+msgstr ""
+
+#: src/sessions/SessionsShowPage.svelte:119
+#, javascript-format
+msgid "Saving the image for ${ name } failed: ${ error }"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:50
+#, javascript-format
+msgid "Finding a free port failed: ${ error }"
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:131
+#: src/sessions/SessionsIndexPage.svelte:133
+#: src/sessions/SessionsNewPage.svelte:54
+msgid "New session"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:55
+#, javascript-format
+msgid ""
+"Creates a git worktree of a repository and a tmux session, both named ${ "
+"prefix }-…, running your shell in the worktree with a command typed in, and "
+"opens it in your terminal app."
+msgstr ""
+
+#: src/communities/components/CommunitiesForm.svelte:25
+#: src/files/FilesEditPage.svelte:53
+#: src/profile/ProfileEditPage.svelte:129
+#: src/sessions/SessionsNewPage.svelte:57
+msgid "Name"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:58
+msgid "What the name sets"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:59
+#, javascript-format
+msgid ""
+"The worktree goes in the repository's ${ worktreeDirectory } directory, on "
+"a new branch of that name from the base branch, or on the existing branch. "
+"The prefix tells the sessions list which tmux sessions and worktrees were "
+"made here."
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:60
+msgid "Sessions started here are named with this prefix"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:62
+msgid "fix-login"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:63
+msgid "Repository"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:64
+msgid "What the repository is"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:65
+#, javascript-format
+msgid ""
+"The repository to make the worktree of. A leading ${ homeTilde } is your "
+"home directory."
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:140
+#: src/sessions/SessionsNewPage.svelte:66
+msgid "Detecting…"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:67
+msgid "Base branch"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:68
+msgid "What the base branch is"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:69
+msgid ""
+"The branch a new worktree branch starts from. It's not used when a branch "
+"with the session's name already exists."
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:15
+#: src/sessions/SessionsNewPage.svelte:70
+msgid "Command"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:71
+msgid "What the command does"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:72
+msgid "The command typed into the shell. Leave it empty for a shell at a prompt."
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:73
+msgid "Port"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:74
+msgid "What the port is for"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:75
+#, javascript-format
+msgid ""
+"Set in the session's ${ portVariable } variable, for the servers started in "
+"the worktree to listen on, so each session's app runs on a port of its own. "
+"The suggested one is the lowest from 4001 up that no session started here "
+"holds."
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:76
+msgid "Finding…"
+msgstr ""
+
+#: src/files/FilesNewPage.svelte:350
+#: src/sessions/SessionsNewPage.svelte:78
+msgid "Creating…"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:78
+msgid "Create and open"
+msgstr ""
+
+#: src/sessions/SessionsNewPage.svelte:33
+#, javascript-format
+msgid "Creating ${ name } failed: ${ error }"
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:40
+msgid "Shell"
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:41
+msgid "Terminal app"
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:43
+msgid "Session prefix"
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:44
+msgid "Watched directories"
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:72
+#, javascript-format
+msgid "${ name }: agent ${ from } → ${ to }"
+msgstr ""
+
+#: src/home/HomePage.svelte:13
+#: src/lib/layouts/BottomBar.svelte:43
+#: src/sessions/SessionsIndexPage.svelte:128
+msgid "Sessions"
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:129
+msgid ""
+"The tmux sessions started here, with the agent status in each, then the "
+"worktrees with no session running. Refreshes every 2 seconds."
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:132
+msgid "New"
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:134
+msgid "Current sessions"
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:135
+msgid "Which sessions are listed, and what the actions do"
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:136
+#, javascript-format
+msgid ""
+"Only tmux sessions named ${ prefix }-… are listed, and the worktrees named "
+"${ prefix }-… of the repositories in ${ watchedDirectories } that have no "
+"session, as after a restart. A session opens its page, with the agent's "
+"chat and the Open, Review, Trace and Git menus."
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:137
+#, javascript-format
+msgid ""
+"Open new tmux session starts a session in the worktree, types the command "
+"that resumes the agent last chatting there (${ claudeContinue }, ${ "
+"codexResume } or ${ cursorResume }) and opens its page. The agent is Claude "
+"Code, Cursor's ${ cursorAgent } or ${ codex }. Claude Code's status is read "
+"from ${ claudeSessions }, which it doesn't document, so it may change. ${ "
+"cursorAgent } and ${ codex } report none, so each is busy when its chat was "
+"written to in the last few seconds, else idle."
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:138
+msgid "The settings detected on this Mac"
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:139
+#, javascript-format
+msgid "Detecting failed: ${ detectError }"
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:143
+msgid ""
+"The shell, terminal app and tmux the app found on this Mac, the prefix of "
+"the sessions and worktrees it creates, and the directories whose "
+"repositories are looked in for worktrees. New sessions run the shell, and "
+"Open uses the terminal app."
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:146
+#, javascript-format
+msgid "No sessions or worktrees. New session starts one, named ${ prefix }-…"
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:63
+#, javascript-format
+msgid "Listing the sessions failed: ${ error }"
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:88
+#, javascript-format
+msgid "${ sessionCount } session"
+msgid_plural "${ sessionCount } sessions"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/SessionsIndexPage.svelte:89
+#, javascript-format
+msgid "${ worktreeCount } worktree"
+msgid_plural "${ worktreeCount } worktrees"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/SessionsIndexPage.svelte:90
+#, javascript-format
+msgid "Refreshed: ${ sessions } and ${ worktrees } with no session"
+msgstr ""
+
+#: src/sessions/SessionsIndexPage.svelte:111
+#, javascript-format
+msgid "Continuing ${ name } failed: ${ error }"
+msgstr ""
+
+#: src/sessions/SessionChoices.svelte:40
+#: src/sessions/SessionStatusBar.svelte:21
+#: src/sessions/SessionSummary.svelte:17
+msgid "no agent"
+msgstr ""
+
+#: src/sessions/SessionChoices.svelte:41
+#: src/sessions/SessionStatusBar.svelte:22
+#: src/sessions/SessionSummary.svelte:18
+msgid "No agent is running in the session"
+msgstr ""
+
+#: src/sessions/SessionStatusBar.svelte:23
+msgid "detached"
+msgstr ""
+
+#: src/sessions/SessionStatusBar.svelte:24
+msgid "No terminal window is attached to the session, so Open starts a new one"
+msgstr ""
+
+#: src/reviews/ReviewsShowPage.svelte:120
+#: src/sessions/SessionStatusBar.svelte:32
+msgid "Review"
+msgstr ""
+
+#: src/sessions/SessionStatusBar.svelte:33
+msgid "Open the changes in Reviews"
+msgstr ""
+
+#: src/sessions/SessionStatusBar.svelte:39
+msgid "Trace a test through the changes in Traces"
+msgstr ""
+
+#: src/sessions/PromptForm.svelte:67
+msgid "No readable image found. Choose a PNG, JPEG, GIF or WebP file."
+msgstr ""
+
+#: src/sessions/PromptForm.svelte:104
+msgid "Write to the agent. Enter sends, Shift+Enter starts a new line."
+msgstr ""
+
+#: src/sessions/PromptForm.svelte:110
+msgid "Add an image: its path is put in the prompt. You can also paste or drop one."
+msgstr ""
+
+#: src/sessions/PromptForm.svelte:113
+msgid "Adding…"
+msgstr ""
+
+#: src/sessions/PromptForm.svelte:113
+msgid "Add"
+msgstr ""
+
+#: src/sessions/PromptForm.svelte:114
+#: src/sessions/PromptForm.svelte:115
+#: src/sessions/PromptForm.svelte:117
+msgid "Send"
+msgstr ""
+
+#: src/sessions/PromptForm.svelte:117
+msgid "Sending…"
+msgstr ""
+
+#: src/sessions/PromptForm.svelte:49
+#, javascript-format
+msgid "Could not add ${ file.name }. See recent logs for details."
+msgstr ""
+
+#: src/sessions/PromptForm.svelte:51
+#, javascript-format
+msgid "Could not add ${ file.name }: ${ error }"
+msgstr ""
+
+#: src/sessions/OpenMenu.svelte:14
+msgid "Open"
+msgstr ""
+
+#: src/sessions/OpenMenu.svelte:15
+msgid "Get to the session"
+msgstr ""
+
+#: src/sessions/OpenMenu.svelte:17
+msgid "Open in browser"
+msgstr ""
+
+#: src/sessions/OpenMenu.svelte:18
+#, javascript-format
+msgid ""
+"Opens http://localhost:${ port } in the web browser, at the computer's "
+"tailnet name on a phone."
+msgstr ""
+
+#: src/sessions/OpenMenu.svelte:23
+msgid "Open artifacts"
+msgstr ""
+
+#: src/sessions/OpenMenu.svelte:24
+msgid ""
+"Opens the screenshots, previews and other files made in the session's "
+"checkout in the web browser. Needs bin/dev running in the main checkout."
+msgstr ""
+
+#: src/sessions/OpenMenu.svelte:29
+msgid "Open in the terminal app"
+msgstr ""
+
+#: src/sessions/OpenMenu.svelte:30
+msgid ""
+"Brings the session's window to the front, or opens a new window attached to "
+"it."
+msgstr ""
+
+#: src/sessions/OpenMenu.svelte:35
+msgid "Copy attach command"
+msgstr ""
+
+#: src/sessions/OpenMenu.svelte:36
+msgid "To paste into any terminal:"
+msgstr ""
+
+#: src/sessions/NotificationsEnabledIcon.svelte:5
+msgid "Notifying when the agent finishes"
+msgstr ""
+
+#: src/sessions/NotificationBell.svelte:20
+msgid "Notifying when the agent finishes. Turn off"
+msgstr ""
+
+#: src/sessions/NotificationBell.svelte:20
+msgid "Notify me each time the agent finishes"
+msgstr ""
+
+#: src/sessions/NotificationBell.svelte:39
+#, javascript-format
+msgid "Reading the notifications for ${ name } failed: ${ error }"
+msgstr ""
+
+#: src/sessions/NotificationBell.svelte:27
+#, javascript-format
+msgid "${ name }: Notifying when the agent finishes"
+msgstr ""
+
+#: src/sessions/NotificationBell.svelte:27
+#, javascript-format
+msgid "${ name }: Stopped notifying"
+msgstr ""
+
+#: src/sessions/NotificationBell.svelte:29
+#, javascript-format
+msgid "Changing the notifications for ${ name } failed: ${ error }"
+msgstr ""
+
+#: src/sessions/GitStatus.svelte:6
+msgid "no commits"
+msgstr ""
+
+#: src/sessions/GitStatus.svelte:9
+#, javascript-format
+msgid "Branch ${ branch }, tracking ${ upstream }"
+msgstr ""
+
+#: src/sessions/GitStatus.svelte:9
+#, javascript-format
+msgid "Branch ${ branch }"
+msgstr ""
+
+#: src/sessions/GitStatus.svelte:10
+#, javascript-format
+msgid "Detached HEAD at ${ commit }"
+msgstr ""
+
+#: src/sessions/GitStatus.svelte:10
+msgid "Detached HEAD"
+msgstr ""
+
+#: src/sessions/GitStatus.svelte:14
+#, javascript-format
+msgid "${ git.staged } staged"
+msgid_plural "${ git.staged } staged"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/GitStatus.svelte:15
+#, javascript-format
+msgid "${ git.unstaged } unstaged"
+msgid_plural "${ git.unstaged } unstaged"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/GitStatus.svelte:16
+#, javascript-format
+msgid "${ git.untracked } untracked"
+msgid_plural "${ git.untracked } untracked"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/GitStatus.svelte:17
+#, javascript-format
+msgid "${ git.conflicted } conflicted"
+msgid_plural "${ git.conflicted } conflicted"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/GitStatus.svelte:26
+#, javascript-format
+msgid "${ git.ahead } ahead of, ${ git.behind } behind ${ git.upstream }"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:9
+msgid "Conflicted"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:10
+msgid "Unstaged"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:11
+msgid "Untracked"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:12
+msgid "Staged"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:17
+#, javascript-format
+msgid "${ count } conflicted file"
+msgid_plural "${ count } conflicted files"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/GitMenu.svelte:18
+#, javascript-format
+msgid "${ count } unstaged change"
+msgid_plural "${ count } unstaged changes"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/GitMenu.svelte:19
+#, javascript-format
+msgid "${ count } untracked file"
+msgid_plural "${ count } untracked files"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/GitMenu.svelte:20
+#, javascript-format
+msgid "${ count } staged change"
+msgid_plural "${ count } staged changes"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/GitMenu.svelte:26
+msgid "no git status"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:27
+msgid "no changes"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:32
+#, javascript-format
+msgid "detached at ${ commit }"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:37
+msgid "Git"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:38
+#, javascript-format
+msgid "Git: ${ summary }"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:41
+msgid "Branch"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:43
+msgid "Upstream"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:45
+msgid "Commits"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:46
+#, javascript-format
+msgid "${ git.ahead } ahead, ${ git.behind } behind"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:50
+#, javascript-format
+msgid ""
+"Commit or remove the changes before turning it into a branch or merging it "
+"into ${ mergeBranch }."
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:51
+msgid "Turn into branch"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:52
+#, javascript-format
+msgid ""
+"Removes the worktree and closes the session but keeps the branch ${ branch "
+"}, to check out, merge or delete later from the main checkout."
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:57
+#, javascript-format
+msgid "Merge into ${ baseBranch }"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:58
+#, javascript-format
+msgid ""
+"Fast-forwards ${ baseBranch }, the branch ${ branch } was created from, "
+"with ${ branch }, then removes the worktree, deletes the branch and closes "
+"the session. The work lives on in ${ baseBranch }."
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:63
+#, javascript-format
+msgid "Merge into ${ mainBranch }"
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:65
+#, javascript-format
+msgid ""
+"Fast-forwards ${ mainBranch } with ${ branch }, which brings ${ baseBranch "
+"}'s commits too, then removes the worktree, deletes the branch and closes "
+"the session. The work lives on in ${ mainBranch }."
+msgstr ""
+
+#: src/sessions/GitMenu.svelte:66
+#, javascript-format
+msgid ""
+"Fast-forwards ${ mainBranch } with ${ branch }, then removes the worktree, "
+"deletes the branch and closes the session. The work lives on in ${ "
+"mainBranch }."
+msgstr ""
+
+#: src/sessions/ChatSummary.svelte:9
+msgid "The agent"
+msgstr ""
+
+#: src/sessions/ChatSummary.svelte:12
+msgid "Your prompts"
+msgstr ""
+
+#: src/sessions/ChatSummary.svelte:13
+msgid "Agent messages"
+msgstr ""
+
+#: src/sessions/ChatSummary.svelte:14
+#, javascript-format
+msgid "${ agentName } notes"
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:35
+#: src/sessions/ChatSummary.svelte:15
+msgid "Thinking"
+msgstr ""
+
+#: src/sessions/ChatSummary.svelte:16
+msgid "Tool calls"
+msgstr ""
+
+#: src/sessions/AgentBadge.svelte:6
+#: src/sessions/ChatSummary.svelte:20
+msgid "unknown"
+msgstr ""
+
+#: src/sessions/ChatSummary.svelte:25
+#, javascript-format
+msgid "${ messageCount } message"
+msgid_plural "${ messageCount } messages"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sessions/ChatSummary.svelte:29
+msgid "Failed tool calls"
+msgstr ""
+
+#: src/sessions/ChatSummary.svelte:31
+msgid "Without a result yet"
+msgstr ""
+
+#: src/sessions/ChatSummary.svelte:33
+msgid "Context window"
+msgstr ""
+
+#: src/sessions/ChatSummary.svelte:35
+msgid "Started"
+msgstr ""
+
+#: src/sessions/ChatSummary.svelte:37
+msgid "Last message"
+msgstr ""
+
+#: src/sessions/ChatSummary.svelte:39
+msgid "Tool calls by tool"
+msgstr ""
+
+#: src/sessions/ChatSummary.svelte:42
+#, javascript-format
+msgid ""
+"${ agentName } notes are lines it writes as yours, like context it adds and "
+"commands you run. All shows them folded."
+msgstr ""
+
+#: src/sessions/ChatSummary.svelte:43
+#, javascript-format
+msgid ""
+"${ agentName }'s transcript leaves out tool results, and only your prompts "
+"have a time."
+msgstr ""
+
+#: src/sessions/ChatSummary.svelte:44
+#, javascript-format
+msgid ""
+"Read from ${ transcriptPath }, the transcript ${ agentName } writes as it "
+"works. It isn't documented, so lines it can't read are left out, and long "
+"tool inputs and results are cut short."
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:11
+msgid "You"
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:11
+msgid "Agent"
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:11
+msgid "Agent CLI"
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:13
+msgid "Context"
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:14
+msgid "Conversation summary"
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:16
+msgid "Command output"
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:17
+msgid "Background task"
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:18
+msgid "Interrupted"
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:19
+msgid "Note"
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:26
+msgid "Cut short, the rest is in the transcript."
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:39
+msgid "no result yet"
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:40
+msgid "failed"
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:41
+msgid "Input"
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:42
+msgid "Result"
+msgstr ""
+
+#: src/sessions/ChatMessage.svelte:43
+msgid "Tool result"
+msgstr ""
+
+#: src/lib/code_reviewer/comparison_form.js:13
+#: src/sessions/ChangesMenu.svelte:31
+msgid "Uncommitted changes"
+msgstr ""
+
+#: src/sessions/ChangesMenu.svelte:32
+msgid "The uncommitted changes in the worktree, compared with its last commit."
+msgstr ""
+
+#: src/sessions/ChangesMenu.svelte:35
+msgid "Committed changes"
+msgstr ""
+
+#: src/sessions/ChangesMenu.svelte:36
+#, javascript-format
+msgid ""
+"Everything the branch committed since it branched off ${ baseBranch }, like "
+"a pull request."
+msgstr ""
+
+#: src/sessions/AgentBadge.svelte:6
+msgid "working"
+msgstr ""
+
+#: src/sessions/AgentBadge.svelte:6
+msgid "idle"
+msgstr ""
+
+#: src/sessions/AgentBadge.svelte:17
+#, javascript-format
+msgid "The agent looks “${ statusText }”, judged by its recent writes to its chat"
+msgstr ""
+
+#: src/sessions/AgentBadge.svelte:18
+#, javascript-format
+msgid "The agent reports “${ statusText }”"
+msgstr ""
+
+#: src/sessions/AgentBadge.svelte:21
+#, javascript-format
+msgid "${ reported }, last changed ${ changedAgo }"
+msgstr ""
+
+#: src/reviews/view_model.js:37
+msgid "All changes by group"
+msgstr ""
+
+#: src/reviews/view_model.js:38
+msgid "Default group"
+msgstr ""
+
+#: src/reviews/StaleIcon.svelte:8
+#, javascript-format
+msgid "${ count } caller still calling a removed or renamed function"
+msgid_plural "${ count } callers still calling a removed or renamed function"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/files/FilesIndexPage.svelte:89
+#: src/files/FilesNewPage.svelte:334
+#: src/reviews/ReviewsShowPage.svelte:24
+#: src/reviews/nodes/GroupCardNode.svelte:55
+msgid "Files"
+msgstr ""
+
+#: src/lib/components/CodeInput.svelte:15
+#: src/reviews/ReviewsShowPage.svelte:25
+#: src/reviews/ledger/CodeFooter.svelte:40
+#: src/reviews/ledger/FileCodeFooter.svelte:53
+msgid "Code"
+msgstr ""
+
+#: src/reviews/ReviewsShowPage.svelte:31
+#.  How the Code tab draws calls into dependencies and the standard library.
+msgid "Calls into dependencies and the standard library are shown, dimmed."
+msgstr ""
+
+#: src/reviews/ReviewsShowPage.svelte:72
+#: src/reviews/nodes/GroupCardNode.svelte:33
+#, javascript-format
+msgid "${ count } file"
+msgid_plural "${ count } files"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/reviews/ReviewsShowPage.svelte:126
+msgid "Start a new review."
+msgstr ""
+
+#: src/reviews/ReviewsShowPage.svelte:127
+#, javascript-format
+msgid "This page needs a review to show. ${ newReviewLink }"
+msgstr ""
+
+#: src/reviews/ReviewsShowPage.svelte:128
+msgid "Analyzing the changes…"
+msgstr ""
+
+#: src/reviews/ReviewsShowPage.svelte:130
+msgid "Nothing changed between the two."
+msgstr ""
+
+#: src/reviews/ReviewsShowPage.svelte:134
+msgid "Which calls the code shows"
+msgstr ""
+
+#: src/reviews/ReviewsShowPage.svelte:146
+msgid "How to use this view, what its markers mean, and what was compared"
+msgstr ""
+
+#: src/reviews/ReviewsShowPage.svelte:147
+msgid "Click a group to show it, a file to open its group's code."
+msgstr ""
+
+#: src/reviews/ReviewsShowPage.svelte:148
+msgid "Hover a function to see its code, click the code to keep it open."
+msgstr ""
+
+#: src/reviews/ReviewsShowPage.svelte:149
+msgid "stale caller"
+msgstr ""
+
+#: src/reviews/ReviewsShowPage.svelte:150
+msgid "also changed, click to jump"
+msgstr ""
+
+#: src/reviews/ReviewsShowPage.svelte:151
+#, javascript-format
+msgid "${ result.files.length } changed file"
+msgid_plural "${ result.files.length } changed files"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/reviews/ReviewsShowPage.svelte:152
+#, javascript-format
+msgid "${ functionCount } changed function"
+msgid_plural "${ functionCount } changed functions"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/reviews/ReviewsShowPage.svelte:155
+#, javascript-format
+msgid "${ skippedCount } skipped file:"
+msgid_plural "${ skippedCount } skipped files:"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/reviews/ReviewsNewPage.svelte:32
+msgid "New review"
+msgstr ""
+
+#: src/reviews/ReviewsNewPage.svelte:33
+msgid "A git repository with Elixir or Rust code, and what to compare."
+msgstr ""
+
+#: src/reviews/ReviewsNewPage.svelte:37
+msgid "Highlight or ignore modules"
+msgstr ""
+
+#: src/reviews/ReviewsNewPage.svelte:38
+msgid "Also highlight (one per line)"
+msgstr ""
+
+#: src/reviews/ReviewsNewPage.svelte:41
+msgid "Ignore (one per line)"
+msgstr ""
+
+#: src/reviews/ReviewsNewPage.svelte:44
+#, javascript-format
+msgid ""
+"Calls to modules the project defines are always highlighted. A line is a "
+"module (${ shop } covers ${ shopOrders } but not ${ shopWeb }), a function "
+"(${ enumReduce } or ${ enumReduceArity }), or a prefix ending in ${ star } "
+"(${ shopStar } covers ${ shopWeb } too). Ignored callers and calls "
+"disappear; ignoring beats highlighting."
+msgstr ""
+
+#: src/reviews/ReviewTree.svelte:55
+#: src/reviews/ReviewsNewPage.svelte:46
+#: src/reviews/nodes/GroupCardNode.svelte:55
+msgid "Groups"
+msgstr ""
+
+#: src/reviews/ReviewsNewPage.svelte:47
+msgid "Group config file (optional)"
+msgstr ""
+
+#: src/reviews/ReviewsNewPage.svelte:48
+msgid ".code_reviewer.toml in the repository is used when this is empty"
+msgstr ""
+
+#: src/reviews/ReviewsNewPage.svelte:50
+msgid "Add to a group (one per line)"
+msgstr ""
+
+#: src/reviews/ReviewsNewPage.svelte:53
+msgid "Leave out of a group (one per line)"
+msgstr ""
+
+#: src/reviews/ReviewsNewPage.svelte:56
+#, javascript-format
+msgid ""
+"A line is ${ groupPattern }, where the group is a name (${ data }) and the "
+"pattern is a glob or ${ regex } expression matched against the path from "
+"the repository root. These add to ${ groupConfigFile }. With no groups "
+"defined, every file is in the default group."
+msgstr ""
+
+#: src/reviews/ReviewsNewPage.svelte:58
+msgid "Review changes"
+msgstr ""
+
+#: src/reviews/LinesLabel.svelte:7
+msgid "Lines added and removed"
+msgstr ""
+
+#: src/reviews/nodes/LinkChipNode.svelte:19
+#, javascript-format
+msgid "${ groupLabel } · calls ${ lineLabel }"
+msgstr ""
+
+#: src/reviews/nodes/LinkChipNode.svelte:19
+#, javascript-format
+msgid "${ groupLabel } · called from ${ lineLabel }"
+msgstr ""
+
+#: src/reviews/nodes/LinkChipNode.svelte:20
+msgid "Click to show its group"
+msgstr ""
+
+#: src/reviews/nodes/GroupCardNode.svelte:20
+msgid "every group"
+msgstr ""
+
+#: src/reviews/nodes/GroupCardNode.svelte:20
+msgid "files in no group"
+msgstr ""
+
+#: src/reviews/nodes/GroupCardNode.svelte:29
+#, javascript-format
+msgid "Show ${ label }"
+msgstr ""
+
+#: src/reviews/nodes/GroupCardNode.svelte:29
+#, javascript-format
+msgid "Open the functions of ${ label }"
+msgstr ""
+
+#: src/reviews/nodes/GroupCardNode.svelte:52
+#, javascript-format
+msgid "Group · ${ subtitle }"
+msgstr ""
+
+#: src/reviews/ledger/ReviewLedgerView.svelte:29
+#, javascript-format
+msgid "${ row.stats.file_count } file"
+msgid_plural "${ row.stats.file_count } files"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/reviews/ledger/OpenAllButtons.svelte:9
+msgid "Open all the files and their code"
+msgstr ""
+
+#: src/reviews/ledger/OpenAllButtons.svelte:10
+msgid "Close all the files and their code"
+msgstr ""
+
+#: src/reviews/ledger/LedgerFile.svelte:74
+#, javascript-format
+msgid "${ file.functions.length } function"
+msgid_plural "${ file.functions.length } functions"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/files/FilesShowPage.svelte:63
+#: src/reviews/ledger/LedgerFile.svelte:76
+msgid "File"
+msgstr ""
+
+#: src/reviews/ledger/LedgerFile.svelte:85
+msgid "Outputs"
+msgstr ""
+
+#: src/reviews/ledger/LedgerFile.svelte:94
+msgid "none"
+msgstr ""
+
+#: src/reviews/ledger/LedgerFile.svelte:95
+msgid "Inputs"
+msgstr ""
+
+#: src/reviews/ledger/LedgerFile.svelte:106
+msgid "none outside this file"
+msgstr ""
+
+#: src/reviews/ledger/FileCodeFooter.svelte:18
+msgid "Raw"
+msgstr ""
+
+#: src/reviews/ledger/CodeFooter.svelte:41
+#: src/reviews/ledger/FileCodeFooter.svelte:54
+msgid "Loading code…"
+msgstr ""
+
+#: src/reviews/ledger/FileCodeFooter.svelte:58
+msgid "Binary file"
+msgstr ""
+
+#: src/reviews/ledger/FileCodeFooter.svelte:58
+msgid "Changed lines"
+msgstr ""
+
+#: src/reviews/ledger/FileCodeFooter.svelte:63
+msgid "The contents of a binary file are not shown."
+msgstr ""
+
+#: src/reviews/ledger/FileCodeFooter.svelte:64
+msgid ""
+"Nothing is left of this text in the new version. Choose Raw to see the "
+"removed lines."
+msgstr ""
+
+#: src/reviews/ledger/FileCodeFooter.svelte:68
+#, javascript-format
+msgid "${ diff.omitted_line_count } more line is not shown."
+msgid_plural "${ diff.omitted_line_count } more lines are not shown."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/reviews/ledger/CodeFooter.svelte:46
+#, javascript-format
+msgid "${ functions.length } changed function"
+msgid_plural "${ functions.length } changed functions"
+msgstr[0] ""
+msgstr[1] ""
 
 #: src/quick-picker/QuickPickerPage.svelte:137
 msgid "Search images by name…"
@@ -63,16 +1679,16 @@ msgstr ""
 msgid "Copying…"
 msgstr ""
 
-#: src/lib/layouts/AccountMenu.svelte:55
-#: src/profile/ProfileEditPage.svelte:119
+#: src/lib/layouts/AccountMenu.svelte:45
+#: src/profile/ProfileEditPage.svelte:120
 msgid "Profile"
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:120
+#: src/profile/ProfileEditPage.svelte:121
 msgid "This account is only on this device."
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:121
+#: src/profile/ProfileEditPage.svelte:122
 msgid ""
 "Nothing is backed up: if the device is lost or reset, or the app is "
 "removed, what you made is gone. Sign up or log in to keep it safe and use "
@@ -81,34 +1697,28 @@ msgstr ""
 
 #: src/accounts/AccountsIndexPage.svelte:52
 #: src/lib/AccountsNeeded.svelte:16
-#: src/profile/ProfileEditPage.svelte:123
+#: src/profile/ProfileEditPage.svelte:124
 msgid "Sign up or log in"
 msgstr ""
 
-#: src/communities/components/CommunitiesForm.svelte:25
-#: src/files/FilesEditPage.svelte:53
-#: src/profile/ProfileEditPage.svelte:130
-msgid "Name"
-msgstr ""
-
-#: src/profile/ProfileEditPage.svelte:133
+#: src/profile/ProfileEditPage.svelte:132
 msgid "Save name"
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:134
+#: src/profile/ProfileEditPage.svelte:133
 msgid "Language"
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:138
+#: src/profile/ProfileEditPage.svelte:137
 #, javascript-format
 msgid "Follow the system (${ systemLanguage })"
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:144
+#: src/profile/ProfileEditPage.svelte:143
 msgid "Picture"
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:151
+#: src/profile/ProfileEditPage.svelte:150
 msgid "Save picture"
 msgstr ""
 
@@ -123,12 +1733,6 @@ msgstr ""
 #: src/posts/PostsShowPage.svelte:32
 #, javascript-format
 msgid "in ${ communityNames }"
-msgstr ""
-
-#: src/communities/CommunitiesShowPage.svelte:42
-#: src/files/FilesShowPage.svelte:90
-#: src/posts/PostsShowPage.svelte:35
-msgid "Edit"
 msgstr ""
 
 #: src/communities/CommunitiesShowPage.svelte:44
@@ -152,17 +1756,12 @@ msgstr ""
 msgid "New post"
 msgstr ""
 
-#: src/lib/layouts/AppNav.svelte:39
 #: src/posts/PostsIndexPage.svelte:13
 msgid "Posts"
 msgstr ""
 
 #: src/posts/PostsIndexPage.svelte:17
 msgid "No posts yet."
-msgstr ""
-
-#: src/posts/PostsIndexPage.svelte:23
-msgid "Show"
 msgstr ""
 
 #: src/posts/PostsEditPage.svelte:43
@@ -252,7 +1851,7 @@ msgstr ""
 
 #: src/lib/AccountsGuestNotice.svelte:45
 #: src/lib/AccountsNeeded.svelte:19
-#: src/lib/layouts/AccountMenu.svelte:71
+#: src/lib/layouts/AccountMenu.svelte:61
 msgid "Sign up"
 msgstr ""
 
@@ -289,7 +1888,7 @@ msgstr ""
 msgid "Theme: ${ current }"
 msgstr ""
 
-#: src/lib/layouts/BottomBar.svelte:40
+#: src/lib/layouts/BottomBar.svelte:45
 #: src/lib/layouts/ThemeMenu.svelte:22
 msgid "Theme"
 msgstr ""
@@ -353,7 +1952,7 @@ msgid "No community"
 msgstr ""
 
 #: src/communities/CommunitiesIndexPage.svelte:13
-#: src/lib/layouts/AppNav.svelte:41
+#: src/lib/layouts/AppNav.svelte:43
 #: src/lib/layouts/CurrentCommunityMenu.svelte:63
 msgid "Communities"
 msgstr ""
@@ -380,51 +1979,44 @@ msgstr ""
 msgid "Join / Manage Communities"
 msgstr ""
 
-#: src/lib/layouts/BottomBar.svelte:32
+#: src/lib/layouts/BottomBar.svelte:35
 msgid "Close menu"
 msgstr ""
 
-#: src/lib/layouts/BottomBar.svelte:34
-#: src/lib/layouts/BottomBar.svelte:56
+#: src/lib/layouts/BottomBar.svelte:37
+#: src/lib/layouts/BottomBar.svelte:61
 msgid "Menu"
 msgstr ""
 
-#: src/lib/layouts/AppNav.svelte:83
-#: src/lib/layouts/BottomBar.svelte:42
+#: src/lib/layouts/AppNav.svelte:85
+#: src/lib/layouts/BottomBar.svelte:47
 msgid "Main"
 msgstr ""
 
 #: src/lib/layouts/AppHeader.svelte:19
 #: src/lib/layouts/AppHeader.svelte:20
-#: src/lib/layouts/BottomBar.svelte:49
+#: src/lib/layouts/BottomBar.svelte:54
 msgid "Back"
 msgstr ""
 
 #: src/lib/layouts/AppHeader.svelte:23
 #: src/lib/layouts/AppHeader.svelte:24
-#: src/lib/layouts/BottomBar.svelte:52
+#: src/lib/layouts/BottomBar.svelte:57
 msgid "Forward"
 msgstr ""
 
-#: src/lib/layouts/AppNav.svelte:36
+#: src/lib/layouts/AppNav.svelte:37
 #. * @type {Link[]} 
 msgid "Home"
 msgstr ""
 
-#: src/files/FilesIndexPage.svelte:89
-#: src/files/FilesNewPage.svelte:334
-#: src/lib/layouts/AppNav.svelte:40
-#. * @type {Link[]} 
-msgid "Files"
-msgstr ""
-
 #: src/forum/ForumIndexPage.svelte:9
-#: src/lib/layouts/AppNav.svelte:43
+#: src/lib/layouts/AppNav.svelte:45
 #. * @type {Link[]} 
 msgid "Forum"
 msgstr ""
 
-#: src/lib/layouts/AppNav.svelte:47
+#: src/lib/layouts/AppNav.svelte:49
 #. * @type {Link[]} 
 msgid "Ops"
 msgstr ""
@@ -439,33 +2031,33 @@ msgstr ""
 msgid "Update your payment"
 msgstr ""
 
-#: src/lib/layouts/AccountMenu.svelte:45
+#: src/lib/layouts/AccountMenu.svelte:36
 msgid "Account, as a guest"
 msgstr ""
 
 #: src/accounts/current/AccountsCurrentShowPage.svelte:25
-#: src/lib/layouts/AccountMenu.svelte:45
+#: src/lib/layouts/AccountMenu.svelte:36
 msgid "Account"
 msgstr ""
 
-#: src/lib/layouts/AccountMenu.svelte:48
+#: src/lib/layouts/AccountMenu.svelte:38
 msgid "Guest"
 msgstr ""
 
 #: src/accounts/AccountsIndexPage.svelte:209
-#: src/lib/layouts/AccountMenu.svelte:52
+#: src/lib/layouts/AccountMenu.svelte:42
 msgid "On this device only"
 msgstr ""
 
-#: src/lib/layouts/AccountMenu.svelte:58
+#: src/lib/layouts/AccountMenu.svelte:48
 msgid "Account settings"
 msgstr ""
 
-#: src/lib/layouts/AccountMenu.svelte:61
+#: src/lib/layouts/AccountMenu.svelte:51
 msgid "Switch account"
 msgstr ""
 
-#: src/lib/layouts/AccountMenu.svelte:64
+#: src/lib/layouts/AccountMenu.svelte:54
 msgid "Log out"
 msgstr ""
 
@@ -474,8 +2066,8 @@ msgstr ""
 #: src/accounts/AccountsSignInPage.svelte:89
 #: src/accounts/AccountsSignInPage.svelte:99
 #: src/accounts/components/AccountsSignInSteps.svelte:30
-#: src/lib/layouts/AccountMenu.svelte:67
-#: src/lib/layouts/AccountMenu.svelte:69
+#: src/lib/layouts/AccountMenu.svelte:57
+#: src/lib/layouts/AccountMenu.svelte:59
 msgid "Log in"
 msgstr ""
 
@@ -509,41 +2101,166 @@ msgstr ""
 msgid "Could not copy the image"
 msgstr ""
 
-#: src/lib/components/CodeInput.svelte:15
-#. *
-#.    * @typedef {Object} Props
-#.    * @property {string} [value]
-#.    * @property {number} [length]
-#.    * @property {boolean} [disabled]
-#.    * @property {string} [label] for screen readers
-#.    * @property {(code: string) => void} [oncomplete]
-#.    
-#. * @type {Props} 
-msgid "Code"
-msgstr ""
-
 #: src/lib/components/CodeInput.svelte:31
 #, javascript-format
 msgid "${ label }, digit ${ position } of ${ length }"
 msgstr ""
 
-#: src/home/HomePage.svelte:7
-msgid "posts"
+#: src/lib/code_reviewer/comparison_form.js:14
+msgid "One commit"
 msgstr ""
 
-#: src/home/HomePage.svelte:9
+#: src/lib/code_reviewer/comparison_form.js:15
+msgid "Branch vs branch"
+msgstr ""
+
+#: src/lib/code_reviewer/comparison_form.js:93
+msgid "Everything changed but not yet committed, compared with the last commit."
+msgstr ""
+
+#: src/lib/code_reviewer/comparison_form.js:95
+msgid "What the chosen commit changed, compared with the commit before it."
+msgstr ""
+
+#: src/lib/code_reviewer/comparison_form.js:98
+msgid "Pick two different branches."
+msgstr ""
+
+#: src/lib/code_reviewer/comparison_form.js:100
+msgid "the branch"
+msgstr ""
+
+#: src/lib/code_reviewer/comparison_form.js:101
+msgid "the other branch"
+msgstr ""
+
+#: src/lib/code_reviewer/comparison_form.js:102
+#, javascript-format
 msgid ""
-"The same pages on the web, on the desktop and on a phone, over the same "
-"Rust application."
+"What ${ headBranch } changed since it branched off ${ baseBranch }, like a "
+"pull request."
+msgstr ""
+
+#: src/lib/code_reviewer/comparison_form.js:112
+#, javascript-format
+msgid "${ headRef } since it branched off ${ baseRef }"
+msgstr ""
+
+#: src/lib/code_reviewer/comparison_form.js:115
+#, javascript-format
+msgid "commit ${ shortSha }"
+msgstr ""
+
+#: src/lib/code_reviewer/comparison_form.js:117
+msgid "uncommitted changes"
+msgstr ""
+
+#: src/lib/code_reviewer/change_styles.js:35
+msgid "added"
+msgstr ""
+
+#: src/lib/code_reviewer/change_styles.js:36
+msgid "modified"
+msgstr ""
+
+#: src/lib/code_reviewer/change_styles.js:37
+msgid "removed"
+msgstr ""
+
+#: src/lib/code_reviewer/change_styles.js:38
+msgid "renamed"
+msgstr ""
+
+#: src/lib/code_reviewer/change_styles.js:61
+msgid "Still calls a removed or renamed function"
+msgstr ""
+
+#: src/lib/code_reviewer/change_styles.js:62
+msgid "Also changed in this review. Click to jump to it."
+msgstr ""
+
+#: src/lib/code_reviewer/LogList.svelte:5
+msgid "Recent logs"
+msgstr ""
+
+#: src/lib/code_reviewer/LogList.svelte:8
+msgid "Nothing logged yet. What the buttons on this page do shows up here."
+msgstr ""
+
+#: src/lib/code_reviewer/components/ComparisonFields.svelte:60
+msgid "Repository path"
+msgstr ""
+
+#: src/lib/code_reviewer/components/ComparisonFields.svelte:61
+msgid "/path/to/project"
+msgstr ""
+
+#: src/lib/code_reviewer/components/ComparisonFields.svelte:66
+msgid "Commit"
+msgstr ""
+
+#: src/lib/code_reviewer/components/ComparisonFields.svelte:70
+#: src/lib/code_reviewer/components/ComparisonFields.svelte:75
+#: src/lib/code_reviewer/components/ComparisonFields.svelte:80
+msgid "None found"
+msgstr ""
+
+#: src/lib/code_reviewer/components/ComparisonFields.svelte:71
+msgid "This branch"
+msgstr ""
+
+#: src/lib/code_reviewer/components/ComparisonFields.svelte:76
+msgid "Against"
 msgstr ""
 
 #: src/home/HomePage.svelte:10
-#, javascript-format
-msgid "Log in, then start with the ${ postsLink }."
+msgid ""
+"Run Claude Code, Cursor or Codex agent sessions in tmux, review what a "
+"change did, and trace a test through it."
 msgstr ""
 
-#: src/files/FilesShowPage.svelte:63
-msgid "File"
+#: src/home/HomePage.svelte:11
+msgid ""
+"Sessions, reviews and traces run in Code Reviewer's apps for the Mac and "
+"the iPhone. In a browser you can only manage your account."
+msgstr ""
+
+#: src/home/HomePage.svelte:14
+msgid "The agent sessions started here"
+msgstr ""
+
+#: src/home/HomePage.svelte:15
+msgid ""
+"See whether the agent is busy or idle in each tmux session this app "
+"started, open one in your terminal app, or start a new one."
+msgstr ""
+
+#: src/home/HomePage.svelte:17
+msgid "Reviews"
+msgstr ""
+
+#: src/home/HomePage.svelte:18
+msgid "Review the changes of a repository"
+msgstr ""
+
+#: src/home/HomePage.svelte:19
+msgid ""
+"Pick a git repository with Elixir or Rust code and what to compare: "
+"uncommitted changes, one commit, or one branch against another."
+msgstr ""
+
+#: src/home/HomePage.svelte:21
+msgid "Traces"
+msgstr ""
+
+#: src/home/HomePage.svelte:22
+msgid "Trace a test through the changes"
+msgstr ""
+
+#: src/home/HomePage.svelte:23
+msgid ""
+"Pick a test and read every call below it, top to bottom like a stack trace, "
+"with each function marked against the base of the comparison."
 msgstr ""
 
 #: src/files/FilesShowPage.svelte:65
@@ -623,10 +2340,6 @@ msgstr ""
 msgid ""
 "Creating ${ run.done } of ${ run.total }. Stay on this page until they are "
 "done."
-msgstr ""
-
-#: src/files/FilesNewPage.svelte:350
-msgid "Creating…"
 msgstr ""
 
 #: src/files/FilesNewPage.svelte:351
@@ -938,33 +2651,33 @@ msgstr ""
 msgid "${ money } / year"
 msgstr ""
 
-#: src/accounts/AccountsTrialPage.svelte:35
+#: src/accounts/AccountsTrialPage.svelte:36
 msgid "Try it now"
 msgstr ""
 
-#: src/accounts/AccountsTrialPage.svelte:36
+#: src/accounts/AccountsTrialPage.svelte:37
 msgid "Guest visits are not available right now."
 msgstr ""
 
 #: src/accounts/AccountsSignInPage.svelte:89
-#: src/accounts/AccountsTrialPage.svelte:38
-#: src/accounts/AccountsTrialPage.svelte:46
+#: src/accounts/AccountsTrialPage.svelte:39
+#: src/accounts/AccountsTrialPage.svelte:47
 msgid "Log in or sign up"
 msgstr ""
 
-#: src/accounts/AccountsTrialPage.svelte:39
+#: src/accounts/AccountsTrialPage.svelte:40
 msgid ""
 "Use the app for 24 hours with no account. What you make is deleted after "
 "that, unless you sign up, which keeps all of it."
 msgstr ""
 
-#: src/accounts/AccountsTrialPage.svelte:40
+#: src/accounts/AccountsTrialPage.svelte:41
 msgid ""
 "A guest stays in this browser, and has no files or picture until they sign "
 "up."
 msgstr ""
 
-#: src/accounts/AccountsTrialPage.svelte:44
+#: src/accounts/AccountsTrialPage.svelte:45
 #: src/accounts/components/AccountsGuestRow.svelte:29
 msgid "Continue as guest"
 msgstr ""

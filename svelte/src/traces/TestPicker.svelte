@@ -1,6 +1,7 @@
 <!-- The tests of the head, by file, to pick one. A search box narrows them,
      and when the repository has LiveView tests a switch keeps only those. -->
 <script>
+  import { t } from "ttag";
   import { CHANGE_STYLES } from "../lib/code_reviewer/change_styles.js";
   import { sameFunction, testLabel } from "./call_stack.js";
 
@@ -30,17 +31,26 @@
     }
     return [...groups].map(([filePath, tests]) => ({ filePath, tests }));
   });
+
+  /** The title of a test's dot, `test added`. */
+  function testChangeTitle(change) {
+    if (change === "added") return t`test added`;
+    if (change === "modified") return t`test modified`;
+    if (change === "removed") return t`test removed`;
+    if (change === "renamed") return t`test renamed`;
+    return t`test unchanged`;
+  }
 </script>
 
 <div class="space-y-2 border-b border-base-300 px-6 py-3">
-  <input bind:value={search} placeholder="Find a test" spellcheck="false" class="w-full rounded-lg border border-base-300 bg-base-100 px-2.5 py-1.5 font-mono text-xs text-base-content placeholder:text-base-content/30" />
+  <input bind:value={search} placeholder={t`Find a test`} spellcheck="false" class="w-full rounded-lg border border-base-300 bg-base-100 px-2.5 py-1.5 font-mono text-xs text-base-content placeholder:text-base-content/30" />
   {#if hasLiveViewTests}
     <label class="flex items-center gap-2 text-[11px] text-base-content/60">
       <input type="checkbox" bind:checked={liveViewOnly} />
-      LiveView tests only
+      {t`LiveView tests only`}
     </label>
   {/if}
-  <p class="font-mono text-[11px] text-base-content/50">{shown.length} of {tests.length} tests</p>
+  <p class="font-mono text-[11px] text-base-content/50">{t`${shown.length} of ${tests.length} tests`}</p>
 </div>
 <div class="min-h-0 flex-1 overflow-auto">
   {#each byFile as group (group.filePath)}
@@ -61,13 +71,13 @@
         >
           <span
             class={["size-1.5 shrink-0 rounded-full", change ? change.dot : "bg-base-content/20"]}
-            title={change ? `test ${change.label}` : "test unchanged"}
+            title={testChangeTitle(test.change)}
           ></span>
           <span class="truncate">{testLabel(test.function)}</span>
         </button>
       {/each}
     </div>
   {:else}
-    <p class="px-6 py-4 text-[11px] text-base-content/50">No tests match.</p>
+    <p class="px-6 py-4 text-[11px] text-base-content/50">{t`No tests match.`}</p>
   {/each}
 </div>

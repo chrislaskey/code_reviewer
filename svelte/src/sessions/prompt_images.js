@@ -1,5 +1,6 @@
 // Images pasted, dropped or picked for a prompt: found in what the browser
 // hands over, and read as base64 to send to the backend.
+import { t } from "ttag";
 
 /** The image files in a paste or drop's `DataTransfer`. */
 export function imageFilesIn(dataTransfer) {
@@ -26,7 +27,8 @@ export function readFileAsBase64(file) {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result).split(",", 2)[1] ?? "");
     reader.onerror = () => reject(reader.error);
-    reader.onabort = () => reject(new Error(`Reading ${file.name} was cancelled`));
+    const fileName = file.name;
+    reader.onabort = () => reject(new Error(t`Reading ${fileName} was cancelled`));
     reader.readAsDataURL(file);
   });
 }

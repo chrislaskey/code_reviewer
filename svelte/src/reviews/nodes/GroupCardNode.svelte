@@ -5,12 +5,13 @@
 <script>
   import { getContext } from "svelte";
   import { Handle, Position } from "@xyflow/svelte";
+  import { msgid, ngettext, t } from "ttag";
   import Icon from "../../lib/components/Icon.svelte";
-  import { CHANGE_STYLES, plural } from "../../lib/code_reviewer/change_styles.js";
+  import { CHANGE_STYLES } from "../../lib/code_reviewer/change_styles.js";
   import LinesLabel from "../LinesLabel.svelte";
   import StaleIcon from "../StaleIcon.svelte";
   import StartEllipsis from "../StartEllipsis.svelte";
-  import { ALL_CHANGES_ID, UNGROUPED_ID } from "../view_model.js";
+  import { ALL_CHANGES_ID, UNGROUPED_ID, groupLabel } from "../view_model.js";
   import { CARD_PARTS, SIZES } from "./layout.js";
 
   let { data } = $props();
@@ -20,11 +21,24 @@
   let status = $derived(CHANGE_STYLES[row.status]);
   let isAllChanges = $derived(row.group.id === ALL_CHANGES_ID);
   let subtitle = $derived(
-    isAllChanges ? "every group" : row.group.id === UNGROUPED_ID ? "files in no group" : row.group.id,
+    isAllChanges ? t`every group` : row.group.id === UNGROUPED_ID ? t`files in no group` : row.group.id,
   );
 
+  function lineLabel(line) {
+    return line.kind === "group" ? groupLabel(line) : line.label;
+  }
+
   function lineTitle(line) {
-    return line.kind === "group" ? `Show ${line.label}` : `Open the functions of ${line.label}`;
+    const label = lineLabel(line);
+    return line.kind === "group" ? t`Show ${label}` : t`Open the functions of ${label}`;
+  }
+
+  function filesCount(count) {
+    return ngettext(msgid`${count} file`, `${count} files`, count);
+  }
+
+  function functionsCount(count) {
+    return ngettext(msgid`${count} function`, `${count} functions`, count);
   }
 
   function openLine(line) {
@@ -43,16 +57,16 @@
     </span>
     <div class="min-w-0 flex-1">
       <div class="flex items-baseline justify-between gap-2">
-        <h3 class="truncate text-sm font-semibold" title={row.group.label}>{row.group.label}</h3>
-        <span class="font-mono text-[10px] text-base-content/50">{plural(row.stats.file_count, "file")}</span>
+        <h3 class="truncate text-sm font-semibold" title={groupLabel(row.group)}>{groupLabel(row.group)}</h3>
+        <span class="font-mono text-[10px] text-base-content/50">{filesCount(row.stats.file_count)}</span>
       </div>
-      <p class="truncate font-mono text-[11px] text-base-content/60">Group · {subtitle}</p>
+      <p class="truncate font-mono text-[11px] text-base-content/60">{t`Group · ${subtitle}`}</p>
     </div>
   </div>
 
   <div class="border-t border-base-content/10" style="padding-bottom: {CARD_PARTS.bottom}px">
     <div class="flex items-center px-4 text-[10px] uppercase tracking-wide text-base-content/40" style="height: {CARD_PARTS.label}px">
-      {row.content_label}
+      {row.content_label === "Groups" ? t`Groups` : t`Files`}
     </div>
     {#each row.lines as line (line.key)}
       {@const lineStatus = line.status ? CHANGE_STYLES[line.status] : null}
@@ -73,13 +87,13 @@
           <span class={["w-3 shrink-0 text-center font-bold", lineStatus.text]}>{lineStatus.sign}</span>
         {/if}
         {#if line.kind === "group"}
-          <span class="min-w-0 flex-1 truncate font-semibold">{line.label}</span>
+          <span class="min-w-0 flex-1 truncate font-semibold">{lineLabel(line)}</span>
         {:else}
           <span class="min-w-0 flex-1"><StartEllipsis text={line.label} /></span>
         {/if}
         {#if hasFunctions}
           <span class="shrink-0 text-[10px] text-base-content/50">
-            {line.kind === "group" ? plural(line.stats.file_count, "file") : plural(line.stats.function_count, "function")}
+            {line.kind === "group" ? filesCount(line.stats.file_count) : functionsCount(line.stats.function_count)}
           </span>
           <LinesLabel added={line.stats.added_lines} removed={line.stats.removed_lines} />
         {/if}
