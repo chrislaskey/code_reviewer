@@ -2,9 +2,9 @@
 //! and git worktrees on the server's machine, and the coding agents in
 //! them. It runs programs there, so only an app's bearer token reaches
 //! it. Showing a session in a terminal window is for the machine itself:
-//! a request that came over the tailnet, which `tailscale serve` marks
-//! with `Tailscale-User-Login`, is refused. A device, for its bells, the
-//! notifications it collects and its push token, is the hash of its
+//! a request not sent to the machine's own address, as one through
+//! `tailscale serve` from the tailnet, is refused. A device, for its
+//! bells, the notifications it collects and its push token, is the hash of its
 //! bearer token, `device_id_of`.
 
 pub mod artifacts;
@@ -25,13 +25,16 @@ use app_core::services::agents::chat::ChatHistory;
 use app_core::services::terminal_app::ShowOutcome;
 
 use crate::api_error::ApiError;
-use crate::user_auth::{CurrentToken, CurrentUserFromBearerToken};
+use crate::user_auth::{CurrentToken, CurrentUserFromBearerToken, is_localhost};
 
 /// The largest image pasted into a prompt, sent as base64.
 pub const PROMPT_IMAGE_MAX_BYTES: usize = 64 * 1024 * 1024;
 
 /// The header `tailscale serve` adds to a request from the tailnet.
 const TAILSCALE_USER_LOGIN_HEADER: &str = "tailscale-user-login";
+
+/// The header `tailscale serve` adds to every request it passes on.
+const FORWARDED_FOR_HEADER: &str = "x-forwarded-for";
 
 #[derive(Deserialize)]
 pub struct NewSession {
@@ -66,6 +69,16 @@ pub struct BellFields {
 #[derive(Deserialize)]
 pub struct ApplePushTokenFields {
     pub token: String,
+}
+
+/// Whether a request was sent to this machine's own address, not
+/// through `tailscale serve`. Asked of the address, since serve leaves
+/// out `Tailscale-User-Login` for a tagged device; serve keeps the
+/// tailnet `Host` and always adds `X-Forwarded-For`.
+fn is_from_this_machine(headers: &HeaderMap) -> bool {
+    is_localhost(headers)
+        && !headers.contains_key(TAILSCALE_USER_LOGIN_HEADER)
+        && !headers.contains_key(FORWARDED_FOR_HEADER)
 }
 
 /// The device a request is from: its sign-in's token, hashed as the
@@ -190,7 +203,7 @@ pub async fn terminal_windows_create(
     headers: HeaderMap,
     Path(name): Path<String>,
 ) -> Result<Json<ShowOutcome>, ApiError> {
-    if headers.contains_key(TAILSCALE_USER_LOGIN_HEADER) {
+    if !is_from_this_machine(&headers) {
         return Err(ApiError::new(
             StatusCode::FORBIDDEN,
             "The terminal app opens only on the computer running the server; copy the attach command to use the session from here",

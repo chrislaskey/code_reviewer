@@ -95,20 +95,46 @@ async fn sessions_routes_refuse_the_cookie_and_the_terminal_window_refuses_the_t
     .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED, "the cookie is not read");
 
-    let request = Request::builder()
-        .method(Method::POST)
-        .uri("/api/sessions/cr-anything/terminal-window")
-        .header(header::AUTHORIZATION, format!("Bearer {}", router.token))
-        .header("Tailscale-User-Login", "someone@example.com")
-        .body(Body::empty())
-        .expect("a request");
-    let response = router
-        .router
-        .clone()
-        .oneshot(request)
-        .await
-        .expect("a response");
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    // As `tailscale serve` passes them on: a person's device, a tagged
+    // device, which has no login header, and a forwarded request naming
+    // localhost.
+    let tailnet_host = "laptop.example.ts.net:4000";
+    for (name, headers) in [
+        (
+            "a person's device",
+            vec![
+                ("Host", tailnet_host),
+                ("Tailscale-User-Login", "someone@example.com"),
+                ("X-Forwarded-For", "100.64.0.1"),
+            ],
+        ),
+        (
+            "a tagged device",
+            vec![("Host", tailnet_host), ("X-Forwarded-For", "100.64.0.2")],
+        ),
+        (
+            "a forwarded request naming localhost",
+            vec![
+                ("Host", "localhost:4000"),
+                ("X-Forwarded-For", "100.64.0.3"),
+            ],
+        ),
+    ] {
+        let mut request = Request::builder()
+            .method(Method::POST)
+            .uri("/api/sessions/cr-anything/terminal-window")
+            .header(header::AUTHORIZATION, format!("Bearer {}", router.token));
+        for (header_name, value) in headers {
+            request = request.header(header_name, value);
+        }
+        let response = router
+            .router
+            .clone()
+            .oneshot(request.body(Body::empty()).expect("a request"))
+            .await
+            .expect("a response");
+        assert_eq!(response.status(), StatusCode::FORBIDDEN, "{name}");
+    }
 }
 
 #[tokio::test]
