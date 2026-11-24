@@ -1,0 +1,160 @@
+<!-- A box to write a prompt to a session's agent. Nothing reaches the
+     session until Enter or Send; Shift+Enter starts a new line. `onSend`
+     resolves to whether it was sent, and the text is kept when it wasn't. With
+     `draftKey`, the unsent text is kept in this client's localStorage under it.
+     With `onAttachImage`, images pasted, dropped or picked are saved by it and
+     their paths put in the prompt where the cursor is. -->
+<script>
+  import Button from "../lib/components/Button.svelte";
+  import Icon from "../lib/components/Icon.svelte";
+  import { loadPromptDraft, savePromptDraft } from "./prompt_draft.js";
+  import { imageFilesIn, insertIntoPrompt } from "./prompt_images.js";
+
+  /** `controls`: shown on the left of the Send row, like the chat's toggles. */
+  /** `onAttachImage`: saves an image and resolves to its path, or `null` when it couldn't. */
+  /** @type {{ draftKey?: string, disabled?: boolean, disabledReason?: string, onSend: (prompt: string) => Promise<boolean>, onAttachImage?: (file: File) => Promise<string | null>, onAttachmentError?: (message: string) => void, controls?: import("svelte").Snippet<[]> }} */
+  let { draftKey, disabled = false, disabledReason = "", onSend, onAttachImage, onAttachmentError, controls } = $props();
+
+  // The page is remounted per session, so the key only matters at the start.
+  // svelte-ignore state_referenced_locally
+  let prompt = $state(draftKey ? loadPromptDraft(draftKey) : "");
+  let sending = $state(false);
+  let attachingCount = $state(0);
+  let attachmentError = $state("");
+  /** @type {HTMLTextAreaElement | undefined} */
+  let textarea = $state();
+  /** @type {HTMLInputElement | undefined} */
+  let imagePicker = $state();
+
+  $effect(() => {
+    if (draftKey) savePromptDraft(draftKey, prompt);
+  });
+
+  let canSend = $derived(!disabled && !sending && attachingCount === 0 && prompt.trim() !== "");
+
+  async function send(event) {
+    event?.preventDefault();
+    if (!canSend) return;
+    sending = true;
+    try {
+      if (await onSend(prompt)) prompt = "";
+    } finally {
+      sending = false;
+    }
+  }
+
+  async function attachImages(files) {
+    if (!onAttachImage || files.length === 0) return;
+    attachmentError = "";
+    attachingCount += files.length;
+    for (const file of files) {
+      try {
+        const path = await onAttachImage(file);
+        if (path) insertAtCursor(path);
+        else reportAttachmentError(`Could not add ${file.name}. See recent logs for details.`);
+      } catch (error) {
+        reportAttachmentError(`Could not add ${file.name}: ${error}`);
+      } finally {
+        attachingCount -= 1;
+      }
+    }
+  }
+
+  function reportAttachmentError(message) {
+    attachmentError = message;
+    onAttachmentError?.(message);
+  }
+
+  function filesToAttach(source) {
+    const files = imageFilesIn(source);
+    const hasFiles = Array.from(source?.files ?? []).length > 0 || Array.from(source?.items ?? []).some((item) => item.kind === "file");
+    if (files.length === 0 && hasFiles) {
+      reportAttachmentError("No readable image found. Choose a PNG, JPEG, GIF or WebP file.");
+    }
+    return files;
+  }
+
+  function insertAtCursor(text) {
+    const position = textarea?.selectionEnd ?? prompt.length;
+    const inserted = insertIntoPrompt(prompt, position, text);
+    prompt = inserted.prompt;
+    queueMicrotask(() => textarea?.setSelectionRange(inserted.position, inserted.position));
+  }
+
+  function attachPastedImages(event) {
+    const files = filesToAttach(event.clipboardData);
+    if (!onAttachImage || files.length === 0) return;
+    event.preventDefault();
+    attachImages(files);
+  }
+
+  function attachDroppedImages(event) {
+    const files = filesToAttach(event.dataTransfer);
+    if (!onAttachImage || files.length === 0) return;
+    event.preventDefault();
+    attachImages(files);
+  }
+
+  function attachPickedImages(event) {
+    attachImages(filesToAttach(event.currentTarget));
+    event.currentTarget.value = "";
+  }
+
+  function sendOnEnter(event) {
+    // isComposing: Enter that picks a character in an input method.
+    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) send(event);
+  }
+</script>
+
+<form class="prompt-form panel" onsubmit={send}>
+  <textarea
+    class="textarea prompt-input w-full"
+    rows="3"
+    placeholder={disabled ? disabledReason : "Write to the agent. Enter sends, Shift+Enter starts a new line."}
+    bind:value={prompt}
+    bind:this={textarea}
+    onkeydown={sendOnEnter}
+    onpaste={attachPastedImages}
+    ondrop={attachDroppedImages}
+    {disabled}
+  ></textarea>
+  {#if attachmentError}
+    <p class="text-error text-sm" role="alert">{attachmentError}</p>
+  {/if}
+  <div class="prompt-actions">
+    {@render controls?.()}
+    <div class="prompt-send-group">
+      {#if onAttachImage}
+        <input
+          class="hidden"
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          multiple
+          bind:this={imagePicker}
+          onchange={attachPickedImages}
+        />
+        <Button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          title="Add an image: its path is put in the prompt. You can also paste or drop one."
+          disabled={disabled || sending}
+          onclick={() => imagePicker?.click()}
+        >
+          <Icon name="hero-plus-micro" class="size-4" />
+          {attachingCount > 0 ? "Adding…" : "Add"}
+        </Button>
+      {/if}
+      <!-- An arrow on small windows, to leave the row room for the controls. -->
+      <Button
+        type="submit"
+        class="btn btn-primary text-base max-sm:btn-square max-sm:btn-sm"
+        title="Send"
+        aria-label="Send"
+        disabled={!canSend}
+      >
+        <span class="max-sm:hidden">{sending ? "Sending…" : "Send"}</span>
+        <Icon name="hero-paper-airplane-mini" class="size-5 sm:hidden" />
+      </Button>
+    </div>
+  </div>
+</form>

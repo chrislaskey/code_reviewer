@@ -164,8 +164,8 @@ pub fn run() {
             app::sessions::sessions_continuations_create,
             app::sessions::sessions_merges_create,
             app::sessions::sessions_terminal_windows_create,
-            app::sessions::sessions_browser_url_get,
-            app::sessions::sessions_artifacts_url_get
+            app::sessions::sessions_browser_open,
+            app::sessions::sessions_artifacts_open
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

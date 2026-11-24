@@ -16,3 +16,4 @@
 @import "./lib/code_reviewer/styles.css" layer(base);
 @import "./lib/code_reviewer/code_page.css" layer(base);
 @import "./reviews/styles.css" layer(base);
+@import "./sessions/styles.css" layer(base);

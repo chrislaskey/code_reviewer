@@ -4,6 +4,7 @@
 
 use serde_json::Value;
 use tauri::{AppHandle, State};
+use tauri_plugin_opener::OpenerExt;
 
 use app_core::app::sessions::online;
 
@@ -155,26 +156,38 @@ pub async fn sessions_terminal_windows_create(
         .map_err(|error| sync::online_error(&app, error))
 }
 
+/// Opens a session's `http://localhost:<port>` in the system browser.
 #[tauri::command]
-pub async fn sessions_browser_url_get(
+pub async fn sessions_browser_open(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     name: String,
-) -> Result<Value, CommandError> {
+) -> Result<(), CommandError> {
     let (deployment, transport) = device.active_with_transport().await?;
-    online::browser_url_get(&deployment, &transport, &name)
+    let url = online::browser_url_get(&deployment, &transport, &name)
         .await
-        .map_err(|error| sync::online_error(&app, error))
+        .map_err(|error| sync::online_error(&app, error))?;
+    let url = url.as_str().ok_or("the server answered no address")?;
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|error| format!("could not open the browser: {error}"))?;
+    Ok(())
 }
 
+/// Opens a session's artifacts in the system browser.
 #[tauri::command]
-pub async fn sessions_artifacts_url_get(
+pub async fn sessions_artifacts_open(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     name: String,
-) -> Result<Value, CommandError> {
+) -> Result<(), CommandError> {
     let (deployment, transport) = device.active_with_transport().await?;
-    online::artifacts_url_get(&deployment, &transport, &name)
+    let url = online::artifacts_url_get(&deployment, &transport, &name)
         .await
-        .map_err(|error| sync::online_error(&app, error))
+        .map_err(|error| sync::online_error(&app, error))?;
+    let url = url.as_str().ok_or("the server answered no address")?;
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|error| format!("could not open the browser: {error}"))?;
+    Ok(())
 }

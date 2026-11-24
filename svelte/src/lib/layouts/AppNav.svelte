@@ -19,6 +19,7 @@
     homeUrl,
     opsHomeUrl,
     reviewsNewUrl,
+    sessionsIndexUrl,
     supportIndexUrl,
     tracesNewUrl,
   } from "../routes.js";
@@ -32,6 +33,7 @@
     { id: "home", label: t`Home`, icon: "hero-home", href: homeUrl() },
     ...(currentUser.value
       ? [
+          { id: "sessions", label: "Sessions", icon: "hero-command-line", href: sessionsIndexUrl() },
           { id: "reviews", label: "Reviews", icon: "hero-document-magnifying-glass", href: reviewsNewUrl() },
           { id: "traces", label: "Traces", icon: "hero-arrow-trending-down", href: tracesNewUrl() },
           { id: "communities", label: t`Communities`, icon: "hero-user-group", href: communitiesIndexUrl() },

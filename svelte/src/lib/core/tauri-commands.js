@@ -832,13 +832,13 @@ export function sessionsTerminalWindowsCreate(name) {
 /**
  * @param {string} name
  */
-export function sessionsBrowserUrlGet(name) {
-  return invoke("sessions_browser_url_get", { name });
+export function sessionsBrowserOpen(name) {
+  return invoke("sessions_browser_open", { name });
 }
 
 /**
  * @param {string} name
  */
-export function sessionsArtifactsUrlGet(name) {
-  return invoke("sessions_artifacts_url_get", { name });
+export function sessionsArtifactsOpen(name) {
+  return invoke("sessions_artifacts_open", { name });
 }

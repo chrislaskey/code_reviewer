@@ -864,13 +864,13 @@ export function sessionsTerminalWindowsCreate(name) {
 /**
  * @param {string} name
  */
-export function sessionsBrowserUrlGet(name) {
-  return send("GET", sessionPath(name, "/browser-url"));
+export async function sessionsBrowserOpen(name) {
+  window.open(await send("GET", sessionPath(name, "/browser-url")), "_blank", "noopener");
 }
 
 /**
  * @param {string} name
  */
-export function sessionsArtifactsUrlGet(name) {
-  return send("GET", sessionPath(name, "/artifacts-url"));
+export async function sessionsArtifactsOpen(name) {
+  window.open(await send("GET", sessionPath(name, "/artifacts-url")), "_blank", "noopener");
 }

@@ -374,3 +374,32 @@ export function traceRequestFromSearch(search) {
   if (module && name && Number.isInteger(arity)) request.test = { module, name, arity };
   return request;
 }
+
+// Sessions: a session's page takes its name from its path, `/sessions/cr-fix`.
+export const SESSIONS_INDEX_PATH = "/sessions";
+export const SESSIONS_NEW_PATH = "/sessions/new";
+export const SESSIONS_SHOW_PATH = "/sessions/:name";
+
+export function sessionsIndexUrl() {
+  return SESSIONS_INDEX_PATH;
+}
+
+export function sessionsNewUrl() {
+  return SESSIONS_NEW_PATH;
+}
+
+/** @param {string} name the session's full name, prefix included */
+export function sessionsShowUrl(name) {
+  return SESSIONS_SHOW_PATH.replace(":name", encodeURIComponent(name));
+}
+
+/**
+ * The session name in a session page's path (`location.pathname`), or null when it names none.
+ * @param {string} pathname
+ */
+export function sessionNameFromPath(pathname) {
+  const prefix = `${SESSIONS_INDEX_PATH}/`;
+  if (!pathname.startsWith(prefix)) return null;
+  const name = decodeURIComponent(pathname.slice(prefix.length));
+  return name === "" ? null : name;
+}

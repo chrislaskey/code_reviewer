@@ -1,0 +1,49 @@
+<!-- A menu on a session or worktree card that opens the changes in its
+     directory in another feature: the uncommitted changes, or everything
+     the branch committed since its base branch, or the main branch. Each choice is a plain link
+     to the page `urlFor` names, such as the review or the trace show page. -->
+<script>
+  import ChoiceMenu from "../lib/code_reviewer/components/ChoiceMenu.svelte";
+  import MenuChoice from "../lib/code_reviewer/components/MenuChoice.svelte";
+
+  /**
+   * @type {{
+   *   label: string,
+   *   title: string,
+   *   directory: string,
+   *   git: any,
+   *   mainBranch: string,
+   *   urlFor: (request: object) => string,
+   *   class?: any,
+   * }}
+   */
+  let { label, title, directory, git, mainBranch, urlFor, class: class_ } = $props();
+
+  let baseBranch = $derived(git?.base_branch ?? mainBranch);
+  let uncommittedChangesUrl = $derived(urlFor({ repo_path: directory }));
+  let committedChangesUrl = $derived(
+    urlFor({
+      repo_path: directory,
+      base_ref: baseBranch,
+      head_ref: git?.branch ?? "HEAD",
+      compare_from_merge_base: true,
+    }),
+  );
+</script>
+
+<ChoiceMenu {label} {title} class={class_}>
+  {#snippet children({ close })}
+    <MenuChoice
+      label="Uncommitted changes"
+      explanation="The uncommitted changes in the worktree, compared with its last commit."
+      href={uncommittedChangesUrl}
+      onclick={close}
+    />
+    <MenuChoice
+      label="Committed changes"
+      explanation="Everything the branch committed since it branched off {baseBranch}, like a pull request."
+      href={committedChangesUrl}
+      onclick={close}
+    />
+  {/snippet}
+</ChoiceMenu>
