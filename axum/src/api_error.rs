@@ -28,6 +28,7 @@ use app_core::app::memberships::MembershipError;
 use app_core::app::posts::PostError;
 use app_core::app::posts_communities::PostCommunityError;
 use app_core::app::reviews::ReviewError;
+use app_core::app::sessions::host::SessionError;
 use app_core::app::traces::TraceError;
 use app_core::app::users::UserError;
 use app_core::data::accounts_credentials::CredentialError;
@@ -87,6 +88,14 @@ impl From<ReviewError> for ApiError {
             ReviewError::Interrupted(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         ApiError::new(status, error.to_string())
+    }
+}
+
+/// What tmux, git or an agent said went wrong, mostly the request's to
+/// fix, such as a session that does not exist, so a 422.
+impl From<SessionError> for ApiError {
+    fn from(error: SessionError) -> Self {
+        ApiError::new(StatusCode::UNPROCESSABLE_ENTITY, error.to_string())
     }
 }
 

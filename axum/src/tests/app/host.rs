@@ -1,5 +1,6 @@
-//! The reviews and traces routes, on a git repository made for the test:
-//! answered for an app's bearer token, never for the browser's cookie.
+//! The host routes, reviews, traces and sessions: answered for an app's
+//! bearer token, never for the browser's cookie; reviews and traces on a
+//! git repository made for the test.
 
 use std::path::Path;
 use std::process::Command;
@@ -77,4 +78,35 @@ async fn reviews_routes_answer_a_bearer_token_and_refuse_the_cookie() {
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(body, json!({ "error": "invalid revision: nope" }));
+}
+
+#[tokio::test]
+async fn sessions_routes_refuse_the_cookie_and_the_terminal_window_refuses_the_tailnet() {
+    let (router, _) = test_router().await;
+    let cookie = format!("token={}", router.token);
+    let (status, _, _) = send_with(
+        &router.router,
+        None,
+        Some(&cookie),
+        Method::GET,
+        "/api/sessions",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "the cookie is not read");
+
+    let request = Request::builder()
+        .method(Method::POST)
+        .uri("/api/sessions/cr-anything/terminal-window")
+        .header(header::AUTHORIZATION, format!("Bearer {}", router.token))
+        .header("Tailscale-User-Login", "someone@example.com")
+        .body(Body::empty())
+        .expect("a request");
+    let response = router
+        .router
+        .clone()
+        .oneshot(request)
+        .await
+        .expect("a response");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }

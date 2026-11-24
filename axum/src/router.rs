@@ -23,7 +23,7 @@ use crate::accounts::{
 use crate::api_error::ApiError;
 use crate::app::{
     avatars, communities, current_community, current_user, files, memberships, posts, reviews,
-    traces,
+    sessions, traces,
 };
 use crate::state::AppState;
 use crate::sync;
@@ -102,6 +102,43 @@ fn app_api() -> Router<AppState> {
         .route("/api/reviews/file-diffs", post(reviews::file_diffs_list))
         .route("/api/traces/tests", post(traces::tests_list))
         .route("/api/traces/call-stacks", post(traces::call_stacks_get))
+        .route("/api/sessions", get(sessions::list).post(sessions::create))
+        .route("/api/sessions/settings", get(sessions::settings_get))
+        .route(
+            "/api/sessions/default-port",
+            get(sessions::default_port_get),
+        )
+        .route(
+            "/api/sessions/{name}",
+            get(sessions::get).delete(sessions::delete),
+        )
+        .route("/api/sessions/{name}/chat", get(sessions::chat_get))
+        .route(
+            "/api/sessions/{name}/prompts",
+            post(sessions::prompts_create),
+        )
+        .route(
+            "/api/sessions/{name}/prompt-images",
+            post(sessions::prompt_images_create)
+                .layer(DefaultBodyLimit::max(sessions::PROMPT_IMAGE_MAX_BYTES)),
+        )
+        .route(
+            "/api/sessions/{name}/continuation",
+            post(sessions::continuations_create),
+        )
+        .route("/api/sessions/{name}/merge", post(sessions::merges_create))
+        .route(
+            "/api/sessions/{name}/terminal-window",
+            post(sessions::terminal_windows_create),
+        )
+        .route(
+            "/api/sessions/{name}/browser-url",
+            get(sessions::browser_url_get),
+        )
+        .route(
+            "/api/sessions/{name}/artifacts-url",
+            get(sessions::artifacts_url_get),
+        )
 }
 
 /// The sync API, `sync`, for the devices: every route requires the

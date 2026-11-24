@@ -8,11 +8,16 @@ use std::sync::Arc;
 
 #[cfg(feature = "host")]
 use crate::app::analysis::service::AnalysisService;
+#[cfg(feature = "host")]
+use crate::app::sessions::host::SessionHost;
 
 /// What the app keeps on the server between requests.
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct ServerState {
     /// The parsed projects reviews and traces share, see `app::reviews`.
     #[cfg(feature = "host")]
     pub analysis: Arc<AnalysisService>,
+    /// The tmux sessions and worktrees, see `app::sessions::host`.
+    #[cfg(feature = "host")]
+    pub sessions: SessionHost,
 }

@@ -1,17 +1,18 @@
 //! Artifacts: files made while working in a checkout, such as screenshots
 //! and page previews, kept in the app's main checkout under
 //! `artifacts/<project>/<worktree>/` and served by `bin/dev` (see
-//! `artifacts/README.md`). `bin/dev` tells the app where they are, and only
-//! when it runs in the main checkout, so without it there are none.
+//! `artifacts/README.md`). There are some only when `bin/dev` started the
+//! server in the main checkout: its `artifacts/`, served by the Svelte dev
+//! server `bin/dev` names in `PAGES_DEV_URL`.
 
 use std::path::{Path, PathBuf};
 
 use crate::services::git_worktree::find_checkout;
 
-/// The variable `bin/dev` sets to the artifacts directory.
-const DIRECTORY_VARIABLE: &str = "CODE_REVIEWER_ARTIFACTS_DIRECTORY";
-/// The variable `bin/dev` sets to the port its dev server serves them on.
-const PORT_VARIABLE: &str = "CODE_REVIEWER_ARTIFACTS_PORT";
+/// The variable `bin/dev` sets to the address of the dev server that serves them.
+const PAGES_DEV_URL_VARIABLE: &str = "PAGES_DEV_URL";
+/// The folder in the main checkout that holds them.
+const ARTIFACTS_FOLDER: &str = "artifacts";
 /// The folder of the work done in a main checkout, not a linked worktree.
 const MAIN_CHECKOUT_FOLDER: &str = "main";
 /// The folder in a checkout's artifacts that images pasted into a prompt go in.
@@ -23,25 +24,31 @@ const MAX_PROMPT_IMAGE_NAME_ATTEMPTS: u32 = 100;
 #[derive(Clone, Debug, PartialEq)]
 pub struct ArtifactsServer {
     pub directory: PathBuf,
-    pub port: u16,
+    /// The dev server's address, such as `http://localhost:1420`.
+    pub pages_url: String,
 }
 
 impl ArtifactsServer {
-    /// The artifacts `bin/dev` set up, or `None` when it didn't start the app.
+    /// The artifacts of the main checkout the server runs in, served by
+    /// `bin/dev`'s dev server; `None` in a linked worktree, whose `.git` is
+    /// a file, or when `bin/dev` didn't start the server.
     pub fn from_environment() -> Option<Self> {
-        let directory = std::env::var_os(DIRECTORY_VARIABLE)?;
-        let port = std::env::var(PORT_VARIABLE).ok()?.parse().ok()?;
+        let pages_url = std::env::var(PAGES_DEV_URL_VARIABLE).ok()?;
+        let checkout = std::env::current_dir().ok()?;
+        if !checkout.join(".git").is_dir() {
+            return None;
+        }
         Some(Self {
-            directory: PathBuf::from(directory),
-            port,
+            directory: checkout.join(ARTIFACTS_FOLDER),
+            pages_url: pages_url.trim_end_matches('/').to_string(),
         })
     }
 
-    /// The URL of a folder's index on this computer.
+    /// The URL of a folder's index on the dev server.
     pub fn localhost_url(&self, folder: &ArtifactsFolder) -> String {
         format!(
-            "http://localhost:{}/artifacts/{}/{}/",
-            self.port, folder.project, folder.worktree
+            "{}/artifacts/{}/{}/",
+            self.pages_url, folder.project, folder.worktree
         )
     }
 
@@ -175,7 +182,7 @@ mod tests {
     fn server(directory: &Path) -> ArtifactsServer {
         ArtifactsServer {
             directory: directory.to_path_buf(),
-            port: 1420,
+            pages_url: "http://localhost:1420".to_string(),
         }
     }
 

@@ -1,9 +1,9 @@
 //! The app's routes: posts, files, communities, the current user and community, and the sync;
-//! reviews and traces in `reviews`.
+//! reviews, traces and sessions in `host`.
 
 use super::*;
 
-mod reviews;
+mod host;
 
 #[tokio::test]
 async fn posts_list_as_json() {

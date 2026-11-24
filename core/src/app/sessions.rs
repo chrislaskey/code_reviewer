@@ -24,6 +24,7 @@
 
 pub mod artifacts;
 pub mod continue_command;
+pub mod host;
 pub mod summaries;
 
 use std::path::{Path, PathBuf};
