@@ -64,6 +64,15 @@ Server settings:
                    app's dev server runs as it does in production. See
                    core/src/servers/settings.rs.
 
+The tailnet:
+  When the web target runs and Tailscale is installed and up, the pages are
+  built (\`pnpm build\`, for the web server to serve), then
+  \`tailscale serve\` gives the web server the address
+  https://<this computer>.<tailnet>.ts.net:<web port> on the tailnet, and
+  prints it: a phone's server, SYNC_SERVER_URL in .env for \`bin/reinstall\`.
+  It stops with the rest. TAILSCALE_SERVE=false, from the environment or
+  else from .env, turns it off.
+
 Other servers:
   MULTI_SERVER   none, listed_only or any: the app's multiServer setting
                  for the session, in place of tauri.conf.json's, so the
@@ -285,6 +294,21 @@ if [ "$starts_web" = true ]; then
     done < <(STORAGE_PORT="$storage_port" "$ROOT/bin/storage" env)
   else
     echo "bin/dev: warning: garage is not installed, so uploads are off; \`brew install garage\`" >&2
+  fi
+fi
+
+# The web server on the tailnet, see the help. In the foreground, so it
+# stops with the rest and leaves nothing behind.
+if [ "$starts_web" = true ] && [ "$(read_setting TAILSCALE_SERVE)" != false ]; then
+  if ! command -v tailscale > /dev/null; then
+    echo "bin/dev: warning: tailscale is not installed, so a phone can't reach the web server" >&2
+  elif ! tailscale status > /dev/null 2>&1; then
+    echo "bin/dev: warning: Tailscale is not up, so a phone can't reach the web server" >&2
+  else
+    echo "bin/dev: building the pages for the tailnet"
+    (cd "$ROOT/svelte" && pnpm build)
+    (exec tailscale serve --https="$web_port" "http://127.0.0.1:$web_port") &
+    pids+=($!)
   fi
 fi
 
