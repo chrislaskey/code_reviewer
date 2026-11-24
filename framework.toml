@@ -183,6 +183,7 @@ seams = [
     "svelte/src/lib/core/**",
     "svelte/src/lib/routes.js",
     "svelte/src/lib/pages.js",
+    "svelte/src/lib/identity.js",
     "svelte/src/lib/layouts/AppNav.svelte",
     "svelte/src/lib/layouts/BottomBar.svelte",
 ]

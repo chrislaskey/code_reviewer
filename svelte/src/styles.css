@@ -187,6 +187,22 @@ body {
   }
 }
 
+/* The app's name in the community menu's place, on a server with a single
+   community: only on small windows, which have no gutter with Home. */
+.app-header-app-name {
+  display: none;
+  padding: 0 0.25rem;
+  color: var(--fg);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+@media (width < 40rem) {
+  .app-header-app-name {
+    display: block;
+  }
+}
+
 /* A header menu's panel (HeaderMenu), below its button, at its right. */
 .header-menu-panel {
   position: absolute;
