@@ -286,7 +286,15 @@ In Code Reviewer, its own:
      and the quick picker, kept, uses files. Hidden from the nav only;
      the template's fix is its `docs/suggestions/code-organization-examples.md`.
 3. Reviews and traces: read-only, no background tasks, the smallest
-   feature that crosses every layer. The first proof of the host feature,
+   feature that crosses every layer. Built 2026-11-24, all but the check
+   on a running app: template `CurrentUserFromBearerToken` and
+   `CurrentUserFromCookie`, the `ServerState` seam, `services.rs` and
+   `svelte/src/lib/pages.js` as seams; `host` feature with
+   `core/src/app/analysis/`, `groups/`, `services/git.rs`; routes under
+   `/api/reviews/*` and `/api/traces/*`; online calls, Tauri commands,
+   both JS clients; pages in `svelte/src/reviews/`, `traces/`, own
+   components in `svelte/src/lib/code_reviewer/`. Main's waves and
+   background pattern left out for now. The first proof of the host feature,
    the online-only calls and a phone signed in over the tailnet.
 4. Sessions, without notifications.
 5. Notifications: desktop, then APNs.
