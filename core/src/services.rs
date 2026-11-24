@@ -4,6 +4,8 @@
 
 #[cfg(feature = "app-store")]
 pub mod app_store;
+#[cfg(feature = "host")]
+pub mod git;
 pub mod mailer;
 #[cfg(feature = "object-storage")]
 pub mod storage;

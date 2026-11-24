@@ -27,6 +27,8 @@ use app_core::app::files_communities::FileCommunityError;
 use app_core::app::memberships::MembershipError;
 use app_core::app::posts::PostError;
 use app_core::app::posts_communities::PostCommunityError;
+use app_core::app::reviews::ReviewError;
+use app_core::app::traces::TraceError;
 use app_core::app::users::UserError;
 use app_core::data::accounts_credentials::CredentialError;
 use app_core::data::accounts_users::AccountUserError;
@@ -73,6 +75,28 @@ impl ApiError {
             field_errors: Some(field_errors),
             code: None,
         }
+    }
+}
+
+/// A repository path or a revision git does not know is the request's
+/// to fix, so a 422 with git's message.
+impl From<ReviewError> for ApiError {
+    fn from(error: ReviewError) -> Self {
+        let status = match &error {
+            ReviewError::Analysis(_) | ReviewError::Git(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            ReviewError::Interrupted(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        ApiError::new(status, error.to_string())
+    }
+}
+
+impl From<TraceError> for ApiError {
+    fn from(error: TraceError) -> Self {
+        let status = match &error {
+            TraceError::Analysis(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            TraceError::Interrupted(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        ApiError::new(status, error.to_string())
     }
 }
 

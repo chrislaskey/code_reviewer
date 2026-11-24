@@ -5,7 +5,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-app_core = { workspace = true, features = ["postgres", "mail-resend", "object-storage", "stripe", "app-store"] }
+app_core = { workspace = true, features = ["postgres", "mail-resend", "object-storage", "stripe", "app-store", "host"] }
 axum = "0.8"
 axum-extra = { version = "0.12", features = ["cookie"] }
 chrono = { version = "0.4", default-features = false, features = ["serde"] }
@@ -26,4 +26,5 @@ uuid = { version = "1", features = ["serde"] }
 async-trait = "0.1"
 async-stripe-webhook = "=1.0.0-rc.10"
 http-body-util = "0.1"
+tempfile = "3"
 tower = { version = "0.5", features = ["util"] }

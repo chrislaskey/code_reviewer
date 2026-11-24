@@ -22,7 +22,8 @@ use crate::accounts::{
 };
 use crate::api_error::ApiError;
 use crate::app::{
-    avatars, communities, current_community, current_user, files, memberships, posts,
+    avatars, communities, current_community, current_user, files, memberships, posts, reviews,
+    traces,
 };
 use crate::state::AppState;
 use crate::sync;
@@ -89,6 +90,18 @@ fn app_api() -> Router<AppState> {
             "/api/communities/{community_id}/membership",
             post(memberships::create).delete(memberships::delete),
         )
+        .route("/api/reviews/branches", get(reviews::branches_list))
+        .route(
+            "/api/reviews/file-changes",
+            post(reviews::file_changes_list),
+        )
+        .route(
+            "/api/reviews/function-diffs",
+            post(reviews::function_diffs_list),
+        )
+        .route("/api/reviews/file-diffs", post(reviews::file_diffs_list))
+        .route("/api/traces/tests", post(traces::tests_list))
+        .route("/api/traces/call-stacks", post(traces::call_stacks_get))
 }
 
 /// The sync API, `sync`, for the devices: every route requires the
