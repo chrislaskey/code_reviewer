@@ -18,6 +18,17 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-24: no bounce on the desktop, a see-through header on small windows
+
+- **What changed**: the desktop app's window no longer bounces past the
+  page's ends (`overscroll-behavior: none`), as the phone's doesn't.
+  Below 40rem the header, which scrolls away with the page, has no
+  background and no line under it, so the page's background shows
+  through it.
+- **What an app does**: **Optional**: an app with a background of its
+  own at the top of its pages, such as a pattern, may start it at the
+  window's top below 40rem, behind the header and a phone's status bar.
+
 ## 2026-11-24: the sign-in scheme checked against the app's identifier
 
 - **What changed**: a test of the Tauri app fails when `APP_URL_SCHEME`
