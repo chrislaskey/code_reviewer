@@ -108,6 +108,10 @@ body {
   gap: 1.25rem;
 }
 
+.page-wide {
+  max-width: 980px;
+}
+
 /* Against the gutter, as the open tab joins it. */
 .app-layout .page {
   margin: 0;
