@@ -22,21 +22,12 @@
     accountsSignInUrl,
     profileEditUrl,
   } from "../routes.js";
-  import { Button, ErrorMessage, Icon, Link } from "../components/index.js";
+  import { Avatar, Button, ErrorMessage, Icon, Link } from "../components/index.js";
 
 
   let isGuest = $derived(currentUser.value?.kind === "trial");
   let busy = $state(false);
   let error = $state("");
-
-  let initials = $derived(
-    (currentUser.value?.name ?? "")
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((word) => word[0].toUpperCase())
-      .join(""),
-  );
 
   async function signOut() {
     error = "";
@@ -57,13 +48,7 @@
   <HeaderMenu label={isGuest ? t`Account, as a guest` : t`Account`} buttonClass="btn-circle">
     {#snippet button()}
       <span class="relative inline-flex">
-        {#if currentUser.value.avatar_url}
-          <img src={currentUser.value.avatar_url} alt="" class="size-7 rounded-full object-cover" />
-        {:else if initials}
-          <span class="avatar-initials">{initials}</span>
-        {:else}
-          <Icon name="hero-user-circle" class="size-7" />
-        {/if}
+        <Avatar user={currentUser.value} />
         {#if isGuest}
           <span class="bg-warning ring-base-100 absolute -top-0.5 -right-0.5 size-2.5 rounded-full ring-2" data-guest-dot></span>
         {/if}

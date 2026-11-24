@@ -18,6 +18,20 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-24: Avatar, the initials when a picture doesn't load
+
+- **What changed**: the core component `Avatar` draws a person's
+  picture, else their initials, else a person icon, and the initials
+  when the picture doesn't load, such as a dev server's `localhost`
+  address seen from a phone, or a deleted file. `AccountMenu` and
+  `ProfileEditPage` use it. `.avatar-initials` no longer sets a size;
+  `.avatar-sm` (28px) and `.avatar-lg` (5rem) do.
+- **What an app does**:
+  - **Optional**: `<Avatar user={...} />` wherever the app shows a
+    person's picture, in place of an `<img>` of `avatar_url`.
+  - **Required**, for an app that used `.avatar-initials` itself: add
+    `.avatar-sm` beside it for its old size.
+
 ## 2026-11-24: the app's name in the identity seam
 
 1f7ddaa.

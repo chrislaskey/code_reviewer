@@ -1,10 +1,12 @@
 // The app's core components: mostly atoms, the small elements every page
-// uses, such as headings, text, buttons, links and form controls, so they
+// uses, such as headings, text, buttons, links, form controls and a
+// person's avatar, so they
 // look the same everywhere, and the few generic pieces many pages repeat:
 // the page's column, a dialog and its buttons, a form's field errors, a
 // grid of tiles and a translated sentence with links in it. Anything
 // bigger is composed from these where it's used. See AGENTS.md.
 export { default as Alert } from "./Alert.svelte";
+export { default as Avatar } from "./Avatar.svelte";
 export { default as Badge } from "./Badge.svelte";
 export { default as Button } from "./Button.svelte";
 export { default as Checkbox } from "./Checkbox.svelte";
