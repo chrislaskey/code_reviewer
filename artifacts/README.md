@@ -13,12 +13,13 @@ itself. `bin/artifacts` prints the folder for the current checkout,
 creating it. Everything here but this README, `index.html` and
 `.gitignore` is ignored by git, so artifacts are never committed.
 
-`bin/dev` serves them at `/artifacts/` on its dev server, in dev only:
-`/artifacts/` lists every project and worktree, `/artifacts/<project>/`
-and `/artifacts/<project>/<worktree>/` the files below them, newest first.
-When Tailscale is up, `bin/dev` prints the address a phone on the tailnet
-opens. Run in the main checkout, it also tells the desktop app where they
-are, for each session's Open › Open artifacts.
+The web server serves them at `/artifacts/`, run from the main checkout or
+any worktree: `/artifacts/` lists every project and worktree,
+`/artifacts/<project>/` and `/artifacts/<project>/<worktree>/` the files
+below them, newest first. Under `bin/dev` the Svelte dev server sends
+`/artifacts/` to it too, and a phone reaches it at the tailnet address
+`bin/dev` prints. Each is sent sandboxed, so an artifact's scripts can't
+act as the signed-in pages.
 
 A worktree's artifacts are deleted with it: by the app's Merge and Close,
 and by `bin/worktree merge` and `close`.

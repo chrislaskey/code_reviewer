@@ -12,7 +12,7 @@ case "${1:-}" in
 Prints the folder for the current checkout's artifacts, creating it:
 <main checkout>/artifacts/<project>/<worktree>, with <worktree> \`main\` in
 the main checkout itself. Save screenshots, previews and other files to
-show the user there; bin/dev in the main checkout serves them at
+show the user there; the web server serves them at
 /artifacts/<project>/<worktree>/.
 
 Usage: $0

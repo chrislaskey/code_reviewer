@@ -7,6 +7,8 @@
 //! notifications it collects and its push token, is the hash of its
 //! bearer token, `device_id_of`.
 
+pub mod artifacts;
+
 use std::sync::Arc;
 
 use axum::Json;

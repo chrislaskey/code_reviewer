@@ -59,6 +59,22 @@ pub struct Checkout {
     pub main_checkout: PathBuf,
 }
 
+/// The main checkout of the repository `directory` is in, waiting for git
+/// on this thread; `None` outside a repository.
+pub fn find_main_checkout_blocking(directory: &Path) -> Option<PathBuf> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(directory)
+        .args(["rev-parse", "--path-format=absolute", "--git-common-dir"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let common_directory = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
+    common_directory.parent().map(Path::to_path_buf)
+}
+
 /// The checkout `directory` is in, and its repository's main checkout.
 pub async fn find_checkout(directory: &Path) -> Result<Checkout, String> {
     let output = run_git(

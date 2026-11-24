@@ -10,6 +10,7 @@ use app_core::app::sessions::online;
 
 use crate::command_error::CommandError;
 use crate::device_accounts::DeviceAccounts;
+use crate::server_urls;
 use crate::sync;
 
 #[tauri::command]
@@ -174,7 +175,8 @@ pub async fn sessions_browser_open(
     Ok(())
 }
 
-/// Opens a session's artifacts in the system browser.
+/// Opens a session's artifacts in the system browser, on the server the
+/// app signs in at.
 #[tauri::command]
 pub async fn sessions_artifacts_open(
     app: AppHandle,
@@ -182,10 +184,12 @@ pub async fn sessions_artifacts_open(
     name: String,
 ) -> Result<(), CommandError> {
     let (deployment, transport) = device.active_with_transport().await?;
-    let url = online::artifacts_url_get(&deployment, &transport, &name)
+    let path = online::artifacts_url_get(&deployment, &transport, &name)
         .await
         .map_err(|error| sync::online_error(&app, error))?;
-    let url = url.as_str().ok_or("the server answered no address")?;
+    let path = path.as_str().ok_or("the server answered no address")?;
+    let server = device.active_or_default_server().await?;
+    let url = server_urls::browser_page_url(&app, &server, path)?;
     app.opener()
         .open_url(url, None::<&str>)
         .map_err(|error| format!("could not open the browser: {error}"))?;

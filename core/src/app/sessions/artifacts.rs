@@ -1,18 +1,20 @@
 //! Artifacts: files made while working in a checkout, such as screenshots
-//! and page previews, kept in the app's main checkout under
-//! `artifacts/<project>/<worktree>/` and served by `bin/dev` (see
-//! `artifacts/README.md`). There are some only when `bin/dev` started the
-//! server in the main checkout: its `artifacts/`, served by the Svelte dev
-//! server `bin/dev` names in `PAGES_DEV_URL`.
+//! and page previews, kept in the main checkout of the repository the
+//! server runs in, under `artifacts/<project>/<worktree>/`, and served by
+//! the server at `/artifacts/` (see `artifacts/README.md`).
 
 use std::path::{Path, PathBuf};
 
-use crate::services::git_worktree::find_checkout;
+use serde::Serialize;
 
-/// The variable `bin/dev` sets to the address of the dev server that serves them.
-const PAGES_DEV_URL_VARIABLE: &str = "PAGES_DEV_URL";
+use crate::services::git_worktree::{find_checkout, find_main_checkout_blocking};
+
 /// The folder in the main checkout that holds them.
 const ARTIFACTS_FOLDER: &str = "artifacts";
+/// The page that lists the files below a folder's address.
+const INDEX_FILE: &str = "index.html";
+/// The address of the list of every artifact the index reads.
+const FILE_LIST_PATH: &str = "files.json";
 /// The folder of the work done in a main checkout, not a linked worktree.
 const MAIN_CHECKOUT_FOLDER: &str = "main";
 /// The folder in a checkout's artifacts that images pasted into a prompt go in.
@@ -20,36 +22,81 @@ const PROMPT_IMAGES_FOLDER: &str = "prompt-images";
 /// How many names a new prompt image tries before giving up.
 const MAX_PROMPT_IMAGE_NAME_ATTEMPTS: u32 = 100;
 
-/// Where the artifacts are kept and served.
+/// Where the artifacts are kept.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ArtifactsServer {
     pub directory: PathBuf,
-    /// The dev server's address, such as `http://localhost:1420`.
-    pub pages_url: String,
+}
+
+/// What an address below `/artifacts/` shows.
+#[derive(Debug, PartialEq)]
+pub enum FoundArtifact {
+    /// Every artifact, for the index.
+    FileList(Vec<ArtifactFile>),
+    /// A file to send: an artifact, or the index for a folder's address.
+    File(PathBuf),
+    Missing,
+}
+
+/// One artifact in the index's list.
+#[derive(Debug, PartialEq, Serialize)]
+pub struct ArtifactFile {
+    /// Below the artifacts folder, `<project>/<worktree>/<file>`.
+    pub path: String,
+    pub size: u64,
+    /// Milliseconds since 1970.
+    pub modified: f64,
 }
 
 impl ArtifactsServer {
-    /// The artifacts of the main checkout the server runs in, served by
-    /// `bin/dev`'s dev server; `None` in a linked worktree, whose `.git` is
-    /// a file, or when `bin/dev` didn't start the server.
-    pub fn from_environment() -> Option<Self> {
-        let pages_url = std::env::var(PAGES_DEV_URL_VARIABLE).ok()?;
-        let checkout = std::env::current_dir().ok()?;
-        if !checkout.join(".git").is_dir() {
-            return None;
-        }
+    /// The artifacts of the main checkout of the repository the server
+    /// runs in, whichever worktree it runs in; `None` outside a repository.
+    pub fn from_current_directory() -> Option<Self> {
+        let directory = std::env::current_dir().ok()?;
+        let main_checkout = find_main_checkout_blocking(&directory)?;
         Some(Self {
-            directory: checkout.join(ARTIFACTS_FOLDER),
-            pages_url: pages_url.trim_end_matches('/').to_string(),
+            directory: main_checkout.join(ARTIFACTS_FOLDER),
         })
     }
 
-    /// The URL of a folder's index on the dev server.
-    pub fn localhost_url(&self, folder: &ArtifactsFolder) -> String {
-        format!(
-            "{}/artifacts/{}/{}/",
-            self.pages_url, folder.project, folder.worktree
-        )
+    /// The address of a folder's index on the server.
+    pub fn folder_path(&self, folder: &ArtifactsFolder) -> String {
+        format!("/artifacts/{}/{}/", folder.project, folder.worktree)
+    }
+
+    /// What `path`, below `/artifacts/` and decoded, shows: the list of
+    /// files, the index for a folder, or a file. Never a hidden file or one
+    /// outside the folder. Reads the disk, so call it off the async threads.
+    pub fn find(&self, path: &str) -> FoundArtifact {
+        if path == FILE_LIST_PATH {
+            return FoundArtifact::FileList(self.list_files());
+        }
+        let segments: Vec<&str> = path
+            .split('/')
+            .filter(|segment| !segment.is_empty())
+            .collect();
+        if segments.iter().any(|segment| !is_plain_segment(segment)) {
+            return FoundArtifact::Missing;
+        }
+        let found = segments
+            .iter()
+            .fold(self.directory.clone(), |path, segment| path.join(segment));
+        if found.is_dir() {
+            FoundArtifact::File(self.directory.join(INDEX_FILE))
+        } else if found.is_file() {
+            FoundArtifact::File(found)
+        } else {
+            FoundArtifact::Missing
+        }
+    }
+
+    /// The files in the projects' folders, newest first, without hidden ones.
+    fn list_files(&self) -> Vec<ArtifactFile> {
+        let mut files = Vec::new();
+        list_files_below(&self.directory, "", &mut files);
+        files.retain(|file| file.path.contains('/'));
+        files.sort_by(|a, b| b.modified.total_cmp(&a.modified));
+        files
     }
 
     /// Deletes a folder's artifacts, when it has any.
@@ -125,6 +172,41 @@ async fn write_new_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     file.flush().await
 }
 
+/// Not empty, `.` or `..`, not hidden, and with no separator.
+fn is_plain_segment(segment: &str) -> bool {
+    !segment.starts_with('.') && !segment.contains('\\')
+}
+
+fn list_files_below(directory: &Path, prefix: &str, files: &mut Vec<ArtifactFile>) {
+    let Ok(entries) = std::fs::read_dir(directory) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.starts_with('.') {
+            continue;
+        }
+        let path = format!("{prefix}{name}");
+        let Ok(metadata) = std::fs::metadata(entry.path()) else {
+            continue;
+        };
+        if metadata.is_dir() {
+            list_files_below(&entry.path(), &format!("{path}/"), files);
+        } else if metadata.is_file() {
+            let modified = metadata
+                .modified()
+                .ok()
+                .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                .map_or(0.0, |duration| duration.as_secs_f64() * 1000.0);
+            files.push(ArtifactFile {
+                path,
+                size: metadata.len(),
+                modified,
+            });
+        }
+    }
+}
+
 /// The folder of one checkout's artifacts: its repository's main checkout's
 /// name, then the worktree's name, or `main` for the main checkout.
 #[derive(Clone, Debug, PartialEq)]
@@ -182,7 +264,6 @@ mod tests {
     fn server(directory: &Path) -> ArtifactsServer {
         ArtifactsServer {
             directory: directory.to_path_buf(),
-            pages_url: "http://localhost:1420".to_string(),
         }
     }
 
@@ -194,8 +275,8 @@ mod tests {
         assert_eq!(folder.project, "code_reviewer");
         assert_eq!(folder.worktree, "cr-mobile-ux");
         assert_eq!(
-            server(Path::new("/a")).localhost_url(&folder),
-            "http://localhost:1420/artifacts/code_reviewer/cr-mobile-ux/"
+            server(Path::new("/a")).folder_path(&folder),
+            "/artifacts/code_reviewer/cr-mobile-ux/"
         );
     }
 
@@ -283,5 +364,72 @@ mod tests {
 
         assert_eq!(folder.project, "project");
         assert_eq!(folder.worktree, "main");
+    }
+
+    #[test]
+    fn finds_files_the_index_for_folders_and_nothing_hidden_or_outside() {
+        let directory = tempfile::tempdir().unwrap();
+        let artifacts = directory.path().join("artifacts");
+        let worktree = artifacts.join("code_reviewer/cr-x");
+        std::fs::create_dir_all(&worktree).unwrap();
+        std::fs::write(artifacts.join("index.html"), "index").unwrap();
+        std::fs::write(worktree.join("shot.png"), "png").unwrap();
+        std::fs::write(worktree.join(".secret"), "hidden").unwrap();
+        std::fs::write(directory.path().join("outside.txt"), "outside").unwrap();
+        let server = server(&artifacts);
+
+        assert_eq!(
+            server.find("code_reviewer/cr-x/shot.png"),
+            FoundArtifact::File(worktree.join("shot.png"))
+        );
+        assert_eq!(
+            server.find("code_reviewer/cr-x/"),
+            FoundArtifact::File(artifacts.join("index.html"))
+        );
+        assert_eq!(
+            server.find(""),
+            FoundArtifact::File(artifacts.join("index.html"))
+        );
+        assert_eq!(
+            server.find("code_reviewer/cr-x/.secret"),
+            FoundArtifact::Missing
+        );
+        assert_eq!(server.find("../outside.txt"), FoundArtifact::Missing);
+        assert_eq!(
+            server.find("code_reviewer/missing.png"),
+            FoundArtifact::Missing
+        );
+    }
+
+    #[test]
+    fn lists_the_projects_files_newest_first() {
+        let directory = tempfile::tempdir().unwrap();
+        let worktree = directory.path().join("code_reviewer/cr-x");
+        std::fs::create_dir_all(&worktree).unwrap();
+        std::fs::write(directory.path().join("README.md"), "readme").unwrap();
+        std::fs::write(worktree.join("older.png"), "old").unwrap();
+        std::fs::write(worktree.join(".hidden"), "hidden").unwrap();
+        let older = std::fs::OpenOptions::new()
+            .write(true)
+            .open(worktree.join("older.png"))
+            .unwrap();
+        older
+            .set_modified(std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1))
+            .unwrap();
+        std::fs::write(worktree.join("newer.png"), "newer").unwrap();
+
+        let FoundArtifact::FileList(files) = server(directory.path()).find("files.json") else {
+            panic!("expected the list");
+        };
+
+        let paths: Vec<&str> = files.iter().map(|file| file.path.as_str()).collect();
+        assert_eq!(
+            paths,
+            [
+                "code_reviewer/cr-x/newer.png",
+                "code_reviewer/cr-x/older.png"
+            ]
+        );
+        assert_eq!(files[0].size, 5);
     }
 }

@@ -301,9 +301,8 @@ In Code Reviewer, its own:
    processes, terminal app, `agents/`), `core/src/app/sessions/` with
    `SessionHost` in `ServerState`, routes under `/api/sessions` (the
    terminal window refused over the tailnet), online calls, Tauri
-   commands, pages. Artifacts kept as on main (template `bin/dev` passes
-   `PAGES_DEV_URL`); the server serving them itself is
-   `docs/suggestions/artifacts.md`.
+   commands, pages. Artifacts kept as on main at first; since 2026-11-24 the
+   server serves them itself at `/artifacts/`, sandboxed (6b).
 5. Notifications: desktop, then APNs. Built 2026-11-24, all but the check
    on a running app and a phone: template `ServerTask::run` gets
    `ServerState`; bells per device, the hash of its bearer token, dropped
@@ -324,29 +323,37 @@ need the user's choice first.
 
 ### 6a. The phone reaching the server
 
-- **`tailscale serve` in front of `app_web`** (T4, option B), tried on the
-  Mac: `tailscale serve --bg --https=443 http://127.0.0.1:<web port>`.
-  Its certificate, the `Tailscale-User-Login` header the Terminal route
-  refuses, and `TRUST_PROXY_HEADERS` for the rate limits.
-- **The sign-in pages over the tailnet.** The phone signs in through the
-  server's sign-in page in the iOS sheet, at `https://mac.ts.net`, so
-  `app_web` must serve the built pages (`svelte/dist`); `bin/dev` serves
-  them from Vite on another port. Decide: a Code Reviewer script,
-  `bin/tailnet`, that builds the pages and runs `tailscale serve`
-  (recommended), or a step in the README.
-- **Installing:** `bin/reinstall` with `SYNC_SERVER_URL=https://mac.ts.net`,
-  `multiServer "any"` for typing the address once (C4).
+Built 2026-11-24 (template `bcd10f1`): `bin/dev`, with the web target,
+when Tailscale is installed and up, builds the pages and runs
+`tailscale serve --https=<web port> http://127.0.0.1:<web port>` in the
+foreground, so it stops with the rest; `TAILSCALE_SERVE=false` turns it
+off. The phone signs in at the server's own built pages, and one address
+carries the pages, the API and the artifacts. Tried on the Mac: the
+foreground serve on a port other than 443 answers and leaves no config
+behind. Left to check with the phone:
+
+- The `Tailscale-User-Login` header reaching the server (the Terminal
+  route's 403), and `TRUST_PROXY_HEADERS` for the rate limits.
+- **Installing:** `SYNC_SERVER_URL` in `.env` set to the address
+  `tailscale serve` prints (`https://nyx.tailcbcf2d.ts.net:4030` with
+  `PORT=4030`), then `bin/reinstall`; `multiServer "any"` for typing it
+  in instead (C4).
 
 ### 6b. What the phone opens
 
-- **A session's browser and artifacts links** are `localhost` addresses
-  on the Mac, useless on the phone. On main the app pointed them at the
-  paired computer's tailnet name, and `bin/dev` listened on every
-  address. Decide: point them at the server's host and add a
-  `tailscale serve` path for the dev server's port (keeps today's way),
-  or have the server serve the artifacts itself
-  (`docs/suggestions/artifacts.md`) and leave session browser links to
-  the Mac.
+- **Artifacts:** built 2026-11-24. The server serves them at
+  `/artifacts/` from the main checkout of the repository it runs in,
+  whichever worktree (`core/src/app/sessions/artifacts.rs`,
+  `axum/src/app/sessions/artifacts.rs`), sandboxed by
+  `Content-Security-Policy: sandbox allow-scripts ...` so an artifact's
+  scripts never act as the signed-in pages, with
+  `Access-Control-Allow-Origin: *` for the index's list. The session's
+  artifacts link is a path the app opens beside its sign-in page; the
+  Vite plugin is gone and the dev server sends `/artifacts` on to the
+  server. Left to check with the phone.
+- **A session's browser link** is `http://localhost:<its PORT>` on the
+  Mac, useless on the phone; on main the app pointed it at the paired
+  computer's tailnet name. Decide later, with the phone in hand.
 - **The Terminal window** answers 403 over the tailnet: check the page
   says so plainly, and hide the action on a phone.
 

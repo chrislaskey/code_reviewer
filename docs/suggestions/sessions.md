@@ -66,8 +66,6 @@ Ideas and template features not in the rewrite. None are planned.
   `artifacts/<project>/<worktree>/` instead, with `bin/artifacts` (or the
   app) telling them where, and the cleanup on Merge and Close already
   names the project.
-- Serving artifacts from the app's backend instead of bin/dev's dev
-  server, so they show without bin/dev running in the main checkout.
 - Switching a session's model: `/model <name>` sent as a prompt works in
   both Claude Code and Codex (tested through the same tmux paste). A model
   picker on the session page could send it. Claude Code saves the choice as

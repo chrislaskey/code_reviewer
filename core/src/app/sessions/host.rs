@@ -12,7 +12,7 @@ use std::time::Duration;
 use thiserror::Error;
 use tokio::sync::OnceCell;
 
-use crate::app::sessions::artifacts::ArtifactsServer;
+use crate::app::sessions::artifacts::{ArtifactsServer, FoundArtifact};
 use crate::app::sessions::notifications::{SessionNotification, SessionNotifications};
 use crate::app::sessions::summaries::{SessionSummaries, SessionSummaryCache};
 use crate::app::sessions::{self, DetectedSettings, SessionStatus, Settings};
@@ -46,8 +46,8 @@ pub struct SessionHost {
     /// The file each Cursor or Codex process writes, so `lsof` isn't run
     /// on every refresh.
     open_files: Arc<OpenFileCache>,
-    /// Where bin/dev keeps and serves artifacts; `None` when it didn't
-    /// start the server in the main checkout.
+    /// Where the artifacts are kept; `None` when the server doesn't run
+    /// in a git checkout.
     artifacts: Option<ArtifactsServer>,
     /// Each device's bells, and the notifications it hasn't collected.
     notifications: SessionNotifications,
@@ -69,7 +69,7 @@ impl SessionHost {
             settings: OnceCell::new(),
             summaries: SessionSummaryCache::new(Arc::clone(&open_files)),
             open_files,
-            artifacts: ArtifactsServer::from_environment(),
+            artifacts: ArtifactsServer::from_current_directory(),
             notifications: open_notifications(data_directory),
             apple_push: open_apple_push(data_directory),
         }
@@ -233,12 +233,23 @@ impl SessionHost {
             .map_err(SessionError)
     }
 
-    /// The address of a session's artifacts on the dev server; an error
-    /// when bin/dev didn't start the server in the main checkout.
+    /// The address of a session's artifacts on the server, such as
+    /// `/artifacts/code_reviewer/cr-x/`; an error when the server doesn't
+    /// run in a git checkout.
     pub async fn artifacts_url_get(&self, name: &str) -> Result<String, SessionError> {
         sessions::get_session_artifacts_url(self.settings().await, self.artifacts.as_ref(), name)
             .await
             .map_err(SessionError)
+    }
+
+    /// What an address below `/artifacts/` shows, `path` decoded.
+    pub async fn artifacts_find(&self, path: String) -> FoundArtifact {
+        let Some(artifacts) = self.artifacts.clone() else {
+            return FoundArtifact::Missing;
+        };
+        tokio::task::spawn_blocking(move || artifacts.find(&path))
+            .await
+            .unwrap_or(FoundArtifact::Missing)
     }
 
     /// The bells and the notifications waiting, for the watcher.

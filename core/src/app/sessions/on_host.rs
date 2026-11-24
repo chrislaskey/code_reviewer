@@ -768,7 +768,7 @@ pub async fn get_session_browser_url(settings: &Settings, name: &str) -> Result<
     Ok(localhost_url(port))
 }
 
-/// The URL on this computer of the artifacts of the checkout one of the
+/// The address on the server of the artifacts of the checkout one of the
 /// app's sessions is in, to open in a browser.
 pub async fn get_session_artifacts_url(
     settings: &Settings,
@@ -777,7 +777,7 @@ pub async fn get_session_artifacts_url(
 ) -> Result<String, String> {
     let artifacts = require_artifacts(artifacts)?;
     let folder = find_session_artifacts_folder(settings, name).await?;
-    Ok(artifacts.localhost_url(&folder))
+    Ok(artifacts.folder_path(&folder))
 }
 
 /// Saves an image, sent as base64, in the artifacts of the checkout one of
@@ -802,7 +802,7 @@ pub async fn save_prompt_image_for_session(
 
 fn require_artifacts(artifacts: Option<&ArtifactsServer>) -> Result<&ArtifactsServer, String> {
     artifacts.ok_or_else(|| {
-        "Artifacts are served by bin/dev in the main checkout; it didn't start this app".to_string()
+        "There are no artifacts: the server doesn't run in a git checkout".to_string()
     })
 }
 

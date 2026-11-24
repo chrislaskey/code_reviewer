@@ -110,3 +110,31 @@ async fn sessions_routes_refuse_the_cookie_and_the_terminal_window_refuses_the_t
         .expect("a response");
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
+
+#[tokio::test]
+async fn artifacts_answer_without_a_token_and_sandboxed() {
+    let (router, _) = test_router().await;
+
+    // The index committed in the main checkout of the repository the tests run in.
+    for (path, status) in [
+        ("/artifacts/", StatusCode::OK),
+        ("/artifacts/.gitignore", StatusCode::NOT_FOUND),
+    ] {
+        let request = Request::builder()
+            .uri(path)
+            .body(Body::empty())
+            .expect("a request");
+        let response = router
+            .router
+            .clone()
+            .oneshot(request)
+            .await
+            .expect("a response");
+        assert_eq!(response.status(), status, "{path}");
+        assert_eq!(
+            response.headers()[header::CONTENT_SECURITY_POLICY],
+            "sandbox allow-scripts allow-popups allow-downloads",
+            "{path}"
+        );
+    }
+}

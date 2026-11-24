@@ -17,7 +17,7 @@ AI Agents MUST run these commands to test, lint, and verify code before declarin
 * **Test Suite:** `cargo test --workspace --all-targets`
 * **Security Audit:** `cargo audit`
 
-**Artifacts:** Save screenshots, page previews and other files made for the user to look at in the folder `bin/artifacts` prints: `<main checkout>/artifacts/<project>/<worktree>/`, kept outside the worktree so the app run from the main checkout sees them (see `artifacts/README.md`). Git ignores them, and `bin/dev` in the main checkout serves them at `/artifacts/<project>/<worktree>/<file>` (its port is 1420 unless PORT is set; the user can also reach it from a phone over Tailscale). Give the user the file's URL.
+**Artifacts:** Save screenshots, page previews and other files made for the user to look at in the folder `bin/artifacts` prints: `<main checkout>/artifacts/<project>/<worktree>/`, kept in the main checkout, outside the worktree (see `artifacts/README.md`). Git ignores them, and the web server serves them at `/artifacts/<project>/<worktree>/<file>`, from whichever worktree it runs in: on the Svelte dev server's port too (1420 unless PORT is set, then PORT + 1000), and on the tailnet address `bin/dev` prints, for a phone. Give the user the file's URL.
 
 **Asking Questions:** Do not use the `AskUserQuestion` tool or other interactive terminal prompts. This repo is often worked on through the code reviewer app's chat, whose textarea input can't answer them. Ask questions and discuss options in plain text in your normal response, then wait for the user's reply.
 

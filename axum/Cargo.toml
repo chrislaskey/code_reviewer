@@ -16,6 +16,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 time = "0.3"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
+tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["fs", "trace"] }
 tower_governor = { version = "0.8", default-features = false, features = ["axum"] }
 tracing = "0.1"
@@ -27,4 +28,3 @@ async-trait = "0.1"
 async-stripe-webhook = "=1.0.0-rc.10"
 http-body-util = "0.1"
 tempfile = "3"
-tower = { version = "0.5", features = ["util"] }

@@ -151,6 +151,9 @@ fn app_api() -> Router<AppState> {
             "/api/devices/current/apple-push-token",
             put(sessions::apple_push_token_update),
         )
+        .route("/artifacts", get(sessions::artifacts::index))
+        .route("/artifacts/", get(sessions::artifacts::index))
+        .route("/artifacts/{*path}", get(sessions::artifacts::get))
 }
 
 /// The sync API, `sync`, for the devices: every route requires the
