@@ -52,6 +52,13 @@
   --page-inset-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* The desktop app's window doesn't bounce past the page's ends, as the
+   phone's doesn't, so the header, the bar and the page's top stay put. */
+[data-app="desktop"],
+[data-app="desktop"] body {
+  overscroll-behavior: none;
+}
+
 /* The body paints the background and fills the window: WebKit leaves the
    old colour on the root background below short pages after a theme
    change. */
@@ -150,10 +157,16 @@ body {
 
 /* Small windows keep only the bottom bar fixed: the header is the top of
    the page, at the same place, so the page's padding still clears it, and
-   still reaches under a phone's status bar while at the top. */
+   still reaches under a phone's status bar while at the top. It is the
+   page's own background there, with no line, so the two read as one. */
 @media (width < 40rem) {
   .app-header {
     position: absolute;
+    background: transparent;
+  }
+
+  .app-header::after {
+    display: none;
   }
 }
 
