@@ -57,11 +57,13 @@ this one:
   the browser session; a "remember me" would give it the token's year.
 - **Signing out everywhere**: deleting every token of the user, not
   just the one the request carried, and a page listing the tokens.
-- **Signing out, or removing an account, while offline.** A device
-  cannot sign out without reaching the server to forget its token, and
-  Remove from device signs out first, so a person offline cannot hand
-  the device over. The alternative, dropping the data and leaving the
-  token to expire, is a choice to make deliberately.
+- **Telling the server later, after a sign-out offline.** A device
+  that signs out, or removes an account, while its server cannot be
+  reached forgets the token and leaves it to expire on the server,
+  within its year. The device could keep the token in `device.db`
+  instead, as one to forget, and send the sign-out the next time that
+  server answers, from the sync or at start. It would also cover a
+  server that was removed or moved, by giving up after a while.
 - **Encrypting the account files.** A signed-out account's file stays
   readable on disk until it is removed, the same exposure the active
   account has; SQLCipher would close it for every file.

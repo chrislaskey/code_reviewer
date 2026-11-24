@@ -406,8 +406,9 @@ impl DeviceAccounts {
     }
 
     /// Signs the active account out: the server forgets the token, the
-    /// file keeps its data, and nobody is active. Not for a local user,
-    /// who could never sign back in.
+    /// file keeps its data, and nobody is active. Works offline too,
+    /// see `accounts::sign_out_on_device`. Not for a local user, who
+    /// could never sign back in.
     pub async fn sign_out<T: Transport>(&self, transport: &T) -> Result<(), DeviceAccountsError> {
         let (id, deployment) = self.active_pair().await?;
         if self.get(id).await?.local {
@@ -428,8 +429,9 @@ impl DeviceAccounts {
     }
 
     /// Removes an account from the device: signs it out, through the
-    /// transport to its server, when it is signed in, then deletes its
-    /// folder, the database and the files' bytes, and its row. Answers
+    /// transport to its server, when it is signed in, offline too, then
+    /// deletes its folder, the database and the files' bytes, and its
+    /// row. Answers
     /// the counts instead while a change would be lost, unless
     /// `losing_changes`.
     pub async fn remove<T: Transport>(
@@ -951,6 +953,9 @@ mod tests {
     /// The default server's URL, never asked: the tests sign in through
     /// `InProcess`.
     pub(super) const SERVER_URL: &str = "http://localhost:4000";
+
+    /// Nothing listens on port 1, so a request there is refused at once.
+    const UNREACHABLE_URL: &str = "http://127.0.0.1:1";
 
     async fn default_server_id(device: &DeviceAccounts) -> Uuid {
         device
@@ -1538,6 +1543,74 @@ mod tests {
         assert_eq!(removal, Removal::Removed);
         assert_eq!(active_user_id(&device).await, None);
         assert!(device.list().await.expect("listed").is_empty());
+    }
+
+    #[tokio::test]
+    async fn device_accounts_sign_out_and_remove_with_the_server_unreachable() {
+        let directory = tempfile::tempdir().expect("a directory");
+        let server = server().await;
+        let unreachable = Http::new(UNREACHABLE_URL).expect("a transport");
+        let device = DeviceAccounts::open(directory.path(), SERVER_URL)
+            .await
+            .expect("opened");
+        let alice = device
+            .keep_signed_in(
+                default_server_id(&device).await,
+                signed_up(&server, "alice@example.com").await,
+            )
+            .await
+            .expect("alice kept");
+        posts::create(
+            &device.active().await.expect("alice's"),
+            &alice,
+            "kept through the sign-out",
+            &[],
+        )
+        .await
+        .expect("a post");
+
+        device
+            .sign_out(&unreachable)
+            .await
+            .expect("signed out offline");
+        assert_eq!(active_user_id(&device).await, None);
+        let listed = device.list().await.expect("listed");
+        assert!(!listed[0].signed_in);
+
+        let bob = device
+            .keep_signed_in(
+                default_server_id(&device).await,
+                signed_up(&server, "bob@example.com").await,
+            )
+            .await
+            .expect("bob kept");
+        let bob_id = id_of(&device, bob.id).await;
+        posts::create(
+            &device.active().await.expect("bob's"),
+            &bob,
+            "not pushed",
+            &[],
+        )
+        .await
+        .expect("a post");
+        let removal = device
+            .remove(&unreachable, bob_id, false)
+            .await
+            .expect("asked");
+        assert_eq!(
+            removal,
+            Removal::ChangesWouldBeLost {
+                pending: 1,
+                conflicts: 0
+            }
+        );
+        let removal = device
+            .remove(&unreachable, bob_id, true)
+            .await
+            .expect("removed offline");
+        assert_eq!(removal, Removal::Removed);
+        assert!(!file_exists(&device, bob_id));
+        assert_eq!(device.list().await.expect("listed").len(), 1);
     }
 
     #[tokio::test]
