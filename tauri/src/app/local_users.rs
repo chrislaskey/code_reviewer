@@ -31,8 +31,8 @@ pub async fn local_users_create(
     Ok(device.local_user_create(&device_name()).await?)
 }
 
-/// Moves what the local user made into the account whose sign-in
-/// offered it, and syncs; on a server with a single community, the
+/// Moves what the local user made into the account of the pending
+/// move, and syncs; on a server with a single community, the
 /// local user's communities are merged into the account's.
 #[tauri::command]
 pub async fn local_users_move(
@@ -49,7 +49,7 @@ pub async fn local_users_move(
     Ok(user)
 }
 
-/// Adds the account whose sign-in offered a move beside the local
+/// Adds the account of the pending move beside the local
 /// user, which stays as it was, and syncs.
 #[tauri::command]
 pub async fn local_users_keep_separate(

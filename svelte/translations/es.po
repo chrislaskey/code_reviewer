@@ -183,7 +183,7 @@ msgstr "En"
 msgid "Could not check who is signed in: ${ reason }"
 msgstr "No se pudo comprobar quién inició sesión: ${ reason }"
 
-#: src/lib/router.js:81
+#: src/lib/router.js:84
 #, javascript-format
 msgid "This page could not load: ${ reason }"
 msgstr "Esta página no se pudo cargar: ${ reason }"
@@ -1609,10 +1609,10 @@ msgstr "Quitar de todos modos"
 
 #: src/accounts/components/AccountsMoveDialog.svelte:26
 #, javascript-format
-msgid "Move ${ offered.items } item into ${ offered.email }?"
-msgid_plural "Move ${ offered.items } items into ${ offered.email }?"
-msgstr[0] "¿Mover ${ offered.items } elemento a ${ offered.email }?"
-msgstr[1] "¿Mover ${ offered.items } elementos a ${ offered.email }?"
+msgid "Move ${ pendingMove.items } item into ${ pendingMove.email }?"
+msgid_plural "Move ${ pendingMove.items } items into ${ pendingMove.email }?"
+msgstr[0] "¿Mover ${ pendingMove.items } elemento a ${ pendingMove.email }?"
+msgstr[1] "¿Mover ${ pendingMove.items } elementos a ${ pendingMove.email }?"
 
 #: src/accounts/components/AccountsMoveDialog.svelte:32
 #, javascript-format
@@ -1630,10 +1630,10 @@ msgstr "La cuenta que solo estaba en este dispositivo desaparece después."
 #: src/accounts/components/AccountsMoveDialog.svelte:34
 #, javascript-format
 msgid ""
-"Keeping them separate adds ${ offered.email } beside it, and leaves what you "
-"made where it is, on this device only."
+"Keeping them separate adds ${ pendingMove.email } beside it, and leaves what "
+"you made where it is, on this device only."
 msgstr ""
-"Mantenerlas separadas añade ${ offered.email } junto a ella y deja lo que "
+"Mantenerlas separadas añade ${ pendingMove.email } junto a ella y deja lo que "
 "hiciste donde está, solo en este dispositivo."
 
 #: src/accounts/components/AccountsMoveDialog.svelte:38

@@ -160,10 +160,10 @@ export function accountsSignInPending() {
  * Exchanges the code the browser showed for the session, which becomes
  * the active account: `{outcome: "signed_in", user}`. On a device with a
  * local user, and an account new to it, nothing is done yet and it
- * answers `{outcome: "move_offered", email, items}`: the person chooses
+ * answers `{outcome: "pending_move", email, items}`: the person chooses
  * localUsersMove or localUsersKeepSeparate.
  * @param {string} code
- * @returns {Promise<{outcome: "signed_in", user: object} | {outcome: "move_offered", email: string, items: number}>}
+ * @returns {Promise<{outcome: "signed_in", user: object} | {outcome: "pending_move", email: string, items: number}>}
  */
 export function accountsSignInFinish(code) {
   return invoke("accounts_sign_in_finish", { code });
@@ -362,12 +362,12 @@ export function localUsersCreate() {
   return invoke("local_users_create");
 }
 
-/** Moves what the local user made into the account whose sign-in offered it. */
+/** Moves what the local user made into the account of the pending move. */
 export function localUsersMove() {
   return invoke("local_users_move");
 }
 
-/** Adds the account whose sign-in offered a move beside the local user. */
+/** Adds the account of the pending move beside the local user. */
 export function localUsersKeepSeparate() {
   return invoke("local_users_keep_separate");
 }

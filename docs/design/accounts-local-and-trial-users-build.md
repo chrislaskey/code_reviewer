@@ -225,11 +225,11 @@ column on `accounts_tokens` that holds the address a code was sent to.
   only no local user: it is the way in for someone new. So it is gone
   once anyone is on the device, and after a move; it comes back if
   every account is removed.
-- **A move is offered only into an account that is new to the device.**
+- **The person is asked to move only into an account that is new to the device.**
   An account that already has a folder on the device is signed in
   beside the local user as before; moving into it would mean joining
   two folders. Left for later.
-- **The session of a sign-in whose move is offered is held in memory**
+- **The session of a sign-in whose move is pending is held in memory**
   until the person answers. Quitting the app at that question means
   signing in again.
 - **A push keeps to what waited when it began.** A change made while

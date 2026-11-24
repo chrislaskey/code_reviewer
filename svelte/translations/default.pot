@@ -193,7 +193,7 @@ msgstr ""
 msgid "Could not check who is signed in: ${ reason }"
 msgstr ""
 
-#: src/lib/router.js:81
+#: src/lib/router.js:84
 #, javascript-format
 msgid "This page could not load: ${ reason }"
 msgstr ""
@@ -1564,8 +1564,8 @@ msgstr ""
 
 #: src/accounts/components/AccountsMoveDialog.svelte:26
 #, javascript-format
-msgid "Move ${ offered.items } item into ${ offered.email }?"
-msgid_plural "Move ${ offered.items } items into ${ offered.email }?"
+msgid "Move ${ pendingMove.items } item into ${ pendingMove.email }?"
+msgid_plural "Move ${ pendingMove.items } items into ${ pendingMove.email }?"
 msgstr[0] ""
 msgstr[1] ""
 
@@ -1583,8 +1583,8 @@ msgstr ""
 #: src/accounts/components/AccountsMoveDialog.svelte:34
 #, javascript-format
 msgid ""
-"Keeping them separate adds ${ offered.email } beside it, and leaves what "
-"you made where it is, on this device only."
+"Keeping them separate adds ${ pendingMove.email } beside it, and leaves "
+"what you made where it is, on this device only."
 msgstr ""
 
 #: src/accounts/components/AccountsMoveDialog.svelte:38

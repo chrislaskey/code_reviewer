@@ -91,7 +91,7 @@ pub enum SignInFinished {
     /// person is asked whether what the local user made moves into the
     /// account, `local_user_move`, or stays apart,
     /// `local_user_keep_separate`. Nothing was done yet.
-    MoveOffered {
+    MovePending {
         email: String,
         /// The local user's posts and files.
         items: i64,
@@ -129,7 +129,7 @@ pub enum DeviceAccountsError {
     #[error("An account that is only on this device has nothing to sign out of")]
     LocalUserHasNoSignOut,
     #[error("No sign-in is waiting to be moved into; sign in again")]
-    NoMoveOffered,
+    NoPendingMove,
     #[error("Could not reach {url}: {reason}")]
     ServerUnreachable { url: String, reason: String },
     #[error("could not keep the server's settings: {0}")]
@@ -164,9 +164,9 @@ pub struct DeviceAccounts {
     /// The build's default server, see `server_urls`.
     default_server_url: String,
     active: RwLock<Option<Active>>,
-    /// The sign-in whose move was offered, until the person answers; in
+    /// The sign-in waiting on the person's answer to the move; in
     /// memory only, so quitting the app means signing in again.
-    move_offered: Mutex<Option<MoveOffered>>,
+    pending_move: Mutex<Option<PendingMove>>,
 }
 
 struct Active {
@@ -176,7 +176,7 @@ struct Active {
     transport: Http,
 }
 
-struct MoveOffered {
+struct PendingMove {
     server_id: Uuid,
     session: Session,
 }
@@ -258,7 +258,7 @@ impl DeviceAccounts {
             list,
             default_server_url: default_server_url.to_string(),
             active: RwLock::new(None),
-            move_offered: Mutex::new(None),
+            pending_move: Mutex::new(None),
         };
         accounts.default_server_create().await?;
         accounts.sweep().await?;
@@ -560,8 +560,8 @@ impl DeviceAccounts {
             }
         };
         let email = session.email.clone();
-        *self.move_offered.lock().await = Some(MoveOffered { server_id, session });
-        Ok(SignInFinished::MoveOffered { email, items })
+        *self.pending_move.lock().await = Some(PendingMove { server_id, session });
+        Ok(SignInFinished::MovePending { email, items })
     }
 
     /// The person chose to move: everything the local user made becomes
@@ -577,12 +577,12 @@ impl DeviceAccounts {
             .local_account()
             .await?
             .ok_or(LocalUserError::NotLocal)?;
-        let MoveOffered { server_id, session } = self
-            .move_offered
+        let PendingMove { server_id, session } = self
+            .pending_move
             .lock()
             .await
             .take()
-            .ok_or(DeviceAccountsError::NoMoveOffered)?;
+            .ok_or(DeviceAccountsError::NoPendingMove)?;
         if self.active_id().await != Some(local.id) {
             self.activate(local.id).await?;
         }
@@ -611,9 +611,9 @@ impl DeviceAccounts {
     pub async fn local_user_merge_target_community(
         &self,
     ) -> Result<Option<MergeTargetCommunity>, DeviceAccountsError> {
-        let (server_id, token) = match self.move_offered.lock().await.as_ref() {
-            Some(offered) => (offered.server_id, offered.session.token.clone()),
-            None => return Err(DeviceAccountsError::NoMoveOffered),
+        let (server_id, token) = match self.pending_move.lock().await.as_ref() {
+            Some(pending) => (pending.server_id, pending.session.token.clone()),
+            None => return Err(DeviceAccountsError::NoPendingMove),
         };
         let transport = self.transport_for(&self.server_of(Some(server_id)).await?)?;
         let settings = transport.servers_current_settings_get().await?.settings;
@@ -627,18 +627,18 @@ impl DeviceAccounts {
     /// The person chose to keep them apart: the account is added beside
     /// the local user, which stays as it was.
     pub async fn local_user_keep_separate(&self) -> Result<User, DeviceAccountsError> {
-        let MoveOffered { server_id, session } = self
-            .move_offered
+        let PendingMove { server_id, session } = self
+            .pending_move
             .lock()
             .await
             .take()
-            .ok_or(DeviceAccountsError::NoMoveOffered)?;
+            .ok_or(DeviceAccountsError::NoPendingMove)?;
         self.keep_signed_in(server_id, session).await
     }
 
-    /// Forgets a move that was offered and not answered.
-    pub async fn move_offered_forget(&self) {
-        *self.move_offered.lock().await = None;
+    /// Forgets a pending move the person did not answer.
+    pub async fn pending_move_forget(&self) {
+        *self.pending_move.lock().await = None;
     }
 
     /// Makes the account with the open deployment the active one, with
@@ -1163,18 +1163,18 @@ mod tests {
         .expect("a post");
         assert!(matches!(
             device.local_user_move(None).await,
-            Err(DeviceAccountsError::NoMoveOffered)
+            Err(DeviceAccountsError::NoPendingMove)
         ));
 
         let session = signed_up(&server, "alice@example.com").await;
         let alice_id = session.user.id;
-        let offered = device
+        let finished = device
             .sign_in_finished(default_server_id(&device).await, session)
             .await
             .expect("finished");
         assert_eq!(
-            offered,
-            SignInFinished::MoveOffered {
+            finished,
+            SignInFinished::MovePending {
                 email: "alice@example.com".to_string(),
                 items: 1,
             }
@@ -1246,11 +1246,11 @@ mod tests {
         .expect("a post");
 
         let session = signed_up(&server, "alice@example.com").await;
-        let offered = device
+        let finished = device
             .sign_in_finished(default_server_id(&device).await, session)
             .await
             .expect("finished");
-        assert!(matches!(offered, SignInFinished::MoveOffered { .. }));
+        assert!(matches!(finished, SignInFinished::MovePending { .. }));
         let alice = device.local_user_keep_separate().await.expect("kept apart");
         assert_eq!(active_user_id(&device).await, Some(alice.id));
         let listed = device.list().await.expect("listed");
@@ -1268,7 +1268,7 @@ mod tests {
             .expect("finished");
         assert!(
             matches!(finished, SignInFinished::SignedIn { .. }),
-            "an account already on the device is not offered a move"
+            "an account already on the device is not asked to move"
         );
 
         let back = device
