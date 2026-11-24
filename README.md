@@ -207,6 +207,9 @@ each account made on the server with `cargo run -p app_web -- accounts
 users create <email>`, which asks for its password, given a new one
 with `accounts users password <email>` and deleted with `accounts users
 delete <email>`; see `docs/design/accounts-sign-in.md`.
+`bin/dev` reads `SERVER_SETTINGS` from `.env` when the environment has
+none (`.env.example`). A server that sells nothing adds
+`"accounts_purchasing": false`, see `docs/design/multi-server.md`.
 
 What was left out, changing the email and the rest of the Phoenix flow, is
 `docs/suggestions/accounts.md`.

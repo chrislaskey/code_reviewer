@@ -53,6 +53,12 @@ Ports:
                session's tmux environment, so each worktree's apps run on
                ports of their own.
 
+Server settings:
+  SERVER_SETTINGS  The web server's settings, a JSON document, from the
+                   environment or else from .env (copy .env.example), so an
+                   app's dev server runs as it does in production. See
+                   core/src/servers/settings.rs.
+
 Other servers:
   MULTI_SERVER   none, listed_only or any: the app's multiServer setting
                  for the session, in place of tauri.conf.json's, so the
@@ -68,6 +74,16 @@ USAGE
 fail() {
   echo "$0: $*" >&2
   exit 1
+}
+
+# A variable from the environment, else its last line in .env.
+read_setting() {
+  local name="$1"
+  if [ -n "${!name:-}" ]; then
+    echo "${!name}"
+  elif [ -f "$ROOT/.env" ]; then
+    sed -n "s/^$name=//p" "$ROOT/.env" | tail -n 1
+  fi
 }
 
 DEFAULT_WEB_PORT=4000
@@ -271,7 +287,7 @@ for target in "${targets[@]}"; do
   case "$target" in
     web)
       echo "bin/dev: the web server on http://localhost:$web_port"
-      (cd "$ROOT" && exec env ${storage_env[@]+"${storage_env[@]}"} PORT="$web_port" TRIAL_USERS_MAX="${TRIAL_USERS_MAX:-100}" cargo run -p app_web) &
+      (cd "$ROOT" && exec env ${storage_env[@]+"${storage_env[@]}"} PORT="$web_port" TRIAL_USERS_MAX="${TRIAL_USERS_MAX:-100}" SERVER_SETTINGS="$(read_setting SERVER_SETTINGS)" cargo run -p app_web) &
       pids+=($!)
       ;;
     desktop)

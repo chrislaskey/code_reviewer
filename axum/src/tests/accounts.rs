@@ -503,6 +503,7 @@ async fn accounts_sign_in_codes_are_refused_and_a_password_signs_in_when_the_set
         features: app_core::app::features::Features {
             accounts_sign_up: false,
             accounts_sign_in_code: false,
+            ..app_core::app::features::Features::default()
         },
     };
     let (router, _) = test_router_with(TrialUsersMax(2), false, password_only).await;
@@ -1053,6 +1054,43 @@ async fn stripe_webhooks_create_is_not_found_without_a_secret() {
     let signature = stripe_signature(&body, STRIPE_SIGNING_SECRET);
     let (status, _) = stripe_webhook_send(&without_stripe, &body, Some(&signature)).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn accounts_purchasing_routes_are_refused_when_the_settings_turn_purchasing_off() {
+    let selling_nothing = ServerSettings {
+        features: app_core::app::features::Features {
+            accounts_purchasing: false,
+            ..app_core::app::features::Features::default()
+        },
+    };
+    let (router, _) = test_router_with(TrialUsersMax(2), false, selling_nothing).await;
+    let refused = json!({ "error": "This server sells nothing" });
+    for path in [
+        "/api/accounts/products",
+        "/api/accounts/purchases",
+        "/api/accounts/subscriptions",
+    ] {
+        let (status, body) = get(&router, path).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{path}");
+        assert_eq!(body, refused, "{path}");
+    }
+    let (status, body) = send_as(
+        &router.router,
+        None,
+        Method::POST,
+        "/api/accounts/webhooks/stripe",
+        Some(json!({})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(body, refused);
+    let (status, _) = get(&router, "/api/accounts/current/preferences").await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "the rest of the account all the same"
+    );
 }
 
 #[tokio::test]

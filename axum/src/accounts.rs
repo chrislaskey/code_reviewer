@@ -19,7 +19,9 @@
 //! `features.accounts_sign_up`, makes no account for a new email,
 //! `sign_up_offered`; one that turns codes off,
 //! `features.accounts_sign_in_code`, signs in by password alone,
-//! `sign_in_code_offered`. The accounts app's other routes are its
+//! `sign_in_code_offered`; one that turns purchasing off,
+//! `features.accounts_purchasing`, answers none of the routes that buy,
+//! `purchasing_offered`. The accounts app's other routes are its
 //! submodules, each at the path of the core module it calls.
 
 pub mod app_store_notifications;
@@ -37,8 +39,9 @@ pub mod trial_users;
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::State;
+use axum::extract::{Request, State};
 use axum::http::{HeaderMap, StatusCode};
+use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum_extra::extract::CookieJar;
 use axum_extra::extract::cookie::Cookie;
@@ -118,6 +121,20 @@ pub(crate) fn sign_in_code_offered(document: &SettingsDocument) -> Result<(), Ap
             StatusCode::FORBIDDEN,
             "This server signs in with a password only",
         ))
+    }
+}
+
+/// Whether the server sells plans and products; a 403 to every
+/// purchasing route, webhooks included, when its settings say not.
+pub(crate) async fn purchasing_offered(
+    State(document): State<Arc<SettingsDocument>>,
+    request: Request,
+    next: Next,
+) -> Response {
+    if document.settings.features.accounts_purchasing {
+        next.run(request).await
+    } else {
+        ApiError::new(StatusCode::FORBIDDEN, "This server sells nothing").into_response()
     }
 }
 
