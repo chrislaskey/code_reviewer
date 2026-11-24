@@ -144,6 +144,12 @@ pointer to a file, no more.
   Then the sign-in page, with the account menu available.
 - **Remove from device**: sign out if signed in, delete the row, then
   the file.
+- **Both work offline.** When the server cannot be reached, or answers
+  an error, the device signs out all the same and logs that the server
+  was not told. The token stays valid on the server until it expires,
+  but the device held its only copy. A person can always sign out of,
+  or remove, an account on their own device, even one whose server is
+  gone. Telling the server later is in `../suggestions/accounts.md`.
 - **The server answers 401.** See "A token the server no longer knows".
 
 ### A token the server no longer knows

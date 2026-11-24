@@ -496,7 +496,9 @@ pub async fn keep_signed_in(
 /// Tells the server to forget the device's token and clears the setting,
 /// so nobody is signed in. The data stays, pending and conflicted
 /// changes included, for the next sign-in to resume from; a token the
-/// server no longer knows is already forgotten.
+/// server no longer knows is already forgotten. A server that cannot be
+/// told, offline say, keeps the token until it expires, and the device
+/// signs out all the same: it holds the only copy.
 pub async fn sign_out_on_device<T: Transport>(
     deployment: &Deployment,
     transport: &T,
@@ -504,10 +506,13 @@ pub async fn sign_out_on_device<T: Transport>(
     if deployment.role != Role::Device {
         return Err(AccountError::DeviceOnly);
     }
-    let (_user, token) = crate::app::users::signed_in_with_token(deployment).await?;
+    let (user, token) = crate::app::users::signed_in_with_token(deployment).await?;
     match transport.sign_out(&token).await {
         Ok(()) | Err(SyncError::Unauthorized) | Err(SyncError::AccountDeleted) => {}
-        Err(error) => return Err(error.into()),
+        Err(error) => tracing::warn!(
+            "signed {} out on the device only; the server was not told: {error:?}",
+            user.id
+        ),
     }
     forget_signed_in(deployment).await
 }
