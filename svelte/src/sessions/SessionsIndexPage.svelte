@@ -124,7 +124,7 @@
   <section>
     <div class="section-header">
       <div class="section-title">
-        <h2>Current sessions</h2>
+        <h2 class="section-heading">Current sessions</h2>
         <InfoPopover title="Which sessions are listed, and what the actions do">
           Only tmux sessions named {prefix}-… are listed, and the worktrees named {prefix}-… of the repositories in
           {watchedDirectories} that have no session, as after a restart. A session opens its page, with the agent's chat
@@ -160,7 +160,7 @@
     </div>
     <div class="session-list">
       {#if empty}
-        <div class="panel empty muted">No sessions or worktrees. New session starts one, named {prefix}-…</div>
+        <div class="raised-panel empty muted">No sessions or worktrees. New session starts one, named {prefix}-…</div>
       {/if}
       {#each sessionList?.sessions ?? [] as session (session.name)}
         <SessionSummary {session} />

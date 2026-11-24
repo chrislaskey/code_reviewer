@@ -193,25 +193,25 @@
 
   <section>
     {#if name === null}
-      <div class="panel empty muted">The address names no session.</div>
+      <div class="raised-panel empty muted">The address names no session.</div>
     {:else if session}
-      <div class="panel" class:working>
+      <div class="raised-panel" class:working>
         <SessionStatusBar {session} {mainBranch} {actions} />
       </div>
       {#if sessionError}
         <p class="hint muted">{sessionError}. Showing it as it was last seen.</p>
       {/if}
     {:else if sessionError}
-      <div class="panel empty muted">{sessionError}</div>
+      <div class="raised-panel empty muted">{sessionError}</div>
     {:else}
-      <div class="panel empty muted">Loading…</div>
+      <div class="raised-panel empty muted">Loading…</div>
     {/if}
   </section>
 
   <section class="mt-8">
     <div class="section-header">
       <div class="section-title">
-        <h2>Chat</h2>
+        <h2 class="section-heading">Chat</h2>
         {#if chat}
           <span class="chat-count muted">
             {chatFilter === "all" ? "" : `${shownMessages.length} of `}{chat.messages.length} messages
@@ -269,13 +269,13 @@
         {/each}
       </div>
     {:else if chatError}
-      <div class="panel empty muted">{chatError}</div>
+      <div class="raised-panel empty muted">{chatError}</div>
     {:else if !session && sessionError}
-      <div class="panel empty muted">No chat history without a running session.</div>
+      <div class="raised-panel empty muted">No chat history without a running session.</div>
     {:else if session && !session.agent}
-      <div class="panel empty muted">No agent is running in the session.</div>
+      <div class="raised-panel empty muted">No agent is running in the session.</div>
     {:else}
-      <div class="panel empty muted">Loading…</div>
+      <div class="raised-panel empty muted">Loading…</div>
     {/if}
   </section>
 

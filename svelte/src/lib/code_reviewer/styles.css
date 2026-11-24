@@ -1,5 +1,6 @@
 /* Code Reviewer's own styles beside the template's (../../styles.css):
-   the full-page layout's insets and the choice menu's lines. */
+   the full-page layout's insets, its raised boxes, section headings and
+   log, and the choice menu's lines. */
 
 :root {
   /* The inset of a full page's content and bars, and the room above its title. */
@@ -16,4 +17,54 @@
   color: var(--muted);
   font-size: 0.875rem;
   line-height: 1.3;
+}
+
+/* A raised box on the page; what's in it sets its own padding. */
+.raised-panel {
+  background: var(--card);
+  border-radius: 10px;
+  box-shadow: var(--raised-shadow);
+}
+
+/* A section's heading, such as "Chat": small, muted capitals. */
+.section-heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+/* LogList: what the page's actions did, newest first. */
+#log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875rem;
+  background: var(--card);
+  border-radius: 10px;
+  box-shadow: var(--raised-shadow);
+  max-height: 260px;
+  overflow: auto;
+}
+
+#log li {
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  white-space: pre-wrap;
+}
+
+#log li:last-child {
+  border-bottom: none;
+}
+
+#log .log-placeholder {
+  color: var(--muted);
+}
+
+#log pre {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
 }

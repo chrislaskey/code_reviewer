@@ -46,7 +46,7 @@
     {/snippet}
   </Header>
 
-  <form onsubmit={submit} class="panel space-y-5 p-6">
+  <form onsubmit={submit} class="raised-panel space-y-5 p-6">
     <ComparisonFields bind:form onRefsError={(message) => (refsError = message)} />
 
     <div class="flex flex-wrap items-center gap-3">

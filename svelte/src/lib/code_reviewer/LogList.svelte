@@ -3,7 +3,7 @@
 </script>
 
 <section>
-  <h2>Recent logs</h2>
+  <h2 class="section-heading">Recent logs</h2>
   <ul id="log">
     {#each logEntries as entry (entry.id)}
       <li>

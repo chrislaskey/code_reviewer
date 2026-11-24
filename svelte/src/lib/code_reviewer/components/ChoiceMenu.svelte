@@ -62,7 +62,7 @@
     <Icon name="hero-chevron-down-micro" class="size-4" />
   </summary>
   <ul
-    class="dropdown-content menu choice-menu panel w-[24rem] max-sm:fixed! max-sm:inset-x-(--page-gutter) max-sm:top-(--menu-top) max-sm:w-auto"
+    class="dropdown-content menu choice-menu raised-panel w-[24rem] max-sm:fixed! max-sm:inset-x-(--page-gutter) max-sm:top-(--menu-top) max-sm:w-auto"
     style:--menu-top="{menuTop}px"
   >
     {@render children({ close })}

@@ -106,7 +106,7 @@
   }
 </script>
 
-<form class="prompt-form panel" onsubmit={send}>
+<form class="prompt-form raised-panel" onsubmit={send}>
   <textarea
     class="textarea prompt-input w-full"
     rows="3"

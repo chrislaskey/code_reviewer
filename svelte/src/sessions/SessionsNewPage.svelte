@@ -64,7 +64,7 @@
     {/snippet}
   </Header>
 
-  <form class="panel new-session" onsubmit={submit}>
+  <form class="raised-panel new-session" onsubmit={submit}>
     <div class="field">
       <span class="field-label">
         <label for="new-session-name">Name</label>

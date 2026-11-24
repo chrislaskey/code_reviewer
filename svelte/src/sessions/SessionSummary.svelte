@@ -13,7 +13,7 @@
   let working = $derived(session.agent?.status === "busy");
 </script>
 
-<a class="panel session-link" class:working href={sessionsShowUrl(session.name)}>
+<a class="raised-panel session-link" class:working href={sessionsShowUrl(session.name)}>
   <div class="session-header">
     <span class="session-title">
       <span class="name">{session.name}</span>

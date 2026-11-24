@@ -26,11 +26,6 @@
 
 .section-title h2 {
   margin: 0;
-  font-size: 0.9rem;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
 }
 
 .session-list {
@@ -135,7 +130,7 @@ a.session-link {
 /* The glow is a box-shadow: WebKit leaves blurred layers behind as boxes.
    z-index 1 keeps the cards below from covering it; ::before draws the
    card and its rainbow edge. */
-.panel.working {
+.raised-panel.working {
   position: relative;
   z-index: 1;
   border-color: transparent;
@@ -143,7 +138,7 @@ a.session-link {
   animation: working-glow 8s linear infinite;
 }
 
-.panel.working::before {
+.raised-panel.working::before {
   content: "";
   position: absolute;
   inset: -1px;
@@ -203,12 +198,12 @@ a.session-link {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .panel.working,
-  .panel.working::before {
+  .raised-panel.working,
+  .raised-panel.working::before {
     animation: none;
   }
 
-  .panel.working {
+  .raised-panel.working {
     box-shadow:
       -6px 0 16px -4px rgb(255 43 214 / 0.4),
       6px 0 16px -4px rgb(61 139 255 / 0.4);

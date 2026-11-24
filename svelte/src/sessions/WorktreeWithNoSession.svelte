@@ -9,7 +9,7 @@
   let repositoryName = $derived(worktree.repository.split("/").filter(Boolean).pop());
 </script>
 
-<div class="panel">
+<div class="raised-panel">
   <div class="session-header">
     <span class="session-title">
       <span class="name no-session">{worktree.name}</span>
