@@ -1,4 +1,4 @@
-<!-- The Starter Pack's page header: a title on its own line, then an
+<!-- The page header: a title on its own line, then an
      optional subtitle with the optional actions on its right, top aligned. -->
 <script>
   /**
