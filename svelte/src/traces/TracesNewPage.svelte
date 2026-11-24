@@ -17,6 +17,7 @@
   } from "../lib/code_reviewer/comparison_form.js";
   import { navigateToUrl } from "../lib/router.js";
   import { traceRequestFromSearch, tracesShowUrl } from "../lib/routes.js";
+  import TopBackgroundPattern from "../lib/code_reviewer/components/TopBackgroundPattern.svelte";
 
   const STORAGE_KEY = "code_reviewer.trace_form.v1";
 
@@ -35,8 +36,7 @@
   }
 </script>
 
-
-
+<TopBackgroundPattern />
 
 <Page wide>
   <Header>

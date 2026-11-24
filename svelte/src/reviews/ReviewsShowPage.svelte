@@ -28,6 +28,7 @@
   import { createOpenAllCommand } from "./ledger/open_all.svelte.js";
   import ReviewNodeView from "./nodes/ReviewNodeView.svelte";
   import { ALL_CHANGES_ID, findFileById, toViewFiles, toViewGroupRows } from "./view_model.js";
+  import TopBackgroundPattern from "../lib/code_reviewer/components/TopBackgroundPattern.svelte";
 
   const VIEW_OPTIONS = [
     { value: "nodes", label: "Files" },
@@ -119,7 +120,7 @@
   });
 </script>
 
-
+<TopBackgroundPattern />
 
 <div class="full-page max-sm:h-auto">
   <div class="full-page-title">

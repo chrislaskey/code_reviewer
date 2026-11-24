@@ -19,6 +19,7 @@
   import { STOP_LABELS, SYSTEM_CALL_CHOICES, UNCHANGED_CHOICES, frameCounts, testLabel } from "./call_stack.js";
   import CallStackView from "./CallStackView.svelte";
   import TestPicker from "./TestPicker.svelte";
+  import TopBackgroundPattern from "../lib/code_reviewer/components/TopBackgroundPattern.svelte";
 
   const PHONE_TAB_OPTIONS = [
     { value: "tests", label: "Tests" },
@@ -114,7 +115,7 @@
   </ChoiceMenu>
 {/snippet}
 
-
+<TopBackgroundPattern />
 
 <div class="full-page max-sm:h-auto">
   <div class="full-page-title">

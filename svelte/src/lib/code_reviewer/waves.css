@@ -1,0 +1,91 @@
+/* The waves at the bottom of Code Reviewer's pages (StillWaves) and the
+   room below the content for them; the top pattern (TopBackgroundPattern)
+   uses the theme's colours as they are. */
+
+/* The body is a stacking context, so the waves and the pattern, at z-index
+   -1, show above its background and below the page. */
+body {
+  isolation: isolate;
+}
+
+/* Room below the content for the waves. */
+.with-waves {
+  padding-bottom: 240px;
+}
+
+/* The waves at the bottom of the landing pages, back to front: three shades
+   of the theme's secondary, which overlap cleanly where mixed hues turn
+   muddy and don't repeat the primary the page already uses. The most vivid
+   is at the back and strongest, the dimmest in front and faintest. */
+:root {
+  --wave-color-1: var(--wave-hue);
+  --wave-color-2: color-mix(in oklab, var(--wave-hue) 70%, var(--color-base-content));
+  --wave-color-3: color-mix(in oklab, var(--wave-hue) 60%, var(--color-base-100));
+  --wave-hue: var(--color-secondary);
+  --wave-opacity-1: 0.32;
+  --wave-opacity-2: 0.24;
+  --wave-opacity-3: 0.14;
+}
+
+/* Themes whose secondary is muted, so their waves came out grey. */
+[data-theme="business"],
+[data-theme="coffee"],
+[data-theme="corporate"],
+[data-theme="luxury"] {
+  --wave-hue: var(--color-accent);
+}
+
+[data-theme="lemonade"] {
+  --wave-hue: oklch(84% 0.18 180);
+}
+
+[data-theme="bumblebee"] {
+  --wave-hue: oklch(84% 0.18 210);
+}
+
+[data-theme="abyss"] {
+  --wave-hue: oklch(84% 0.18 160);
+}
+
+[data-theme="luxury"] {
+  --wave-hue: oklch(84% 0.15 70);
+}
+
+[data-theme="sunset"] {
+  --wave-hue: oklch(64% 0.18 320);
+}
+
+[data-theme="acid"] {
+  --wave-hue: var(--color-primary);
+}
+
+[data-theme="aqua"] {
+  --wave-hue: oklch(84% 0.18 270);
+}
+
+[data-theme="autumn"] {
+  --wave-hue: var(--color-primary);
+}
+
+[data-theme="black"] {
+  --wave-hue: oklch(84% 0.05 270);
+}
+
+[data-theme="dim"] {
+  --wave-hue: oklch(84% 0.18 335);
+}
+
+[data-theme="garden"] {
+  --wave-hue: oklch(70% 0.20 138);
+}
+
+/* Light and dark keep the Starter Pack's pink, violet and blue. */
+[data-theme="light"],
+[data-theme="dark"] {
+  --wave-color-1: #e935c1;
+  --wave-color-2: #8b5cf6;
+  --wave-color-3: #3b82f6;
+  --wave-opacity-1: 0.22;
+  --wave-opacity-2: 0.22;
+  --wave-opacity-3: 0.22;
+}

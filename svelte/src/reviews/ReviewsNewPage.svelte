@@ -11,6 +11,8 @@
   import { navigateToUrl } from "../lib/router.js";
   import { reviewRequestFromSearch, reviewsShowUrl } from "../lib/routes.js";
   import { buildRequest, formFromRequest, loadForm, saveForm } from "./review_form.js";
+  import StillWaves from "../lib/code_reviewer/components/StillWaves.svelte";
+  import TopBackgroundPattern from "../lib/code_reviewer/components/TopBackgroundPattern.svelte";
 
   const linkedRequest = reviewRequestFromSearch(window.location.search);
 
@@ -31,10 +33,11 @@
   }
 </script>
 
+<StillWaves rippleOnLoad />
 
+<TopBackgroundPattern />
 
-
-<Page wide>
+<Page wide class="with-waves">
   <Header>
     New review
     {#snippet subtitle()}

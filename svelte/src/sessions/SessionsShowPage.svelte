@@ -33,8 +33,11 @@
   import { readFileAsBase64 } from "./prompt_images.js";
   import { createSessionActions } from "./session_actions.js";
   import SessionStatusBar from "./SessionStatusBar.svelte";
+  import StillWaves from "../lib/code_reviewer/components/StillWaves.svelte";
+  import TopBackgroundPattern from "../lib/code_reviewer/components/TopBackgroundPattern.svelte";
 
   const REFRESH_INTERVAL_MS = 5000;
+  const REFRESH_RIPPLE_STRENGTH = 20;
   // Toggles for the prompt box's layout, each on or off by itself.
   const CHAT_LAYOUT_TOGGLES = [
     { value: "pinned", icon: "lucide-pin", title: "Pin the prompt in view while the chat scrolls" },
@@ -63,6 +66,7 @@
     !session ? "No running session to write to" : !session.agent?.tmux_pane_id ? "No agent running in the session" : "",
   );
 
+  let waves;
   let refreshing = false;
   let lastRefreshError;
 
@@ -89,7 +93,9 @@
     return !refreshError;
   }
 
-  async function refreshFromButton() {
+  async function refreshFromButton(event) {
+    const box = event.currentTarget.getBoundingClientRect();
+    waves.ripple(REFRESH_RIPPLE_STRENGTH, box.left + box.width / 2);
     if (await refresh()) log(`${name}: Refreshed`);
   }
 
@@ -174,10 +180,11 @@
   </div>
 {/snippet}
 
+<StillWaves bind:this={waves} rippleOnLoad />
 
+<TopBackgroundPattern />
 
-
-<Page wide>
+<Page wide class="with-waves">
   <Header>
     <a href={sessionsIndexUrl()} class="title-link">
       <Icon name="hero-chevron-left" class="size-5" />

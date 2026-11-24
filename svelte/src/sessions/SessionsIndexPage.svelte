@@ -21,13 +21,17 @@
   import { listSessionChanges } from "./session_changes.js";
   import SessionSummary from "./SessionSummary.svelte";
   import WorktreeWithNoSession from "./WorktreeWithNoSession.svelte";
+  import StillWaves from "../lib/code_reviewer/components/StillWaves.svelte";
+  import TopBackgroundPattern from "../lib/code_reviewer/components/TopBackgroundPattern.svelte";
 
   const REFRESH_INTERVAL_MS = 2000;
 
+  const RIPPLE_STRENGTHS = { added: 40, removed: 25, statusChanged: 30, refreshed: 20, action: 25 };
 
   let detected = $state();
   let detectError = $state();
   let sessionList = $state();
+  let waves;
 
   let prefix = $derived(detected?.settings.session_name_prefix ?? "");
   let watchedDirectories = $derived(detected?.settings.watched_directories.join(", ") ?? "");
@@ -71,14 +75,33 @@
 
   function showSessionChanges(changes) {
     for (const { name, from, to } of changes.statusChanged) log(`${name}: agent ${from} → ${to}`);
+    for (const [change, entries] of Object.entries(changes)) {
+      for (let i = 0; i < entries.length; i++) waves.ripple(RIPPLE_STRENGTHS[change]);
+    }
   }
 
-  async function refreshFromButton() {
+  function rippleUnder(element, strength) {
+    const box = element.getBoundingClientRect();
+    waves.ripple(strength, box.left + box.width / 2);
+  }
+
+  async function refreshFromButton(event) {
+    rippleUnder(event.currentTarget, RIPPLE_STRENGTHS.refreshed);
     if (await refresh()) {
       const sessions = countOf(sessionList.sessions.length, "session");
       const worktrees = countOf(sessionList.worktrees.length, "worktree");
       log(`Refreshed: ${sessions} and ${worktrees} with no session`);
     }
+  }
+
+  // Only choices: a menu's own summary isn't a button or link.
+  function rippleOnActions(element) {
+    const rippleOnAction = (event) => {
+      const action = event.target.closest("button, a");
+      if (action) rippleUnder(action, RIPPLE_STRENGTHS.action);
+    };
+    element.addEventListener("click", rippleOnAction);
+    return () => element.removeEventListener("click", rippleOnAction);
   }
 
   // Opens the new session's page once it's running.
@@ -106,10 +129,11 @@
 
 <svelte:window onfocus={refresh} />
 
+<StillWaves bind:this={waves} rippleOnLoad />
 
+<TopBackgroundPattern />
 
-
-<Page wide>
+<Page wide class="with-waves">
   <Header>
     Sessions
     {#snippet subtitle()}
@@ -158,7 +182,7 @@
         Refresh
       </Button>
     </div>
-    <div class="session-list">
+    <div class="session-list" {@attach rippleOnActions}>
       {#if empty}
         <div class="raised-panel empty muted">No sessions or worktrees. New session starts one, named {prefix}-…</div>
       {/if}

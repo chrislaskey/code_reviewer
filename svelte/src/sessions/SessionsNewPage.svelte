@@ -12,6 +12,8 @@
   import InfoPopover from "../lib/code_reviewer/components/InfoPopover.svelte";
   import { sessionsCreate, sessionsDefaultPortGet, sessionsSettingsGet } from "../lib/core/index.js";
   import { log } from "../lib/code_reviewer/log.svelte.js";
+  import StillWaves from "../lib/code_reviewer/components/StillWaves.svelte";
+  import TopBackgroundPattern from "../lib/code_reviewer/components/TopBackgroundPattern.svelte";
 
   let newSession = $state({ name: "", repository: "", baseBranch: "", command: "claude", port: "" });
   let creating = $state(false);
@@ -52,10 +54,11 @@
   });
 </script>
 
+<StillWaves rippleOnLoad />
 
+<TopBackgroundPattern />
 
-
-<Page wide>
+<Page wide class="with-waves">
   <Header>
     New session
     {#snippet subtitle()}
