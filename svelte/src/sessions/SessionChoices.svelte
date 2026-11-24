@@ -11,6 +11,7 @@
   import { sessionsShowUrl } from "../lib/routes.js";
   import AgentBadge from "./AgentBadge.svelte";
   import Badge from "./Badge.svelte";
+  import NotificationsEnabledIcon from "./NotificationsEnabledIcon.svelte";
 
   const REFRESH_INTERVAL_MS = 2000;
 
@@ -45,6 +46,7 @@
           {session.name}
           {#if session.repository_name}<span class="session-choice-repository">{session.repository_name}</span>{/if}
         </span>
+        {#if session.notifications_enabled}<NotificationsEnabledIcon />{/if}
         {#if session.agent}
           <AgentBadge session={session.agent} />
         {:else}

@@ -166,3 +166,46 @@ pub async fn artifacts_url_get(
     let path = session_path(name, "/artifacts-url");
     ask(deployment, server, Method::GET, &path, None).await
 }
+
+/// Whether this device's bell is on for a session.
+pub async fn bell_get(
+    deployment: &Deployment,
+    server: &Http,
+    name: &str,
+) -> Result<Value, OnlineError> {
+    let path = session_path(name, "/bell");
+    ask(deployment, server, Method::GET, &path, None).await
+}
+
+/// Turns this device's bell for a session on or off.
+pub async fn bell_update(
+    deployment: &Deployment,
+    server: &Http,
+    name: &str,
+    enabled: bool,
+) -> Result<Value, OnlineError> {
+    let path = session_path(name, "/bell");
+    let body = serde_json::json!({ "enabled": enabled });
+    ask(deployment, server, Method::PUT, &path, Some(&body)).await
+}
+
+/// The notifications waiting for this device, else the next ones within
+/// 25 seconds, else none.
+pub async fn notifications_waiting_list(
+    deployment: &Deployment,
+    server: &Http,
+) -> Result<Value, OnlineError> {
+    let path = "/api/notifications/waiting";
+    ask(deployment, server, Method::GET, path, None).await
+}
+
+/// Keeps this phone's Apple push token on the server.
+pub async fn apple_push_token_update(
+    deployment: &Deployment,
+    server: &Http,
+    token: &str,
+) -> Result<Value, OnlineError> {
+    let path = "/api/devices/current/apple-push-token";
+    let body = serde_json::json!({ "token": token });
+    ask(deployment, server, Method::PUT, path, Some(&body)).await
+}

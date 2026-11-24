@@ -40,6 +40,8 @@ pub fn run() {
     let builder = builder
         .plugin(tauri_plugin_storekit::init())
         .plugin(tauri_plugin_web_auth_session::init());
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_notification::init());
     builder
         .plugin(tauri_plugin_opener::init())
         .register_asynchronous_uri_scheme_protocol("files", |context, request, responder| {
@@ -57,6 +59,8 @@ pub fn run() {
             sync::setup(app)?;
             accounts::store_transactions::spawn_send_unfinished(app.handle().clone());
             quick_picker::register(app.handle())?;
+            #[cfg(desktop)]
+            app::session_notifications::spawn(app.handle().clone());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -165,7 +169,9 @@ pub fn run() {
             app::sessions::sessions_merges_create,
             app::sessions::sessions_terminal_windows_create,
             app::sessions::sessions_browser_open,
-            app::sessions::sessions_artifacts_open
+            app::sessions::sessions_artifacts_open,
+            app::sessions::sessions_bell_get,
+            app::sessions::sessions_bell_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

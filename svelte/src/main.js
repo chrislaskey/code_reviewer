@@ -4,6 +4,12 @@ import { isTauri } from "@tauri-apps/api/core";
 // Registers the pages with the router before it mounts.
 import "./lib/router.js";
 import { translationsStart } from "./lib/translations.js";
+import { onSessionNotificationClicked } from "./lib/core/index.js";
+import { navigateToUrl } from "./lib/router.js";
+import { sessionsShowUrl } from "./lib/routes.js";
+
+// A clicked session notification opens the session's page.
+onSessionNotificationClicked((name) => navigateToUrl(sessionsShowUrl(name)));
 
 // Where the pages run, for the styles that keep clear of the window chrome
 // (styles.css): "desktop" under the Tauri window's title bar, "mobile"

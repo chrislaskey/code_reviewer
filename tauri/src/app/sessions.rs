@@ -191,3 +191,28 @@ pub async fn sessions_artifacts_open(
         .map_err(|error| format!("could not open the browser: {error}"))?;
     Ok(())
 }
+
+#[tauri::command]
+pub async fn sessions_bell_get(
+    app: AppHandle,
+    device: State<'_, DeviceAccounts>,
+    name: String,
+) -> Result<Value, CommandError> {
+    let (deployment, transport) = device.active_with_transport().await?;
+    online::bell_get(&deployment, &transport, &name)
+        .await
+        .map_err(|error| sync::online_error(&app, error))
+}
+
+#[tauri::command]
+pub async fn sessions_bell_update(
+    app: AppHandle,
+    device: State<'_, DeviceAccounts>,
+    name: String,
+    enabled: bool,
+) -> Result<Value, CommandError> {
+    let (deployment, transport) = device.active_with_transport().await?;
+    online::bell_update(&deployment, &transport, &name, enabled)
+        .await
+        .map_err(|error| sync::online_error(&app, error))
+}

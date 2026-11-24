@@ -36,6 +36,9 @@ whoami = "2"
 # desktops only, see src/accounts_loopback.rs
 [target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
 tauri-plugin-oauth = "2"
+# The desktop shows its session notifications itself, see
+# src/app/session_notifications.rs; a phone gets them pushed by Apple
+tauri-plugin-notification = "2"
 
 # The clipboard's image types, see src/clipboard/, and the quick picker,
 # see src/quick_picker/ and src/macos/

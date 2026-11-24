@@ -6,6 +6,7 @@
   import { sessionsShowUrl } from "../lib/routes.js";
   import AgentBadge from "./AgentBadge.svelte";
   import Badge from "./Badge.svelte";
+  import NotificationsEnabledIcon from "./NotificationsEnabledIcon.svelte";
 
   let { session } = $props();
 
@@ -18,6 +19,7 @@
       <span class="name">{session.name}</span>
       {#if session.repository_name}<span class="repository-name">{session.repository_name}</span>{/if}
     </span>
+    {#if session.notifications_enabled}<NotificationsEnabledIcon />{/if}
     {#if session.agent}
       <AgentBadge session={session.agent} />
     {:else}

@@ -3,6 +3,7 @@
      transcript the agent writes, Claude Code's, Cursor's or Codex's. The session is
      named in the path, `/sessions/<name>`. Refreshes like the sessions page. -->
 <script>
+  import NotificationBell from "./NotificationBell.svelte";
   import { Page } from "../lib/components/index.js";
   import { onMount } from "svelte";
   import Button from "../lib/components/Button.svelte";
@@ -184,6 +185,9 @@
     </a>
     {#snippet subtitle()}
       The session's status and actions, and the agent's chat history. Refreshes every 5 seconds.
+    {/snippet}
+    {#snippet actions()}
+      {#if name !== null}<NotificationBell {name} />{/if}
     {/snippet}
   </Header>
 

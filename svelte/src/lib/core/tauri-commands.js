@@ -842,3 +842,26 @@ export function sessionsBrowserOpen(name) {
 export function sessionsArtifactsOpen(name) {
   return invoke("sessions_artifacts_open", { name });
 }
+
+/** @param {string} name */
+export function sessionsBellGet(name) {
+  return invoke("sessions_bell_get", { name });
+}
+
+/**
+ * @param {string} name
+ * @param {boolean} enabled
+ */
+export function sessionsBellUpdate(name, enabled) {
+  return invoke("sessions_bell_update", { name, enabled });
+}
+
+/**
+ * Calls `callback` with the session's name when one of the desktop's
+ * session notifications is clicked (../../../../tauri/src/app/session_notifications.rs).
+ * @param {(name: string) => unknown} callback
+ */
+export function onSessionNotificationClicked(callback) {
+  return listen("session_notification_clicked", (event) => callback(/** @type {string} */ (event.payload)));
+}
+

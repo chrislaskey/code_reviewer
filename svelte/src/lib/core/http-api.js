@@ -874,3 +874,25 @@ export async function sessionsBrowserOpen(name) {
 export async function sessionsArtifactsOpen(name) {
   window.open(await send("GET", sessionPath(name, "/artifacts-url")), "_blank", "noopener");
 }
+
+/** @param {string} name */
+export function sessionsBellGet(name) {
+  return send("GET", sessionPath(name, "/bell"));
+}
+
+/**
+ * @param {string} name
+ * @param {boolean} enabled
+ */
+export function sessionsBellUpdate(name, enabled) {
+  return send("PUT", sessionPath(name, "/bell"), { enabled });
+}
+
+/**
+ * A browser shows no session notifications.
+ * @param {(name: string) => unknown} _callback
+ */
+export function onSessionNotificationClicked(_callback) {
+  return Promise.resolve(() => {});
+}
+
