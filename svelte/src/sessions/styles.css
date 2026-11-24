@@ -510,6 +510,16 @@ a.session-link {
   padding: 1.25rem;
 }
 
+/* Main's field style, for the form's plain inputs. */
+.new-session input {
+  font: inherit;
+  padding: 0.55rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--color-base-100);
+  color: var(--fg);
+}
+
 .new-session .field,
 .settings-fields label {
   display: flex;
