@@ -314,4 +314,69 @@ In Code Reviewer, its own:
    entitlement. Found: `framework_check` fails on the `Package.resolved`
    files an iOS build writes in `tauri/plugins/*/ios/`, though git ignores
    them; the check should skip ignored files (template).
-6. iOS details; the web turned off but for signing in.
+6. iOS details; the web turned off but for signing in. Planned below.
+
+## Step 6: the phone, and the web for signing in alone
+
+Planned 2026-11-24, to start after the verification pass of steps 3 to
+5, which will add to it. Each part a commit; the ones marked "decide"
+need the user's choice first.
+
+### 6a. The phone reaching the server
+
+- **`tailscale serve` in front of `app_web`** (T4, option B), tried on the
+  Mac: `tailscale serve --bg --https=443 http://127.0.0.1:<web port>`.
+  Its certificate, the `Tailscale-User-Login` header the Terminal route
+  refuses, and `TRUST_PROXY_HEADERS` for the rate limits.
+- **The sign-in pages over the tailnet.** The phone signs in through the
+  server's sign-in page in the iOS sheet, at `https://mac.ts.net`, so
+  `app_web` must serve the built pages (`svelte/dist`); `bin/dev` serves
+  them from Vite on another port. Decide: a Code Reviewer script,
+  `bin/tailnet`, that builds the pages and runs `tailscale serve`
+  (recommended), or a step in the README.
+- **Installing:** `bin/reinstall` with `SYNC_SERVER_URL=https://mac.ts.net`,
+  `multiServer "any"` for typing the address once (C4).
+
+### 6b. What the phone opens
+
+- **A session's browser and artifacts links** are `localhost` addresses
+  on the Mac, useless on the phone. On main the app pointed them at the
+  paired computer's tailnet name, and `bin/dev` listened on every
+  address. Decide: point them at the server's host and add a
+  `tailscale serve` path for the dev server's port (keeps today's way),
+  or have the server serve the artifacts itself
+  (`docs/suggestions/artifacts.md`) and leave session browser links to
+  the Mac.
+- **The Terminal window** answers 403 over the tailnet: check the page
+  says so plainly, and hide the action on a phone.
+
+### 6c. The phone's look and feel
+
+- **Compare main's mobile pieces with the template's** and send what is
+  generic to the template: the bottom bar (main: Home, Back, Forward,
+  More with a sheet), the top spacing (main's cr-Mobilevertical), and
+  `webview_background.js`, which paints the webview in the theme's
+  colour behind the status bar and home indicator (the template has
+  none).
+- **The keyboard bar** (T3): confirm it is hidden on the phone.
+- **Code Reviewer's icons and launch screen** in place of Starter
+  Pack's (`tauri/icons`, `gen/apple/Assets.xcassets`).
+- **Notifications:** the APNs key copied to `axum/data/`, a push
+  arriving, and a tap opening its session.
+
+### 6d. The web for signing in alone
+
+The host routes already refuse the browser's cookie, so the web cannot
+run anything; what is left is what a visitor sees.
+
+- **The public pages** (`svelte/src/public/`, Code Reviewer's to edit):
+  Starter Pack's home, about, privacy and terms. Recommended: one short
+  home page naming Code Reviewer and saying it runs in its apps, and the
+  rest removed from the build where that is easy.
+- **The app's pages in a browser**: left as they are, each host page
+  showing its 401 as a sign-in error. Recommended: no gating code (the
+  user's guidance, 2026-11-24); the browser's home page says to use the
+  app.
+- **Template features not used**: communities, posts and files stay out
+  of the nav (step 2); trials are off with sign-ups.
+
