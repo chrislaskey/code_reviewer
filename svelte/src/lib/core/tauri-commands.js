@@ -1,5 +1,5 @@
 // app_core over the Tauri app's commands (../../../../tauri/src/).
-import { convertFileSrc, invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { addPluginListener, convertFileSrc, invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { FormError } from "./form_error.js";
 
@@ -857,11 +857,21 @@ export function sessionsBellUpdate(name, enabled) {
 }
 
 /**
- * Calls `callback` with the session's name when one of the desktop's
- * session notifications is clicked (../../../../tauri/src/app/session_notifications.rs).
+ * Calls `callback` with the session's name when a session notification is
+ * clicked: the desktop's own (../../../../tauri/src/app/session_notifications.rs),
+ * or a push tapped on a phone, which the iOS plugin reports with the push's
+ * `session_name`, also when the tap launched the app.
  * @param {(name: string) => unknown} callback
  */
-export function onSessionNotificationClicked(callback) {
-  return listen("session_notification_clicked", (event) => callback(/** @type {string} */ (event.payload)));
+export async function onSessionNotificationClicked(callback) {
+  const unlisten = await listen("session_notification_clicked", (event) => callback(/** @type {string} */ (event.payload)));
+  if (document.documentElement.dataset.app === "mobile") {
+    await addPluginListener("notifications", "notificationClicked", (click) => {
+      const name = click?.data?.session_name;
+      if (name) callback(name);
+    });
+    await tauriInvoke("plugin:notifications|set_click_listener_active", { active: true });
+  }
+  return unlisten;
 }
 

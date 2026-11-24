@@ -204,6 +204,8 @@ pub async fn sessions_bell_get(
         .map_err(|error| sync::online_error(&app, error))
 }
 
+/// On a phone, turning a bell on first gives the server the push token,
+/// asking the person's permission the first time.
 #[tauri::command]
 pub async fn sessions_bell_update(
     app: AppHandle,
@@ -211,6 +213,10 @@ pub async fn sessions_bell_update(
     name: String,
     enabled: bool,
 ) -> Result<Value, CommandError> {
+    #[cfg(target_os = "ios")]
+    if enabled {
+        crate::app::apple_push_registration::register_for_apple_push(&app).await?;
+    }
     let (deployment, transport) = device.active_with_transport().await?;
     online::bell_update(&deployment, &transport, &name, enabled)
         .await

@@ -60,6 +60,9 @@ tauri-plugin-storekit = { path = "plugins/storekit" }
 # The sign-in sheet, our own plugin, see plugins/web-auth-session and
 # docs/design/accounts-sign-in.md
 tauri-plugin-web-auth-session = { path = "plugins/web-auth-session" }
+# A phone's session notifications come pushed by Apple: its push token, see
+# src/app/apple_push_registration.rs
+tauri-plugin-notifications = { version = "0.4.6", default-features = false, features = ["push-notifications"] }
 
 [dev-dependencies]
 tempfile = "3"

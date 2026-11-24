@@ -39,7 +39,8 @@ pub fn run() {
     #[cfg(target_os = "ios")]
     let builder = builder
         .plugin(tauri_plugin_storekit::init())
-        .plugin(tauri_plugin_web_auth_session::init());
+        .plugin(tauri_plugin_web_auth_session::init())
+        .plugin(tauri_plugin_notifications::init());
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_notification::init());
     builder
@@ -61,6 +62,8 @@ pub fn run() {
             quick_picker::register(app.handle())?;
             #[cfg(desktop)]
             app::session_notifications::spawn(app.handle().clone());
+            #[cfg(target_os = "ios")]
+            app::apple_push_registration::spawn_send_if_allowed(app.handle().clone());
             Ok(())
         })
         .on_window_event(|window, event| {

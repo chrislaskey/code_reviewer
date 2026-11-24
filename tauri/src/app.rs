@@ -2,6 +2,8 @@
 //! module it calls, `app::posts` for `app_core::app::posts`, and named as
 //! the web server's route module for the same resource.
 
+#[cfg(target_os = "ios")]
+pub mod apple_push_registration;
 pub mod avatars;
 pub mod communities;
 pub mod current_community;
