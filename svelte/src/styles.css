@@ -119,6 +119,14 @@ body {
   max-width: 980px;
 }
 
+/* Small windows: the see-through header and the page read as one, with
+   no line to keep clear of, so the page starts closer below it. */
+@media (width < 40rem) {
+  .page {
+    padding-top: 0.5rem;
+  }
+}
+
 /* Against the gutter, as the open tab joins it. */
 .app-layout .page {
   margin: 0;
@@ -184,22 +192,6 @@ body {
 @media (width < 40rem) {
   [data-app="desktop"] .app-header-history {
     display: none;
-  }
-}
-
-/* The app's name in the community menu's place, on a server with a single
-   community: only on small windows, which have no gutter with Home. */
-.app-header-app-name {
-  display: none;
-  padding: 0 0.25rem;
-  color: var(--fg);
-  font-weight: 700;
-  text-decoration: none;
-}
-
-@media (width < 40rem) {
-  .app-header-app-name {
-    display: block;
   }
 }
 

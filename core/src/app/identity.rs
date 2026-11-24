@@ -3,8 +3,7 @@
 //! app built from the template, whose synced tables would not match, see
 //! `servers`. To change in a fork, with the `productName`, the window's
 //! `title` and the `identifier` of `tauri/tauri.conf.json`, the pages'
-//! `APP_NAME` (`svelte/src/lib/identity.js`) and `<title>`
-//! (`svelte/src/index.html`), and `APP_URL_SCHEME`
+//! `<title>` (`svelte/src/index.html`), and `APP_URL_SCHEME`
 //! (`svelte/src/lib/routes.js`), which tests of the Tauri app keep equal
 //! to them.
 

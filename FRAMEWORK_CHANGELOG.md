@@ -18,6 +18,24 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-24: Wi-Fi sync icons, no name in the header, a closer page top
+
+- **What changed**: the header's sync status is a Wi-Fi icon online and
+  a Wi-Fi-off icon offline, from Lucide: `lucide-static` and
+  `svelte/vendor/lucide.js`, the `lucide-*` classes for the icons
+  heroicons lacks, are the template's now. The app's name in the header
+  on a single-community server is gone again, and with it
+  `svelte/src/lib/identity.js`; a test still keeps the `<title>` of
+  `svelte/src/index.html` equal to `APP_NAME`. On small windows a page
+  starts closer below the header.
+- **What an app does**:
+  - **Required**: delete `svelte/src/lib/identity.js`, if the merge
+    left it.
+  - **Required**, for an app that had added Lucide itself: keep the
+    template's `svelte/vendor/lucide.js`, the `@plugin` line in
+    `svelte/src/app.css` once, and `lucide-static` in
+    `svelte/package.json` once, then `pnpm install`.
+
 ## 2026-11-24: the app's name in the header on a single-community server
 
 - **What changed**: on small windows, a server with a single community

@@ -398,12 +398,7 @@ mod tests {
     }
 
     #[test]
-    fn device_servers_app_name_is_the_pages_and_their_title() {
-        let identity = include_str!("../../../svelte/src/lib/identity.js");
-        assert!(
-            identity.contains(&format!("export const APP_NAME = \"{APP_NAME}\";")),
-            "set APP_NAME in svelte/src/lib/identity.js to {APP_NAME}"
-        );
+    fn device_servers_app_name_is_the_pages_title() {
         let index = include_str!("../../../svelte/src/index.html");
         assert!(
             index.contains(&format!("<title>{APP_NAME}</title>")),

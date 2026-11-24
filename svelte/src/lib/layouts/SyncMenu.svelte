@@ -66,7 +66,7 @@
   <HeaderMenu label={t`Sync`} buttonClass="gap-1.5">
     {#snippet button()}
       {#if status.offline}
-        <Icon name="hero-signal-slash" class="size-5 text-warning" />
+        <Icon name="lucide-wifi-off" class="size-5 text-warning" />
         <span class="max-sm:hidden">{t`Offline`}</span>
       {/if}
       {#if status.conflicts > 0}
@@ -76,7 +76,7 @@
         <Icon name="hero-cloud-arrow-up" class="size-5" />
         <span class="max-sm:hidden">{t`${status.pending} waiting`}</span>
       {:else if !status.offline}
-        <Icon name={error ? "hero-exclamation-circle" : "hero-cloud"} class={["size-5", error && "text-error"]} />
+        <Icon name={error ? "hero-exclamation-circle" : "lucide-wifi"} class={["size-5", error && "text-error"]} />
       {/if}
     {/snippet}
     {#snippet children(close)}
