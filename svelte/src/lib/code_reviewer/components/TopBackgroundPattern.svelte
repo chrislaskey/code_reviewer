@@ -24,7 +24,7 @@
     position: fixed;
     inset: calc(var(--app-header-inset-top) + var(--app-header-height)) 0 auto var(--gutter-width);
     height: 150px;
-    z-index: -1;
+    z-index: 0;
   }
 
   .faded-area {

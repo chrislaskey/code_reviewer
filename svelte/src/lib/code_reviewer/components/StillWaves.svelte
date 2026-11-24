@@ -42,7 +42,7 @@
     position: fixed;
     inset: auto 0 var(--bottom-bar-height) var(--gutter-width);
     height: 220px;
-    z-index: -1;
+    z-index: 0;
     pointer-events: none;
   }
 </style>
