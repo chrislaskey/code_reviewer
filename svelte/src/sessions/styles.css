@@ -448,11 +448,18 @@ a.session-link {
 }
 
 /* Stays in view at the top of the window while the chat scrolls under it,
+   below the app's header; on small windows the header scrolls away, so
    below a phone's status bar and camera. */
 .chat-prompt.pinned {
   position: sticky;
-  top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+  top: calc(var(--app-header-inset-top) + var(--app-header-height) + 0.5rem);
   z-index: 5;
+}
+
+@media (width < 40rem) {
+  .chat-prompt.pinned {
+    top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+  }
 }
 
 /* Room to write a long prompt; the chat is below it. */
