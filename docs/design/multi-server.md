@@ -272,10 +272,11 @@ their size and type settled when the first one is needed.
 - **The app a server runs** is `APP_IDENTIFIER` in
   `core/src/app/identity.rs`, a seam every fork edits with the
   `identifier` of `tauri/tauri.conf.json`; a test of the Tauri app
-  keeps the two equal.
+  keeps the two equal. Beside it is `APP_NAME`, kept equal to the
+  `productName` and the window's `title` the same way.
 - **A server's own name**: `SERVER_NAME`, a slug, and
   `SERVER_DISPLAY_NAME`, read in `axum/src/config.rs`; unset, `default`
-  and the product name, so a deployment of today needs no change.
+  and `APP_NAME`, so a deployment of today needs no change.
 - **Its settings**: `SERVER_SETTINGS`, see "Server settings".
 - **The list**: `LISTED_SERVERS`, entries of a name and an origin,
   `acme=https://acme.example,beta=https://beta.example`, on the default

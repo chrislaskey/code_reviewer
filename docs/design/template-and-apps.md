@@ -309,14 +309,18 @@ Agents write much of the code, so the nudge comes when the edit is made:
 ### Pulling down and contributing back
 
 - **`bin/framework update`** fetches and merges `template/main`, runs
-  the check, and resolves a template change to an example the app
-  deleted by keeping the deletion.
+  the check, resolves a template change to an example the app
+  deleted by keeping the deletion, and prints the entries of
+  `FRAMEWORK_CHANGELOG.md` the merge brings in.
 - **`bin/framework contribute`** lists the commits since the merge-base
   that touch framework files or start with `template:`, and
   cherry-picks the chosen ones onto a branch from `template/main`.
-- **The version is the template commit.** A breaking change gets a
-  short entry in `docs/framework-changes.md` saying what changed and
-  what an app does about it.
+- **The version is the template commit.** A change that asks
+  something of an app, or gives it something new to turn on, gets an
+  entry in `FRAMEWORK_CHANGELOG.md` saying what changed and what an
+  app does about it, its steps marked required or optional. An agent
+  pulling the template reads the printed entries and takes the steps
+  (AGENTS.md).
 
 ### Seams shrink when they hurt
 
@@ -346,7 +350,7 @@ advance.
 6. `framework.toml`, `framework.lock` and the check.
 7. The AGENTS.md section and the `PreToolUse` hook.
 8. `bin/framework update` and `contribute`, and
-   `docs/framework-changes.md`.
+   `docs/framework-changes.md`, now `FRAMEWORK_CHANGELOG.md`.
 9. Update `code-organization.md`, `code-organization-axum-tauri-svelte.md`,
    `offline-sync.md`, `offline-files-decisions.md` and
    `files-communities.md`.

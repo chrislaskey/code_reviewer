@@ -17,10 +17,10 @@ use tauri::{AppHandle, State};
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
+use app_core::app::identity::APP_NAME;
 use app_core::deployment::now;
 use app_core::servers::settings::{ServerSettings, SettingsDocument};
 use app_core::servers::{self, ListedServer, ServerName};
-use app_core::services::mailer::mails::APP_NAME;
 use app_core::services::web_server::Http;
 use app_core::sync::SyncError;
 
@@ -387,5 +387,13 @@ mod tests {
         let config: serde_json::Value =
             serde_json::from_str(include_str!("../../tauri.conf.json")).expect("the config");
         assert_eq!(config["identifier"], APP_IDENTIFIER);
+    }
+
+    #[test]
+    fn device_servers_app_name_is_the_product_name_and_window_title() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../../tauri.conf.json")).expect("the config");
+        assert_eq!(config["productName"], APP_NAME);
+        assert_eq!(config["app"]["windows"][0]["title"], APP_NAME);
     }
 }

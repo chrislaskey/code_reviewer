@@ -15,9 +15,9 @@ use std::env;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
 
+use app_core::app::identity::APP_NAME;
 use app_core::servers::settings::ServerSettings;
 use app_core::servers::{ListedServers, ServerDescription, ServerName};
-use app_core::services::mailer::mails::APP_NAME;
 
 const DEFAULT_HOST: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 const DEFAULT_PORT: u16 = 4000;
