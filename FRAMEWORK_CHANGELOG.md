@@ -18,6 +18,35 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-25: an app deletes the examples
+
+- **What changed**: an app can delete posts, files or both, see "How an
+  app deletes an example" in `docs/design/examples-delete.md`. The
+  framework's tests name no example: the tests of the examples' own
+  rules moved into them (`posts_communities.rs`, `files.rs`,
+  `files_communities.rs`, and `files_uploads_are_refused_to_a_trial_user`
+  in `axum/src/tests/app.rs`), and
+  `framework_check_finds_no_example_named_in_the_framework` reads tests
+  too. `sync_two_devices_over_http` syncs a community; the files
+  example's over-HTTP tests are `files_a_file_over_http` and
+  `files_many_files_over_http`. `users::list_by_ids` is `pub`, and
+  Tauri's `user_auth::signed_in_with_transport` allows being unused, so
+  a deleted example leaves no dead framework code. `framework.toml`
+  lists the quick picker's page, `svelte/src/quick-picker/**` and
+  `svelte/src/quick-picker.html`, and `tauri/capabilities/quick-picker.json`
+  as the files example's, and `core/src/app.rs` and
+  `core/src/data/mod.rs` as seams.
+- **What an app does**:
+  - **Optional**, for an app that hid an example, keeping its core
+    modules, its table and its line in `synced_tables.rs` for the
+    framework's sake: delete it, by the design's steps, and reset the
+    local databases (`bin/reset`). Remove any `[[divergence]]` it
+    declared for a framework file it changed to do so.
+  - **Required**, for an app that changed the moved tests in its copy
+    of `sync.rs`, `memberships.rs`, `local_users.rs` or `deletions.rs`:
+    keep the template's, and carry its own changes over to the
+    example's files.
+
 ## 2026-11-25: the framework's tests on a table of its own
 
 - **What changed**: the framework's tests use `app_test_notes`, a synced

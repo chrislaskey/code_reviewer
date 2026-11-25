@@ -737,3 +737,40 @@ async fn current_user_update_changes_their_name() {
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+#[tokio::test]
+async fn files_uploads_are_refused_to_a_trial_user() {
+    let router = test_router().await;
+    let (status, headers, _) = send_with(
+        &router.router,
+        None,
+        None,
+        Method::POST,
+        "/api/accounts/trial",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let cookie = headers[header::SET_COOKIE]
+        .to_str()
+        .expect("a cookie")
+        .split(';')
+        .next()
+        .expect("its value")
+        .to_string();
+
+    let (status, _, _) = send_with(
+        &router.router,
+        None,
+        Some(&cookie),
+        Method::POST,
+        "/api/files/uploads",
+        Some(json!({ "content_type": "text/plain", "size": 5, "sha256": "0".repeat(64) })),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "no files on a trial"
+    );
+}

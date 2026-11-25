@@ -49,7 +49,7 @@ fn list_names(manifest: &Manifest, language: Language) -> Vec<String> {
 }
 
 /// Every line of the framework's Rust, JavaScript and Svelte that names
-/// an example, outside comments and tests.
+/// an example, outside comments, tests included.
 pub fn list_named_in_framework(
     root: &Path,
     manifest: &Manifest,
@@ -61,9 +61,6 @@ pub fn list_named_in_framework(
         let Some(language) = Language::of(&path) else {
             continue;
         };
-        if language == Language::Rust && is_tests_file(&path) {
-            continue;
-        }
         let text = std::fs::read_to_string(&file).map_err(|source| CheckError::Read {
             path: file.clone(),
             source,
@@ -109,13 +106,8 @@ impl Language {
     }
 }
 
-fn is_tests_file(path: &str) -> bool {
-    path.split('/')
-        .any(|part| part == "tests" || part == "tests.rs")
-}
-
-/// The names in the text, by line number from 1, outside comments and,
-/// in Rust, before the tests. In Rust a name as a path, `posts::list`,
+/// The names in the text, by line number from 1, outside comments. In
+/// Rust a name as a path, `posts::list`,
 /// `app::posts` or in a `use`, a table, `app_posts`, or a route,
 /// `"/api/posts"`. In the pages a name joined to another word,
 /// `postsIndexUrl` or `PostsForm`, a component, `FileImage`, or a part
@@ -131,9 +123,6 @@ fn names_in(text: &str, names: &[String], language: Language) -> Vec<(usize, Str
                 in_comment = None;
             }
             continue;
-        }
-        if language == Language::Rust && trimmed.starts_with("#[cfg(") && trimmed.contains("test") {
-            break;
         }
         if trimmed.starts_with("//") || trimmed.starts_with('*') {
             continue;
@@ -246,76 +235,77 @@ mod tests {
     use super::*;
 
     fn names() -> Vec<String> {
-        vec!["posts".to_string(), "app_posts".to_string()]
+        vec!["recipes".to_string(), "app_recipes".to_string()]
     }
 
     #[test]
     fn framework_check_examples_list_names_takes_each_globs_last_plain_part_by_language() {
         let manifest = Manifest {
             examples: vec![
-                "core/src/app/posts.rs".to_string(),
-                "core/src/app/posts/**".to_string(),
-                "core/src/data/app_posts/**".to_string(),
-                "core/migrations/*/*_app_posts_create.sql".to_string(),
-                "svelte/src/posts/**".to_string(),
-                "svelte/src/lib/FileImage.svelte".to_string(),
+                "core/src/app/recipes.rs".to_string(),
+                "core/src/app/recipes/**".to_string(),
+                "core/src/data/app_recipes/**".to_string(),
+                "core/migrations/*/*_app_recipes_create.sql".to_string(),
+                "svelte/src/recipes/**".to_string(),
+                "svelte/src/lib/RecipeCard.svelte".to_string(),
             ],
             ..Manifest::default()
         };
         assert_eq!(
             list_names(&manifest, Language::Rust),
-            ["posts", "app_posts"]
+            ["recipes", "app_recipes"]
         );
         assert_eq!(
             list_names(&manifest, Language::Pages),
-            ["posts", "FileImage"]
+            ["recipes", "RecipeCard"]
         );
     }
 
     #[test]
-    fn framework_check_examples_names_in_rust_finds_paths_tables_and_routes_outside_comments_and_tests()
-     {
-        let text = "use crate::app::posts;\n\
+    fn framework_check_examples_names_in_rust_finds_paths_tables_and_routes_tests_included() {
+        let text = "use crate::app::recipes;\n\
                     use crate::app::{\n\
-                        communities, posts,\n\
+                        communities, recipes,\n\
                     };\n\
-                    // posts in a comment\n\
-                    let posts = posts::list();\n\
-                    let posts_left = posts.len();\n\
-                    route(\"/api/posts\");\n\
-                    sqlx::query(\"SELECT * FROM app_posts\");\n\
+                    // recipes in a comment\n\
+                    let recipes = recipes::list();\n\
+                    let posts_left = recipes.len();\n\
+                    route(\"/api/recipes\");\n\
+                    sqlx::query(\"SELECT * FROM app_recipes\");\n\
                     #[cfg(test)]\n\
-                    use crate::app::posts;\n";
+                    mod tests {\n\
+                        use crate::app::recipes;\n";
         assert_eq!(
             names_in(text, &names(), Language::Rust),
             [
-                (1, "posts".to_string()),
-                (3, "posts".to_string()),
-                (6, "posts".to_string()),
-                (8, "posts".to_string()),
-                (9, "app_posts".to_string()),
+                (1, "recipes".to_string()),
+                (3, "recipes".to_string()),
+                (6, "recipes".to_string()),
+                (8, "recipes".to_string()),
+                (9, "app_recipes".to_string()),
+                (12, "recipes".to_string()),
             ]
         );
     }
 
     #[test]
     fn framework_check_examples_names_in_pages_finds_joined_names_components_and_paths() {
-        let text = "<!-- About posts,\n\
-                    posts again -->\n\
-                    import { postsIndexUrl } from \"../lib/routes.js\";\n\
-                    import Form from \"../posts/components/Form.svelte\";\n\
-                    import { FileImage } from \"../lib/index.js\";\n\
-                    let posts = items.posts;\n\
-                    let postscript = 1;\n\
-                    /** posts */\n";
+        let text = "<!-- About recipes,\n\
+                    recipes again -->\n\
+                    import { recipesIndexUrl } from \"../lib/routes.js\";\n\
+                    import Form from \"../recipes/components/Form.svelte\";\n\
+                    import { RecipeCard } from \"../lib/index.js\";\n\
+                    let recipes = items.recipes;\n\
+                    let recipescript = 1;\n\
+                    /** recipes */\n";
         let mut names = names();
-        names.push("FileImage".to_string());
+        names.push("RecipeCard".to_string());
         assert_eq!(
             names_in(text, &names, Language::Pages),
             [
-                (3, "posts".to_string()),
-                (4, "posts".to_string()),
-                (5, "FileImage".to_string()),
+                (3, "recipes".to_string()),
+                (4, "recipes".to_string()),
+                (5, "RecipeCard".to_string()),
             ]
         );
     }

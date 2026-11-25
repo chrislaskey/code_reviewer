@@ -494,10 +494,9 @@ pub(crate) async fn get_in(tx: &mut Transaction, id: Uuid) -> Result<Option<User
     Ok(app_users::replication::get(tx, id).await?)
 }
 
-pub(crate) async fn list_by_ids(
-    tx: &mut Transaction,
-    ids: &[Uuid],
-) -> Result<Vec<User>, UserError> {
+/// The users of the ids, deleted or not: who made each of some rows,
+/// for a resource of the app's to show.
+pub async fn list_by_ids(tx: &mut Transaction, ids: &[Uuid]) -> Result<Vec<User>, UserError> {
     if ids.is_empty() {
         return Ok(Vec::new());
     }

@@ -861,11 +861,9 @@ pub(crate) mod tests {
     use super::*;
     use crate::accounts::{self, Session};
     use crate::app::communities::CommunityError;
-    #[cfg(feature = "object-storage")]
-    use crate::app::files;
     pub(crate) use crate::app::users::tests::device_of;
-    use crate::app::{communities, memberships, posts, posts_communities};
-    use crate::data::{app_communities, app_posts, app_users, app_users_communities};
+    use crate::app::{communities, memberships};
+    use crate::data::{app_communities, app_users, app_users_communities};
     use crate::database::with_each_database;
     use crate::deployment::{Role, now};
     #[cfg(feature = "sync-http")]
@@ -917,15 +915,6 @@ pub(crate) mod tests {
             .expect("the notes")
             .into_iter()
             .map(|note| note.body)
-            .collect()
-    }
-
-    async fn post_bodies(deployment: &Deployment, user: &User) -> Vec<String> {
-        posts::list(deployment, user)
-            .await
-            .expect("the posts")
-            .into_iter()
-            .map(|listed| listed.post.body)
             .collect()
     }
 
@@ -2129,16 +2118,6 @@ pub(crate) mod tests {
         }
     }
 
-    async fn community_names(deployment: &Deployment, user: &User, post_id: Uuid) -> Vec<String> {
-        posts::get(deployment, user, post_id)
-            .await
-            .expect("the post")
-            .communities
-            .into_iter()
-            .map(|community| community.name)
-            .collect()
-    }
-
     #[tokio::test]
     async fn sync_joining_on_the_web_fills_the_device_and_leaving_empties_it() {
         with_each_database(|database| async move {
@@ -2392,42 +2371,6 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn sync_a_post_taken_out_of_a_community_leaves_the_other_members_device_and_comes_back() {
-        with_each_database(|database| async move {
-            let server = Deployment::new(database, Role::Server);
-            let (alice, _) = user_with_token(&server, "alice@example.com").await;
-            let (bob, bob_token) = user_with_token(&server, "bob@example.com").await;
-            let gardening = communities::create(&server, &alice, "Gardening")
-                .await
-                .expect("a community");
-            memberships::create(&server, &bob, gardening.id)
-                .await
-                .expect("joined");
-            let post = posts::create(&server, &alice, "roses", &[gardening.id])
-                .await
-                .expect("a post");
-            let b = device_of(&bob, &bob_token).await;
-            sync(&b, &server).await;
-            assert_eq!(post_bodies(&b, &bob).await, vec!["roses"]);
-
-            posts_communities::remove(&server, &alice, post.id, gardening.id)
-                .await
-                .expect("removed");
-            let report = sync(&b, &server).await;
-            assert_eq!(report.pruned, 1);
-            assert!(post_bodies(&b, &bob).await.is_empty());
-
-            posts_communities::add(&server, &alice, post.id, gardening.id)
-                .await
-                .expect("added back");
-            let report = sync(&b, &server).await;
-            assert_eq!(report.pruned, 0);
-            assert_eq!(post_bodies(&b, &bob).await, vec!["roses"]);
-        })
-        .await;
-    }
-
-    #[tokio::test]
     async fn sync_a_device_rejoining_a_community_gets_the_servers_membership_back() {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
@@ -2473,41 +2416,6 @@ pub(crate) mod tests {
                 .expect("memberships");
             assert_eq!(on_server.len(), 1);
             assert_eq!(on_server[0].id, first.id);
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn sync_adding_a_post_to_a_community_left_meanwhile_is_refused_and_dropped() {
-        with_each_database(|database| async move {
-            let server = Deployment::new(database, Role::Server);
-            let (bob, bob_token) = user_with_token(&server, "bob@example.com").await;
-            let gardening = communities::create(&server, &bob, "Gardening")
-                .await
-                .expect("a community");
-            let b = device_of(&bob, &bob_token).await;
-            sync(&b, &server).await;
-            memberships::delete(&server, &bob, gardening.id)
-                .await
-                .expect("left on the web");
-
-            let post = posts::create(&b, &bob, "late", &[gardening.id])
-                .await
-                .expect("a post, offline");
-            assert_eq!(community_names(&b, &bob, post.id).await, vec!["Gardening"]);
-            let report = sync(&b, &server).await;
-            assert_eq!(report.pushed, 1, "the post");
-            assert_eq!(report.rejected, 1, "its community row");
-            assert_eq!(report.pending, 0);
-            assert_eq!(post_bodies(&b, &bob).await, vec!["late"]);
-            assert!(community_names(&b, &bob, post.id).await.is_empty());
-            assert!(community_names(&server, &bob, post.id).await.is_empty());
-            assert!(
-                memberships::list_mine(&b, &bob)
-                    .await
-                    .expect("memberships")
-                    .is_empty()
-            );
         })
         .await;
     }
@@ -2767,257 +2675,6 @@ pub(crate) mod tests {
         .await;
     }
 
-    /// A sign-in, a sign-up the first time, finished on the server's own
-    /// database with the code the memory mailer caught, as a device: its
-    /// code exchanged over HTTP.
-    #[cfg(feature = "sync-http")]
-    async fn device_session_over(
-        server: &Http,
-        servers_database: &Deployment,
-        email: &str,
-    ) -> Session {
-        let mailer = crate::services::mailer::Mailer::memory();
-        let sent = accounts::sign_in(
-            servers_database,
-            &mailer,
-            email,
-            true,
-            crate::helpers::locales::DEFAULT,
-        )
-        .await
-        .expect("signed in");
-        let code = crate::accounts::tests::code_sent_to(&mailer, email);
-        let (verifier, challenge) = accounts::verifier_and_challenge();
-        let matched = accounts::sign_in_with_code(servers_database, &sent.pending, &code)
-            .await
-            .expect("the code matched");
-        let device_code =
-            accounts::sign_in_confirm_for_device(servers_database, &matched.pending, &challenge)
-                .await
-                .expect("finished");
-        accounts::sign_in_with_device_code_through(server, &device_code.code, &verifier)
-            .await
-            .expect("exchanged over HTTP")
-    }
-
-    #[tokio::test]
-    async fn sync_a_post_taken_out_before_a_device_joined_is_never_sent_to_it() {
-        with_each_database(|database| async move {
-            let server = Deployment::new(database, Role::Server);
-            let (alice, _) = user_with_token(&server, "alice@example.com").await;
-            let (bob, bobs_token) = user_with_token(&server, "bob@example.com").await;
-            let gardening = communities::create(&server, &alice, "Gardening")
-                .await
-                .expect("a community");
-            let cooking = communities::create(&server, &alice, "Cooking")
-                .await
-                .expect("a community");
-            let post = posts::create(&server, &alice, "roses", &[gardening.id, cooking.id])
-                .await
-                .expect("a post");
-            posts_communities::remove(&server, &alice, post.id, gardening.id)
-                .await
-                .expect("taken out of gardening");
-            memberships::create(&server, &bob, gardening.id)
-                .await
-                .expect("joined after");
-
-            let page = pull(&server, &bob, PullRequest::default())
-                .await
-                .expect("a page");
-            assert!(
-                page.rows.iter().all(|row| row.table != app_posts::TABLE),
-                "the post is in cooking only, which bob is not in"
-            );
-            let device = device_of(&bob, &bobs_token).await;
-            run(&device, &InProcess { server: &server })
-                .await
-                .expect("a sync");
-            let mut tx = device.begin().await.expect("a transaction");
-            assert!(
-                posts::get_in(&mut tx, post.id)
-                    .await
-                    .expect("read")
-                    .is_none()
-            );
-            tx.commit().await.expect("committed");
-        })
-        .await;
-    }
-
-    /// A file added on one device reaches a running web server's bucket
-    /// and is fetched by another, over HTTP and the bucket's signed
-    /// URLs, as the apps do; run as `sync_two_devices_over_http` is,
-    /// with the server's bucket set up:
-    ///
-    /// ```sh
-    /// SYNC_SERVER_URL=http://localhost:4010 TEST_SERVER_DATABASE_URL=sqlite:../axum/data/app.db \
-    ///   cargo test -p app_core --features sync-http a_file_over_http -- --ignored
-    /// ```
-    #[cfg(feature = "sync-http")]
-    #[tokio::test]
-    #[ignore]
-    async fn sync_a_file_over_http() {
-        use crate::app::files::FileState;
-        use crate::deployment::FileStore;
-
-        let url = std::env::var("SYNC_SERVER_URL").expect("SYNC_SERVER_URL");
-        let server = Http::new(&url).expect("a transport");
-        let servers_database =
-            crate::database::tests::open_from_env("TEST_SERVER_DATABASE_URL").await;
-        let servers_database = Deployment::new(servers_database, Role::Server);
-        let email = format!("{}@example.com", Uuid::now_v7().simple());
-        let a_folder = tempfile::tempdir().expect("a folder");
-        let b_folder = tempfile::tempdir().expect("a folder");
-        let a = users::tests::device()
-            .await
-            .with_file_store(FileStore::Folder(a_folder.path().to_path_buf()));
-        let b = users::tests::device()
-            .await
-            .with_file_store(FileStore::Folder(b_folder.path().to_path_buf()));
-        let alice = {
-            let session = device_session_over(&server, &servers_database, &email).await;
-            accounts::keep_signed_in(&a, session)
-                .await
-                .expect("signed in on a")
-        };
-        let session = device_session_over(&server, &servers_database, &email).await;
-        accounts::keep_signed_in(&b, session)
-            .await
-            .expect("signed in on b");
-
-        let bytes: Vec<u8> = (0..300_000u32).map(|n| (n % 251) as u8).collect();
-        run(&a, &server).await.expect("a sync for her communities");
-        let personal = memberships::list_mine(&a, &alice)
-            .await
-            .expect("the memberships")[0]
-            .community_id;
-        let file = files::create_with_bytes(&a, &alice, "over http.bin", "", &[personal], &bytes)
-            .await
-            .expect("a file");
-        let report = run(&a, &server).await.expect("a sync");
-        assert_eq!(report.uploaded, 1, "{report:?}");
-        assert_eq!(report.pending, 0, "{report:?}");
-        let shown = files::get(&a, &alice, file.id).await.expect("on a");
-        assert_eq!(shown.state, FileState::Synced);
-
-        let report = run(&a, &server).await.expect("a sync");
-        assert_eq!(report.uploaded, 0);
-        run(&b, &server).await.expect("a sync");
-        let path = files::local_copy(&b, &server, &alice, file.id)
-            .await
-            .expect("fetched on b");
-        assert_eq!(std::fs::read(path).expect("the bytes"), bytes);
-
-        files::delete(&b, &alice, file.id)
-            .await
-            .expect("deleted on b");
-        let report = run(&b, &server).await.expect("a sync");
-        assert_eq!(report.cleaned, 1);
-        accounts::sign_out_on_device(&b, &server)
-            .await
-            .expect("signed out on b");
-        accounts::sign_out_on_device(&a, &server)
-            .await
-            .expect("signed out on a");
-    }
-
-    /// Many files added on a device, `FILES` of them, 1,000 unless set,
-    /// reach a running web server's bucket a sync of
-    /// `crate::sync::bytes::PER_SYNC` at a time, each sync starting the next as
-    /// the app does; prints how long each took. Run as
-    /// `sync_a_file_over_http` is:
-    ///
-    /// ```sh
-    /// SYNC_SERVER_URL=http://localhost:4010 TEST_SERVER_DATABASE_URL=sqlite:../axum/data/app.db \
-    ///   cargo test -p app_core --features sync-http many_files_over_http -- --ignored --nocapture
-    /// ```
-    #[cfg(feature = "sync-http")]
-    #[tokio::test]
-    #[ignore]
-    async fn sync_many_files_over_http() {
-        use crate::app::files::FileState;
-        use crate::deployment::FileStore;
-
-        let url = std::env::var("SYNC_SERVER_URL").expect("SYNC_SERVER_URL");
-        let count: usize = std::env::var("FILES")
-            .ok()
-            .and_then(|count| count.parse().ok())
-            .unwrap_or(1000);
-        let server = Http::new(&url).expect("a transport");
-        let servers_database =
-            crate::database::tests::open_from_env("TEST_SERVER_DATABASE_URL").await;
-        let servers_database = Deployment::new(servers_database, Role::Server);
-        let email = format!("{}@example.com", Uuid::now_v7().simple());
-        let folder = tempfile::tempdir().expect("a folder");
-        let a = users::tests::device()
-            .await
-            .with_file_store(FileStore::Folder(folder.path().to_path_buf()));
-        let alice = {
-            let session = device_session_over(&server, &servers_database, &email).await;
-            accounts::keep_signed_in(&a, session)
-                .await
-                .expect("signed in on a")
-        };
-        run(&a, &server).await.expect("a sync for her communities");
-        let personal = memberships::list_mine(&a, &alice)
-            .await
-            .expect("the memberships")[0]
-            .community_id;
-
-        let started = std::time::Instant::now();
-        let mut ids = Vec::with_capacity(count);
-        for number in 0..count {
-            let bytes = format!("emoji number {number}");
-            let file = files::create_with_bytes(
-                &a,
-                &alice,
-                &format!("{number}.txt"),
-                "text/plain",
-                &[personal],
-                bytes.as_bytes(),
-            )
-            .await
-            .expect("a file");
-            ids.push(file.id);
-        }
-        eprintln!(
-            "{count} files kept on the device in {:?}",
-            started.elapsed()
-        );
-
-        let started = std::time::Instant::now();
-        let mut syncs = 0;
-        loop {
-            let one = std::time::Instant::now();
-            let report = run(&a, &server).await.expect("a sync");
-            syncs += 1;
-            eprintln!(
-                "sync {syncs}: {:?}, uploaded {}, pushed {}, left {}, pulled {}",
-                one.elapsed(),
-                report.uploaded,
-                report.pushed,
-                report.files_left,
-                report.pulled
-            );
-            if !report.more_files_to_send() {
-                assert_eq!(report.pending, 0, "{report:?}");
-                break;
-            }
-        }
-        eprintln!(
-            "{count} files sent in {syncs} syncs, {:?}",
-            started.elapsed()
-        );
-        for id in ids {
-            let shown = files::get(&a, &alice, id).await.expect("on a");
-            assert_eq!(shown.state, FileState::Synced);
-        }
-        accounts::sign_out_on_device(&a, &server)
-            .await
-            .expect("signed out on a");
-    }
-
     /// Two devices against a running web server, `SYNC_SERVER_URL`,
     /// whose database, `TEST_SERVER_DATABASE_URL`, the test opens itself
     /// to sign a user up and read nothing from the server's log, then
@@ -3049,36 +2706,36 @@ pub(crate) mod tests {
         accounts::keep_signed_in(&b, session)
             .await
             .expect("signed in on b");
-        let post = posts::create(&a, &alice, "over http from a", &[])
+        let community = communities::create(&a, &alice, "Made on a")
             .await
-            .expect("a post");
+            .expect("a community");
         run(&a, &server).await.expect("a sync");
         run(&b, &server).await.expect("a sync");
         assert_eq!(
-            posts::get(&b, &alice, post.id)
+            communities::get(&b, &alice, community.id)
                 .await
-                .expect("the post on b")
-                .post
-                .body,
-            "over http from a"
+                .expect("the community on b")
+                .community
+                .name,
+            "Made on a"
         );
 
-        posts::update(&a, &alice, post.id, "a's edit", &[])
+        communities::update(&a, &alice, community.id, "A's name")
             .await
-            .expect("edited on a");
-        posts::update(&b, &alice, post.id, "b's edit", &[])
+            .expect("renamed on a");
+        communities::update(&b, &alice, community.id, "B's name")
             .await
-            .expect("edited on b");
+            .expect("renamed on b");
         run(&a, &server).await.expect("a sync");
         let report = run(&b, &server).await.expect("a sync");
         assert_eq!(report.conflicts, 1);
         assert_eq!(
-            posts::get(&b, &alice, post.id)
+            communities::get(&b, &alice, community.id)
                 .await
-                .expect("the post on b")
-                .post
-                .body,
-            "a's edit"
+                .expect("the community on b")
+                .community
+                .name,
+            "A's name"
         );
         conflicts::delete(&b, conflicts::list(&b).await.expect("one")[0].id)
             .await
@@ -3089,6 +2746,39 @@ pub(crate) mod tests {
         accounts::sign_out_on_device(&a, &server)
             .await
             .expect("signed out on a");
+    }
+
+    /// A sign-in, a sign-up the first time, finished on the server's own
+    /// database with the code the memory mailer caught, as a device: its
+    /// code exchanged over HTTP.
+    #[cfg(feature = "sync-http")]
+    pub(crate) async fn device_session_over(
+        server: &Http,
+        servers_database: &Deployment,
+        email: &str,
+    ) -> Session {
+        let mailer = crate::services::mailer::Mailer::memory();
+        let sent = accounts::sign_in(
+            servers_database,
+            &mailer,
+            email,
+            true,
+            crate::helpers::locales::DEFAULT,
+        )
+        .await
+        .expect("signed in");
+        let code = crate::accounts::tests::code_sent_to(&mailer, email);
+        let (verifier, challenge) = accounts::verifier_and_challenge();
+        let matched = accounts::sign_in_with_code(servers_database, &sent.pending, &code)
+            .await
+            .expect("the code matched");
+        let device_code =
+            accounts::sign_in_confirm_for_device(servers_database, &matched.pending, &challenge)
+                .await
+                .expect("finished");
+        accounts::sign_in_with_device_code_through(server, &device_code.code, &verifier)
+            .await
+            .expect("exchanged over HTTP")
     }
 
     #[test]

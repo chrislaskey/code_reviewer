@@ -706,9 +706,17 @@ impl SyncedTable for Synced {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::memberships::MembershipError;
     use crate::app::posts::PostError;
     use crate::app::{communities, memberships, posts, users};
     use crate::database::{Database, with_each_database};
+    use crate::services::web_server::InProcess;
+    use crate::sync::tests::{device_of, user_with_token};
+    use crate::sync::{PullRequest, Report, pull, run};
+
+    async fn sync(device: &Deployment, server: &Deployment) -> Report {
+        run(device, &InProcess { server }).await.expect("a sync")
+    }
 
     fn server(database: Database) -> Deployment {
         Deployment::new(database, Role::Server)
@@ -940,6 +948,278 @@ mod tests {
             assert_eq!(row.deleted_at, deleted.deleted_at);
             assert_eq!(row.deleted_by_id, Some(alice.id));
             assert_eq!(row.version, 2);
+        })
+        .await;
+    }
+
+    async fn community_names(deployment: &Deployment, user: &User, post_id: Uuid) -> Vec<String> {
+        posts::get(deployment, user, post_id)
+            .await
+            .expect("the post")
+            .communities
+            .into_iter()
+            .map(|community| community.name)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn posts_communities_a_post_taken_out_leaves_the_other_members_device_and_comes_back() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let (alice, _) = user_with_token(&server, "alice@example.com").await;
+            let (bob, bob_token) = user_with_token(&server, "bob@example.com").await;
+            let gardening = communities::create(&server, &alice, "Gardening")
+                .await
+                .expect("a community");
+            memberships::create(&server, &bob, gardening.id)
+                .await
+                .expect("joined");
+            let post = posts::create(&server, &alice, "roses", &[gardening.id])
+                .await
+                .expect("a post");
+            let b = device_of(&bob, &bob_token).await;
+            sync(&b, &server).await;
+            assert_eq!(bodies(&b, &bob).await, vec!["roses"]);
+
+            remove(&server, &alice, post.id, gardening.id)
+                .await
+                .expect("removed");
+            let report = sync(&b, &server).await;
+            assert_eq!(report.pruned, 1);
+            assert!(bodies(&b, &bob).await.is_empty());
+
+            add(&server, &alice, post.id, gardening.id)
+                .await
+                .expect("added back");
+            let report = sync(&b, &server).await;
+            assert_eq!(report.pruned, 0);
+            assert_eq!(bodies(&b, &bob).await, vec!["roses"]);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn posts_communities_adding_to_a_community_left_meanwhile_is_refused_and_dropped() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let (bob, bob_token) = user_with_token(&server, "bob@example.com").await;
+            let gardening = communities::create(&server, &bob, "Gardening")
+                .await
+                .expect("a community");
+            let b = device_of(&bob, &bob_token).await;
+            sync(&b, &server).await;
+            memberships::delete(&server, &bob, gardening.id)
+                .await
+                .expect("left on the web");
+
+            let post = posts::create(&b, &bob, "late", &[gardening.id])
+                .await
+                .expect("a post, offline");
+            assert_eq!(community_names(&b, &bob, post.id).await, vec!["Gardening"]);
+            let report = sync(&b, &server).await;
+            assert_eq!(report.pushed, 1, "the post");
+            assert_eq!(report.rejected, 1, "its community row");
+            assert_eq!(report.pending, 0);
+            assert_eq!(bodies(&b, &bob).await, vec!["late"]);
+            assert!(community_names(&b, &bob, post.id).await.is_empty());
+            assert!(community_names(&server, &bob, post.id).await.is_empty());
+            assert!(
+                memberships::list_mine(&b, &bob)
+                    .await
+                    .expect("memberships")
+                    .is_empty()
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn posts_communities_a_post_taken_out_before_a_device_joined_is_never_sent_to_it() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let (alice, _) = user_with_token(&server, "alice@example.com").await;
+            let (bob, bobs_token) = user_with_token(&server, "bob@example.com").await;
+            let gardening = communities::create(&server, &alice, "Gardening")
+                .await
+                .expect("a community");
+            let cooking = communities::create(&server, &alice, "Cooking")
+                .await
+                .expect("a community");
+            let post = posts::create(&server, &alice, "roses", &[gardening.id, cooking.id])
+                .await
+                .expect("a post");
+            remove(&server, &alice, post.id, gardening.id)
+                .await
+                .expect("taken out of gardening");
+            memberships::create(&server, &bob, gardening.id)
+                .await
+                .expect("joined after");
+
+            let page = pull(&server, &bob, PullRequest::default())
+                .await
+                .expect("a page");
+            assert!(
+                page.rows.iter().all(|row| row.table != app_posts::TABLE),
+                "the post is in cooking only, which bob is not in"
+            );
+            let device = device_of(&bob, &bobs_token).await;
+            run(&device, &InProcess { server: &server })
+                .await
+                .expect("a sync");
+            let mut tx = device.begin().await.expect("a transaction");
+            assert!(
+                posts::get_in(&mut tx, post.id)
+                    .await
+                    .expect("read")
+                    .is_none()
+            );
+            tx.commit().await.expect("committed");
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn posts_communities_leaving_takes_own_posts_out_and_rejoining_brings_back_what_left() {
+        with_each_database(|database| async move {
+            let deployment = server(database);
+            let alice = users::create(&deployment, "alice@example.com", "Alice")
+                .await
+                .expect("a user");
+            let bob = users::create(&deployment, "bob@example.com", "Bob")
+                .await
+                .expect("a user");
+            let gardening = communities::create(&deployment, &alice, "Gardening")
+                .await
+                .expect("a community");
+            memberships::create(&deployment, &bob, gardening.id)
+                .await
+                .expect("joined");
+            let roses = posts::create(&deployment, &alice, "roses", &[gardening.id])
+                .await
+                .expect("a post");
+            let weeds = posts::create(&deployment, &alice, "weeds", &[gardening.id])
+                .await
+                .expect("a post");
+            let bobs = posts::create(&deployment, &bob, "bob's", &[gardening.id])
+                .await
+                .expect("a post");
+            remove(&deployment, &alice, weeds.id, gardening.id)
+                .await
+                .expect("removed on purpose");
+            assert_eq!(bodies(&deployment, &bob).await, vec!["bob's", "roses"]);
+
+            let membership = memberships::list_mine(&deployment, &alice)
+                .await
+                .expect("memberships")
+                .remove(0);
+            memberships::delete(&deployment, &alice, gardening.id)
+                .await
+                .expect("left");
+            assert!(
+                memberships::list_mine(&deployment, &alice)
+                    .await
+                    .expect("none")
+                    .is_empty()
+            );
+            assert_eq!(bodies(&deployment, &bob).await, vec!["bob's"]);
+            assert_eq!(
+                bodies(&deployment, &alice).await,
+                vec!["weeds", "roses"],
+                "her own posts stay hers"
+            );
+            let mut tx = deployment.begin().await.expect("a transaction");
+            let left = memberships::get_in(&mut tx, membership.id)
+                .await
+                .expect("the row")
+                .expect("kept");
+            let left_at = left.deleted_at.expect("deleted");
+            assert_eq!(left.deleted_by_id, Some(alice.id));
+            let rows = app_posts_communities::replication::list_of_membership_deleted_at(
+                &mut tx,
+                membership.id,
+                left_at,
+            )
+            .await
+            .expect("the rows");
+            assert_eq!(
+                rows.len(),
+                1,
+                "roses left with her, weeds was removed before"
+            );
+            assert_eq!(rows[0].post_id, roses.id);
+            tx.commit().await.expect("committed");
+            let error = memberships::delete(&deployment, &alice, gardening.id)
+                .await
+                .expect_err("already left");
+            assert!(matches!(error, MembershipError::NotFound { .. }));
+
+            let rejoined = memberships::create(&deployment, &alice, gardening.id)
+                .await
+                .expect("rejoined");
+            assert_eq!(rejoined.id, membership.id, "the same row");
+            assert_eq!(rejoined.version, 3);
+            assert!(rejoined.deleted_at.is_none());
+            assert_eq!(bodies(&deployment, &bob).await, vec!["bob's", "roses"]);
+            assert_eq!(
+                memberships::create(&deployment, &alice, gardening.id)
+                    .await
+                    .expect("joined again")
+                    .version,
+                3,
+                "joining when in is nothing"
+            );
+            let _ = bobs;
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn posts_communities_rejoining_leaves_a_post_deleted_meanwhile_deleted() {
+        with_each_database(|database| async move {
+            let deployment = server(database);
+            let alice = users::create(&deployment, "alice@example.com", "Alice")
+                .await
+                .expect("a user");
+            let bob = users::create(&deployment, "bob@example.com", "Bob")
+                .await
+                .expect("a user");
+            let gardening = communities::create(&deployment, &alice, "Gardening")
+                .await
+                .expect("a community");
+            memberships::create(&deployment, &bob, gardening.id)
+                .await
+                .expect("joined");
+            let roses = posts::create(&deployment, &alice, "roses", &[gardening.id])
+                .await
+                .expect("a post");
+            memberships::delete(&deployment, &alice, gardening.id)
+                .await
+                .expect("left");
+            posts::delete(&deployment, &alice, roses.id)
+                .await
+                .expect("deleted");
+
+            memberships::create(&deployment, &alice, gardening.id)
+                .await
+                .expect("rejoined");
+            assert!(bodies(&deployment, &bob).await.is_empty());
+            let mut tx = deployment.begin().await.expect("a transaction");
+            let row = app_posts_communities::replication::get_by_post_and_community(
+                &mut tx,
+                roses.id,
+                gardening.id,
+            )
+            .await
+            .expect("the row")
+            .expect("kept");
+            let post = crate::data::app_posts::replication::get(&mut tx, roses.id)
+                .await
+                .expect("the post")
+                .expect("kept");
+            assert_eq!(
+                row.deleted_at, post.deleted_at,
+                "the post's delete, not the leave's"
+            );
         })
         .await;
     }

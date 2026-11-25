@@ -192,8 +192,8 @@ pub(crate) async fn is_signed_in_in(tx: &mut Transaction) -> Result<bool, sqlx::
     }))
 }
 
-/// How many things the local user made, posts and files say, in the
-/// tables that count them, for the question asked before a move.
+/// How many things the local user made, in the tables that count them,
+/// for the question asked before a move.
 pub async fn count_items(deployment: &Deployment) -> Result<i64, LocalUserError> {
     let mut tx = deployment.begin().await?;
     let local = local_user_in(&mut tx).await?;
@@ -378,32 +378,27 @@ async fn queue_creates_in(
     Ok(())
 }
 
-#[cfg(all(test, feature = "object-storage"))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::accounts;
-    use crate::app::files;
-    use crate::app::files::tests::server;
-    use crate::data::app_files;
     use crate::database::with_each_database;
-    use crate::deployment::FileStore;
-    use crate::services::storage::Storage;
     use crate::services::web_server::InProcess;
     use crate::sync;
     use crate::sync::test_notes;
 
-    /// A device where someone skipped signing in, with a folder for
-    /// its files' bytes.
-    async fn device_with_a_local_user() -> (Deployment, User, tempfile::TempDir) {
-        let folder = tempfile::tempdir().expect("a folder");
-        let device = users::tests::device()
-            .await
-            .with_file_store(FileStore::Folder(folder.path().to_path_buf()));
+    fn server(database: crate::database::Database) -> Deployment {
+        Deployment::new(database, Role::Server)
+    }
+
+    /// A device where someone skipped signing in.
+    async fn device_with_a_local_user() -> (Deployment, User) {
+        let device = users::tests::device().await;
         let name = new_name();
         let user = create(&device, Uuid::now_v7(), &name, "Alice's Laptop")
             .await
             .expect("a local user");
-        (device, user, folder)
+        (device, user)
     }
 
     async fn pending(device: &Deployment) -> i64 {
@@ -414,8 +409,8 @@ mod tests {
     async fn local_users_create_signs_in_a_user_with_a_community_who_queues_nothing_and_never_syncs()
      {
         with_each_database(|database| async move {
-            let (server, _storage) = server(database);
-            let (device, local, _folder) = device_with_a_local_user().await;
+            let server = server(database);
+            let (device, local) = device_with_a_local_user().await;
             assert!(local.name.starts_with("local_") && local.name.len() == 17);
             assert_eq!(email_of(&local.name), format!("{}@example.com", local.name));
             assert_eq!(users::signed_in(&device).await.expect("signed in"), local);
@@ -439,12 +434,9 @@ mod tests {
             users::update(&device, &local, "Alice")
                 .await
                 .expect("renamed");
-            files::tests::with_bytes(&device, &local, "notes.txt", "text/plain", b"notes")
-                .await
-                .expect("a file");
             assert_eq!(pending(&device).await, 0, "nothing is queued");
             assert_eq!(note.version, 0);
-            assert_eq!(count_items(&device).await.expect("counted"), 2);
+            assert_eq!(count_items(&device).await.expect("counted"), 1);
 
             let report = sync::run(&device, &InProcess { server: &server })
                 .await
@@ -477,13 +469,12 @@ mod tests {
     }
 
     /// What the test's local user made: a note in their first
-    /// community, a note in none, a second community, a file, and a
+    /// community, a note in none, a second community, and a
     /// note since deleted.
     struct Made {
         in_community: test_notes::Note,
         in_none: test_notes::Note,
         deleted: test_notes::Note,
-        file: app_files::File,
     }
 
     async fn made_by(device: &Deployment, local: &User) -> Made {
@@ -505,27 +496,11 @@ mod tests {
         test_notes::delete(device, local, deleted.id)
             .await
             .expect("deleted");
-        let file = files::tests::with_bytes(device, local, "notes.txt", "text/plain", b"notes")
-            .await
-            .expect("a file");
         Made {
             in_community,
             in_none,
             deleted,
-            file,
         }
-    }
-
-    async fn bucket_has(storage: &Storage, user: &User, id: Uuid) -> bool {
-        storage
-            .size(&crate::sync::bytes::storage_key(
-                &files::Synced,
-                user.id,
-                id,
-            ))
-            .await
-            .expect("looked")
-            .is_some()
     }
 
     async fn names_of_communities(deployment: &Deployment, user: &User) -> Vec<String> {
@@ -547,8 +522,8 @@ mod tests {
     #[tokio::test]
     async fn local_users_move_to_a_new_account_pushes_every_live_row_with_its_time() {
         with_each_database(|database| async move {
-            let (server, storage) = server(database);
-            let (device, local, _folder) = device_with_a_local_user().await;
+            let server = server(database);
+            let (device, local) = device_with_a_local_user().await;
             let made = made_by(&device, &local).await;
             let session =
                 accounts::tests::signed_up_for_a_device(&server, "alice@example.com").await;
@@ -573,8 +548,8 @@ mod tests {
             );
             assert_eq!(
                 pending(&device).await,
-                7,
-                "two communities, two memberships, two notes and a file"
+                6,
+                "two communities, two memberships and two notes"
             );
 
             let report = sync::run(&device, &InProcess { server: &server })
@@ -583,9 +558,8 @@ mod tests {
             assert_eq!(report.push_error, None);
             assert_eq!(
                 (report.pushed, report.rejected, report.conflicts),
-                (7, 0, 0)
+                (6, 0, 0)
             );
-            assert_eq!(report.uploaded, 1);
             assert_eq!(report.pending, 0);
 
             assert_eq!(
@@ -613,11 +587,6 @@ mod tests {
                 .expect("the note");
             assert!(in_community.community_id.is_some());
             assert_eq!(in_community.community_id, made.in_community.community_id);
-            assert!(bucket_has(&storage, &alice, made.file.id).await);
-            let file = files::get(&server, &alice, made.file.id)
-                .await
-                .expect("the file");
-            assert_eq!(file.file.inserted_at, made.file.inserted_at);
 
             assert_eq!(notes_of(&device, &alice).await, on_server);
             assert_eq!(
@@ -634,7 +603,7 @@ mod tests {
     #[tokio::test]
     async fn local_users_move_to_an_account_that_has_data_keeps_both() {
         with_each_database(|database| async move {
-            let (server, _storage) = server(database);
+            let server = server(database);
             let session =
                 accounts::tests::signed_up_for_a_device(&server, "alice@example.com").await;
             let alice = session.user.clone();
@@ -645,7 +614,7 @@ mod tests {
                 .await
                 .expect("a community");
 
-            let (device, local, _folder) = device_with_a_local_user().await;
+            let (device, local) = device_with_a_local_user().await;
             made_by(&device, &local).await;
             move_to_account(&device, session, None)
                 .await
@@ -655,7 +624,7 @@ mod tests {
                 .expect("a sync");
             assert_eq!(
                 (report.pushed, report.rejected, report.conflicts),
-                (7, 0, 0)
+                (6, 0, 0)
             );
 
             assert_eq!(
@@ -676,7 +645,7 @@ mod tests {
     #[tokio::test]
     async fn local_users_move_to_a_single_community_account_merges_every_community_into_its_own() {
         with_each_database(|database| async move {
-            let (server, _storage) = server(database);
+            let server = server(database);
             let session =
                 accounts::tests::signed_up_for_a_device(&server, "alice@example.com").await;
             let alice = session.user.clone();
@@ -686,7 +655,7 @@ mod tests {
             .expect("her sign-up's community");
             assert_eq!(merge_target.community.name, "Personal");
 
-            let (device, local, _folder) = device_with_a_local_user().await;
+            let (device, local) = device_with_a_local_user().await;
             let made = made_by(&device, &local).await;
             let garden = communities::list(&device, &local)
                 .await
@@ -729,11 +698,6 @@ mod tests {
                     note.body
                 );
             }
-            let file = files::get(&server, &alice, made.file.id)
-                .await
-                .expect("the file");
-            let names: Vec<_> = file.communities.iter().map(|c| c.name.as_str()).collect();
-            assert_eq!(names, ["Personal"]);
             assert_eq!(
                 notes_of(&device, &alice).await,
                 notes_of(&server, &alice).await
@@ -797,7 +761,7 @@ mod tests {
     #[tokio::test]
     async fn local_users_move_to_account_is_only_for_a_local_user() {
         with_each_database(|database| async move {
-            let (server, _storage) = server(database);
+            let server = server(database);
             let session =
                 accounts::tests::signed_up_for_a_device(&server, "alice@example.com").await;
             let device = users::tests::device_of(&session.user, &session.token).await;

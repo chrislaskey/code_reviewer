@@ -146,7 +146,7 @@ On a MacBook, in dev, against Garage, with small text files:
 | Picking and checking for duplicates, on the web | 4 s |
 | A choice, and the same for the rest | under 0.2 s |
 | Creating, on the web, three at a time | 157 s |
-| Keeping them on a device, then its syncs (`sync_many_files_over_http`, a debug build) | 2.5 s, then 50 syncs in 82 s |
+| Keeping them on a device, then its syncs (`files_many_files_over_http`, a debug build) | 2.5 s, then 50 syncs in 82 s |
 
 A device's syncs grow slower as the files reach the server, 0.4 s for
 the first and 0.7 s for the tenth of 1,000: each pull starts

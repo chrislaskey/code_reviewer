@@ -1,4 +1,4 @@
-//! Files: a file in communities, as a row that syncs like a post and
+//! Files: a file in communities, as a row that syncs like any other and
 //! bytes kept apart from it, see `docs/design/offline-files-decisions.md`
 //! and `docs/design/files-communities.md`. The row holds the name, the
 //! content type and the size; the bytes are in the server's bucket at
@@ -10,7 +10,8 @@
 //! communities, `files_communities`: a live member of one sees it, and
 //! it lives as long as it is in one.
 //!
-//! Every write is an event applied by `apply_event`, as a post's is.
+//! Every write is an event applied by `apply_event`, as every synced
+//! row's is.
 //! What differs is the create: it carries the file's communities, and
 //! the server writes the rows only once the file is in its bucket, and
 //! answers `file_not_uploaded` until then.
@@ -1271,7 +1272,7 @@ impl SyncedBytes for Synced {
 pub(crate) mod tests {
     use super::*;
     use crate::accounts::Session;
-    use crate::app::{posts, users};
+    use crate::app::users;
     use crate::database::{Database, with_each_database};
     use crate::deployment::FileStore;
     use crate::helpers::content_type;
@@ -1281,8 +1282,17 @@ pub(crate) mod tests {
     use crate::sync::bytes::{Upload, UploadNew};
     use crate::sync::conflicts::{self, ConflictError, Resolve};
     use crate::sync::pending_changes;
+    use crate::sync::test_notes;
     use crate::sync::tests::user_with_token;
     use crate::sync::{self, BackfillRequest, Page, PullRequest, PushRequest, PushResponse};
+    #[cfg(feature = "sync-http")]
+    use crate::{
+        accounts,
+        app::{files, memberships},
+        services::web_server::Http,
+        sync::run,
+        sync::tests::device_session_over,
+    };
     use std::path::Path;
 
     /// The user's own community on the deployment, made the first time.
@@ -1690,9 +1700,9 @@ pub(crate) mod tests {
             let file = with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
                 .await
                 .expect("a file");
-            posts::create(&a, &alice, "a post beside it", &[])
+            test_notes::create(&a, &alice, "a note beside it", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             assert_eq!(in_bucket(&storage, &alice, file.id).await, None);
 
             let report = sync::run(&a, &InProcess { server: &server })
@@ -1701,7 +1711,7 @@ pub(crate) mod tests {
             assert_eq!(report.uploaded, 1);
             assert_eq!(
                 report.pushed, 4,
-                "the community, its membership and the post, then the file once its bytes went"
+                "the community, its membership and the note, then the file once its bytes went"
             );
             assert_eq!(report.pending, 0);
             assert_eq!(report.push_error, None);
@@ -1864,9 +1874,9 @@ pub(crate) mod tests {
             rename(&a, &alice, lost.id, "renamed.txt")
                 .await
                 .expect("renamed while waiting");
-            posts::create(&a, &alice, "a post", &[])
+            test_notes::create(&a, &alice, "a note", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             std::fs::remove_file(bytes::local_path(&a, lost.id).expect("a path"))
                 .expect("its bytes gone");
 
@@ -1876,7 +1886,7 @@ pub(crate) mod tests {
             assert_eq!(report.uploaded, 1);
             assert_eq!(
                 report.pushed, 4,
-                "the community, its membership, the post and the other file"
+                "the community, its membership, the note and the other file"
             );
             assert_eq!(report.pending, 1, "its rename, held back with it");
             assert_eq!(in_bucket(&storage, &alice, kept.id).await, Some(4));
@@ -2111,9 +2121,9 @@ pub(crate) mod tests {
             let file = with_bytes(&a, &alice, "notes.txt", "text/plain", b"some notes")
                 .await
                 .expect("a file");
-            posts::create(&a, &alice, "a post", &[])
+            test_notes::create(&a, &alice, "a note", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             let down = Faulty {
                 down_for_files: true,
                 ..Faulty::new(&server)
@@ -2133,9 +2143,12 @@ pub(crate) mod tests {
             assert_eq!(create.attempts, 0);
             tx.commit().await.expect("committed");
             assert_eq!(
-                posts::list(&server, &alice).await.expect("the posts").len(),
+                test_notes::list(&server, &alice)
+                    .await
+                    .expect("the notes")
+                    .len(),
                 1,
-                "the post went all the same"
+                "the note went all the same"
             );
 
             sync::run(&a, &InProcess { server: &server })
@@ -2973,5 +2986,272 @@ pub(crate) mod tests {
         .await
         .expect_err("no bucket");
         assert!(matches!(error, FileError::Bytes(BytesError::NoFileStore)));
+    }
+
+    /// A file added on one device reaches a running web server's bucket
+    /// and is fetched by another, over HTTP and the bucket's signed
+    /// URLs, as the apps do. Run against a running web server, its
+    /// bucket set up, and its database, which the test opens itself to
+    /// sign a user up:
+    ///
+    /// ```sh
+    /// SYNC_SERVER_URL=http://localhost:4010 TEST_SERVER_DATABASE_URL=sqlite:../axum/data/app.db \
+    ///   cargo test -p app_core --features sync-http a_file_over_http -- --ignored
+    /// ```
+    #[cfg(feature = "sync-http")]
+    #[tokio::test]
+    #[ignore]
+    async fn files_a_file_over_http() {
+        use crate::app::files::FileState;
+        use crate::deployment::FileStore;
+
+        let url = std::env::var("SYNC_SERVER_URL").expect("SYNC_SERVER_URL");
+        let server = Http::new(&url).expect("a transport");
+        let servers_database =
+            crate::database::tests::open_from_env("TEST_SERVER_DATABASE_URL").await;
+        let servers_database = Deployment::new(servers_database, Role::Server);
+        let email = format!("{}@example.com", Uuid::now_v7().simple());
+        let a_folder = tempfile::tempdir().expect("a folder");
+        let b_folder = tempfile::tempdir().expect("a folder");
+        let a = users::tests::device()
+            .await
+            .with_file_store(FileStore::Folder(a_folder.path().to_path_buf()));
+        let b = users::tests::device()
+            .await
+            .with_file_store(FileStore::Folder(b_folder.path().to_path_buf()));
+        let alice = {
+            let session = device_session_over(&server, &servers_database, &email).await;
+            accounts::keep_signed_in(&a, session)
+                .await
+                .expect("signed in on a")
+        };
+        let session = device_session_over(&server, &servers_database, &email).await;
+        accounts::keep_signed_in(&b, session)
+            .await
+            .expect("signed in on b");
+
+        let bytes: Vec<u8> = (0..300_000u32).map(|n| (n % 251) as u8).collect();
+        run(&a, &server).await.expect("a sync for her communities");
+        let personal = memberships::list_mine(&a, &alice)
+            .await
+            .expect("the memberships")[0]
+            .community_id;
+        let file = files::create_with_bytes(&a, &alice, "over http.bin", "", &[personal], &bytes)
+            .await
+            .expect("a file");
+        let report = run(&a, &server).await.expect("a sync");
+        assert_eq!(report.uploaded, 1, "{report:?}");
+        assert_eq!(report.pending, 0, "{report:?}");
+        let shown = files::get(&a, &alice, file.id).await.expect("on a");
+        assert_eq!(shown.state, FileState::Synced);
+
+        let report = run(&a, &server).await.expect("a sync");
+        assert_eq!(report.uploaded, 0);
+        run(&b, &server).await.expect("a sync");
+        let path = files::local_copy(&b, &server, &alice, file.id)
+            .await
+            .expect("fetched on b");
+        assert_eq!(std::fs::read(path).expect("the bytes"), bytes);
+
+        files::delete(&b, &alice, file.id)
+            .await
+            .expect("deleted on b");
+        let report = run(&b, &server).await.expect("a sync");
+        assert_eq!(report.cleaned, 1);
+        accounts::sign_out_on_device(&b, &server)
+            .await
+            .expect("signed out on b");
+        accounts::sign_out_on_device(&a, &server)
+            .await
+            .expect("signed out on a");
+    }
+
+    /// Many files added on a device, `FILES` of them, 1,000 unless set,
+    /// reach a running web server's bucket a sync of
+    /// `crate::sync::bytes::PER_SYNC` at a time, each sync starting the next as
+    /// the app does; prints how long each took. Run as
+    /// `files_a_file_over_http` is:
+    ///
+    /// ```sh
+    /// SYNC_SERVER_URL=http://localhost:4010 TEST_SERVER_DATABASE_URL=sqlite:../axum/data/app.db \
+    ///   cargo test -p app_core --features sync-http many_files_over_http -- --ignored --nocapture
+    /// ```
+    #[cfg(feature = "sync-http")]
+    #[tokio::test]
+    #[ignore]
+    async fn files_many_files_over_http() {
+        use crate::app::files::FileState;
+        use crate::deployment::FileStore;
+
+        let url = std::env::var("SYNC_SERVER_URL").expect("SYNC_SERVER_URL");
+        let count: usize = std::env::var("FILES")
+            .ok()
+            .and_then(|count| count.parse().ok())
+            .unwrap_or(1000);
+        let server = Http::new(&url).expect("a transport");
+        let servers_database =
+            crate::database::tests::open_from_env("TEST_SERVER_DATABASE_URL").await;
+        let servers_database = Deployment::new(servers_database, Role::Server);
+        let email = format!("{}@example.com", Uuid::now_v7().simple());
+        let folder = tempfile::tempdir().expect("a folder");
+        let a = users::tests::device()
+            .await
+            .with_file_store(FileStore::Folder(folder.path().to_path_buf()));
+        let alice = {
+            let session = device_session_over(&server, &servers_database, &email).await;
+            accounts::keep_signed_in(&a, session)
+                .await
+                .expect("signed in on a")
+        };
+        run(&a, &server).await.expect("a sync for her communities");
+        let personal = memberships::list_mine(&a, &alice)
+            .await
+            .expect("the memberships")[0]
+            .community_id;
+
+        let started = std::time::Instant::now();
+        let mut ids = Vec::with_capacity(count);
+        for number in 0..count {
+            let bytes = format!("emoji number {number}");
+            let file = files::create_with_bytes(
+                &a,
+                &alice,
+                &format!("{number}.txt"),
+                "text/plain",
+                &[personal],
+                bytes.as_bytes(),
+            )
+            .await
+            .expect("a file");
+            ids.push(file.id);
+        }
+        eprintln!(
+            "{count} files kept on the device in {:?}",
+            started.elapsed()
+        );
+
+        let started = std::time::Instant::now();
+        let mut syncs = 0;
+        loop {
+            let one = std::time::Instant::now();
+            let report = run(&a, &server).await.expect("a sync");
+            syncs += 1;
+            eprintln!(
+                "sync {syncs}: {:?}, uploaded {}, pushed {}, left {}, pulled {}",
+                one.elapsed(),
+                report.uploaded,
+                report.pushed,
+                report.files_left,
+                report.pulled
+            );
+            if !report.more_files_to_send() {
+                assert_eq!(report.pending, 0, "{report:?}");
+                break;
+            }
+        }
+        eprintln!(
+            "{count} files sent in {syncs} syncs, {:?}",
+            started.elapsed()
+        );
+        for id in ids {
+            let shown = files::get(&a, &alice, id).await.expect("on a");
+            assert_eq!(shown.state, FileState::Synced);
+        }
+        accounts::sign_out_on_device(&a, &server)
+            .await
+            .expect("signed out on a");
+    }
+
+    /// A device where someone skipped signing in, with a folder for its
+    /// files' bytes.
+    async fn device_with_a_local_user() -> (Deployment, User, tempfile::TempDir) {
+        let folder = tempfile::tempdir().expect("a folder");
+        let device = users::tests::device()
+            .await
+            .with_file_store(FileStore::Folder(folder.path().to_path_buf()));
+        let local = crate::app::local_users::create(
+            &device,
+            Uuid::now_v7(),
+            &crate::app::local_users::new_name(),
+            "Alice's Laptop",
+        )
+        .await
+        .expect("a local user");
+        (device, local, folder)
+    }
+
+    #[tokio::test]
+    async fn files_a_local_users_file_moves_to_their_new_account_with_its_bytes() {
+        with_each_database(|database| async move {
+            let (server, storage) = server(database);
+            let (device, local, _folder) = device_with_a_local_user().await;
+            let file = with_bytes(&device, &local, "notes.txt", "text/plain", b"notes")
+                .await
+                .expect("a file");
+            assert_eq!(
+                crate::app::local_users::count_items(&device)
+                    .await
+                    .expect("counted"),
+                1
+            );
+            let session =
+                crate::accounts::tests::signed_up_for_a_device(&server, "alice@example.com").await;
+            let alice = crate::app::local_users::move_to_account(&device, session, None)
+                .await
+                .expect("moved");
+
+            let report = sync::run(&device, &InProcess { server: &server })
+                .await
+                .expect("a sync");
+            assert_eq!(report.push_error, None);
+            assert_eq!((report.rejected, report.conflicts), (0, 0));
+            assert_eq!(report.uploaded, 1);
+            assert_eq!(report.pending, 0);
+            assert!(
+                storage
+                    .size(&crate::sync::bytes::storage_key(&Synced, alice.id, file.id))
+                    .await
+                    .expect("looked")
+                    .is_some(),
+                "its bytes in the bucket, under the account"
+            );
+            let shown = get(&server, &alice, file.id).await.expect("the file");
+            assert_eq!(
+                shown.file.inserted_at, file.inserted_at,
+                "made when it was made"
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn files_a_local_users_file_moves_into_a_single_community_accounts_own() {
+        with_each_database(|database| async move {
+            let (server, _storage) = server(database);
+            let session =
+                crate::accounts::tests::signed_up_for_a_device(&server, "alice@example.com").await;
+            let alice = session.user.clone();
+            let merge_target = crate::app::local_users::MergeTargetCommunity::oldest_membership(
+                communities::list(&server, &alice).await.expect("listed"),
+            )
+            .expect("her sign-up's community");
+            let (device, local, _folder) = device_with_a_local_user().await;
+            let file = with_bytes(&device, &local, "notes.txt", "text/plain", b"notes")
+                .await
+                .expect("a file");
+            crate::app::local_users::move_to_account(&device, session, Some(merge_target))
+                .await
+                .expect("moved");
+
+            let report = sync::run(&device, &InProcess { server: &server })
+                .await
+                .expect("a sync");
+            assert_eq!(report.push_error, None);
+            assert_eq!((report.rejected, report.conflicts), (0, 0));
+            let shown = get(&server, &alice, file.id).await.expect("the file");
+            let names: Vec<_> = shown.communities.iter().map(|c| c.name.as_str()).collect();
+            assert_eq!(names, ["Personal"]);
+        })
+        .await;
     }
 }

@@ -164,6 +164,8 @@ framework = [
 ]
 
 seams = [
+    "core/src/app.rs",
+    "core/src/data/mod.rs",
     "core/src/app/identity.rs",
     "core/src/app/synced_tables.rs",
     "core/src/app/jobs.rs",
@@ -214,9 +216,12 @@ examples = [
     "tauri/src/quick_picker/**",
     "tauri/src/clipboard/**",
     "tauri/src/macos/**",
+    "tauri/capabilities/quick-picker.json",
 
     "svelte/src/posts/**",
     "svelte/src/files/**",
+    "svelte/src/quick-picker/**",
+    "svelte/src/quick-picker.html",
     "svelte/src/lib/FileImage.svelte",
     "svelte/src/lib/file_size.js",
 ]

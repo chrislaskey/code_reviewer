@@ -19,6 +19,8 @@ pub async fn signed_in(device: &DeviceAccounts) -> Result<(Deployment, User), Co
 
 /// `signed_in` with the transport to the account's server, for a command
 /// that also asks the server, read together with the deployment.
+// The app's commands use it, as the files example's do
+#[allow(dead_code)]
 pub async fn signed_in_with_transport(
     device: &DeviceAccounts,
 ) -> Result<(Deployment, Http, User), CommandError> {

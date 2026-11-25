@@ -362,20 +362,6 @@ async fn accounts_trial_makes_a_user_whose_cookie_lasts_two_days_and_who_signs_u
         None,
         Some(&cookie),
         Method::POST,
-        "/api/files/uploads",
-        Some(json!({ "content_type": "text/plain", "size": 5, "sha256": "0".repeat(64) })),
-    )
-    .await;
-    assert_eq!(
-        status,
-        StatusCode::UNPROCESSABLE_ENTITY,
-        "no files on a trial"
-    );
-    let (status, _, _) = send_with(
-        &router.router,
-        None,
-        Some(&cookie),
-        Method::POST,
         "/api/users/current/avatar/uploads",
         Some(json!({ "content_type": "image/png", "size": 5 })),
     )

@@ -1,6 +1,6 @@
 # Deleting the examples
 
-Status: planned 2026-11-25; steps 1 to 4 built 2026-11-25.
+Status: built 2026-11-25, steps 1 to 5; step 6 open.
 
 ## Request
 
@@ -106,7 +106,8 @@ Considered: a test that deletes the examples in a copy of the repository
 and builds it. Rejected: it would have to edit the seams, which every
 app changes, so it would break on the app's own lines.
 
-Until the tests are moved (below), the check skips each file's tests.
+It reads the tests too, so a framework test cannot lean on an example
+either.
 
 ### The framework tests on a table of its own
 
@@ -145,8 +146,28 @@ sync tests.
 
 ### An example's tests stay with it
 
-The tests of an example's own rules move into its files, so they go
-when it goes. The files example's tests stop creating posts.
+The tests of an example's own rules are in its files, so they go when
+it goes: posts' community rows taken out and brought back, a file
+outliving its creator's account, a local user's file moving with its
+bytes. The files example's tests use test notes, not posts, for a row
+beside a file.
+
+A test against a running web server needs a table the server has, so
+the framework's (`sync_two_devices_over_http`) syncs a community, and
+the files example keeps its own for bytes.
+
+### A deleted example leaves no unused framework code
+
+An app builds with `-D warnings`, so a framework function only an
+example called would fail its lint once the example went.
+`users::list_by_ids` is `pub`, for an app's resources to show who
+made a row, and Tauri's `user_auth::signed_in_with_transport` allows
+being unused, for an app's commands that ask the server.
+
+Checked 2026-11-25 by deleting both examples in a copy of the
+repository: `cargo clippy --workspace --all-targets -- -D warnings`,
+`cargo test --workspace --all-targets`, `pnpm check`, `pnpm build` and,
+after `pnpm translations:update`, `pnpm translations:check` all passed.
 
 ### Migrations
 
@@ -155,6 +176,31 @@ An example's tables are created by its own migrations, listed in
 example, and resets its local databases. An app with a deployed
 database keeps them and adds a migration that drops the tables:
 sqlx refuses a database with an applied migration that is missing.
+
+## How an app deletes an example
+
+1. Delete the example's files: the globs of `examples` in
+   `framework.toml` for it, its migrations among them, and then those
+   globs.
+2. Take its lines out of the seams:
+   - `core/src/app.rs` and `core/src/data/mod.rs`: its modules.
+   - `core/src/app/synced_tables.rs`: its tables.
+   - `axum/src/app.rs`, `axum/src/router.rs`: its module and routes.
+   - `axum/src/api_error.rs`, `tauri/src/command_error.rs`: its errors.
+   - `axum/src/tests/app.rs`, `axum/src/tests/router.rs`: its tests,
+     and `test_router_with_a_post` for posts.
+   - `tauri/src/app.rs`, `tauri/src/lib.rs`: its module and commands.
+     For files also the `files` URI scheme, `quick_picker::register`,
+     and the `clipboard`, `macos` and `quick_picker` modules.
+   - `svelte/src/lib/pages.js`, `routes.js`, `layouts/AppNav.svelte`
+     and `core/`: its pages, paths, nav item and calls. For files also
+     the `quick_picker` input of `svelte/vite.config.js`.
+3. Run `pnpm translations:update` in `svelte/`.
+4. Reset the local databases, `bin/reset`, since their applied
+   migrations name the deleted ones.
+5. Run the checks of AGENTS.md, section 2.
+
+No `[[divergence]]` is needed: none of these is a framework file.
 
 ## Steps
 

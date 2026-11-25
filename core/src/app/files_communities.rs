@@ -1286,4 +1286,91 @@ mod tests {
         })
         .await;
     }
+
+    /// A file is its communities', so its creator's account goes without
+    /// it: one in a community with other members stays there, one in
+    /// hers alone goes with that community.
+    #[tokio::test]
+    async fn files_communities_a_deleted_accounts_files_stay_in_communities_with_other_members() {
+        use crate::accounts::deletions::{self, tests::code_mailed};
+        use crate::accounts::tests::signed_up_for_a_device;
+        use crate::services::mailer::Mailer;
+
+        with_each_database(|database| async move {
+            let (server, storage) = server(database);
+            let mailer = Mailer::memory();
+            let alice = signed_up_for_a_device(&server, "alice@example.com").await;
+            let bob = signed_up_for_a_device(&server, "bob@example.com").await;
+            let shared = communities::create(&server, &alice.user, "Shared")
+                .await
+                .expect("a community");
+            memberships::create(&server, &bob.user, shared.id)
+                .await
+                .expect("joined");
+            let personal = memberships::list_mine(&server, &alice.user)
+                .await
+                .expect("the memberships")
+                .into_iter()
+                .map(|membership| membership.community_id)
+                .find(|id| *id != shared.id)
+                .expect("alice's own community");
+            let mut created = Vec::new();
+            for (name, community_id) in [("shared.txt", shared.id), ("private.txt", personal)] {
+                let new = FileNew {
+                    community_ids: vec![community_id],
+                    ..new_file(name, b"bytes", community_id)
+                };
+                storage
+                    .put(
+                        &crate::sync::bytes::storage_key(&files::Synced, alice.user.id, new.id),
+                        b"bytes".to_vec(),
+                    )
+                    .await
+                    .expect("the upload");
+                created.push(
+                    files::create(&server, &alice.user, &new)
+                        .await
+                        .expect("a file"),
+                );
+            }
+
+            let code = code_mailed(&server, &mailer, &alice).await;
+            deletions::create(
+                &server,
+                &mailer,
+                &alice.user,
+                Some(&code),
+                crate::helpers::locales::DEFAULT,
+            )
+            .await
+            .expect("deleted");
+
+            let shown = files::get(&server, &bob.user, created[0].id)
+                .await
+                .expect("the community keeps it");
+            assert_eq!(shown.creator, None);
+            let mut tx = server.begin().await.expect("a transaction");
+            let private = files::get_in(&mut tx, created[1].id)
+                .await
+                .expect("read")
+                .expect("kept until the purge");
+            tx.commit().await.expect("committed");
+            assert!(private.deleted_at.is_some(), "it went with her community");
+            for file in &created {
+                assert!(
+                    storage
+                        .size(&crate::sync::bytes::storage_key(
+                            &files::Synced,
+                            alice.user.id,
+                            file.id
+                        ))
+                        .await
+                        .expect("looked")
+                        .is_some(),
+                    "the bytes go by the sweep, not by person"
+                );
+            }
+        })
+        .await;
+    }
 }
