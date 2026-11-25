@@ -60,7 +60,8 @@ Pages:
 
 Server settings:
   SERVER_SETTINGS  The web server's settings, a JSON document, from the
-                   environment or else from .env (copy .env.example), so an
+                   environment or else from .env (made from .env.example
+                   when there is none), so an
                    app's dev server runs as it does in production. See
                    core/src/servers/settings.rs.
 
@@ -237,6 +238,12 @@ stop_all() {
   done
 }
 trap stop_all EXIT INT TERM
+
+# A new checkout or worktree has no .env, as git ignores it.
+if [ ! -f "$ROOT/.env" ] && [ -f "$ROOT/.env.example" ]; then
+  cp "$ROOT/.env.example" "$ROOT/.env"
+  echo "bin/dev: created .env from .env.example"
+fi
 
 if [ ! -d "$ROOT/svelte/node_modules" ]; then
   (cd "$ROOT/svelte" && pnpm install)
