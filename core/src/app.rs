@@ -13,6 +13,7 @@ pub mod files_communities;
 pub mod groups;
 pub mod identity;
 pub mod jobs;
+pub mod last_visited_page;
 pub mod local_users;
 pub mod locales;
 pub mod memberships;

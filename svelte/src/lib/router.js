@@ -10,12 +10,15 @@
 // going nowhere (page_load_error.svelte.js). The template's own pages are
 // listed here, the app's in pages.js. A page whose required feature is
 // disabled on the server (APP_PAGES_REQUIRED_FEATURES) redirects to Home,
-// as do the communities pages on a server with a single community.
+// as do the communities pages on a server with a single community. In the
+// app, each page loaded is kept as the active account's last visited page,
+// which a switch back to that account opens; the device's own pages, such
+// as the accounts page, are not kept.
 import { Navigation, createRouter } from "sv-router";
 import { t } from "ttag";
 import AppLayout from "./layouts/AppLayout.svelte";
 import { APP_PAGES, APP_PAGES_REQUIRED_FEATURES } from "./pages.js";
-import { hasDeviceAccounts } from "./core/index.js";
+import { hasDeviceAccounts, lastVisitedPageUpdate } from "./core/index.js";
 import { currentServerHasSingleCommunity, currentServerLoad } from "./current_server.svelte.js";
 import { currentUserLoad } from "./current_user.svelte.js";
 import { errorMessageOf } from "./error_message.js";
@@ -48,6 +51,9 @@ import {
   homeUrl,
 } from "./routes.js";
 
+/** The device's own pages, never kept as an account's last visited page. */
+const DEVICE_PATHS = [ACCOUNTS_INDEX_PATH, ACCOUNTS_SIGN_IN_PATH, ACCOUNTS_TRIAL_PATH, ACCOUNTS_BACK_TO_APP_PATH];
+
 const { navigate, route } = createRouter({
   layout: AppLayout,
   hooks: {
@@ -76,6 +82,12 @@ const { navigate, route } = createRouter({
         await currentServerLoad().catch(() => {});
         if (currentServerHasSingleCommunity()) throw navigateToUrl(homeUrl());
       }
+    },
+    afterLoad() {
+      const { pathname, search } = window.location;
+      if (!hasDeviceAccounts || DEVICE_PATHS.includes(pathname)) return;
+      // Nobody may be active yet; the page shows either way
+      lastVisitedPageUpdate(pathname + search).catch(() => {});
     },
     onError(problem) {
       // A redirect from beforeLoad arrives here too
@@ -149,7 +161,7 @@ export function currentPathname() {
 }
 
 // The router types its paths; ours come from routes.js, so any path goes.
-const navigateToPath = /** @type {(pathname: string) => Promise<unknown>} */ (/** @type {unknown} */ (navigate));
+const navigateToPath = /** @type {(pathname: string, options?: {search?: string}) => Promise<unknown>} */ (/** @type {unknown} */ (navigate));
 
 /**
  * Shows the page at a URL from routes.js in place of the current one, and
@@ -157,5 +169,7 @@ const navigateToPath = /** @type {(pathname: string) => Promise<unknown>} */ (/*
  * @param {string} url
  */
 export function navigateToUrl(url) {
-  return navigateToPath(url);
+  const queryStart = url.indexOf("?");
+  if (queryStart === -1) return navigateToPath(url);
+  return navigateToPath(url.slice(0, queryStart), { search: url.slice(queryStart) });
 }

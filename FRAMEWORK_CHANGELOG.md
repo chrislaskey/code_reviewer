@@ -18,6 +18,20 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-24: A switch to an account opens its last visited page
+
+- **What changed**: in the app, the router keeps each page loaded as
+  the active account's `last_visited_page` device setting. The device's
+  own pages, such as `/accounts`, are not kept. A switch to an account
+  opens that page again: Switch on `/accounts`, or a double tap on the
+  avatar, which switches to the next signed-in account (commit
+  `5201fc5`). Signing in and starting the app still land on Home.
+  `deviceAccountsSwitch` now answers `{user, last_visited_page}` instead
+  of the user. `navigateToUrl` now keeps a URL's query.
+- **What an app does**:
+  - **Required**, for an app that calls `deviceAccountsSwitch` and uses
+    what it answers: read the user from its `user`.
+
 ## 2026-11-24: bin/dev creates .env from .env.example
 
 - **What changed**: `bin/dev` copies `.env.example` to `.env` when there

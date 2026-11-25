@@ -4,7 +4,8 @@
      made-up one, with what that means and Sign up, AccountsGuestNotice,
      which a dot on the avatar points to; links to their profile and their
      account's settings; Switch account in the app, to the device's
-     accounts; and Log out. A local user and a guest have no log-out,
+     accounts, where a double tap on the avatar switches to the next
+     signed-in account at once, on the page last visited in it; and Log out. A local user and a guest have no log-out,
      having nothing to log back in with, and no account settings. A
      visitor sees Log in and Sign up on the web, and Log in in the app, to
      the device's accounts. -->
@@ -12,10 +13,11 @@
   import { t } from "ttag";
   import AccountsGuestNotice from "../AccountsGuestNotice.svelte";
   import HeaderMenu from "./HeaderMenu.svelte";
-  import { accountsSignOut, hasDeviceAccounts } from "../core/index.js";
+  import { accountsSignOut, deviceAccountsSwitchNext, hasDeviceAccounts } from "../core/index.js";
   import { errorMessageOf } from "../error_message.js";
   import { currentUser, currentUserForget } from "../current_user.svelte.js";
   import { navigateToUrl } from "../router.js";
+  import { pageAfterSignInUrl } from "../pages.js";
   import {
     accountsIndexUrl,
     accountsCurrentShowUrl,
@@ -42,10 +44,29 @@
       busy = false;
     }
   }
+
+  async function switchToNextAccount() {
+    if (busy) return;
+    error = "";
+    busy = true;
+    try {
+      const switched = await deviceAccountsSwitchNext();
+      if (switched) {
+        currentUserForget();
+        await navigateToUrl(switched.last_visited_page ?? pageAfterSignInUrl());
+      }
+    } catch (problem) {
+      error = errorMessageOf(problem);
+    } finally {
+      busy = false;
+    }
+  }
 </script>
 
 {#if currentUser.value}
-  <HeaderMenu label={isGuest ? t`Account, as a guest` : t`Account`} buttonClass="btn-circle">
+  <HeaderMenu label={isGuest ? t`Account, as a guest` : t`Account`} buttonClass="btn-circle"
+    ondoubletap={hasDeviceAccounts ? switchToNextAccount : undefined}
+  >
     {#snippet button()}
       <span class="relative inline-flex">
         <Avatar user={currentUser.value} />

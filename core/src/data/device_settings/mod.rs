@@ -38,6 +38,10 @@ pub const SIGNED_IN: &str = "signed_in";
 /// for none chosen yet, see `current_community`.
 pub const CURRENT_COMMUNITY: &str = "current_community_id";
 
+/// The page the person was last on in this account, a path with its
+/// query, or null for none yet, see `last_visited_page`.
+pub const LAST_VISITED_PAGE: &str = "last_visited_page";
+
 /// The account a local user's records were moved to, a
 /// `local_users::Moved`, until the app has updated its list of
 /// accounts; null otherwise.
@@ -55,6 +59,7 @@ pub fn defaults() -> Vec<(&'static str, Value)> {
         (WORK_OFFLINE, Value::Bool(false)),
         (SIGNED_IN, Value::Null),
         (CURRENT_COMMUNITY, Value::Null),
+        (LAST_VISITED_PAGE, Value::Null),
         (LOCAL_USER_MOVED, Value::Null),
         (PLAN, Value::Null),
     ]
