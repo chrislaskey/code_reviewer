@@ -11,6 +11,7 @@
   import HeaderMenu from "./HeaderMenu.svelte";
   import { onSynced, syncRun, syncSetOffline, syncStatus } from "../core/index.js";
   import { errorMessageOf } from "../error_message.js";
+  import { flashMessageShow } from "../flash_messages.svelte.js";
   import { currentUserForget } from "../current_user.svelte.js";
   import { navigateToUrl } from "../router.js";
   import { accountsIndexUrl, conflictsIndexUrl } from "../routes.js";
@@ -37,7 +38,9 @@
     } = /** @type {{report?: {push_error?: string}, error?: string, account_deleted?: boolean}} */ (outcome ?? {});
     if (accountDeleted) {
       currentUserForget();
-      navigateToUrl(accountsIndexUrl({ accountDeleted: true }));
+      navigateToUrl(accountsIndexUrl()).then(() =>
+        flashMessageShow(t`This account was deleted, and removed from this device.`),
+      );
       return;
     }
     error = failure ?? report?.push_error ?? "";

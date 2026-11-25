@@ -3,7 +3,7 @@
 <script>
   /**
    * @typedef {Object} Props
-   * @property {"info" | "warning" | "error"} [tone]
+   * @property {"info" | "success" | "warning" | "error"} [tone]
    * @property {any} [class]
    * @property {import("svelte").Snippet} children
    */
@@ -11,7 +11,7 @@
   /** @type {Props & Record<string, any>} */
   let { tone = "info", class: class_, children, ...attributes } = $props();
 
-  const TONE_CLASSES = { info: "alert-info", warning: "alert-warning", error: "alert-error" };
+  const TONE_CLASSES = { info: "alert-info", success: "alert-success", warning: "alert-warning", error: "alert-error" };
 </script>
 
 <div class={["alert", TONE_CLASSES[tone], class_]} {...attributes}>

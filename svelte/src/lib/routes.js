@@ -61,12 +61,9 @@ export function accountsTrialUrl() {
   return ACCOUNTS_TRIAL_PATH;
 }
 
-/**
- * The accounts on this device, inside the app only.
- * @param {{accountDeleted?: boolean}} [options] to say an account was just deleted
- */
-export function accountsIndexUrl({ accountDeleted = false } = {}) {
-  return accountDeleted ? `${ACCOUNTS_INDEX_PATH}?account_deleted=1` : ACCOUNTS_INDEX_PATH;
+/** The accounts on this device, inside the app only. */
+export function accountsIndexUrl() {
+  return ACCOUNTS_INDEX_PATH;
 }
 
 // The account pages carry two things in their query, which every link
