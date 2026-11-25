@@ -54,3 +54,23 @@ fn framework_check_leaves_an_apps_new_files_beside_the_templates_to_the_app() {
         );
     }
 }
+
+#[test]
+fn framework_check_finds_no_example_named_in_the_framework() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("the repository's root");
+    let manifest = framework_check::manifest(root).expect("the manifest");
+    let named = framework_check::examples::list_named_in_framework(root, &manifest)
+        .expect("the framework's files");
+    assert!(
+        named.is_empty(),
+        "The framework names an example, which an app deleting it would break, \
+         see docs/design/examples-delete.md. Give the example's part to it, \
+         through a SyncedTable method say:\n\n{}",
+        named
+            .iter()
+            .map(|named| format!("  {named}\n"))
+            .collect::<String>()
+    );
+}

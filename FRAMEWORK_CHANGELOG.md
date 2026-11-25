@@ -18,6 +18,34 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-25: the framework names no example
+
+- **What changed**: the framework's code no longer names posts or
+  files, see `docs/design/examples-delete.md`. What goes with a deleted
+  account, a left or rejoined membership and a deleted community is
+  each table's own, by four `SyncedTable` methods with defaults that do
+  nothing: `delete_of_user`, `delete_with_membership`,
+  `revive_with_membership` and `delete_with_community`. Posts implement
+  the first, posts' community rows the two membership ones, and files'
+  community rows the last. `DeletionError::Post` is now
+  `DeletionError::Table`, and `MembershipError` and `CommunityError`
+  have a `Table` variant. The conflicts page links back to Home. A test,
+  `framework_check_finds_no_example_named_in_the_framework`, fails on a
+  framework file naming an example outside its tests. `framework.toml`
+  lists `svelte/src/posts/**` and `svelte/src/files/**` as examples.
+- **What an app does**:
+  - **Required**, for an app that matches `DeletionError`,
+    `MembershipError` or `CommunityError` in its own code: answer the
+    `Table` variant, as `axum/src/api_error.rs` does.
+  - **Required**, for an app that changed `core/src/app/posts.rs`,
+    `posts_communities.rs` or `files_communities.rs`: keep the new
+    `SyncedTable` methods in its copy when the merge conflicts, or a
+    deleted account keeps its posts, and a left membership its posts'
+    community rows.
+  - **Optional**: a table of the app's own whose rows go with their
+    maker's account, leave with a membership, or go with a community
+    implements the method.
+
 ## 2026-11-25: the theme per person
 
 - **What changed**: the theme is a preference, `theme` in

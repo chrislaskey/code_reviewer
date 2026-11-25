@@ -18,6 +18,8 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
+pub mod examples;
+
 /// The manifest at the root of the repository.
 pub const MANIFEST: &str = "framework.toml";
 /// The hashes at the root of the repository.
@@ -200,9 +202,19 @@ pub fn framework_hashes(
     root: &Path,
     manifest: &Manifest,
 ) -> Result<BTreeMap<String, String>, CheckError> {
+    let mut hashes = BTreeMap::new();
+    for (path, file) in framework_files(root, manifest)? {
+        hashes.insert(path, sha256_of(&file)?);
+    }
+    Ok(hashes)
+}
+
+/// Every framework file under the root: its path from the root with `/`
+/// between folders, and where it is.
+fn framework_files(root: &Path, manifest: &Manifest) -> Result<Vec<(String, PathBuf)>, CheckError> {
     let framework = patterns(&manifest.framework)?;
     let exceptions = patterns(manifest.seams.iter().chain(&manifest.examples))?;
-    let mut hashes = BTreeMap::new();
+    let mut files = Vec::new();
     // The repository's own .gitignore files alone, not a person's global
     // ones, so every machine hashes the same files
     let walk = WalkBuilder::new(root)
@@ -226,10 +238,10 @@ pub fn framework_hashes(
             continue;
         };
         if matches_any(&framework, &path) && !matches_any(&exceptions, &path) {
-            hashes.insert(path, sha256_of(entry.path())?);
+            files.push((path, entry.path().to_path_buf()));
         }
     }
-    Ok(hashes)
+    Ok(files)
 }
 
 /// Reads `framework.lock` at the root: one `<sha256>  <path>` a line.

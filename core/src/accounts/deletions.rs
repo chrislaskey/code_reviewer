@@ -2,13 +2,14 @@
 //! `docs/design/accounts-delete.md`. A full user asks for a code,
 //! `code::create`, which is mailed as a sign-in's is, and gives it back
 //! to `create`, which deletes everything of theirs in one transaction:
-//! their posts and memberships, and a community nobody else is in, each
-//! soft-deleted as an event in their name, so every device that pulled
-//! a row sees it go; their user, named "Deleted user"; their staff row;
-//! and their account, so sign-in finds it no longer and a token of
-//! theirs is answered `410`. Their files belong to their communities:
-//! those in a community deleted with them go with it, the rest stay,
-//! see `files_communities`. Then, outside the transaction, a Stripe plan
+//! their rows of each synced table, by the table's own rule
+//! (`SyncedTable::delete_of_user`), their memberships, and a community
+//! nobody else is in, each soft-deleted as an event in their name, so
+//! every device that pulled a row sees it go; their user, named "Deleted
+//! user"; their staff row; and their account, so sign-in finds it no
+//! longer and a token of theirs is answered `410`. A table's rows that
+//! belong to a community rather than their maker go with the community,
+//! or stay. Then, outside the transaction, a Stripe plan
 //! is ended at once and the customer deleted, their pictures are
 //! deleted, and they are mailed; a failure there is logged and left to
 //! the daily jobs. The purge removes the rows 90 days later, and the
@@ -26,7 +27,6 @@ pub mod code;
 #[cfg(feature = "stripe")]
 use crate::data::accounts_subscriptions;
 use crate::data::app_communities;
-use crate::data::app_posts;
 use crate::data::app_users_communities;
 use crate::data::ops_staff;
 use thiserror::Error;
@@ -37,7 +37,7 @@ use crate::accounts::trial_users;
 use crate::accounts::{AccountError, MAX_CODE_ATTEMPTS};
 use crate::app::communities::{self, CommunityError};
 use crate::app::memberships::{self, MembershipError};
-use crate::app::posts::{self, PostError};
+use crate::app::synced_tables;
 use crate::app::users::{self, UserError};
 use crate::data::accounts_tokens;
 use crate::data::accounts_users::{self, AccountUser, AccountUserError};
@@ -48,6 +48,7 @@ use crate::deployment::{Deployment, Role, now};
 use crate::services::mailer::mails;
 use crate::services::mailer::{MailError, Mailer};
 use crate::sync::events::{Answer, AnswerStatus};
+use crate::sync::synced_table::TableError;
 
 #[derive(Debug, Error)]
 pub enum DeletionError {
@@ -65,8 +66,9 @@ pub enum DeletionError {
     User(#[from] UserError),
     #[error(transparent)]
     AccountUser(#[from] AccountUserError),
+    /// A synced table's own module failed.
     #[error(transparent)]
-    Post(#[from] PostError),
+    Table(#[from] TableError),
     #[error(transparent)]
     Membership(#[from] MembershipError),
     #[error(transparent)]
@@ -179,11 +181,8 @@ async fn delete_and_commit(
 /// staff row and the account.
 async fn delete_in(tx: &mut Transaction, user: &User) -> Result<(), DeletionError> {
     let role = Role::Server;
-    for post in
-        crate::data::app_posts::list(tx, crate::data::app_posts::Filter::OwnedBy(user.id)).await?
-    {
-        let event = deleted_event(app_posts::TABLE, post.id, post.version);
-        refused_unless_applied(&posts::apply_in(tx, role, user, &event).await?.answer)?;
+    for table in synced_tables::list().iter().rev() {
+        table.delete_of_user(tx, role, user).await?;
     }
     for membership in
         app_users_communities::list(&mut *tx, app_users_communities::Filter::User(user.id)).await?
@@ -343,6 +342,7 @@ mod tests {
     use super::*;
     use crate::accounts::tests::{code_sent_to, signed_up_for_a_device};
     use crate::accounts::{self, Session};
+    use crate::app::posts;
     use crate::app::users;
     use crate::app::users::tests::device_of;
     use crate::database::with_each_database;

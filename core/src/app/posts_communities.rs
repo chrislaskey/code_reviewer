@@ -234,7 +234,7 @@ pub(crate) async fn delete_with_post(
 
 /// Deletes the member's live rows in the community with their
 /// membership, at its moment.
-pub(crate) async fn delete_with_membership(
+async fn delete_with_membership(
     tx: &mut Transaction,
     role: Role,
     membership: &Membership,
@@ -255,7 +255,7 @@ pub(crate) async fn delete_with_membership(
 /// Revives the rows that left with the membership at `left_at`, unless
 /// their post was deleted meanwhile, in which case a row takes the
 /// post's delete instead.
-pub(crate) async fn revive_with_membership(
+async fn revive_with_membership(
     tx: &mut Transaction,
     role: Role,
     membership: &Membership,
@@ -665,6 +665,26 @@ impl SyncedTable for Synced {
     ) -> Result<Vec<TableRow>, TableError> {
         let rows = list_live_of_community_after(tx, community_id, after, limit).await?;
         Ok(rows.iter().map(table_row).collect::<Result<_, _>>()?)
+    }
+
+    /// A row is put in under its owner's membership, so it leaves with it.
+    async fn delete_with_membership(
+        &self,
+        tx: &mut Transaction,
+        role: Role,
+        membership: &Membership,
+    ) -> Result<(), TableError> {
+        Ok(delete_with_membership(tx, role, membership).await?)
+    }
+
+    async fn revive_with_membership(
+        &self,
+        tx: &mut Transaction,
+        role: Role,
+        membership: &Membership,
+        left_at: DateTime<Utc>,
+    ) -> Result<(), TableError> {
+        Ok(revive_with_membership(tx, role, membership, left_at).await?)
     }
 
     async fn move_rows_to_community(

@@ -281,7 +281,7 @@ pub(crate) async fn list_visible_of_files(
 
 /// Deletes the community's live rows with it, at its moment, and each
 /// file that leaves with no row.
-pub(crate) async fn delete_with_community(
+async fn delete_with_community(
     tx: &mut Transaction,
     role: Role,
     community: &Community,
@@ -725,6 +725,17 @@ impl SyncedTable for Synced {
             to.community_id,
         )
         .await?)
+    }
+
+    /// A row is the community's, so it goes with it, and a file left in
+    /// no community goes too.
+    async fn delete_with_community(
+        &self,
+        tx: &mut Transaction,
+        role: Role,
+        community: &Community,
+    ) -> Result<(), TableError> {
+        Ok(delete_with_community(tx, role, community).await?)
     }
 }
 

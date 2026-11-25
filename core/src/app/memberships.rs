@@ -1,10 +1,10 @@
 //! Memberships: a user in a community, with a role the app interprets,
 //! `member` for every row today. Joining writes the row; leaving
-//! soft-deletes it and takes the member's own posts in the community
+//! soft-deletes it and takes the member's own rows in the community
 //! along, every row under it deleted at the one moment; rejoining
 //! revives the same row and exactly what left with it, see
-//! `posts_communities`. Once the purge has removed the row, rejoining
-//! starts fresh.
+//! `SyncedTable::delete_with_membership`. Once the purge has removed the
+//! row, rejoining starts fresh.
 //!
 //! The server decides these rows: a device's event is what the person
 //! meant, applied through the same join and leave, and the server's row
@@ -19,8 +19,7 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::posts_communities;
-use crate::app::{communities, users};
+use crate::app::{communities, synced_tables, users};
 use crate::data::app_communities::Community;
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
 use crate::data::app_sync_backfills;
@@ -48,6 +47,9 @@ pub enum MembershipError {
     Rejected(String),
     #[error(transparent)]
     Record(#[from] crate::sync::events::RecordError),
+    /// A synced table's own module failed.
+    #[error(transparent)]
+    Table(#[from] TableError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -370,15 +372,13 @@ async fn leave_at(
     membership.deleted_at = Some(at);
     membership.deleted_by_id = Some(user.id);
     write_changed(tx, role, &mut membership).await?;
-    posts_communities::delete_with_membership(tx, role, &membership)
-        .await
-        .map_err(|error| MembershipError::Invalid(error.to_string()))?;
+    delete_rows_with(tx, role, &membership).await?;
     Ok(membership)
 }
 
 /// Soft-deletes every live membership in the deleted community at the
 /// community's moment, and every live row under them; copied down, not
-/// logged, as a post's delete is.
+/// logged, as every delete with a parent is.
 pub(crate) async fn delete_with_community(
     tx: &mut Transaction,
     role: Role,
@@ -393,9 +393,7 @@ pub(crate) async fn delete_with_community(
         membership.deleted_at = community.deleted_at;
         membership.deleted_by_id = community.deleted_by_id;
         write_changed(tx, role, &mut membership).await?;
-        posts_communities::delete_with_membership(tx, role, &membership)
-            .await
-            .map_err(|error| MembershipError::Invalid(error.to_string()))?;
+        delete_rows_with(tx, role, &membership).await?;
     }
     Ok(())
 }
@@ -413,10 +411,24 @@ async fn revive(
     membership.deleted_at = None;
     membership.deleted_by_id = None;
     write_changed(tx, role, &mut membership).await?;
-    posts_communities::revive_with_membership(tx, role, &membership, left_at)
-        .await
-        .map_err(|error| MembershipError::Invalid(error.to_string()))?;
+    for table in synced_tables::list() {
+        table
+            .revive_with_membership(tx, role, &membership, left_at)
+            .await?;
+    }
     Ok(membership)
+}
+
+/// Deletes every table's rows under the membership, children first.
+async fn delete_rows_with(
+    tx: &mut Transaction,
+    role: Role,
+    membership: &Membership,
+) -> Result<(), MembershipError> {
+    for table in synced_tables::list().iter().rev() {
+        table.delete_with_membership(tx, role, membership).await?;
+    }
+    Ok(())
 }
 
 /// Writes the membership over its row as the role does: the server

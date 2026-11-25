@@ -14,7 +14,7 @@
   } from "../lib/core/index.js";
   import { loaded } from "../lib/loaded.svelte.js";
   import { errorMessageOf } from "../lib/error_message.js";
-  import { postsIndexUrl } from "../lib/routes.js";
+  import { homeUrl } from "../lib/routes.js";
   import { Button, ErrorMessage, Heading, Link, Page, Panel, Text } from "../lib/components/index.js";
 
   const changes = loaded(
@@ -105,5 +105,5 @@
     {/each}
   </ul>
 
-  <Link href={postsIndexUrl()}>{t`Back to posts`}</Link>
+  <Link href={homeUrl()}>{t`Back to Home`}</Link>
 </Page>

@@ -165,7 +165,9 @@ impl From<CommunityError> for ApiError {
             }
             CommunityError::Membership(error) => return ApiError::from_membership(error),
             CommunityError::Record(error) => return ApiError::from_record(error),
-            CommunityError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            CommunityError::Table(_) | CommunityError::Database(_) => {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         };
         ApiError::new(status, error.to_string())
     }
@@ -181,7 +183,9 @@ impl ApiError {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
             MembershipError::Record(error) => return ApiError::from_record(error),
-            MembershipError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            MembershipError::Table(_) | MembershipError::Database(_) => {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         };
         ApiError::new(status, error.to_string())
     }
@@ -346,7 +350,6 @@ impl From<DeletionError> for ApiError {
         let status = match error {
             DeletionError::User(error) => return error.into(),
             DeletionError::AccountUser(error) => return error.into(),
-            DeletionError::Post(error) => return error.into(),
             DeletionError::Membership(error) => return error.into(),
             DeletionError::Community(error) => return error.into(),
             // Never 401, which a device takes for a sign-out
@@ -355,9 +358,10 @@ impl From<DeletionError> for ApiError {
             }
             DeletionError::Mail(_) => StatusCode::SERVICE_UNAVAILABLE,
             DeletionError::NoAccount { .. } => StatusCode::NOT_FOUND,
-            DeletionError::ServerOnly | DeletionError::Refused(_) | DeletionError::Database(_) => {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            DeletionError::ServerOnly
+            | DeletionError::Refused(_)
+            | DeletionError::Table(_)
+            | DeletionError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         ApiError::new(status, error.to_string())
     }

@@ -1,12 +1,13 @@
 //! Communities: the soft boundary inside a deployment, see
 //! `docs/design/offline-sync.md`. A user joins communities, see
-//! `memberships`, and a post is in the communities its owner chose, see
-//! `posts_communities`. Any user creates a community and joins it as
+//! `memberships`, and an app's rows are in communities, each table by
+//! its own rule. Any user creates a community and joins it as
 //! they do; every user sees every community, so a device can list them
 //! and join, but a trial user's, which nobody else sees or joins, see
 //! `trial_users`. Any live member renames or deletes one, `member` being the
 //! only role yet. A delete takes every membership in the community along,
-//! and with them the posts' community rows, all at the one moment.
+//! and every table's rows in it, all at the one moment, see
+//! `SyncedTable::delete_with_community`.
 
 use crate::data::app_communities::{self, AcceptedCommunity, Community, TABLE};
 use crate::data::app_users_communities;
@@ -16,8 +17,8 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::files_communities;
 use crate::app::memberships::{self, MembershipError};
+use crate::app::synced_tables;
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
 use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
@@ -57,6 +58,9 @@ pub enum CommunityError {
     Membership(#[from] MembershipError),
     #[error(transparent)]
     Record(#[from] crate::sync::events::RecordError),
+    /// A synced table's own module failed.
+    #[error(transparent)]
+    Table(#[from] TableError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -410,9 +414,9 @@ pub(crate) async fn apply_in(
             let updated = updated.into_row();
             if changes.contains_key("deleted_at") && updated.deleted_at.is_some() {
                 memberships::delete_with_community(tx, role, &updated).await?;
-                files_communities::delete_with_community(tx, role, &updated)
-                    .await
-                    .map_err(|error| CommunityError::Malformed(error.to_string()))?;
+                for table in synced_tables::list().iter().rev() {
+                    table.delete_with_community(tx, role, &updated).await?;
+                }
             }
             finish(tx, role, user, event, conflicts, updated).await
         }

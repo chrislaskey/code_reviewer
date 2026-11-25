@@ -131,8 +131,7 @@ msgstr "Editar"
 msgid "Delete"
 msgstr "Eliminar"
 
-#: src/conflicts/ConflictsIndexPage.svelte:67 src/posts/PostsNewPage.svelte:47
-#: src/posts/PostsShowPage.svelte:39
+#: src/posts/PostsNewPage.svelte:47 src/posts/PostsShowPage.svelte:39
 msgid "Back to posts"
 msgstr "Volver a las publicaciones"
 
@@ -859,6 +858,10 @@ msgstr "Intentar de nuevo"
 msgid "Let it go"
 msgstr "Descartarlo"
 
+#: src/conflicts/ConflictsIndexPage.svelte:67
+msgid "Back to Home"
+msgstr "Volver a Inicio"
+
 #: src/communities/CommunitiesShowPage.svelte:34
 msgid "Community"
 msgstr "Comunidad"
@@ -916,12 +919,8 @@ msgid "Delete ${ community.name }?"
 msgstr "¿Eliminar ${ community.name }?"
 
 #: src/communities/components/CommunitiesDeleteDialog.svelte:26
-msgid ""
-"Every member leaves it, and the posts in it are taken out of it. The posts "
-"themselves stay with the people who wrote them."
-msgstr ""
-"Todos los miembros salen de ella y sus publicaciones se quitan de ella. Las "
-"publicaciones en sí siguen siendo de quienes las escribieron."
+msgid "Every member leaves it, and everything in it is taken out of it."
+msgstr "Todos los miembros salen de ella y todo lo que contiene se quita de ella."
 
 #: src/accounts/components/AccountsRemoveDialog.svelte:48
 #: src/communities/components/CommunitiesDeleteDialog.svelte:29
@@ -1787,6 +1786,13 @@ msgstr "Este pago caducó y no se cobró nada."
 msgctxt "verb"
 msgid "Post"
 msgstr "Publicar"
+
+#~ msgid ""
+#~ "Every member leaves it, and the posts in it are taken out of it. The "
+#~ "posts themselves stay with the people who wrote them."
+#~ msgstr ""
+#~ "Todos los miembros salen de ella y sus publicaciones se quitan de ella. "
+#~ "Las publicaciones en sí siguen siendo de quienes las escribieron."
 
 #, javascript-format
 #~ msgid "Created ${ community.inserted_at }"

@@ -158,17 +158,21 @@ pub async fn update(
 pub async fn delete(deployment: &Deployment, user: &User, id: Uuid) -> Result<(), PostError> {
     let mut tx = deployment.begin().await?;
     let post = get_own(&mut tx, user, id).await?;
-    let event = Event::update(
+    let applied = apply_in(&mut tx, deployment.role, user, &deleted_event(&post)).await?;
+    tx.commit().await?;
+    applied.post().map(|_| ())
+}
+
+/// The event that soft-deletes the post.
+fn deleted_event(post: &Post) -> Event {
+    Event::update(
         TABLE,
-        id,
+        post.id,
         post.version,
         json::object_fields(json!({ "deleted_at": null })),
         json::object_fields(json!({ "deleted_at": now() })),
         now(),
-    );
-    let applied = apply_in(&mut tx, deployment.role, user, &event).await?;
-    tx.commit().await?;
-    applied.post().map(|_| ())
+    )
 }
 
 /// Applies an event of the user's to its post and answers it: what the
@@ -535,6 +539,20 @@ impl SyncedTable for Synced {
             version: post.version,
             fields: post.fields(UPDATE_FIELDS)?,
         }))
+    }
+
+    /// A post is its writer's, so it goes with their account.
+    async fn delete_of_user(
+        &self,
+        tx: &mut Transaction,
+        role: Role,
+        user: &User,
+    ) -> Result<(), TableError> {
+        for post in app_posts::list(tx, app_posts::Filter::OwnedBy(user.id)).await? {
+            let applied = apply_in(tx, role, user, &deleted_event(&post)).await?;
+            applied.post()?;
+        }
+        Ok(())
     }
 
     async fn prune(&self, tx: &mut Transaction, user: &User) -> Result<u64, TableError> {

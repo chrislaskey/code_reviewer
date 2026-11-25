@@ -215,6 +215,8 @@ examples = [
     "tauri/src/clipboard/**",
     "tauri/src/macos/**",
 
+    "svelte/src/posts/**",
+    "svelte/src/files/**",
     "svelte/src/lib/FileImage.svelte",
     "svelte/src/lib/file_size.js",
 ]

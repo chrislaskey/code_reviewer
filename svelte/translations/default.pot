@@ -137,7 +137,6 @@ msgstr ""
 msgid "Delete"
 msgstr ""
 
-#: src/conflicts/ConflictsIndexPage.svelte:67
 #: src/posts/PostsNewPage.svelte:47
 #: src/posts/PostsShowPage.svelte:39
 msgid "Back to posts"
@@ -855,6 +854,10 @@ msgstr ""
 msgid "Let it go"
 msgstr ""
 
+#: src/conflicts/ConflictsIndexPage.svelte:67
+msgid "Back to Home"
+msgstr ""
+
 #: src/communities/CommunitiesShowPage.svelte:34
 msgid "Community"
 msgstr ""
@@ -912,9 +915,7 @@ msgid "Delete ${ community.name }?"
 msgstr ""
 
 #: src/communities/components/CommunitiesDeleteDialog.svelte:26
-msgid ""
-"Every member leaves it, and the posts in it are taken out of it. The posts "
-"themselves stay with the people who wrote them."
+msgid "Every member leaves it, and everything in it is taken out of it."
 msgstr ""
 
 #: src/accounts/components/AccountsRemoveDialog.svelte:48
