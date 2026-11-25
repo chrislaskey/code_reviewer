@@ -6,4 +6,5 @@ pub mod json;
 pub mod locales;
 pub mod random;
 pub mod sha256;
+pub mod themes;
 pub mod translations;

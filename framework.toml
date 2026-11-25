@@ -40,6 +40,7 @@ framework = [
     "core/src/helpers/locales.rs",
     "core/src/helpers/random.rs",
     "core/src/helpers/sha256.rs",
+    "core/src/helpers/themes.rs",
     "core/src/helpers/translations.rs",
     "core/src/services/app_store.rs",
     "core/src/services/mailer.rs",

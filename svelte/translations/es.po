@@ -279,18 +279,23 @@ msgstr ""
 "Tu visita como invitado terminó. Regístrate antes de ${ deletedAt } para "
 "conservar lo que hiciste."
 
-#: src/lib/layouts/ThemeMenu.svelte:21
+#: src/lib/layouts/ThemeMenu.svelte:27
 #, javascript-format
 msgid "Theme: ${ current }"
 msgstr "Tema: ${ current }"
 
-#: src/lib/layouts/BottomBar.svelte:40 src/lib/layouts/ThemeMenu.svelte:22
+#: src/lib/layouts/BottomBar.svelte:40 src/lib/layouts/ThemeMenu.svelte:28
 msgid "Theme"
 msgstr "Tema"
 
-#: src/lib/layouts/ThemeChoices.svelte:22
+#: src/lib/layouts/ThemeChoices.svelte:36
 msgid "System"
 msgstr "Sistema"
+
+#: src/lib/layouts/ThemeChoices.svelte:31
+#, javascript-format
+msgid "Could not keep the theme: ${ reason }"
+msgstr "No se pudo guardar el tema: ${ reason }"
 
 #: src/accounts/deletions/AccountsDeletionsNewPage.svelte:53
 #: src/lib/layouts/SyncMenu.svelte:34

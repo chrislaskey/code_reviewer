@@ -170,9 +170,9 @@ export function accountsPasswordUpdate(password) {
 }
 
 /**
- * The signed-in person's preferences: `locale`, the language chosen, or
- * null to follow the device's.
- * @returns {Promise<{locale: string | null}>}
+ * The signed-in person's preferences: `locale`, the language chosen, and
+ * `theme`, the theme chosen, each null to follow the device.
+ * @returns {Promise<{locale: string | null, theme: string | null}>}
  */
 export function accountsPreferencesGet() {
   return send("GET", "/api/accounts/current/preferences");
@@ -181,9 +181,9 @@ export function accountsPreferencesGet() {
 /**
  * One of the signed-in person's preferences, null for its default, then
  * all of them.
- * @param {"locale"} key
+ * @param {"locale" | "theme"} key
  * @param {unknown} value
- * @returns {Promise<{locale: string | null}>}
+ * @returns {Promise<{locale: string | null, theme: string | null}>}
  */
 export function accountsPreferencesUpdate(key, value) {
   return send("PUT", "/api/accounts/current/preferences", { key, value });

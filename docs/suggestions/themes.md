@@ -49,12 +49,10 @@ own is cached there too, all its variables, applied at once, then
 refreshed from the API or Tauri command once the app loads. That
 covers the app offline as well.
 
-Where it lives is to decide: today the choice is per device, in
-`localStorage`. Kept with the account, it is either a synced `app_`
-table, following the person to each device through events
-(`docs/design/offline-sync.md`), or a setting on the server alone.
-Local and guest users (`docs/design/accounts-local-and-trial-users.md`)
-need an answer too.
+Where the choice lives is decided: the `theme` preference in
+`accounts_preferences`, synced to the person's devices, local and trial
+users included (`docs/design/locales.md`, "The theme"). A theme of a
+person's own would be another table, the preference naming it by id.
 
 ## Security
 

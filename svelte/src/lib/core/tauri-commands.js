@@ -115,8 +115,9 @@ export function accountsPasswordUpdate(password) {
 
 /**
  * The signed-in person's preferences, kept on this device and synced:
- * `locale`, the language chosen, or null to follow the device's.
- * @returns {Promise<{locale: string | null}>}
+ * `locale`, the language chosen, and `theme`, the theme chosen,
+ * each null to follow the device.
+ * @returns {Promise<{locale: string | null, theme: string | null}>}
  */
 export function accountsPreferencesGet() {
   return invoke("accounts_preferences_get");
@@ -125,9 +126,9 @@ export function accountsPreferencesGet() {
 /**
  * One of the signed-in person's preferences, null for its default,
  * written on this device and synced when it next can, then all of them.
- * @param {"locale"} key
+ * @param {"locale" | "theme"} key
  * @param {unknown} value
- * @returns {Promise<{locale: string | null}>}
+ * @returns {Promise<{locale: string | null, theme: string | null}>}
  */
 export function accountsPreferencesUpdate(key, value) {
   return invoke("accounts_preferences_update", { key, value });

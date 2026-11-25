@@ -18,6 +18,29 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-25: the theme per person
+
+- **What changed**: the theme is a preference, `theme` in
+  `accounts_preferences`, beside `locale`: per person, so each account
+  on a device has its own, synced to their other devices. Its values are
+  `helpers::themes::SUPPORTED`, which a core test keeps in step with
+  `THEMES` in `svelte/src/lib/layouts/themes.js`, or null for "System".
+  `Preferences` has a `theme` field. The theme menu writes it, and the
+  pages follow it with `themesFollow` when the current user loads.
+  `theme_script.js` keeps the last theme shown on the device for the
+  first paint, takes `app:set-theme` with the theme in `detail.theme`,
+  and dispatches `app:theme-changed`. A theme chosen before this change
+  on a device is replaced by the person's preference, "System" until
+  they choose. See `docs/design/locales.md`, "The theme".
+- **What an app does**:
+  - **Required**, for an app that changed the themes in `themes.js` or
+    `theme.css`: list the same ones in `core/src/helpers/themes.rs`,
+    declared as a `[[divergence]]`.
+  - **Required**, for an app that dispatches `app:set-theme` itself:
+    call `themesFollow` instead.
+  - **Required**, for an app that builds `Preferences` field by field:
+    add `theme: None`.
+
 ## 2026-11-25: a file's content on its row
 
 - **What changed**: a row with bytes may keep small text content on the

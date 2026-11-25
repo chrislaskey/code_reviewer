@@ -284,18 +284,23 @@ msgstr ""
 msgid "Your guest visit ended. Sign up before ${ deletedAt } to keep what you made."
 msgstr ""
 
-#: src/lib/layouts/ThemeMenu.svelte:21
+#: src/lib/layouts/ThemeMenu.svelte:27
 #, javascript-format
 msgid "Theme: ${ current }"
 msgstr ""
 
 #: src/lib/layouts/BottomBar.svelte:40
-#: src/lib/layouts/ThemeMenu.svelte:22
+#: src/lib/layouts/ThemeMenu.svelte:28
 msgid "Theme"
 msgstr ""
 
-#: src/lib/layouts/ThemeChoices.svelte:22
+#: src/lib/layouts/ThemeChoices.svelte:36
 msgid "System"
+msgstr ""
+
+#: src/lib/layouts/ThemeChoices.svelte:31
+#, javascript-format
+msgid "Could not keep the theme: ${ reason }"
 msgstr ""
 
 #: src/accounts/deletions/AccountsDeletionsNewPage.svelte:53

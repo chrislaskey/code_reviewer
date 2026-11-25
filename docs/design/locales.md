@@ -89,6 +89,26 @@ when they differ. Adding one: `msginit` the three `.po` files (README),
 translate them, `pnpm translations:update`, add its code to `SUPPORTED`
 and its `.mo` to `CATALOGS`, beside it.
 
+## The theme
+
+The daisyUI theme is a preference too, `theme`, kept and synced as
+`locale` is: per person, so each account on a phone, on one server or
+several, has its own, and it follows them to their other devices.
+
+- **Its values** are `helpers::themes::SUPPORTED`, the pages'
+  `THEMES` in `svelte/src/lib/layouts/themes.js`, which a core test
+  keeps in step, or null for "System", which follows each device's
+  light or dark setting.
+- **Choosing** in the theme menu (`ThemeChoices`) shows it at once, then
+  writes it with `accountsPreferencesUpdate("theme", value)`. A visitor
+  signed in as nobody keeps theirs on the device alone.
+- **Following** is `themesFollow`, called with the current user, as
+  `translationsFollow` is: a sign-in, a start, a switch of account.
+  Unlike a language, no reload: it sets `data-theme` on `<html>`.
+- **Before the first paint**, `theme_script.js` shows the theme last
+  shown on this device, kept in localStorage under `app:theme`. After a
+  switch of account it shows until the current user loads.
+
 ## Emails
 
 An email goes in the person's language: their `locale` preference, else
