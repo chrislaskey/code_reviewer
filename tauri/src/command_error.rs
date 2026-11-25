@@ -15,6 +15,7 @@ use app_core::app::avatars::AvatarError;
 use app_core::app::communities::CommunityError;
 use app_core::app::current_community::CurrentCommunityError;
 use app_core::app::files::FileError;
+use app_core::app::last_visited_page::LastVisitedPageError;
 use app_core::app::local_users::LocalUserError;
 use app_core::app::memberships::MembershipError;
 use app_core::app::posts::PostError;
@@ -83,6 +84,7 @@ from_message!(
     ConflictError,
     CurrentCommunityError,
     DeviceAccountsError,
+    LastVisitedPageError,
     LocalUserError,
     MembershipError,
     OnlineError,

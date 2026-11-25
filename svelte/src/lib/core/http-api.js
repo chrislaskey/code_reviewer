@@ -247,6 +247,11 @@ export function deviceAccountsSwitchNext() {
   return Promise.resolve(null);
 }
 
+/** @param {string} _path */
+export function lastVisitedPageUpdate(_path) {
+  return Promise.resolve(null);
+}
+
 export function deviceAccountsDeactivate() {
   return Promise.resolve(null);
 }

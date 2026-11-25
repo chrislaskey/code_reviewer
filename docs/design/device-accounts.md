@@ -60,8 +60,14 @@ user's id, and the sweep keeps whatever folder a row names.
   switch. Start time grows with the number of accounts and their data,
   which is accepted.
 - **`work_offline` stays in each account's file**, as today.
-- **A switch lands on the page a sign-in lands on.** Returning to the
-  page the account was last on is a later enhancement, not now.
+- **A switch opens the page the account was last on**, since
+  2026-11-24. The router keeps each page loaded, its path and query,
+  as the `last_visited_page` device setting in the active account's
+  own file. The device's own pages, such as `/accounts` and sign-in,
+  are not kept. An account with no page kept yet lands where a
+  sign-in does. Signing in and starting the app always land on Home.
+  That way, closing and reopening the app gets a person out of a page
+  that does not load.
 - **A signed-out account's file stays readable on disk** until it is
   removed, the same exposure the one signed-in account has today.
   Accepted; encrypting the files is a separate effort.

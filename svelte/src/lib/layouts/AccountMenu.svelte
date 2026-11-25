@@ -5,7 +5,7 @@
      which a dot on the avatar points to; links to their profile and their
      account's settings; Switch account in the app, to the device's
      accounts, where a double tap on the avatar switches to the next
-     signed-in account at once; and Log out. A local user and a guest have no log-out,
+     signed-in account at once, on the page last visited in it; and Log out. A local user and a guest have no log-out,
      having nothing to log back in with, and no account settings. A
      visitor sees Log in and Sign up on the web, and Log in in the app, to
      the device's accounts. -->
@@ -50,10 +50,10 @@
     error = "";
     busy = true;
     try {
-      const user = await deviceAccountsSwitchNext();
-      if (user) {
+      const switched = await deviceAccountsSwitchNext();
+      if (switched) {
         currentUserForget();
-        await navigateToUrl(pageAfterSignInUrl());
+        await navigateToUrl(switched.last_visited_page ?? pageAfterSignInUrl());
       }
     } catch (problem) {
       error = errorMessageOf(problem);

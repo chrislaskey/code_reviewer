@@ -206,7 +206,9 @@ export function deviceAccountsList() {
 }
 
 /**
- * Makes a signed-in account the active one, which then syncs.
+ * Makes a signed-in account the active one, which then syncs. Answers
+ * `{user, last_visited_page}`, the page they were last on in that
+ * account, or null for none.
  * @param {string} id the account's id on this device
  */
 export function deviceAccountsSwitch(id) {
@@ -215,11 +217,19 @@ export function deviceAccountsSwitch(id) {
 
 /**
  * Switches to the next signed-in account, in the order they were added to
- * this device, which then syncs. Answers the user switched to, or null
- * when no other account is signed in.
+ * this device, which then syncs. Answers `{user, last_visited_page}`, as
+ * deviceAccountsSwitch, or null when no other account is signed in.
  */
 export function deviceAccountsSwitchNext() {
   return invoke("device_accounts_switch_next");
+}
+
+/**
+ * Keeps the page as the active account's last visited page.
+ * @param {string} path the path with its query, such as `/posts?page=2`
+ */
+export function lastVisitedPageUpdate(path) {
+  return invoke("last_visited_page_update", { path });
 }
 
 /** Closes the active account, which stays signed in, before adding another. */

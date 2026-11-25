@@ -91,9 +91,9 @@
   /** @param {DeviceAccount} account */
   function switchTo(account) {
     return doThen(async () => {
-      await deviceAccountsSwitch(account.id);
+      const switched = await deviceAccountsSwitch(account.id);
       currentUserForget();
-      await navigateToUrl(pageAfterSignInUrl());
+      await navigateToUrl(switched.last_visited_page ?? pageAfterSignInUrl());
     });
   }
 

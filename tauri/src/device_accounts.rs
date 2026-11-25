@@ -31,6 +31,7 @@ use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
 use app_core::accounts::{self, AccountError, Session};
+use app_core::app::last_visited_page;
 use app_core::app::local_users::{self, LocalUserError, MergeTargetCommunity, Moved};
 use app_core::app::users::{self, UserError};
 use app_core::data::app_users::User;
@@ -78,6 +79,14 @@ pub struct DeviceAccount {
     pub server_host: Option<String>,
     /// What the account's server calls itself; `None` as `server_host`.
     pub server_display_name: Option<String>,
+}
+
+/// What a switch answers: the user now active, and the page they were
+/// last on in that account, which the switch opens again.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Switched {
+    pub user: User,
+    pub last_visited_page: Option<String>,
 }
 
 /// What finishing a sign-in in the browser answers.
@@ -896,13 +905,13 @@ pub async fn device_accounts_switch(
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
     id: Uuid,
-) -> Result<User, CommandError> {
+) -> Result<Switched, CommandError> {
     let user = {
         let _no_sync_meanwhile = server.hold().await;
         device.activate(id).await?
     };
     crate::sync::spawn(app);
-    Ok(user)
+    switched(&device, user).await
 }
 
 /// Switches to the next signed-in account, in the order they were added
@@ -912,15 +921,25 @@ pub async fn device_accounts_switch_next(
     app: AppHandle,
     device: State<'_, DeviceAccounts>,
     server: State<'_, SyncServer>,
-) -> Result<Option<User>, CommandError> {
+) -> Result<Option<Switched>, CommandError> {
     let user = {
         let _no_sync_meanwhile = server.hold().await;
         device.activate_next().await?
     };
-    if user.is_some() {
-        crate::sync::spawn(app);
-    }
-    Ok(user)
+    let Some(user) = user else {
+        return Ok(None);
+    };
+    crate::sync::spawn(app);
+    Ok(Some(switched(&device, user).await?))
+}
+
+async fn switched(device: &DeviceAccounts, user: User) -> Result<Switched, CommandError> {
+    let deployment = device.active().await?;
+    let last_visited_page = last_visited_page::get_on_device(&deployment).await?;
+    Ok(Switched {
+        user,
+        last_visited_page,
+    })
 }
 
 /// Closes the active account, before adding another: nobody is active
@@ -1215,9 +1234,21 @@ mod tests {
         }
         let [alice, bob, carol] = [&users[0], &users[1], &users[2]];
         assert_eq!(active_user_id(&device).await, Some(carol.id));
+        let carols = device.active().await.expect("carol's");
+        last_visited_page::update_on_device(&carols, "/posts?page=2")
+            .await
+            .expect("kept");
 
         let next = device.activate_next().await.expect("switched");
         assert_eq!(next.as_ref(), Some(alice), "back to the first added");
+        let alices = device.active().await.expect("alice's");
+        assert_eq!(
+            last_visited_page::get_on_device(&alices)
+                .await
+                .expect("read"),
+            None,
+            "each account keeps its own"
+        );
         assert_eq!(active_user_id(&device).await, Some(alice.id));
         let next = device.activate_next().await.expect("switched");
         assert_eq!(next.as_ref(), Some(bob));
@@ -1231,6 +1262,15 @@ mod tests {
         assert_eq!(next.as_ref(), Some(alice), "bob is skipped");
         let next = device.activate_next().await.expect("switched");
         assert_eq!(next.as_ref(), Some(carol));
+        let carols = device.active().await.expect("carol's");
+        assert_eq!(
+            last_visited_page::get_on_device(&carols)
+                .await
+                .expect("read")
+                .as_deref(),
+            Some("/posts?page=2"),
+            "kept in her file across the switches"
+        );
 
         device
             .remove(&transport, id_of(&device, alice.id).await, false)

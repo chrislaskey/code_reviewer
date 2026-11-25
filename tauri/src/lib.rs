@@ -69,6 +69,7 @@ pub fn run() {
             app::current_user::current_user_update,
             app::current_community::current_community_get,
             app::current_community::current_community_update,
+            app::last_visited_page::last_visited_page_update,
             app::avatars::uploads::avatars_uploads_create,
             app::avatars::avatars_update,
             accounts::accounts_sign_in_start,
