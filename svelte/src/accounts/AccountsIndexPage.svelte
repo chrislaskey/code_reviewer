@@ -1,6 +1,8 @@
 <!-- The accounts on this device, at /accounts, inside the app: the active
      one, the others to switch to or sign in to, each to remove from the
-     device, and Add account. The device section of the app: no account
+     device, and Add account. A tap anywhere on an account but its other
+     buttons opens it: the active one and a signed-in one on the page last
+     visited in it, a logged-out one at Log in. The device section of the app: no account
      is open while the person adds one, which happens in the browser,
      with the dialog waiting for its code, pasted or returned by itself
      by a desktop's browser; on an iPhone the sign-in sheet over the app
@@ -20,6 +22,7 @@
     deviceAccountsList,
     deviceAccountsRemove,
     deviceAccountsSwitch,
+    lastVisitedPageGet,
     localUsersCanCreate,
     localUsersCreate,
     localUsersKeepSeparate,
@@ -36,7 +39,7 @@
   import AccountsMoveDialog from "./components/AccountsMoveDialog.svelte";
   import AccountsRemoveDialog from "./components/AccountsRemoveDialog.svelte";
   import AccountsSignInDialog from "./components/AccountsSignInDialog.svelte";
-  import { Badge, Button, ErrorMessage, Heading, Page, Panel, Text } from "../lib/components/index.js";
+  import { Badge, Button, ErrorMessage, Heading, Icon, Page, Panel, Text } from "../lib/components/index.js";
 
   /** @typedef {{id: string, server_id: string | null, server_host: string | null, server_display_name: string | null, user_id: string, email: string, signed_in: boolean, local: boolean, active: boolean, last_active_at: string}} DeviceAccount */
 
@@ -93,6 +96,20 @@
       currentUserForget();
       await navigateToUrl(switched.last_visited_page ?? pageAfterSignInUrl());
     });
+  }
+
+  /** The active account, on the page last visited in it. */
+  function openActive() {
+    return doThen(async () => {
+      await navigateToUrl((await lastVisitedPageGet()) ?? pageAfterSignInUrl());
+    });
+  }
+
+  /** @param {DeviceAccount} account */
+  function open(account) {
+    if (account.active) return openActive();
+    if (account.signed_in) return switchTo(account);
+    return openBrowser(account.email, account.server_id);
   }
 
   /**
@@ -222,29 +239,38 @@
 
   <ul class="flex flex-col gap-3">
     {#each accounts as account (account.id)}
-      <Panel as="li" layout="row" class="flex-wrap">
-        <span class="flex grow flex-col">
+      <!-- The account's name is a button whose ::after covers the panel,
+           so the whole panel opens it; its other buttons sit above. -->
+      <Panel as="li" layout="row" class="relative flex-wrap hover:bg-base-200">
+        <button
+          type="button"
+          class="flex grow cursor-pointer flex-col text-start after:absolute after:inset-0 after:rounded-[inherit] after:content-['']"
+          onclick={() => open(account)}
+          disabled={busy}
+          data-account-open
+        >
           <span>{account.local ? t`On this device only` : account.email}</span>
           {#if account.server_host}
             <Text as="span" tone="muted" size="sm">{account.server_display_name} · {account.server_host}</Text>
           {/if}
-        </span>
+        </button>
         {#if account.local}
-          <Button size="sm" variant="primary" onclick={() => openBrowser(null)} disabled={busy}>
+          <Button size="sm" variant="primary" class="relative" onclick={() => openBrowser(null)} disabled={busy}>
             {signUpOrSignIn}
           </Button>
         {/if}
         {#if account.active}
           <Badge tone="primary">{t`Active`}</Badge>
         {:else if account.signed_in}
-          <Button size="sm" onclick={() => switchTo(account)} disabled={busy}>{t`Switch`}</Button>
+          <Button size="sm" class="relative" onclick={() => switchTo(account)} disabled={busy}>{t`Switch`}</Button>
         {:else}
           <Badge tone="ghost">{t`Logged out`}</Badge>
-          <Button size="sm" onclick={() => openBrowser(account.email, account.server_id)} disabled={busy}>{t`Log in`}</Button>
+          <Button size="sm" class="relative" onclick={() => openBrowser(account.email, account.server_id)} disabled={busy}>{t`Log in`}</Button>
         {/if}
-        <Button size="sm" variant="ghost" onclick={() => ((loss = null), (removing = account))} disabled={busy}>
+        <Button size="sm" variant="ghost" class="relative" onclick={() => ((loss = null), (removing = account))} disabled={busy}>
           {t`Remove from device`}
         </Button>
+        <Icon name="hero-chevron-right" class="text-base-content/50 size-4" />
       </Panel>
     {/each}
   </ul>

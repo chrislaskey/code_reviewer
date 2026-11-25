@@ -40,6 +40,7 @@ export const hasDeviceAccounts = core.hasDeviceAccounts;
 export const deviceAccountsList = core.deviceAccountsList;
 export const deviceAccountsSwitch = core.deviceAccountsSwitch;
 export const deviceAccountsSwitchNext = core.deviceAccountsSwitchNext;
+export const lastVisitedPageGet = core.lastVisitedPageGet;
 export const lastVisitedPageUpdate = core.lastVisitedPageUpdate;
 export const deviceAccountsDeactivate = core.deviceAccountsDeactivate;
 export const deviceAccountsRemove = core.deviceAccountsRemove;

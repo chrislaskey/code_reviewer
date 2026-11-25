@@ -225,6 +225,11 @@ export function deviceAccountsSwitchNext() {
   return invoke("device_accounts_switch_next");
 }
 
+/** The active account's last visited page, such as `/posts?page=2`, or null for none. */
+export function lastVisitedPageGet() {
+  return invoke("last_visited_page_get");
+}
+
 /**
  * Keeps the page as the active account's last visited page.
  * @param {string} path the path with its query, such as `/posts?page=2`
