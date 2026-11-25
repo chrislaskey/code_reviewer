@@ -7,7 +7,8 @@
 // the app to the accounts on the device, where sign-in is reached from;
 // the app never shows the sign-in pages themselves. When it cannot tell,
 // or a page's code does not load, the page says so above it rather than
-// going nowhere (page_load_error.svelte.js). The template's own pages are
+// going nowhere, as an error flash message (flash_messages.svelte.js),
+// and a navigation closes the flash messages shown before it. The template's own pages are
 // listed here, the app's in pages.js. A page whose required feature is
 // disabled on the server (APP_PAGES_REQUIRED_FEATURES) redirects to Home,
 // as do the communities pages on a server with a single community. In the
@@ -22,7 +23,7 @@ import { hasDeviceAccounts, lastVisitedPageUpdate } from "./core/index.js";
 import { currentServerHasSingleCommunity, currentServerLoad } from "./current_server.svelte.js";
 import { currentUserLoad } from "./current_user.svelte.js";
 import { errorMessageOf } from "./error_message.js";
-import { pageLoadErrorClear, pageLoadErrorShow } from "./page_load_error.svelte.js";
+import { flashMessageShow, flashMessagesClear } from "./flash_messages.svelte.js";
 import {
   ACCOUNTS_INDEX_PATH,
   ACCOUNTS_CURRENT_PASSWORD_EDIT_PATH,
@@ -58,7 +59,7 @@ const { navigate, route } = createRouter({
   layout: AppLayout,
   hooks: {
     async beforeLoad({ pathname }) {
-      pageLoadErrorClear();
+      flashMessagesClear();
       // `/` is the public website's on the web; the app's home is its own path
       if (pathname === PUBLIC_HOME_PATH) throw navigateToUrl(homeUrl());
       // In the app a sign-in happens in the browser, from the accounts page
@@ -72,7 +73,7 @@ const { navigate, route } = createRouter({
         user = await currentUserLoad();
       } catch (problem) {
         const reason = errorMessageOf(problem);
-        pageLoadErrorShow(t`Could not check who is signed in: ${reason}`);
+        flashMessageShow(t`Could not check who is signed in: ${reason}`, { tone: "error" });
         return;
       }
       if (!user) throw navigateToUrl(hasDeviceAccounts ? accountsIndexUrl() : accountsSignInUrl());
@@ -93,7 +94,7 @@ const { navigate, route } = createRouter({
       // A redirect from beforeLoad arrives here too
       if (problem instanceof Navigation || problem instanceof Promise) return;
       const reason = errorMessageOf(problem);
-      pageLoadErrorShow(t`This page could not load: ${reason}`);
+      flashMessageShow(t`This page could not load: ${reason}`, { tone: "error" });
     },
   },
   ...APP_PAGES,

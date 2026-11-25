@@ -9,6 +9,7 @@
   import { jt, t } from "ttag";
   import { accountsDeletionsCodeCreate, accountsDeletionsCreate, hasDeviceAccounts } from "../../lib/core/index.js";
   import { errorMessageOf } from "../../lib/error_message.js";
+  import { flashMessageShow } from "../../lib/flash_messages.svelte.js";
   import { currentUser, currentUserForget, currentUserLoad } from "../../lib/current_user.svelte.js";
   import { navigateToUrl } from "../../lib/router.js";
   import { PUBLIC_HOME_PATH, accountsIndexUrl, accountsCurrentShowUrl } from "../../lib/routes.js";
@@ -54,8 +55,12 @@
     return doing(async () => {
       await accountsDeletionsCreate(currentUser.value?.kind === "trial" ? null : code.trim());
       currentUserForget();
-      if (hasDeviceAccounts) await navigateToUrl(accountsIndexUrl({ accountDeleted: true }));
-      else window.location.assign(PUBLIC_HOME_PATH);
+      if (hasDeviceAccounts) {
+        await navigateToUrl(accountsIndexUrl());
+        flashMessageShow(t`This account was deleted, and removed from this device.`);
+      } else {
+        window.location.assign(PUBLIC_HOME_PATH);
+      }
     });
   }
 </script>

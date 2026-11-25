@@ -1780,7 +1780,7 @@ msgstr "abrir"
 msgid "Copying…"
 msgstr "Copiando…"
 
-#: src/lib/layouts/AccountMenu.svelte:45 src/profile/ProfileEditPage.svelte:120
+#: src/lib/layouts/AccountMenu.svelte:67 src/profile/ProfileEditPage.svelte:120
 msgid "Profile"
 msgstr "Perfil"
 
@@ -1882,12 +1882,12 @@ msgstr "¿Qué estás pensando?"
 msgid "In"
 msgstr "En"
 
-#: src/lib/router.js:69
+#: src/lib/router.js:76
 #, javascript-format
 msgid "Could not check who is signed in: ${ reason }"
 msgstr "No se pudo comprobar quién inició sesión: ${ reason }"
 
-#: src/lib/router.js:84
+#: src/lib/router.js:97
 #, javascript-format
 msgid "This page could not load: ${ reason }"
 msgstr "Esta página no se pudo cargar: ${ reason }"
@@ -1946,7 +1946,7 @@ msgid "This needs an account, and you are a guest."
 msgstr "Esto necesita una cuenta, y eres un invitado."
 
 #: src/lib/AccountsGuestNotice.svelte:45 src/lib/AccountsNeeded.svelte:19
-#: src/lib/layouts/AccountMenu.svelte:61
+#: src/lib/layouts/AccountMenu.svelte:83
 msgid "Sign up"
 msgstr "Regístrate"
 
@@ -1996,55 +1996,67 @@ msgstr "Tema"
 msgid "System"
 msgstr "Sistema"
 
-#: src/lib/layouts/SyncMenu.svelte:56
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:53
+#: src/lib/layouts/SyncMenu.svelte:34
+msgid "This account was deleted, and removed from this device."
+msgstr "Esta cuenta se eliminó y se quitó de este dispositivo."
+
+#: src/lib/layouts/SyncMenu.svelte:59
 msgid "Sync"
 msgstr "Sincronizar"
 
-#: src/lib/layouts/SyncMenu.svelte:57
+#: src/lib/layouts/SyncMenu.svelte:60
 msgid "Offline"
 msgstr "Sin conexión"
 
-#: src/lib/layouts/SyncMenu.svelte:58
+#: src/lib/layouts/SyncMenu.svelte:61
 #, javascript-format
 msgid "${ status.conflicts } not saved"
 msgstr "${ status.conflicts } sin guardar"
 
-#: src/lib/layouts/SyncMenu.svelte:59
+#: src/lib/layouts/SyncMenu.svelte:62
 #, javascript-format
 msgid "${ status.pending } waiting"
 msgstr "${ status.pending } en espera"
 
-#: src/lib/layouts/SyncMenu.svelte:62
+#: src/lib/layouts/SyncMenu.svelte:65
 msgid "Working offline"
 msgstr "Trabajando sin conexión"
 
-#: src/lib/layouts/SyncMenu.svelte:65
+#: src/lib/layouts/SyncMenu.svelte:68
 #, javascript-format
 msgid "${ status.conflicts } change was not saved on the server"
 msgid_plural "${ status.conflicts } changes were not saved on the server"
 msgstr[0] "${ status.conflicts } cambio no se guardó en el servidor"
 msgstr[1] "${ status.conflicts } cambios no se guardaron en el servidor"
 
-#: src/lib/layouts/SyncMenu.svelte:70
+#: src/lib/layouts/SyncMenu.svelte:73
 #, javascript-format
 msgid "${ status.pending } waiting to sync"
 msgstr "${ status.pending } esperando para sincronizar"
 
-#: src/lib/layouts/SyncMenu.svelte:71
+#: src/lib/layouts/SyncMenu.svelte:74
 msgid "Everything is synced"
 msgstr "Todo está sincronizado"
 
-#: src/lib/layouts/SyncMenu.svelte:75
+#: src/lib/layouts/SyncMenu.svelte:78
 msgid "Go online"
 msgstr "Conectarse"
 
-#: src/lib/layouts/SyncMenu.svelte:78
+#: src/lib/layouts/SyncMenu.svelte:81
 msgid "Sync now"
 msgstr "Sincronizar ahora"
 
-#: src/lib/layouts/SyncMenu.svelte:81
+#: src/lib/layouts/SyncMenu.svelte:84
 msgid "Work offline"
 msgstr "Trabajar sin conexión"
+
+#: src/lib/components/Dialog.svelte:18
+#: src/lib/layouts/CurrentCommunityMenu.svelte:64
+#: src/lib/layouts/FlashMessages.svelte:10
+#: src/lib/layouts/FlashMessages.svelte:11
+msgid "Close"
+msgstr "Cerrar"
 
 #: src/lib/layouts/CurrentCommunityMenu.svelte:62
 msgid "No community"
@@ -2055,11 +2067,6 @@ msgstr "Sin comunidad"
 #: src/lib/layouts/CurrentCommunityMenu.svelte:63
 msgid "Communities"
 msgstr "Comunidades"
-
-#: src/lib/components/Dialog.svelte:18
-#: src/lib/layouts/CurrentCommunityMenu.svelte:64
-msgid "Close"
-msgstr "Cerrar"
 
 #: src/lib/layouts/CurrentCommunityMenu.svelte:67
 #: src/lib/layouts/CurrentCommunityMenu.svelte:68
@@ -2127,44 +2134,54 @@ msgstr ""
 msgid "Update your payment"
 msgstr "Actualizar tu pago"
 
-#: src/lib/layouts/AccountMenu.svelte:36
+#: src/lib/layouts/AccountMenu.svelte:57
 msgid "Account, as a guest"
 msgstr "Cuenta, como invitado"
 
 #: src/accounts/current/AccountsCurrentShowPage.svelte:25
-#: src/lib/layouts/AccountMenu.svelte:36
+#: src/lib/layouts/AccountMenu.svelte:57
 msgid "Account"
 msgstr "Cuenta"
 
-#: src/lib/layouts/AccountMenu.svelte:38
+#: src/lib/layouts/AccountMenu.svelte:60
 msgid "Guest"
 msgstr "Invitado"
 
-#: src/accounts/AccountsIndexPage.svelte:209
-#: src/lib/layouts/AccountMenu.svelte:42
+#: src/accounts/AccountsIndexPage.svelte:206
+#: src/lib/layouts/AccountMenu.svelte:64
 msgid "On this device only"
 msgstr "Solo en este dispositivo"
 
-#: src/lib/layouts/AccountMenu.svelte:48
+#: src/lib/layouts/AccountMenu.svelte:70
 msgid "Account settings"
 msgstr "Configuración de la cuenta"
 
-#: src/lib/layouts/AccountMenu.svelte:51
+#: src/lib/layouts/AccountMenu.svelte:73
 msgid "Switch account"
 msgstr "Cambiar de cuenta"
 
-#: src/lib/layouts/AccountMenu.svelte:54
+#: src/lib/layouts/AccountMenu.svelte:76
 msgid "Log out"
 msgstr "Cerrar sesión"
 
 #: src/accounts/AccountsIndexPage.svelte:52
-#: src/accounts/AccountsIndexPage.svelte:222
+#: src/accounts/AccountsIndexPage.svelte:219
 #: src/accounts/AccountsSignInPage.svelte:89
 #: src/accounts/AccountsSignInPage.svelte:99
 #: src/accounts/components/AccountsSignInSteps.svelte:30
-#: src/lib/layouts/AccountMenu.svelte:57 src/lib/layouts/AccountMenu.svelte:59
+#: src/lib/layouts/AccountMenu.svelte:79 src/lib/layouts/AccountMenu.svelte:81
 msgid "Log in"
 msgstr "Iniciar sesión"
+
+#: src/lib/layouts/AccountMenu.svelte:47
+#, javascript-format
+msgid "Switched to ${ name }"
+msgstr "Cambiaste a ${ name }"
+
+#: src/lib/layouts/AccountMenu.svelte:51
+#, javascript-format
+msgid "Could not switch accounts: ${ reason }"
+msgstr "No se pudo cambiar de cuenta: ${ reason }"
 
 #: src/lib/core/uploads.js:24
 #, javascript-format
@@ -2175,24 +2192,24 @@ msgstr "La subida falló con ${ request.status }; inténtalo de nuevo"
 msgid "The upload could not reach the storage; try again"
 msgstr "La subida no pudo llegar al almacenamiento; inténtalo de nuevo"
 
-#: src/lib/core/http-api.js:542
+#: src/lib/core/http-api.js:551
 #, javascript-format
 msgid "Could not read the image (${ response.status })"
 msgstr "No se pudo leer la imagen (${ response.status })"
 
-#: src/lib/core/http-api.js:730
+#: src/lib/core/http-api.js:739
 msgid "On the web, plans and products are bought through Stripe"
 msgstr "En la web, los planes y productos se compran a través de Stripe"
 
-#: src/lib/core/http-api.js:734
+#: src/lib/core/http-api.js:743
 msgid "Restoring purchases is in the iPhone app"
 msgstr "Restaurar compras está en la app de iPhone"
 
-#: src/lib/core/http-api.js:738
+#: src/lib/core/http-api.js:747
 msgid "A plan from a phone's store is managed on the phone"
 msgstr "Un plan de la tienda de un teléfono se administra en el teléfono"
 
-#: src/lib/core/http-api.js:561
+#: src/lib/core/http-api.js:570
 msgid "Could not copy the image"
 msgstr "No se pudo copiar la imagen"
 
@@ -2566,7 +2583,7 @@ msgstr "Ponerlo en las comunidades elegidas"
 msgid "Create a copy"
 msgstr "Crear una copia"
 
-#: src/accounts/AccountsIndexPage.svelte:231
+#: src/accounts/AccountsIndexPage.svelte:228
 #: src/files/components/FilesNewRow.svelte:25
 msgid "Skip"
 msgstr "Omitir"
@@ -2872,44 +2889,40 @@ msgstr "Este servidor no acepta registros nuevos."
 msgid "By continuing, you accept the ${ publicPagesLinks }."
 msgstr "Al continuar, aceptas los ${ publicPagesLinks }."
 
-#: src/accounts/AccountsIndexPage.svelte:205
+#: src/accounts/AccountsIndexPage.svelte:203
 msgid "Accounts on this device"
 msgstr "Cuentas en este dispositivo"
 
-#: src/accounts/AccountsIndexPage.svelte:206
-msgid "This account was deleted, and removed from this device."
-msgstr "Esta cuenta se eliminó y se quitó de este dispositivo."
-
-#: src/accounts/AccountsIndexPage.svelte:208
+#: src/accounts/AccountsIndexPage.svelte:205
 msgid "No account yet."
 msgstr "Todavía no hay ninguna cuenta."
 
-#: src/accounts/AccountsIndexPage.svelte:215
+#: src/accounts/AccountsIndexPage.svelte:212
 #: src/accounts/subscriptions/subscription_status.js:8
 msgid "Active"
 msgstr "Activa"
 
-#: src/accounts/AccountsIndexPage.svelte:218
+#: src/accounts/AccountsIndexPage.svelte:215
 #: src/accounts/products/AccountsProductsShowPage.svelte:99
 #: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:101
 #: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:111
 msgid "Switch"
 msgstr "Cambiar"
 
-#: src/accounts/AccountsIndexPage.svelte:219
+#: src/accounts/AccountsIndexPage.svelte:216
 msgid "Logged out"
 msgstr "Sesión cerrada"
 
-#: src/accounts/AccountsIndexPage.svelte:225
+#: src/accounts/AccountsIndexPage.svelte:222
 #: src/accounts/components/AccountsRemoveDialog.svelte:51
 msgid "Remove from device"
 msgstr "Quitar del dispositivo"
 
-#: src/accounts/AccountsIndexPage.svelte:228
+#: src/accounts/AccountsIndexPage.svelte:225
 msgid "Add account"
 msgstr "Añadir cuenta"
 
-#: src/accounts/AccountsIndexPage.svelte:232
+#: src/accounts/AccountsIndexPage.svelte:229
 msgid ""
 "Use the app on this device only, with no account. You can sign up later."
 msgstr ""
@@ -3180,28 +3193,28 @@ msgstr[0] "${ recorded } compra restaurada."
 msgstr[1] "${ recorded } compras restauradas."
 
 #: src/accounts/current/AccountsCurrentShowPage.svelte:41
-#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:56
-#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:75
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:61
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:80
 msgid "Delete my account"
 msgstr "Eliminar mi cuenta"
 
-#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:57
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:62
 msgid ""
 "This account is only on this device, with nothing on the server to delete."
 msgstr ""
 "Esta cuenta solo está en este dispositivo, sin nada en el servidor que "
 "eliminar."
 
-#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:59
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:64
 msgid "this device's accounts"
 msgstr "las cuentas de este dispositivo"
 
-#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:60
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:65
 #, javascript-format
 msgid "To remove it and its data, remove it from ${ accountsLink }."
 msgstr "Para quitarla junto con sus datos, quítala de ${ accountsLink }."
 
-#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:61
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:66
 msgid ""
 "Deleting your account deletes everything you made, in every community and on "
 "every device, and your purchases. It cannot be undone."
@@ -3209,7 +3222,7 @@ msgstr ""
 "Eliminar tu cuenta elimina todo lo que hiciste, en todas las comunidades y "
 "en todos los dispositivos, y tus compras. No se puede deshacer."
 
-#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:62
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:67
 #, javascript-format
 msgid ""
 "Your plan, ${ currentUser.value.plan.product_name }, ends now, with no "
@@ -3218,7 +3231,7 @@ msgstr ""
 "Tu plan, ${ currentUser.value.plan.product_name }, termina ahora, sin "
 "reembolso."
 
-#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:63
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:68
 #, javascript-format
 msgid ""
 "Your plan, ${ currentUser.value.plan.product_name }, is billed by ${ store } "
@@ -3227,28 +3240,28 @@ msgstr ""
 "Tu plan, ${ currentUser.value.plan.product_name }, lo cobra ${ store } hasta "
 "que lo canceles allí. Eliminar tu cuenta no lo cancela."
 
-#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:65
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:70
 msgid "Manage it in the App Store"
 msgstr "Adminístralo en el App Store"
 
-#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:65
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:70
 msgid "Manage it in Google Play"
 msgstr "Adminístralo en Google Play"
 
-#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:67
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:72
 msgid "We email you a code to make sure it is you."
 msgstr "Te enviamos un código por correo para asegurarnos de que eres tú."
 
 #: src/accounts/components/AccountsSignInSteps.svelte:99
-#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:70
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:75
 msgid "Send a new code"
 msgstr "Enviar un código nuevo"
 
-#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:70
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:75
 msgid "Send code"
 msgstr "Enviar código"
 
-#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:71
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:76
 #, javascript-format
 msgid ""
 "A code is on its way to ${ currentUser.value.email }. It expires in ten "
@@ -3258,7 +3271,7 @@ msgstr ""
 "minutos."
 
 #: src/accounts/current/password/AccountsCurrentPasswordEditPage.svelte:50
-#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:77
+#: src/accounts/deletions/AccountsDeletionsNewPage.svelte:82
 msgid "Back to account"
 msgstr "Volver a la cuenta"
 

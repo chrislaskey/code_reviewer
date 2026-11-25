@@ -526,7 +526,20 @@ pages link through. Every path is reloadable: the dev server, the web
 server and the Tauri app all answer an unknown path with `index.html`,
 except under `/api/`, where the web server answers a JSON 404. When the
 router cannot tell who is signed in, or a page's code does not load,
-the page shows why in a banner above it (`svelte/src/lib/page_load_error.svelte.js`).
+the page shows why in an error flash message above it.
+
+### Flash messages
+
+A flash message is a short notice above the page, such as "Switched to
+Alice" or an error: `flashMessageShow(text, { tone, icon })` in
+`svelte/src/lib/flash_messages.svelte.js`, drawn by
+`svelte/src/lib/layouts/FlashMessages.svelte` as a daisyUI alert. The
+tones are `info`, `success`, `warning` and `error`, each with its own
+icon, which `icon` replaces, or hides with `null`. Several show at
+once, newest last. Each stays until it is closed or the next navigation
+starts. To show one on the page a navigation opens, call it after
+`await navigateToUrl(...)`. The caller translates the text with `t` when
+showing it, and it stays in that language.
 
 ### Theme and font
 

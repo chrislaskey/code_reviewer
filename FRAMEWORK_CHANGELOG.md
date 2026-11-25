@@ -18,6 +18,30 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-24: Flash messages
+
+- **What changed**: flash messages are short notices above the page,
+  such as "Switched to Alice" or an error. Call
+  `flashMessageShow(text, { tone, icon })` from
+  `svelte/src/lib/flash_messages.svelte.js`.
+  `svelte/src/lib/layouts/FlashMessages.svelte` draws them as daisyUI
+  alerts. Several can show at once. Each stays until it is closed or the
+  next navigation starts. `Alert` has a new `success` tone.
+  `page_load_error.svelte.js` is gone: the router shows a page that
+  could not load as an error flash message. The double tap on the avatar
+  says who it switched to, and shows its error. The "account was
+  deleted" notice is a flash message too, and `accountsIndexUrl` no
+  longer takes `{ accountDeleted }`; the `?account_deleted` query is gone.
+- **What an app does**:
+  - **Required**, for an app that calls `pageLoadErrorShow` or
+    `pageLoadErrorClear`: call `flashMessageShow(text, { tone: "error" })`
+    or `flashMessagesClear()` instead.
+  - **Required**, for an app that calls `accountsIndexUrl({ accountDeleted: true })`:
+    call `accountsIndexUrl()`, then show the notice with `flashMessageShow`
+    once the navigation finishes.
+  - **Optional**: show the app's own notices with `flashMessageShow`, see
+    README, Flash messages.
+
 ## 2026-11-24: A switch to an account opens its last visited page
 
 - **What changed**: in the app, the router keeps each page loaded as
