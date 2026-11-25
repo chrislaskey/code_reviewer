@@ -527,6 +527,59 @@ async fn files_upload_create_show_rename_and_delete() {
 }
 
 #[tokio::test]
+async fn files_create_with_content_answers_it_from_both_content_routes() {
+    let (router, _) = test_router().await;
+    let (_, communities) = get(&router, "/api/communities").await;
+    let community_id = communities[0]["community"]["id"].clone();
+    let new = json!({
+        "id": "01900000-0000-7000-8000-0000000000e1",
+        "name": "smile",
+        "content_type": "image/svg+xml",
+        "size": 0,
+        "sha256": "",
+        "content": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+        "community_ids": [community_id],
+    });
+    let (status, file) = send(&router, Method::POST, "/api/files", Some(new)).await;
+    assert_eq!(status, StatusCode::CREATED, "no upload first");
+    assert_eq!(file["size"], json!(41));
+    let id = file["id"].as_str().expect("an id");
+
+    for path in [
+        format!("/api/files/{id}/content"),
+        format!("/api/sync/bytes/app_files/{id}/content"),
+    ] {
+        let (status, headers, body) = send_with(
+            &router.router,
+            Some(&router.token),
+            None,
+            Method::GET,
+            &path,
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{path}");
+        assert_eq!(headers[header::CONTENT_TYPE], "image/svg+xml");
+        assert_eq!(headers[header::CONTENT_SECURITY_POLICY], "sandbox");
+        assert_eq!(headers[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
+        assert_eq!(body, json!("<svg xmlns=\"http://www.w3.org/2000/svg\"/>"));
+    }
+    let (_, headers, _) = send_with(
+        &router.router,
+        Some(&router.token),
+        None,
+        Method::GET,
+        &format!("/api/files/{id}/content?download=1"),
+        None,
+    )
+    .await;
+    assert_eq!(
+        headers[header::CONTENT_DISPOSITION],
+        "attachment; filename*=UTF-8''smile"
+    );
+}
+
+#[tokio::test]
 async fn sync_push_applies_an_event_and_pull_returns_the_row() {
     let (router, post) = test_router().await;
     let event = json!({

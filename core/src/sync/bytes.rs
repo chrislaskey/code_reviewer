@@ -18,6 +18,11 @@
 //! first time a page shows the row (`local_copy`). Rows go first and
 //! bytes after, on both sides: `delete_unreferenced` in the bucket,
 //! daily, and `delete_unreferenced_on_device` at the end of each sync.
+//!
+//! A row may keep small content itself instead, see
+//! `docs/design/files-content.md`. Nothing of it goes to the bucket: its
+//! create does not wait, a device writes the content to the folder when
+//! a page asks for it, and the server answers it itself (`row_content`).
 
 #[cfg(feature = "object-storage")]
 pub mod uploads;
@@ -80,6 +85,13 @@ pub struct Readable {
     pub size: u64,
 }
 
+/// The content a row keeps itself, with its content type.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RowContent {
+    pub content_type: String,
+    pub content: String,
+}
+
 /// A row as the cleanup sees it: whose bytes they are, and whether the
 /// row is deleted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -107,6 +119,23 @@ pub trait SyncedBytes: Send + Sync {
             size: event.changes.get("size")?.as_u64()?,
             sha256: event.changes.get("sha256")?.as_str()?.to_string(),
         })
+    }
+
+    /// The content a create says its row keeps itself, from its
+    /// `content` field; none when its bytes go to the bucket.
+    fn content_of_create<'a>(&self, event: &'a Event) -> Option<&'a str> {
+        event.changes.get("content")?.as_str()
+    }
+
+    /// The content of a live row the user sees, when the row keeps it
+    /// itself; none when its bytes are in the bucket.
+    async fn content(
+        &self,
+        _tx: &mut Transaction,
+        _user: &User,
+        _id: Uuid,
+    ) -> Result<Option<RowContent>, TableError> {
+        Ok(None)
     }
 
     /// The live row, if the user sees it, with what its bytes are.
@@ -258,7 +287,8 @@ pub fn bucket(deployment: &Deployment) -> Result<&Storage, BytesError> {
 
 /// A URL the bytes of a row the user sees are read from for the next
 /// hour, signed by the server, with the `Content-Disposition` the
-/// bucket answers it with, if any.
+/// bucket answers it with, if any. A row that keeps its content itself
+/// has none: see `row_content`.
 #[cfg(feature = "object-storage")]
 pub async fn download_url(
     deployment: &Deployment,
@@ -284,6 +314,26 @@ pub async fn download_url(
         .await?)
 }
 
+/// The content of a row the user sees, when the row keeps it itself:
+/// what the server answers instead of a redirect to the bucket. None
+/// when its bytes are in the bucket.
+pub async fn row_content(
+    deployment: &Deployment,
+    user: &User,
+    table: &str,
+    id: Uuid,
+) -> Result<Option<RowContent>, BytesError> {
+    let bytes = of_table(table)?;
+    let mut tx = deployment.begin().await?;
+    bytes
+        .readable(&mut tx, user, id)
+        .await?
+        .ok_or(BytesError::NotFound { id })?;
+    let content = bytes.content(&mut tx, user, id).await?;
+    tx.commit().await?;
+    Ok(content)
+}
+
 /// The bytes of a row the user sees, read from the bucket: what the
 /// server in this process answers a device's fetch with in tests.
 #[cfg(feature = "object-storage")]
@@ -307,13 +357,17 @@ pub(crate) async fn get_from_bucket(
 
 /// Whether the bucket holds the bytes the create says its row carries,
 /// at that size and with that checksum: what the server asks before it
-/// applies the create.
+/// applies the create. A row that keeps its content itself has nothing
+/// to wait for.
 pub async fn is_uploaded(
     deployment: &Deployment,
     user: &User,
     bytes: &dyn SyncedBytes,
     event: &Event,
 ) -> Result<bool, BytesError> {
+    if bytes.content_of_create(event).is_some() {
+        return Ok(true);
+    }
     let Some(of) = bytes.bytes_of_create(event) else {
         return Ok(false);
     };
@@ -380,7 +434,8 @@ fn base64_of_hex(sha256: &str) -> Result<String, BytesError> {
 }
 
 /// The first step of a sync on a device: asks the server about the
-/// bytes of the first `PER_SYNC` rows whose create is pending, and
+/// bytes of the first `PER_SYNC` rows whose create is pending, but those
+/// that keep their content themselves, and
 /// answers every one, those not asked with nothing. What the device
 /// knows of an upload is only this answer, asked again by every sync
 /// and kept nowhere. Once the server cannot be reached the rest are not
@@ -396,6 +451,7 @@ pub async fn ask_about_waiting<T: Transport>(
         .into_iter()
         .filter(|stored| stored.event.kind == EventKind::Create)
         .filter_map(|stored| Some((of_table(&stored.event.table).ok()?, stored)))
+        .filter(|(bytes, stored)| bytes.content_of_create(&stored.event).is_none())
         .collect();
     tx.commit().await?;
 
@@ -652,7 +708,8 @@ pub async fn delete_unreferenced_on_device(
 /// device that did not create the row shows it. Fetched under a
 /// temporary name and renamed once whole, so bytes at their path are
 /// never half there. Working offline, or with the server out of reach,
-/// bytes not here are `NotOnDevice`.
+/// bytes not here are `NotOnDevice`. A row that keeps its content itself
+/// has it written here, with no fetch.
 pub async fn local_copy<T: Transport>(
     deployment: &Deployment,
     transport: &T,
@@ -666,6 +723,7 @@ pub async fn local_copy<T: Transport>(
         .readable(&mut tx, user, id)
         .await?
         .ok_or(BytesError::NotFound { id })?;
+    let content = bytes.content(&mut tx, user, id).await?;
     let offline: bool = device_settings::get(&mut tx, WORK_OFFLINE)
         .await
         .map_err(|error| BytesError::Malformed(error.to_string()))?;
@@ -674,12 +732,17 @@ pub async fn local_copy<T: Transport>(
     if tokio::fs::try_exists(&path).await? {
         return Ok(path);
     }
+    // A name of its own, since two pages may ask for the same bytes at once
+    let partial = path.with_extension(format!("{}.part", Uuid::now_v7().simple()));
+    if let Some(content) = content {
+        tokio::fs::write(&partial, content.content.as_bytes()).await?;
+        tokio::fs::rename(&partial, &path).await?;
+        return Ok(path);
+    }
     if offline {
         return Err(BytesError::NotOnDevice);
     }
     let (_user, token) = users::signed_in_with_token(deployment).await?;
-    // A name of its own, since two pages may ask for the same bytes at once
-    let partial = path.with_extension(format!("{}.part", Uuid::now_v7().simple()));
     let fetched = match transport
         .bytes_download(Some(&token), table, id, &partial)
         .await

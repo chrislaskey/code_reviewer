@@ -47,6 +47,7 @@ phases are built, in `core/src/app/files_communities.rs` and
 | `name` | what a member sees, editable |
 | `content_type` | from the file picked, fixed |
 | `size` | in bytes, fixed |
+| `content` | the content, when the row keeps it, see `files-content.md` |
 
 `created_by_id` is a record, not an owner: no rule reads it but the
 page, which shows the creator if the member sees them and "a former

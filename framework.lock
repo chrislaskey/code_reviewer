@@ -1,6 +1,6 @@
 # The SHA-256 of each framework file as the template ships it, see
 # framework.toml. Written by `cargo run -p framework_check -- lock`.
-8c93dd83649a8dae10c7707b03efcb8a45362a46818b5765c3510ef38c815b6b  FRAMEWORK_CHANGELOG.md
+50f4438eb6c3754e4617b64f52a7f49be38e824a96f8dff201c2375baab5897e  FRAMEWORK_CHANGELOG.md
 dbded3dccbf128f2dafd95a761318f0338856fa9dae66173642d45db3fd63a23  axum/src/accounts.rs
 dfdf353a942c730f3c0cea40c9e89a737bcf5fbf06960b91baab16578564a327  axum/src/accounts/app_store_notifications.rs
 4440725170bdb3eeda5a1257a241671c748cb8069a42809f37f289bacef91187  axum/src/accounts/checkouts.rs
@@ -45,7 +45,7 @@ a16ed1a34da818a4e9699dd597040c5947617faefc3f0994ad2eea9d39a2ef92  axum/src/serve
 c7156e8a30934eea9e5a110ace4b0f3d3fa50e10107e85787bfd40a433c469a4  axum/src/servers/settings.rs
 29af3426b83700015d93d97e2aada8fcec916fc1c38e8c2ef75da83a60c3eea6  axum/src/state.rs
 d5539bac490481eee2bbd823ccba2629723d3e8756dfb9f3f2e39505dc96c596  axum/src/sync.rs
-fa8a747fa9d2ca534ae681e60d13dec61e272daa19df2fd9d146ef30e372f7c8  axum/src/sync/bytes.rs
+2833fa9be5d0ed962e064eae64044f28b463f73f9cfb2f7bf8a36854674de193  axum/src/sync/bytes.rs
 f6cf3c382132b618959001b21ae04ef536df92195a729517fb07084d498fcc1c  axum/src/sync/bytes/uploads.rs
 4a828cf3c1df82454057e8eef7abcfea96e191a7fec9eb17c448c49461a13081  axum/src/tests.rs
 36b078874f1f401c28c2764a3b9e2641f12bd9e6d01cda4250dcc1df0e269096  axum/src/tests/accounts.rs
@@ -209,7 +209,7 @@ e5a409e3ab8e141f1b47f7a63e2b117b93ae417a3a27a4527713a80407f1af83  core/src/servi
 5a0c4767bf1326f96ba1ab748da1ce3c74b7823f70c1f51b9f6fee9a274683b2  core/src/services/stripe.rs
 20847f80d1d99484ab241739fe554d6e1cf3457fac9f7bdd939b2602ca6c568c  core/src/services/web_server.rs
 cd345218dc856ef6fa9b8af4a418ae2298f23809871030207b5f7dbfb9ac691e  core/src/sync.rs
-63c9b9abc17762666c9f431af7498f4a23d6a1e614276acb5975d29734d6577d  core/src/sync/bytes.rs
+01bb147d9311d3d4a79b0605ff367ec4a1e1d46e6086e36090b83fdcff018d1d  core/src/sync/bytes.rs
 951f03b1aa5dc132beb21e88e4ebc4f1aee847bc71e4373eabb7a26f699de1ae  core/src/sync/bytes/uploads.rs
 352dab7026bdaa59bca461dd871f2a1370e5357355329be2a943602a53da023d  core/src/sync/conflicts.rs
 2fb3c0ce9dc80ee4d87d9db2cec7611bd0d18d264546cf472440d4ffc1cf8e41  core/src/sync/events.rs

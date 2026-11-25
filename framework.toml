@@ -201,6 +201,7 @@ examples = [
     "core/src/data/app_files_communities/**",
     "core/migrations/*/*_app_posts_create.sql",
     "core/migrations/*/*_app_files_create.sql",
+    "core/migrations/*/*_app_files_content_add.sql",
 
     "axum/src/app/posts.rs",
     "axum/src/app/files.rs",

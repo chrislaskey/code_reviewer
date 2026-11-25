@@ -12,11 +12,14 @@ use crate::data::app_sync_state::Cursor;
 use crate::database::Transaction;
 use crate::helpers::content_type::{content_type_or_unknown, is_content_type};
 use crate::helpers::field_errors::FieldErrors;
-use crate::helpers::sha256::is_sha256;
+use crate::helpers::sha256::{self, is_sha256};
 
 pub const TABLE: &str = "app_files";
 /// The largest file, 25 MB.
 pub const MAX_BYTES: u64 = 25 * 1024 * 1024;
+/// The most content a row keeps itself, 64 KB: every member's device
+/// gets it with the row.
+pub const MAX_CONTENT_BYTES: usize = 64 * 1024;
 /// The longest name, in characters.
 pub const MAX_NAME_LENGTH: usize = 255;
 
@@ -40,6 +43,11 @@ pub struct File {
     /// The bytes' SHA-256, lowercase hex.
     #[garde(custom(is_sha256))]
     pub sha256: String,
+    /// The content, when the row keeps it; none when the bytes are in
+    /// the bucket. See `docs/design/files-content.md`.
+    #[garde(custom(is_file_content))]
+    #[serde(default)]
+    pub content: Option<String>,
     #[garde(skip)]
     pub inserted_at: DateTime<Utc>,
     #[garde(skip)]
@@ -60,12 +68,18 @@ pub struct File {
 pub struct AcceptedFile(File);
 
 impl AcceptedFile {
-    /// Checks the file, with its name trimmed and a missing content type
-    /// filled in.
+    /// Checks the file, with its name trimmed, a missing content type
+    /// filled in, and the size and SHA-256 of content the row keeps.
     pub fn new(file: File) -> Result<AcceptedFile, FieldErrors> {
+        let (size, sha256) = match &file.content {
+            Some(content) => (content.len() as u64, sha256::hex(content.as_bytes())),
+            None => (file.size, file.sha256.clone()),
+        };
         let file = File {
             name: file.name.trim().to_string(),
             content_type: content_type_or_unknown(&file.content_type),
+            size,
+            sha256,
             ..file
         };
         FieldErrors::check(&file)?;
@@ -101,6 +115,20 @@ pub fn is_file_size(value: &u64, _context: &()) -> garde::Result {
     }
     if *value > MAX_BYTES {
         return Err(garde::Error::new("is larger than 25 MB"));
+    }
+    Ok(())
+}
+
+/// Content a row keeps: not empty and not too large.
+pub fn is_file_content(value: &Option<String>, _context: &()) -> garde::Result {
+    let Some(content) = value else {
+        return Ok(());
+    };
+    if content.is_empty() {
+        return Err(garde::Error::new("is empty"));
+    }
+    if content.len() > MAX_CONTENT_BYTES {
+        return Err(garde::Error::new("is larger than 64 KB"));
     }
     Ok(())
 }

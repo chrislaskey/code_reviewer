@@ -3,7 +3,9 @@
 //! page or a device sends them to the bucket, and `POST /api/files`
 //! writes the row once they are there. `GET /api/files/{id}/content`
 //! redirects to a URL the bytes are read from, for an `<img>` or a
-//! link. See `docs/design/offline-files-decisions.md`.
+//! link, or answers the content a file's row keeps. See
+//! `docs/design/offline-files-decisions.md` and
+//! `docs/design/files-content.md`.
 
 pub mod duplicates;
 pub mod uploads;
@@ -115,13 +117,19 @@ pub async fn delete(
 
 /// The file's bytes, by a redirect to the bucket: the bytes never
 /// change, so the browser may keep the redirect for as long as the URL
-/// it points at works.
+/// it points at works. A file whose row keeps its content is answered
+/// that content.
 pub async fn content(
     State(deployment): State<Deployment>,
     CurrentUser(user): CurrentUser,
     Path(id): Path<Uuid>,
     Query(query): Query<ContentQuery>,
 ) -> Result<Response, ApiError> {
+    if let Some(content) = files::row_content(&deployment, &user, id).await? {
+        let content_disposition =
+            files::content_disposition(&deployment, &user, id, query.download.is_some()).await?;
+        return Ok(sync::bytes::content_response(content, content_disposition));
+    }
     let url = files::content_url(&deployment, &user, id, query.download.is_some()).await?;
     Ok(sync::bytes::content_redirect(url))
 }

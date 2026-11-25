@@ -30,7 +30,9 @@ pub mod duplicates;
 #[cfg(feature = "object-storage")]
 pub mod uploads;
 
-use crate::data::app_files::{self, AcceptedFile, File, TABLE, is_file_name, is_file_size};
+use crate::data::app_files::{
+    self, AcceptedFile, File, TABLE, is_file_content, is_file_name, is_file_size,
+};
 use crate::data::app_files_communities;
 use crate::data::app_users_communities;
 use std::collections::BTreeSet;
@@ -61,13 +63,21 @@ use crate::helpers::sha256::is_sha256;
 use crate::helpers::{json, sha256};
 use crate::services::web_server::Transport;
 use crate::sync::TableRow;
-use crate::sync::bytes::{self, BytesError, BytesRow, Readable, SyncedBytes};
+use crate::sync::bytes::{self, BytesError, BytesRow, Readable, RowContent, SyncedBytes};
 use crate::sync::events::{self, Answer, AnswerStatus};
 use crate::sync::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
 
 /// The fields an event may set when it creates a file: `communities` is
-/// the rows of its first communities, written with it.
-const CREATE_FIELDS: &[&str] = &["name", "content_type", "size", "sha256", "communities"];
+/// the rows of its first communities, written with it, and `content`
+/// the content of a file that keeps it on its row.
+const CREATE_FIELDS: &[&str] = &[
+    "name",
+    "content_type",
+    "size",
+    "sha256",
+    "content",
+    "communities",
+];
 /// The fields an event may change on a file. A file is deleted by
 /// taking it out of its last community, see `files_communities`.
 const UPDATE_FIELDS: &[&str] = &["name"];
@@ -167,7 +177,9 @@ pub struct FilesCache {
 }
 
 /// A file to create: what the person picked, under the id its bytes
-/// are already kept under, in the communities chosen.
+/// are already kept under, in the communities chosen. A file with
+/// `content` keeps it on its row instead, and its size and SHA-256 are
+/// the content's.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Validate)]
 pub struct FileNew {
     #[garde(skip)]
@@ -180,6 +192,9 @@ pub struct FileNew {
     pub size: u64,
     #[garde(custom(is_sha256))]
     pub sha256: String,
+    #[garde(custom(is_file_content))]
+    #[serde(default)]
+    pub content: Option<String>,
     /// One at least, checked with the user's memberships.
     #[garde(skip)]
     pub community_ids: Vec<Uuid>,
@@ -295,8 +310,9 @@ pub async fn get(
 
 /// Writes the row of a file the user creates, whose bytes are already
 /// kept under its id: in the bucket on the server, which refuses the row
-/// otherwise, in the account's folder on a device. It is in the
-/// communities chosen, each one the user is in.
+/// otherwise, in the account's folder on a device. A file with `content`
+/// keeps it on its row, and nothing waits. It is in the communities
+/// chosen, each one the user is in.
 pub async fn create(
     deployment: &Deployment,
     user: &User,
@@ -312,18 +328,17 @@ pub async fn create(
             community_id: *community_id,
         })
         .collect();
-    let event = Event::create(
-        TABLE,
-        new.id,
-        json::object_fields(json!({
-            "name": new.name,
-            "content_type": new.content_type,
-            "size": new.size,
-            "sha256": new.sha256,
-            "communities": communities,
-        })),
-        now(),
-    );
+    let mut changes = json::object_fields(json!({
+        "name": new.name,
+        "content_type": new.content_type,
+        "size": new.size,
+        "sha256": new.sha256,
+        "communities": communities,
+    }));
+    if let Some(content) = &new.content {
+        changes.insert("content".to_string(), json!(content));
+    }
+    let event = Event::create(TABLE, new.id, changes, now());
     apply(deployment, user, &event).await?.file()
 }
 
@@ -353,6 +368,7 @@ pub async fn create_with_bytes(
         content_type: content_type.to_string(),
         size: bytes.len() as u64,
         sha256,
+        content: None,
         community_ids: community_ids.to_vec(),
     }
     .checked()?;
@@ -433,7 +449,8 @@ pub async fn apply_event(
 
 /// A URL a file the user sees is read from for the next hour, signed by
 /// the server; as an attachment, the bucket answers it to be saved under
-/// the file's name instead of shown.
+/// the file's name instead of shown. A file whose row keeps its content
+/// is answered by `row_content` instead.
 #[cfg(feature = "object-storage")]
 pub async fn content_url(
     deployment: &Deployment,
@@ -441,15 +458,36 @@ pub async fn content_url(
     id: Uuid,
     as_attachment: bool,
 ) -> Result<String, FileError> {
-    let content_disposition = if as_attachment {
-        let mut tx = deployment.begin().await?;
-        let file = get_visible(&mut tx, user, id).await?;
-        tx.commit().await?;
-        Some(attachment_named(&file.name))
-    } else {
-        None
-    };
+    let content_disposition = content_disposition(deployment, user, id, as_attachment).await?;
     Ok(bytes::download_url(deployment, user, TABLE, id, content_disposition.as_deref()).await?)
+}
+
+/// The content of a file the user sees, when its row keeps it; none when
+/// its bytes are in the bucket.
+pub async fn row_content(
+    deployment: &Deployment,
+    user: &User,
+    id: Uuid,
+) -> Result<Option<RowContent>, FileError> {
+    Ok(bytes::row_content(deployment, user, TABLE, id).await?)
+}
+
+/// The `Content-Disposition` that saves a file the user sees under its
+/// name, as an attachment; none to show it.
+#[cfg(feature = "object-storage")]
+pub async fn content_disposition(
+    deployment: &Deployment,
+    user: &User,
+    id: Uuid,
+    as_attachment: bool,
+) -> Result<Option<String>, FileError> {
+    if !as_attachment {
+        return Ok(None);
+    }
+    let mut tx = deployment.begin().await?;
+    let file = get_visible(&mut tx, user, id).await?;
+    tx.commit().await?;
+    Ok(Some(attachment_named(&file.name)))
 }
 
 /// Where the bytes of a file the user sees are on this device, fetched
@@ -808,6 +846,7 @@ pub(crate) async fn apply_in(
                 content_type: String::new(),
                 size: 0,
                 sha256: String::new(),
+                content: None,
                 inserted_at: event.row_inserted_at(now),
                 updated_at: now,
                 version,
@@ -929,14 +968,20 @@ impl File {
 
 impl FileNew {
     /// The file as it is kept: its name trimmed, a missing content type
-    /// filled in, and every field within the rules.
+    /// filled in, the size and SHA-256 of content it keeps on its row,
+    /// and every field within the rules.
     pub fn checked(&self) -> Result<FileNew, FileError> {
+        let (size, sha256) = match &self.content {
+            Some(content) => (content.len() as u64, sha256::hex(content.as_bytes())),
+            None => (self.size, self.sha256.clone()),
+        };
         let checked = FileNew {
             id: self.id,
             name: self.name.trim().to_string(),
             content_type: content_type_or_unknown(&self.content_type),
-            size: self.size,
-            sha256: self.sha256.clone(),
+            size,
+            sha256,
+            content: self.content.clone(),
             community_ids: self.community_ids.clone(),
         };
         FieldErrors::check(&checked).map_err(FileError::Invalid)?;
@@ -1087,17 +1132,21 @@ impl SyncedTable for Synced {
                         community_id: row.community_id,
                     })
                     .collect();
+                let mut changes = json::object_fields(json!({
+                    "name": file.name,
+                    "content_type": file.content_type,
+                    "size": file.size,
+                    "sha256": file.sha256,
+                    "communities": communities,
+                }));
+                if let Some(content) = &file.content {
+                    changes.insert("content".to_string(), json!(content));
+                }
                 LocalCreate {
                     id: file.id,
                     inserted_at: file.inserted_at,
                     parents,
-                    changes: json::object_fields(json!({
-                        "name": file.name,
-                        "content_type": file.content_type,
-                        "size": file.size,
-                        "sha256": file.sha256,
-                        "communities": communities,
-                    })),
+                    changes,
                 }
             })
             .collect())
@@ -1159,6 +1208,21 @@ impl SyncedBytes for Synced {
         Ok(file.map(|file| Readable {
             created_by_id: file.created_by_id,
             size: file.size,
+        }))
+    }
+
+    async fn content(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        id: Uuid,
+    ) -> Result<Option<RowContent>, TableError> {
+        let file = app_files::get(tx, user.id, id).await?;
+        Ok(file.and_then(|file| {
+            Some(RowContent {
+                content: file.content?,
+                content_type: file.content_type,
+            })
         }))
     }
 
@@ -1285,6 +1349,7 @@ pub(crate) mod tests {
             content_type: "text/plain".to_string(),
             size: bytes.len() as u64,
             sha256: sha256::hex(bytes),
+            content: None,
             community_ids: vec![community_id],
         }
     }
@@ -2402,6 +2467,7 @@ pub(crate) mod tests {
                 content_type: "not a type".to_string(),
                 size: app_files::MAX_BYTES + 1,
                 sha256: "not a checksum".to_string(),
+                content: None,
                 community_ids: Vec::new(),
             };
             let error = create(&deployment, &alice, &wrong)
@@ -2783,6 +2849,110 @@ pub(crate) mod tests {
                 attachment_named("my notes \"v2\".txt"),
                 "attachment; filename*=UTF-8''my%20notes%20%22v2%22.txt"
             );
+        })
+        .await;
+    }
+
+    /// A file that keeps its content on its row, with no size or
+    /// checksum of its own.
+    fn content_file(name: &str, content: &str, community_id: Uuid) -> FileNew {
+        FileNew {
+            content_type: "text/plain; charset=utf-8".to_string(),
+            size: 0,
+            sha256: String::new(),
+            content: Some(content.to_string()),
+            ..new_file(name, b"", community_id)
+        }
+    }
+
+    #[tokio::test]
+    async fn files_create_with_content_keeps_it_on_the_row_and_needs_no_upload() {
+        with_each_database(|database| async move {
+            let (deployment, storage) = server(database);
+            let alice = users::create(&deployment, "alice@example.com", "Alice")
+                .await
+                .expect("a user");
+            let community_id = personal(&deployment, &alice).await;
+            let new = content_file("smile", "😀", community_id);
+            let file = create(&deployment, &alice, &new).await.expect("a file");
+            assert_eq!(file.content.as_deref(), Some("😀"));
+            assert_eq!(file.size, 4, "the content's bytes");
+            assert_eq!(file.sha256, sha256::hex("😀".as_bytes()));
+            assert_eq!(in_bucket(&storage, &alice, file.id).await, None);
+            let shown = get(&deployment, &alice, file.id).await.expect("the file");
+            assert_eq!(shown.file, file);
+            assert_eq!(shown.shown_as, ShownAs::Text);
+
+            let content = row_content(&deployment, &alice, file.id)
+                .await
+                .expect("the content");
+            assert_eq!(
+                content,
+                Some(RowContent {
+                    content_type: "text/plain; charset=utf-8".to_string(),
+                    content: "😀".to_string(),
+                })
+            );
+
+            let empty = create(
+                &deployment,
+                &alice,
+                &content_file("empty", "", community_id),
+            )
+            .await
+            .expect_err("empty content");
+            assert!(matches!(empty, FileError::Invalid(_)));
+            let large = "x".repeat(app_files::MAX_CONTENT_BYTES + 1);
+            let large = create(
+                &deployment,
+                &alice,
+                &content_file("large", &large, community_id),
+            )
+            .await
+            .expect_err("too much content for a row");
+            assert!(matches!(large, FileError::Invalid(_)));
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn files_with_content_added_offline_reach_the_server_and_another_device_without_an_upload()
+     {
+        with_each_database(|database| async move {
+            let (server, storage) = server(database);
+            let (alice, token) = user_with_token(&server, "alice@example.com").await;
+            let (a, a_folder) = device_with_folder(&alice, &token).await;
+            let (b, _b_folder) = device_with_folder(&alice, &token).await;
+            let transport = InProcess { server: &server };
+            let community_id = personal(&a, &alice).await;
+            let file = create(&a, &alice, &content_file("smile", "😀", community_id))
+                .await
+                .expect("a file");
+            assert_eq!(state_of(&a, &alice, file.id).await.0, FileState::Waiting);
+            assert_eq!(
+                std::fs::read_dir(a_folder.path())
+                    .expect("the folder")
+                    .count(),
+                0,
+                "nothing is kept beside the row"
+            );
+
+            let report = sync::run(&a, &transport).await.expect("a sync");
+            assert_eq!(report.uploaded, 0);
+            assert_eq!(report.pending, 0);
+            assert_eq!(report.push_error, None);
+            assert_eq!(in_bucket(&storage, &alice, file.id).await, None);
+            let on_server = get(&server, &alice, file.id).await.expect("on the server");
+            assert_eq!(on_server.file.content.as_deref(), Some("😀"));
+            assert_eq!(state_of(&a, &alice, file.id).await.0, FileState::Synced);
+
+            sync::run(&b, &transport).await.expect("a sync");
+            let on_b = get(&b, &alice, file.id).await.expect("on b");
+            assert_eq!(on_b.file, on_server.file);
+            let path = local_copy(&b, &transport, &alice, file.id)
+                .await
+                .expect("written from the row");
+            assert_eq!(std::fs::read_to_string(&path).expect("the content"), "😀");
         })
         .await;
     }

@@ -18,6 +18,31 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-25: a file's content on its row
+
+- **What changed**: a row with bytes may keep small text content on the
+  row instead, with nothing in the bucket, see
+  `docs/design/files-content.md`. `SyncedBytes` has two methods for it,
+  with defaults: `content_of_create`, a create's `content` field, and
+  `content`, none. A create that carries `content` does not wait for an
+  upload, `bytes::local_copy` writes the content on a device with no
+  fetch, and `bytes::row_content` answers it on the server, which
+  `GET /api/sync/bytes/{table}/{id}/content` now sends itself, sandboxed
+  (`content_response` in `axum/src/sync/bytes.rs`). The files example
+  uses it: `app_files.content`, by the migration
+  `20261125000000_app_files_content_add.sql`, `content` on `FileNew`,
+  with `size` and `sha256` worked out from it, at most 64 KB, and
+  `files::row_content`, which `GET /api/files/{id}/content` answers.
+- **What an app does**:
+  - **Required**, for an app that kept the files example: keep the
+    migration, and add `content: None` to any `File` or `FileNew` it
+    builds field by field.
+  - **Required**, for an app that changed `app_files` itself: merge the
+    example's changes into its own, or delete the migration if it has
+    no `app_files`.
+  - **Optional**: a table of the app's own with bytes keeps content on
+    its rows by a `content` field in its create and by answering
+    `SyncedBytes::content`.
 ## 2026-11-24: Flash messages
 
 - **What changed**: flash messages are short notices above the page,
