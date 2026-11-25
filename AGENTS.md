@@ -23,6 +23,14 @@ This repository is a template; apps are copies of it that merge its updates and 
 * **When a framework file must change** in an app, declare it in `framework.toml` as a `[[divergence]]` with the reason, and say so in the summary; a change that would serve every app belongs in the template instead. `cargo test --workspace` fails on a framework file that differs from `framework.lock` without one.
 * **After `bin/framework update`**, read the entries of `FRAMEWORK_CHANGELOG.md` it prints, do each step under **What an app does** that applies to this app, and say in the summary which steps were done and which skipped, and why.
 * **In the template itself**, run `cargo run -p framework_check -- lock` after changing a framework file, and put generic changes in their own commits. A change that asks something of an app, or gives it something new to turn on, gets an entry in `FRAMEWORK_CHANGELOG.md` in the same commit.
+* **Sending a change from an app to the template**, when the user asks for it, is one task, done in this order. The user's request covers the commit and push in step 5 and the merge in step 6.
+  1. Make the change in the template's checkout, not in the app. This is the `starter_pack` directory beside the app's, on `main`. A change already committed in the app goes over with `bin/framework contribute SHA...` instead.
+  2. Add the `FRAMEWORK_CHANGELOG.md` entry, when the change needs one (see above). Its steps for an app include removing any `[[divergence]]` an app declared for the same change.
+  3. Run `cargo run -p framework_check -- lock` last, after every other edit. `FRAMEWORK_CHANGELOG.md` is a framework file too, so a lock written before the entry is out of date.
+  4. Run the checks of section 2 in the template.
+  5. Commit the change, its changelog entry and the lock together, in one commit of their own, then push to `main`.
+  6. In the app: undo its own copy of the change and the divergence for it, then run `bin/framework update`. The app's `template` remote is `https://github.com/chrislaskey/starter_pack.git`; add it if `git remote` lacks it. Take the changelog steps (see above), and run the checks of section 2.
+  7. Say in the summary which template commit was pushed, and that the app's merge commit is not pushed.
 
 ## 3. Strict Architectural Rules
 * **Naming** Always use concrete naming instead of jargon. Better to have an explicit name that tells what happens when it is called instead of a shorter name with jargon and ambiguity. Prefer concrete terms like list/get/create/update/upsert/delete on Backend and index/show/new/edit/delete for UI/UX. Name an action by what it does, not by a metaphor: `merge`, not `fold`; `enabled`/`disabled` for a feature switch, not `offered`; `pending_move`, not `move_offered`; "redirects to Home", not "sends home". Comments and docs too: short plain sentences, one idea each, rather than clauses stacked into one.
