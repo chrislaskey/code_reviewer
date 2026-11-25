@@ -13,7 +13,6 @@ use serde_json::Value;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::synced_tables;
 use crate::data::app_events::{self, Event, EventKind, EventStatus, Fields, StoredEvent};
 use crate::data::app_users::User;
 use crate::database::Transaction;
@@ -21,6 +20,7 @@ use crate::deployment::{Deployment, now};
 use crate::sync::bytes::{self, BytesError};
 use crate::sync::events::AnswerStatus;
 use crate::sync::synced_table::TableError;
+use crate::sync::tables;
 
 /// A conflicted change as the page shows it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -119,7 +119,7 @@ pub async fn reapply(deployment: &Deployment, user: &User, id: Uuid) -> Result<(
         changes,
         now(),
     );
-    let synced = synced_tables::get(&stored.event.table).ok_or(ConflictError::Gone)?;
+    let synced = tables::get(&stored.event.table).ok_or(ConflictError::Gone)?;
     let answer = synced
         .apply_in(&mut tx, deployment.role, user, &event)
         .await?;
@@ -183,7 +183,7 @@ struct Row {
 /// The live row the event is about, of a table whose conflicts are
 /// shown; none when it is gone or deleted.
 async fn row_of(tx: &mut Transaction, event: &Event) -> Result<Option<Row>, ConflictError> {
-    let Some(synced) = synced_tables::get(&event.table) else {
+    let Some(synced) = tables::get(&event.table) else {
         return Ok(None);
     };
     let Some(current) = synced.current_fields(tx, event.row_id).await? else {

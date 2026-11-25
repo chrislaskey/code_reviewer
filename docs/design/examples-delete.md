@@ -1,6 +1,6 @@
 # Deleting the examples
 
-Status: planned 2026-11-25; steps 1 to 3 built 2026-11-25.
+Status: planned 2026-11-25; steps 1 to 4 built 2026-11-25.
 
 ## Request
 
@@ -115,16 +115,29 @@ tests alone, `app_test_notes`, in place of posts and files. An app
 that deletes the examples keeps every test of its sync, which matters
 most to an app with a `[[divergence]]` there.
 
-- It is small: a note in a community, with a title and a body, so two
-  fields can conflict, and optional bytes. That covers conflicts,
+- It is small: a note with a body, in one community or none, its
+  `community_id` on the row rather than in a join table. The body and
+  the delete are two fields that can conflict. That covers conflicts,
   visibility by community, backfill, pruning, purge, a local user's
-  move and bytes, without any example's join table.
+  move and an account's delete, without any example's rules.
+- It implements every hook: it goes with its owner's account, with its
+  community, and with its owner's membership there, which rejoining
+  brings back, by its `deleted_at` matching the membership's.
 - It is built with `#[cfg(any(test, feature = "test-tables"))]`. Axum
-  and Tauri turn the feature on as a dev-dependency, so it never ships.
-- Its migration is the tests' own, run on their in-memory database
-  after the app's.
-- It is listed for tests by the framework, after the app's tables, so
-  `synced_tables.rs` stays the app's.
+  and Tauri turn the feature on as a dev-dependency, so a build that
+  ships has none of it.
+- Its table is created by `CREATE TABLE IF NOT EXISTS` after the
+  migrations, whenever a test opens a database, and not by a migration:
+  sqlx refuses a database whose applied migrations it does not all
+  know, and a test may open a file again.
+- The framework lists it after the app's tables, in `sync::tables`,
+  which every part of sync calls. `app/synced_tables.rs` keeps only
+  the app's list.
+- The axum tests' `test_router()` makes no post. A test that wants one
+  makes it, as the seam's `test_router_with_a_post()` does.
+- Not yet: bytes. The bytes machinery's tests are in the files example,
+  `core/src/app/files.rs`, so an app deleting files loses them. Moving
+  them onto test notes with bytes is a later step.
 
 Considered: moving every test that uses posts or files into the
 examples. It is simpler, but an app that deletes them loses most of its
@@ -149,7 +162,10 @@ sqlx refuses a database with an applied migration that is missing.
 2. The pages.
 3. The check, of framework code outside tests. A changelog entry for
    steps 1 to 3.
-4. `app_test_notes`, and the machinery's tests moved onto it.
+4. `app_test_notes`, and the machinery's tests moved onto it. A
+   changelog entry.
 5. The examples' own tests moved into the examples, and the check
    covering tests too. A changelog entry saying how to delete an
    example.
+6. Bytes on test notes, and the bytes machinery's tests moved from
+   `files.rs` onto them.

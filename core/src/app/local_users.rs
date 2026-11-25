@@ -31,7 +31,6 @@ use uuid::Uuid;
 use crate::accounts::Session;
 use crate::app::communities::{self, CommunityAndMembership, CommunityError};
 use crate::app::memberships::{self, MembershipError};
-use crate::app::synced_tables;
 use crate::app::users::{self, SignedIn, UserError};
 use crate::data::app_events::Event;
 use crate::data::app_users::{self, User};
@@ -43,6 +42,7 @@ use crate::deployment::{Deployment, Role, now};
 use crate::helpers::random;
 use crate::sync::events;
 use crate::sync::synced_table::TableError;
+use crate::sync::tables;
 
 /// Whether a device offers to skip signing in. The app's choice, to
 /// change in a fork.
@@ -200,7 +200,7 @@ pub async fn count_items(deployment: &Deployment) -> Result<i64, LocalUserError>
     let counted: Vec<_> = owner_columns()
         .into_iter()
         .filter(|(table, _)| {
-            synced_tables::get(table).is_some_and(|synced| synced.counted_before_a_move())
+            tables::get(table).is_some_and(|synced| synced.counted_before_a_move())
         })
         .collect();
     let count = local_users::count_items(&mut tx, &counted, local).await?;
@@ -230,7 +230,7 @@ pub async fn move_to_account(
     users::upsert_in(&mut tx, &account).await?;
     local_users::maintenance::give_rows_to_user(&mut tx, &owner_columns(), local, account.id)
         .await?;
-    let children_first: Vec<&str> = synced_tables::list()
+    let children_first: Vec<&str> = tables::list()
         .iter()
         .rev()
         .map(|synced| synced.table())
@@ -308,7 +308,7 @@ async fn merge_local_communities_into(
             .filter(|community_id| *community_id != community.id)
             .collect();
     for from_community_id in local_community_ids {
-        for synced in synced_tables::list() {
+        for synced in tables::list() {
             synced
                 .move_rows_to_community(tx, from_community_id, membership)
                 .await?;
@@ -333,7 +333,7 @@ async fn local_user_in(tx: &mut Transaction) -> Result<Uuid, LocalUserError> {
 
 /// Each synced table whose rows name their maker, with that column.
 fn owner_columns() -> Vec<(&'static str, &'static str)> {
-    synced_tables::list()
+    tables::list()
         .iter()
         .filter_map(|synced| Some((synced.table(), synced.owner_column()?)))
         .collect()
@@ -350,7 +350,7 @@ async fn queue_creates_in(
 ) -> Result<(), LocalUserError> {
     let mut made_at_of: BTreeMap<Uuid, DateTime<Utc>> = BTreeMap::new();
     let mut queue = Vec::new();
-    for synced in synced_tables::list() {
+    for synced in tables::list() {
         for create in synced.local_user_creates(tx, user).await? {
             if on_server.contains(&create.id) {
                 continue;
@@ -384,13 +384,13 @@ mod tests {
     use crate::accounts;
     use crate::app::files;
     use crate::app::files::tests::server;
-    use crate::app::posts;
-    use crate::data::{app_files, app_posts};
+    use crate::data::app_files;
     use crate::database::with_each_database;
     use crate::deployment::FileStore;
     use crate::services::storage::Storage;
     use crate::services::web_server::InProcess;
     use crate::sync;
+    use crate::sync::test_notes;
 
     /// A device where someone skipped signing in, with a folder for
     /// its files' bytes.
@@ -430,10 +430,10 @@ mod tests {
             assert_eq!(communities[0].community.name, "Alice's Laptop");
             assert!(communities[0].membership.is_some());
 
-            let post = posts::create(&device, &local, "written here", &[])
+            let note = test_notes::create(&device, &local, "written here", None)
                 .await
-                .expect("a post");
-            posts::update(&device, &local, post.id, "edited here", &[])
+                .expect("a note");
+            test_notes::update(&device, &local, note.id, "edited here")
                 .await
                 .expect("edited");
             users::update(&device, &local, "Alice")
@@ -443,7 +443,7 @@ mod tests {
                 .await
                 .expect("a file");
             assert_eq!(pending(&device).await, 0, "nothing is queued");
-            assert_eq!(post.version, 0);
+            assert_eq!(note.version, 0);
             assert_eq!(count_items(&device).await.expect("counted"), 2);
 
             let report = sync::run(&device, &InProcess { server: &server })
@@ -452,7 +452,10 @@ mod tests {
             assert!(report.local);
             assert_eq!(report.pushed + report.pulled, 0);
             assert_eq!(
-                posts::list(&device, &local).await.expect("posts").len(),
+                test_notes::list(&device, &local)
+                    .await
+                    .expect("notes")
+                    .len(),
                 1,
                 "and nothing was pruned"
             );
@@ -473,13 +476,13 @@ mod tests {
         );
     }
 
-    /// What the test's local user made: a post in their first
-    /// community, a post in none, a second community, a file, and a
-    /// post since deleted.
+    /// What the test's local user made: a note in their first
+    /// community, a note in none, a second community, a file, and a
+    /// note since deleted.
     struct Made {
-        in_community: app_posts::Post,
-        in_none: app_posts::Post,
-        deleted: app_posts::Post,
+        in_community: test_notes::Note,
+        in_none: test_notes::Note,
+        deleted: test_notes::Note,
         file: app_files::File,
     }
 
@@ -487,19 +490,19 @@ mod tests {
         let first = communities::list(device, local).await.expect("listed")[0]
             .community
             .id;
-        let in_community = posts::create(device, local, "in the laptop's", &[first])
+        let in_community = test_notes::create(device, local, "in the laptop's", Some(first))
             .await
-            .expect("a post");
-        let in_none = posts::create(device, local, "in none", &[])
+            .expect("a note");
+        let in_none = test_notes::create(device, local, "in none", None)
             .await
-            .expect("a post");
+            .expect("a note");
         communities::create(device, local, "Garden")
             .await
             .expect("a community");
-        let deleted = posts::create(device, local, "thought better of", &[first])
+        let deleted = test_notes::create(device, local, "thought better of", Some(first))
             .await
-            .expect("a post");
-        posts::delete(device, local, deleted.id)
+            .expect("a note");
+        test_notes::delete(device, local, deleted.id)
             .await
             .expect("deleted");
         let file = files::tests::with_bytes(device, local, "notes.txt", "text/plain", b"notes")
@@ -535,15 +538,10 @@ mod tests {
             .collect()
     }
 
-    async fn posts_of(deployment: &Deployment, user: &User) -> Vec<app_posts::Post> {
-        let mut posts: Vec<app_posts::Post> = posts::list(deployment, user)
-            .await
-            .expect("the posts")
-            .into_iter()
-            .map(|listed| listed.post)
-            .collect();
-        posts.sort_by_key(|post| post.id);
-        posts
+    async fn notes_of(deployment: &Deployment, user: &User) -> Vec<test_notes::Note> {
+        let mut notes = test_notes::list(deployment, user).await.expect("the notes");
+        notes.sort_by_key(|note| note.id);
+        notes
     }
 
     #[tokio::test]
@@ -575,8 +573,8 @@ mod tests {
             );
             assert_eq!(
                 pending(&device).await,
-                8,
-                "two communities, two memberships, two posts, one of them in a community, a file"
+                7,
+                "two communities, two memberships, two notes and a file"
             );
 
             let report = sync::run(&device, &InProcess { server: &server })
@@ -585,7 +583,7 @@ mod tests {
             assert_eq!(report.push_error, None);
             assert_eq!(
                 (report.pushed, report.rejected, report.conflicts),
-                (8, 0, 0)
+                (7, 0, 0)
             );
             assert_eq!(report.uploaded, 1);
             assert_eq!(report.pending, 0);
@@ -595,13 +593,13 @@ mod tests {
                 ["Alice's Laptop", "Garden", "Personal"],
                 "what she made, beside her sign-up's"
             );
-            let on_server = posts_of(&server, &alice).await;
-            assert_eq!(on_server.len(), 2, "the deleted post never left the device");
-            assert!(on_server.iter().all(|post| post.id != made.deleted.id));
+            let on_server = notes_of(&server, &alice).await;
+            assert_eq!(on_server.len(), 2, "the deleted note never left the device");
+            assert!(on_server.iter().all(|note| note.id != made.deleted.id));
             for before in [&made.in_community, &made.in_none] {
                 let after = on_server
                     .iter()
-                    .find(|post| post.id == before.id)
+                    .find(|note| note.id == before.id)
                     .expect("on the server");
                 assert_eq!(after.user_id, alice.id);
                 assert_eq!(
@@ -610,17 +608,18 @@ mod tests {
                 );
                 assert_eq!(after.version, 1);
             }
-            let in_community = posts::get(&server, &alice, made.in_community.id)
+            let in_community = test_notes::get(&server, &alice, made.in_community.id)
                 .await
-                .expect("the post");
-            assert_eq!(in_community.communities[0].name, "Alice's Laptop");
+                .expect("the note");
+            assert!(in_community.community_id.is_some());
+            assert_eq!(in_community.community_id, made.in_community.community_id);
             assert!(bucket_has(&storage, &alice, made.file.id).await);
             let file = files::get(&server, &alice, made.file.id)
                 .await
                 .expect("the file");
             assert_eq!(file.file.inserted_at, made.file.inserted_at);
 
-            assert_eq!(posts_of(&device, &alice).await, on_server);
+            assert_eq!(notes_of(&device, &alice).await, on_server);
             assert_eq!(
                 communities::list(&device, &alice).await.expect("listed"),
                 communities::list(&server, &alice).await.expect("listed"),
@@ -639,9 +638,9 @@ mod tests {
             let session =
                 accounts::tests::signed_up_for_a_device(&server, "alice@example.com").await;
             let alice = session.user.clone();
-            posts::create(&server, &alice, "written on the web", &[])
+            test_notes::create(&server, &alice, "written on the web", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             communities::create(&server, &alice, "Baking")
                 .await
                 .expect("a community");
@@ -656,16 +655,16 @@ mod tests {
                 .expect("a sync");
             assert_eq!(
                 (report.pushed, report.rejected, report.conflicts),
-                (8, 0, 0)
+                (7, 0, 0)
             );
 
             assert_eq!(
                 names_of_communities(&server, &alice).await,
                 ["Alice's Laptop", "Baking", "Garden", "Personal"]
             );
-            let on_server = posts_of(&server, &alice).await;
+            let on_server = notes_of(&server, &alice).await;
             assert_eq!(on_server.len(), 3);
-            assert_eq!(posts_of(&device, &alice).await, on_server);
+            assert_eq!(notes_of(&device, &alice).await, on_server);
             assert_eq!(
                 names_of_communities(&device, &alice).await,
                 names_of_communities(&server, &alice).await
@@ -689,15 +688,17 @@ mod tests {
 
             let (device, local, _folder) = device_with_a_local_user().await;
             let made = made_by(&device, &local).await;
-            let in_both = communities::list(&device, &local)
+            let garden = communities::list(&device, &local)
                 .await
                 .expect("listed")
                 .into_iter()
-                .map(|listed| listed.community.id)
-                .collect::<Vec<_>>();
-            let in_both = posts::create(&device, &local, "in both", &in_both)
+                .find(|listed| listed.community.name == "Garden")
+                .expect("the second community")
+                .community
+                .id;
+            let in_garden = test_notes::create(&device, &local, "in the garden", Some(garden))
                 .await
-                .expect("a post");
+                .expect("a note");
             move_to_account(&device, session, Some(merge_target.clone()))
                 .await
                 .expect("moved");
@@ -717,12 +718,16 @@ mod tests {
             assert_eq!(report.pending, 0);
 
             assert_eq!(names_of_communities(&server, &alice).await, ["Personal"]);
-            for post in [&made.in_community, &in_both] {
-                let shown = posts::get(&server, &alice, post.id)
+            for note in [&made.in_community, &in_garden] {
+                let shown = test_notes::get(&server, &alice, note.id)
                     .await
-                    .expect("the post");
-                let names: Vec<_> = shown.communities.iter().map(|c| c.name.as_str()).collect();
-                assert_eq!(names, ["Personal"], "{}", post.body);
+                    .expect("the note");
+                assert_eq!(
+                    shown.community_id,
+                    Some(merge_target.community.id),
+                    "{}",
+                    note.body
+                );
             }
             let file = files::get(&server, &alice, made.file.id)
                 .await
@@ -730,8 +735,8 @@ mod tests {
             let names: Vec<_> = file.communities.iter().map(|c| c.name.as_str()).collect();
             assert_eq!(names, ["Personal"]);
             assert_eq!(
-                posts_of(&device, &alice).await,
-                posts_of(&server, &alice).await
+                notes_of(&device, &alice).await,
+                notes_of(&server, &alice).await
             );
             assert_eq!(
                 communities::list(&device, &alice).await.expect("listed"),
@@ -796,9 +801,9 @@ mod tests {
             let session =
                 accounts::tests::signed_up_for_a_device(&server, "alice@example.com").await;
             let device = users::tests::device_of(&session.user, &session.token).await;
-            posts::create(&device, &session.user, "hers already", &[])
+            test_notes::create(&device, &session.user, "hers already", None)
                 .await
-                .expect("a post");
+                .expect("a note");
 
             let error = move_to_account(&device, session, None)
                 .await

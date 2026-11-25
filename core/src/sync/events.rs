@@ -218,6 +218,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+    use crate::sync::test_notes;
 
     fn fields(value: Value) -> Fields {
         match value {
@@ -235,7 +236,7 @@ mod tests {
                 .await
                 .expect("user");
             let event = Event::create(
-                crate::data::app_posts::TABLE,
+                test_notes::TABLE,
                 Uuid::now_v7(),
                 fields(json!({"body": "pending"})),
                 crate::deployment::now(),

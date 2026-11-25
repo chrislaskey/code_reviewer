@@ -116,6 +116,11 @@ impl Database {
 
     async fn migrate_sqlite(pool: SqlitePool) -> Result<Database, DatabaseError> {
         SQLITE_MIGRATOR.run(&pool).await?;
+        #[cfg(any(test, feature = "test-tables"))]
+        sqlx::raw_sql(crate::sync::test_notes::SQLITE_TABLE_CREATE_IF_NOT_EXISTS)
+            .execute(&pool)
+            .await
+            .map_err(DatabaseError::Open)?;
         Ok(Database::Sqlite(pool))
     }
 
@@ -137,6 +142,11 @@ impl Database {
             .await
             .map_err(DatabaseError::Open)?;
         POSTGRES_MIGRATOR.run(&pool).await?;
+        #[cfg(any(test, feature = "test-tables"))]
+        sqlx::raw_sql(crate::sync::test_notes::POSTGRES_TABLE_CREATE_IF_NOT_EXISTS)
+            .execute(&pool)
+            .await
+            .map_err(DatabaseError::Open)?;
         Ok(Database::Postgres(pool))
     }
 }

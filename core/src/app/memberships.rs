@@ -19,7 +19,7 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::{communities, synced_tables, users};
+use crate::app::{communities, users};
 use crate::data::app_communities::Community;
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
 use crate::data::app_sync_backfills;
@@ -31,6 +31,7 @@ use crate::helpers::json;
 use crate::sync::TableRow;
 use crate::sync::events::{self, Answer, AnswerStatus};
 use crate::sync::synced_table::{LocalCreate, SyncedTable, TableError};
+use crate::sync::tables;
 
 const CREATE_FIELDS: &[&str] = &["user_id", "community_id", "role"];
 const UPDATE_FIELDS: &[&str] = &["deleted_at"];
@@ -411,7 +412,7 @@ async fn revive(
     membership.deleted_at = None;
     membership.deleted_by_id = None;
     write_changed(tx, role, &mut membership).await?;
-    for table in synced_tables::list() {
+    for table in tables::list() {
         table
             .revive_with_membership(tx, role, &membership, left_at)
             .await?;
@@ -425,7 +426,7 @@ async fn delete_rows_with(
     role: Role,
     membership: &Membership,
 ) -> Result<(), MembershipError> {
-    for table in synced_tables::list().iter().rev() {
+    for table in tables::list().iter().rev() {
         table.delete_with_membership(tx, role, membership).await?;
     }
     Ok(())
@@ -575,9 +576,87 @@ mod tests {
     use crate::app::{communities, posts, posts_communities, users};
     use crate::data::app_posts_communities;
     use crate::database::{Database, with_each_database};
+    use crate::sync::test_notes;
 
     fn server(database: Database) -> Deployment {
         Deployment::new(database, Role::Server)
+    }
+
+    async fn note_bodies(deployment: &Deployment, user: &User) -> Vec<String> {
+        test_notes::list(deployment, user)
+            .await
+            .expect("the notes")
+            .into_iter()
+            .map(|note| note.body)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn memberships_delete_takes_the_members_rows_along_and_create_brings_back_what_left() {
+        with_each_database(|database| async move {
+            let deployment = server(database);
+            let alice = users::create(&deployment, "alice@example.com", "Alice")
+                .await
+                .expect("a user");
+            let bob = users::create(&deployment, "bob@example.com", "Bob")
+                .await
+                .expect("a user");
+            let gardening = communities::create(&deployment, &alice, "Gardening")
+                .await
+                .expect("a community");
+            create(&deployment, &bob, gardening.id)
+                .await
+                .expect("joined");
+            let roses = test_notes::create(&deployment, &alice, "roses", Some(gardening.id))
+                .await
+                .expect("a note");
+            let weeds = test_notes::create(&deployment, &alice, "weeds", Some(gardening.id))
+                .await
+                .expect("a note");
+            test_notes::create(&deployment, &bob, "bob's", Some(gardening.id))
+                .await
+                .expect("a note");
+            test_notes::update_community(&deployment, &alice, weeds.id, None)
+                .await
+                .expect("taken out on purpose");
+            assert_eq!(note_bodies(&deployment, &bob).await, vec!["bob's", "roses"]);
+
+            let membership = list_mine(&deployment, &alice)
+                .await
+                .expect("memberships")
+                .remove(0);
+            delete(&deployment, &alice, gardening.id)
+                .await
+                .expect("left");
+            assert_eq!(note_bodies(&deployment, &bob).await, vec!["bob's"]);
+            assert_eq!(
+                note_bodies(&deployment, &alice).await,
+                vec!["weeds"],
+                "roses left with her, weeds was taken out before"
+            );
+            let mut tx = deployment.begin().await.expect("a transaction");
+            let left = get_in(&mut tx, membership.id)
+                .await
+                .expect("the row")
+                .expect("kept");
+            let roses = test_notes::get_in(&mut tx, roses.id)
+                .await
+                .expect("the note")
+                .expect("kept");
+            assert_eq!(roses.deleted_at, left.deleted_at, "the one moment");
+            tx.commit().await.expect("committed");
+
+            let rejoined = create(&deployment, &alice, gardening.id)
+                .await
+                .expect("rejoined");
+            assert_eq!(rejoined.id, membership.id, "the same row");
+            assert_eq!(
+                note_bodies(&deployment, &bob).await,
+                vec!["bob's", "roses"],
+                "exactly what left with her came back"
+            );
+        })
+        .await;
     }
 
     async fn bodies(deployment: &Deployment, user: &User) -> Vec<String> {

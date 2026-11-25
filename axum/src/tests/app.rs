@@ -2,9 +2,24 @@
 
 use super::*;
 
+/// `test_router`, with one post of Alice's, as the API shows it.
+pub(super) async fn test_router_with_a_post() -> (TestRouter, Value) {
+    let router = test_router().await;
+    let alice = app_core::app::users::get_by_token(&router.deployment, &router.token)
+        .await
+        .expect("alice");
+    let post = app_core::app::posts::create(&router.deployment, &alice, "the first post", &[])
+        .await
+        .expect("a post");
+    let post = app_core::app::posts::get(&router.deployment, &alice, post.id)
+        .await
+        .expect("the post");
+    (router, serde_json::to_value(post).expect("json"))
+}
+
 #[tokio::test]
 async fn posts_list_as_json() {
-    let (router, post) = test_router().await;
+    let (router, post) = test_router_with_a_post().await;
     let (status, body) = get(&router, "/api/posts").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body, json!([post]));
@@ -19,7 +34,7 @@ async fn posts_list_as_json() {
 
 #[tokio::test]
 async fn current_user_is_the_tokens_user_and_nobody_without_one() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, body) = get(&router, "/api/users/current").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["email"], json!("alice@example.com"));
@@ -40,7 +55,7 @@ async fn current_user_is_the_tokens_user_and_nobody_without_one() {
 
 #[tokio::test]
 async fn avatars_upload_then_update_with_field_errors_as_json() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let wrong = json!({ "content_type": "text/html", "size": 0 });
     let (status, body) = send(
         &router,
@@ -87,7 +102,7 @@ async fn avatars_upload_then_update_with_field_errors_as_json() {
 
 #[tokio::test]
 async fn posts_create_refuses_a_body_over_the_maximum_length() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let too_long = "a".repeat(app_core::data::app_posts::MAX_BODY_LENGTH + 1);
     let (status, body) = send(
         &router,
@@ -105,7 +120,7 @@ async fn posts_create_refuses_a_body_over_the_maximum_length() {
 
 #[tokio::test]
 async fn communities_create_join_leave_and_a_post_in_one() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, community) = send(
         &router,
         Method::POST,
@@ -178,7 +193,7 @@ async fn communities_create_join_leave_and_a_post_in_one() {
 
 #[tokio::test]
 async fn current_community_settles_on_the_first_and_keeps_a_choice_in_its_cookie() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let token = Some(router.token.as_str());
     let (status, _, personal) = send_with(
         &router.router,
@@ -269,7 +284,7 @@ async fn current_community_settles_on_the_first_and_keeps_a_choice_in_its_cookie
 
 #[tokio::test]
 async fn communities_show_update_and_delete() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (_, community) = send(
         &router,
         Method::POST,
@@ -310,7 +325,7 @@ async fn communities_show_update_and_delete() {
 
 #[tokio::test]
 async fn posts_get_as_json() {
-    let (router, post) = test_router().await;
+    let (router, post) = test_router_with_a_post().await;
     let (status, body) = get(
         &router,
         &format!("/api/posts/{}", post["post"]["id"].as_str().unwrap()),
@@ -322,7 +337,7 @@ async fn posts_get_as_json() {
 
 #[tokio::test]
 async fn posts_get_missing_is_404() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, body) = get(&router, &format!("/api/posts/{MISSING_ID}")).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert_eq!(
@@ -333,14 +348,14 @@ async fn posts_get_missing_is_404() {
 
 #[tokio::test]
 async fn posts_get_rejects_an_id_that_is_not_a_uuid() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, _) = get(&router, "/api/posts/not-a-uuid").await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
 async fn posts_create() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, created) = send(
         &router,
         Method::POST,
@@ -357,7 +372,7 @@ async fn posts_create() {
 
 #[tokio::test]
 async fn posts_create_refuses_blank() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, body) = send(
         &router,
         Method::POST,
@@ -371,7 +386,7 @@ async fn posts_create_refuses_blank() {
 
 #[tokio::test]
 async fn posts_update() {
-    let (router, post) = test_router().await;
+    let (router, post) = test_router_with_a_post().await;
     let path = format!("/api/posts/{}", post["post"]["id"].as_str().unwrap());
     let (status, updated) = send(
         &router,
@@ -390,7 +405,7 @@ async fn posts_update() {
 
 #[tokio::test]
 async fn posts_delete() {
-    let (router, post) = test_router().await;
+    let (router, post) = test_router_with_a_post().await;
     let path = format!("/api/posts/{}", post["post"]["id"].as_str().unwrap());
     let (status, _) = send(&router, Method::DELETE, &path, None).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
@@ -403,7 +418,7 @@ async fn posts_delete() {
 
 #[tokio::test]
 async fn files_upload_create_show_rename_and_delete() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let bytes = b"some notes".to_vec();
     let sha256 = app_core::helpers::sha256::hex(&bytes);
     let picked = json!({ "content_type": "text/plain", "size": bytes.len(), "sha256": sha256 });
@@ -528,7 +543,7 @@ async fn files_upload_create_show_rename_and_delete() {
 
 #[tokio::test]
 async fn files_create_with_content_answers_it_from_both_content_routes() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (_, communities) = get(&router, "/api/communities").await;
     let community_id = communities[0]["community"]["id"].clone();
     let new = json!({
@@ -581,7 +596,7 @@ async fn files_create_with_content_answers_it_from_both_content_routes() {
 
 #[tokio::test]
 async fn sync_push_applies_an_event_and_pull_returns_the_row() {
-    let (router, post) = test_router().await;
+    let (router, post) = test_router_with_a_post().await;
     let event = json!({
         "id": "01900000-0000-7000-8000-000000000001",
         "table": "app_posts",
@@ -630,7 +645,7 @@ async fn sync_push_applies_an_event_and_pull_returns_the_row() {
 
 #[tokio::test]
 async fn sync_push_takes_a_request_up_to_the_most_a_device_sends_and_no_larger() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let event = |body: String| {
         json!({
             "id": uuid::Uuid::now_v7(),
@@ -676,7 +691,7 @@ async fn sync_push_takes_a_request_up_to_the_most_a_device_sends_and_no_larger()
 
 #[tokio::test]
 async fn sync_push_rejects_a_malformed_request() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, _) = send(
         &router,
         Method::POST,
@@ -689,7 +704,7 @@ async fn sync_push_rejects_a_malformed_request() {
 
 #[tokio::test]
 async fn current_user_get_shows_their_email_and_whether_they_are_staff() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, me) = get(&router, "/api/users/current").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(me["name"], json!("alice"));
@@ -699,7 +714,7 @@ async fn current_user_get_shows_their_email_and_whether_they_are_staff() {
 
 #[tokio::test]
 async fn current_user_update_changes_their_name() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, me) = send(
         &router,
         Method::PUT,

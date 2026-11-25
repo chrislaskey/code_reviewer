@@ -1,10 +1,11 @@
 //! What every route shares: the bearer token, API paths with no route, and the pages.
 
 use super::*;
+use crate::tests::app::test_router_with_a_post;
 
 #[tokio::test]
 async fn a_bearer_token_names_the_user_and_an_unknown_one_is_401() {
-    let (router, post) = test_router().await;
+    let (router, post) = test_router_with_a_post().await;
     let (status, body) = send_as(
         &router.router,
         Some("nope"),
@@ -48,7 +49,7 @@ async fn a_bearer_token_names_the_user_and_an_unknown_one_is_401() {
 
 #[tokio::test]
 async fn api_path_without_a_route_is_a_json_404_not_the_pages() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, body) = get(&router, "/api/no-such-thing").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert_eq!(
@@ -69,7 +70,7 @@ async fn api_path_without_a_route_is_a_json_404_not_the_pages() {
 
 #[tokio::test]
 async fn pages_answer_any_path_with_index_html() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     for path in ["/home", "/posts/new"] {
         let (status, body) = get(&router, path).await;
         assert_eq!(status, StatusCode::OK);
@@ -79,7 +80,7 @@ async fn pages_answer_any_path_with_index_html() {
 
 #[tokio::test]
 async fn public_pages_answer_at_their_file_names() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let cookie = format!("token={}", router.token);
     for cookie in [None, Some(cookie.as_str())] {
         for (path, page) in [

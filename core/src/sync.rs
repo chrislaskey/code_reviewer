@@ -23,6 +23,9 @@ pub mod events;
 pub mod pending_changes;
 pub mod purge;
 pub mod synced_table;
+pub mod tables;
+#[cfg(any(test, feature = "test-tables"))]
+pub mod test_notes;
 
 use crate::data::app_sync_backfills;
 use crate::data::app_sync_state;
@@ -35,7 +38,6 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::app::memberships::{self, MembershipError};
-use crate::app::synced_tables;
 use crate::app::users::{self, UserError};
 use crate::data::app_events::{self, Event, EventKind, EventStatus, StoredEvent};
 use crate::data::app_sync_state::Cursor;
@@ -223,7 +225,7 @@ pub async fn push(
 ) -> Result<PushResponse, SyncError> {
     let mut answers = Vec::with_capacity(request.events.len());
     for event in &request.events {
-        let answer = match synced_tables::get(&event.table) {
+        let answer = match tables::get(&event.table) {
             Some(synced) => synced.apply_event(deployment, user, event).await?,
             None => Answer::rejected(event.id, "unknown_table", None),
         };
@@ -264,7 +266,7 @@ pub async fn pull(
 
     let mut tx = deployment.begin().await?;
     let mut rows: Vec<TableRow> = Vec::new();
-    for synced in synced_tables::list() {
+    for synced in tables::list() {
         rows.extend(
             synced
                 .list_synced_after(&mut tx, user, &after, limit)
@@ -305,7 +307,7 @@ pub async fn backfill(
         });
     }
     let mut rows: Vec<TableRow> = Vec::new();
-    for synced in synced_tables::list() {
+    for synced in tables::list() {
         rows.extend(
             synced
                 .list_live_in_community_after(&mut tx, request.community_id, &after, limit)
@@ -383,7 +385,7 @@ async fn send_with_parents(
 
 /// The synced table of the name a row or an event gives.
 fn synced_table_of(table: &str) -> Result<&'static dyn SyncedTable, SyncError> {
-    synced_tables::get(table)
+    tables::get(table)
         .ok_or_else(|| SyncError::Malformed(format!("a row of an unknown table '{table}'")))
 }
 
@@ -704,7 +706,7 @@ async fn push_batch<T: Transport>(
                 app_events::delete_pending_of_row(&mut tx, &event.table, event.row_id).await?;
                 delete_row(&mut tx, &event.table, event.row_id).await?;
             }
-            answered.insert((synced_tables::position(&server.table), server_id), server);
+            answered.insert((tables::position(&server.table), server_id), server);
         }
     }
     for row in answered.into_values() {
@@ -768,7 +770,7 @@ async fn pull_pages<T: Transport>(
 /// posts point at it.
 async fn reset(deployment: &Deployment, user: &User) -> Result<(), SyncError> {
     let mut tx = deployment.begin().await?;
-    for synced in synced_tables::list().iter().rev() {
+    for synced in tables::list().iter().rev() {
         synced.delete_for_resync(&mut tx, user).await?;
     }
     app_sync_state::maintenance::delete_cursor_and_backfills(&mut tx).await?;
@@ -826,7 +828,7 @@ async fn backfill_pending<T: Transport>(
 async fn prune(deployment: &Deployment, user: &User, report: &mut Report) -> Result<(), SyncError> {
     let mut tx = deployment.begin().await?;
     let mut pruned = 0;
-    for synced in synced_tables::list() {
+    for synced in tables::list() {
         pruned += synced.prune(&mut tx, user).await?;
     }
     tx.commit().await?;
@@ -861,19 +863,17 @@ pub(crate) mod tests {
     use crate::app::communities::CommunityError;
     #[cfg(feature = "object-storage")]
     use crate::app::files;
-    use crate::app::posts::PostError;
     pub(crate) use crate::app::users::tests::device_of;
     use crate::app::{communities, memberships, posts, posts_communities};
-    use crate::data::{
-        app_communities, app_posts, app_posts_communities, app_users, app_users_communities,
-    };
+    use crate::data::{app_communities, app_posts, app_users, app_users_communities};
     use crate::database::with_each_database;
     use crate::deployment::{Role, now};
     #[cfg(feature = "sync-http")]
     use crate::services::web_server::Http;
     use crate::services::web_server::InProcess;
     use crate::sync::bytes::{Upload, UploadNew};
-    use crate::sync::{conflicts, purge};
+    use crate::sync::test_notes::NoteError;
+    use crate::sync::{conflicts, purge, test_notes};
 
     /// A user signed up on the server, with a token for their devices,
     /// and without the community a sign-up starts with, so a test
@@ -912,6 +912,15 @@ pub(crate) mod tests {
     }
 
     async fn bodies(deployment: &Deployment, user: &User) -> Vec<String> {
+        test_notes::list(deployment, user)
+            .await
+            .expect("the notes")
+            .into_iter()
+            .map(|note| note.body)
+            .collect()
+    }
+
+    async fn post_bodies(deployment: &Deployment, user: &User) -> Vec<String> {
         posts::list(deployment, user)
             .await
             .expect("the posts")
@@ -1029,35 +1038,33 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn sync_a_post_written_offline_reaches_the_server_and_the_other_device() {
+    async fn sync_a_note_written_offline_reaches_the_server_and_the_other_device() {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let a = device_of(&alice, &token).await;
             let b = device_of(&alice, &token).await;
-            let post = posts::create(&a, &alice, "from a", &[])
+            let note = test_notes::create(&a, &alice, "from a", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             assert_eq!(pending(&a).await, 1);
 
             let report = sync(&a, &server).await;
             assert_eq!(report.pushed, 1);
             assert_eq!(report.pending, 0);
-            let on_a = posts::get(&a, &alice, post.id)
+            let on_a = test_notes::get(&a, &alice, note.id)
                 .await
-                .expect("the post on a")
-                .post;
+                .expect("the note on a");
             assert_eq!(on_a.version, 1);
             assert!(on_a.last_synced_at.is_some());
             assert_eq!(bodies(&server, &alice).await, vec!["from a"]);
 
             let report = sync(&b, &server).await;
-            assert_eq!(report.pulled, 2, "alice's row and the post");
+            assert_eq!(report.pulled, 2, "alice's row and the note");
             assert_eq!(
-                posts::get(&b, &alice, post.id)
+                test_notes::get(&b, &alice, note.id)
                     .await
-                    .expect("the post on b")
-                    .post,
+                    .expect("the note on b"),
                 on_a
             );
             assert_eq!(users::get(&b, alice.id).await.expect("alice on b"), alice);
@@ -1094,16 +1101,16 @@ pub(crate) mod tests {
             let server = Deployment::new(database, Role::Server);
             let (alice, alice_token) = user_with_token(&server, "alice@example.com").await;
             let (bob, bob_token) = user_with_token(&server, "bob@example.com").await;
-            posts::create(&server, &alice, "alice's", &[])
+            test_notes::create(&server, &alice, "alice's", None)
                 .await
-                .expect("a post");
-            let bobs = posts::create(&server, &bob, "bob's", &[])
+                .expect("a note");
+            let bobs = test_notes::create(&server, &bob, "bob's", None)
                 .await
-                .expect("a post");
+                .expect("a note");
 
             let b = device_of(&bob, &bob_token).await;
             let report = sync(&b, &server).await;
-            assert_eq!(report.pulled, 2, "bob's row and bob's post");
+            assert_eq!(report.pulled, 2, "bob's row and bob's note");
             assert_eq!(bodies(&b, &bob).await, vec!["bob's"]);
             let error = users::get(&b, alice.id).await.expect_err("not on b");
             assert!(matches!(error, UserError::NotFound { .. }));
@@ -1111,8 +1118,10 @@ pub(crate) mod tests {
             let a = device_of(&alice, &alice_token).await;
             sync(&a, &server).await;
             assert_eq!(bodies(&a, &alice).await, vec!["alice's"]);
-            let error = posts::get(&a, &alice, bobs.id).await.expect_err("not on a");
-            assert!(matches!(error, PostError::NotFound { .. }));
+            let error = test_notes::get(&a, &alice, bobs.id)
+                .await
+                .expect_err("not on a");
+            assert!(matches!(error, NoteError::NotFound { .. }));
         })
         .await;
     }
@@ -1123,9 +1132,9 @@ pub(crate) mod tests {
             let server = Deployment::new(database, Role::Server);
             let (alice, _) = user_with_token(&server, "alice@example.com").await;
             let a = device_of(&alice, "not-a-token").await;
-            posts::create(&a, &alice, "mine", &[])
+            test_notes::create(&a, &alice, "mine", None)
                 .await
-                .expect("a post");
+                .expect("a note");
 
             let error = run(&a, &InProcess { server: &server })
                 .await
@@ -1144,22 +1153,21 @@ pub(crate) mod tests {
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let a = device_of(&alice, &token).await;
             let b = device_of(&alice, &token).await;
-            let post = posts::create(&a, &alice, "first", &[])
+            let note = test_notes::create(&a, &alice, "first", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             sync(&a, &server).await;
             sync(&b, &server).await;
 
-            posts::update(&b, &alice, post.id, "edited on b", &[])
+            test_notes::update(&b, &alice, note.id, "edited on b")
                 .await
                 .expect("edited");
             sync(&b, &server).await;
             sync(&a, &server).await;
 
-            let on_a = posts::get(&a, &alice, post.id)
+            let on_a = test_notes::get(&a, &alice, note.id)
                 .await
-                .expect("the post on a")
-                .post;
+                .expect("the note on a");
             assert_eq!(on_a.body, "edited on b");
             assert_eq!(on_a.version, 2);
             assert_eq!(bodies(&server, &alice).await, vec!["edited on b"]);
@@ -1174,16 +1182,16 @@ pub(crate) mod tests {
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let a = device_of(&alice, &token).await;
             let b = device_of(&alice, &token).await;
-            let post = posts::create(&a, &alice, "start", &[])
+            let note = test_notes::create(&a, &alice, "start", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             sync(&a, &server).await;
             sync(&b, &server).await;
 
-            posts::update(&a, &alice, post.id, "a's edit", &[])
+            test_notes::update(&a, &alice, note.id, "a's edit")
                 .await
                 .expect("edited on a");
-            posts::update(&b, &alice, post.id, "b's edit", &[])
+            test_notes::update(&b, &alice, note.id, "b's edit")
                 .await
                 .expect("edited on b");
             sync(&a, &server).await;
@@ -1191,10 +1199,9 @@ pub(crate) mod tests {
             assert_eq!(report.conflicts, 1);
 
             assert_eq!(bodies(&server, &alice).await, vec!["a's edit"]);
-            let on_b = posts::get(&b, &alice, post.id)
+            let on_b = test_notes::get(&b, &alice, note.id)
                 .await
-                .expect("the post on b")
-                .post;
+                .expect("the note on b");
             assert_eq!(on_b.body, "a's edit");
             assert_eq!(on_b.version, 2);
             let conflicts = conflicts::list(&b).await.expect("the conflicts");
@@ -1215,16 +1222,16 @@ pub(crate) mod tests {
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let a = device_of(&alice, &token).await;
             let b = device_of(&alice, &token).await;
-            let post = posts::create(&a, &alice, "start", &[])
+            let note = test_notes::create(&a, &alice, "start", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             sync(&a, &server).await;
             sync(&b, &server).await;
 
-            posts::update(&a, &alice, post.id, "a's edit", &[])
+            test_notes::update(&a, &alice, note.id, "a's edit")
                 .await
                 .expect("edited on a");
-            posts::delete(&b, &alice, post.id)
+            test_notes::delete(&b, &alice, note.id)
                 .await
                 .expect("deleted on b");
             sync(&a, &server).await;
@@ -1234,7 +1241,7 @@ pub(crate) mod tests {
 
             assert!(bodies(&server, &alice).await.is_empty());
             let mut tx = server.begin().await.expect("a transaction");
-            let row = posts::get_in(&mut tx, post.id)
+            let row = test_notes::get_in(&mut tx, note.id)
                 .await
                 .expect("the row")
                 .expect("kept");
@@ -1252,11 +1259,13 @@ pub(crate) mod tests {
             let server = Deployment::new(database, Role::Server);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let a = device_of(&alice, &token).await;
-            let post = posts::create(&a, &alice, "one", &[]).await.expect("a post");
-            posts::update(&a, &alice, post.id, "two", &[])
+            let note = test_notes::create(&a, &alice, "one", None)
+                .await
+                .expect("a note");
+            test_notes::update(&a, &alice, note.id, "two")
                 .await
                 .expect("edited");
-            posts::update(&a, &alice, post.id, "three", &[])
+            test_notes::update(&a, &alice, note.id, "three")
                 .await
                 .expect("edited again");
             assert_eq!(pending(&a).await, 3);
@@ -1266,10 +1275,9 @@ pub(crate) mod tests {
             assert_eq!(report.conflicts, 0);
             assert_eq!(bodies(&server, &alice).await, vec!["three"]);
             assert_eq!(
-                posts::get(&a, &alice, post.id)
+                test_notes::get(&a, &alice, note.id)
                     .await
-                    .expect("the post")
-                    .post
+                    .expect("the note")
                     .version,
                 3
             );
@@ -1448,9 +1456,9 @@ pub(crate) mod tests {
             let a = device_of(&alice, &token).await;
             let count = 2 * PUSH_BATCH + 200;
             for number in 0..count {
-                posts::create(&a, &alice, &format!("post {number}"), &[])
+                test_notes::create(&a, &alice, &format!("note {number}"), None)
                     .await
-                    .expect("a post");
+                    .expect("a note");
             }
 
             let dropped = PushCounted {
@@ -1481,16 +1489,16 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn sync_a_push_of_long_posts_goes_in_requests_the_server_takes() {
+    async fn sync_a_push_of_long_notes_goes_in_requests_the_server_takes() {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let a = device_of(&alice, &token).await;
-            let longest = "é".repeat(app_posts::MAX_BODY_LENGTH);
+            let longest = "é".repeat(test_notes::MAX_BODY_LENGTH);
             for _ in 0..PUSH_BATCH {
-                posts::create(&a, &alice, &longest, &[])
+                test_notes::create(&a, &alice, &longest, None)
                     .await
-                    .expect("a post");
+                    .expect("a note");
             }
 
             let counted = PushCounted {
@@ -1501,7 +1509,7 @@ pub(crate) mod tests {
             let report = run(&a, &counted).await.expect("a sync");
             assert_eq!(report.push_error, None);
             let sizes = counted.sizes.lock().expect("the lock").clone();
-            assert_eq!(sizes.len(), 3, "twenty kilobytes a post: {sizes:?}");
+            assert_eq!(sizes.len(), 3, "twenty kilobytes a note: {sizes:?}");
             assert_eq!(sizes.iter().sum::<usize>(), PUSH_BATCH);
             assert_eq!(report.pending, 0);
             assert_eq!(bodies(&server, &alice).await.len(), PUSH_BATCH);
@@ -1512,7 +1520,7 @@ pub(crate) mod tests {
     #[test]
     fn sync_a_push_request_holds_one_event_at_least_whatever_its_size() {
         let huge = Event::create(
-            app_posts::TABLE,
+            test_notes::TABLE,
             Uuid::now_v7(),
             app_events::Fields::from_iter([(
                 "body".to_string(),
@@ -1541,36 +1549,34 @@ pub(crate) mod tests {
             let (alice, _token) = user_with_token(&server, "alice@example.com").await;
             let last_week = now() - Duration::days(7);
             let offline = Event::create(
-                app_posts::TABLE,
+                test_notes::TABLE,
                 Uuid::now_v7(),
                 app_events::Fields::from_iter([("body".to_string(), json!("written offline"))]),
                 last_week,
             );
-            posts::apply_event(&server, &alice, &offline)
+            test_notes::apply_event(&server, &alice, &offline)
                 .await
                 .expect("applied");
-            let post = posts::get(&server, &alice, offline.row_id)
+            let note = test_notes::get(&server, &alice, offline.row_id)
                 .await
-                .expect("the post")
-                .post;
-            assert_eq!(post.inserted_at, last_week);
-            assert!(post.updated_at > last_week, "the server's own clock");
+                .expect("the note");
+            assert_eq!(note.inserted_at, last_week);
+            assert!(note.updated_at > last_week, "the server's own clock");
 
             let before = now();
             let ahead = Event::create(
-                app_posts::TABLE,
+                test_notes::TABLE,
                 Uuid::now_v7(),
                 app_events::Fields::from_iter([("body".to_string(), json!("a clock set ahead"))]),
                 now() + Duration::days(7),
             );
-            posts::apply_event(&server, &alice, &ahead)
+            test_notes::apply_event(&server, &alice, &ahead)
                 .await
                 .expect("applied");
-            let post = posts::get(&server, &alice, ahead.row_id)
+            let note = test_notes::get(&server, &alice, ahead.row_id)
                 .await
-                .expect("the post")
-                .post;
-            assert!(post.inserted_at >= before && post.inserted_at <= now());
+                .expect("the note");
+            assert!(note.inserted_at >= before && note.inserted_at <= now());
         })
         .await;
     }
@@ -1581,11 +1587,11 @@ pub(crate) mod tests {
             let server = Deployment::new(database, Role::Server);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let a = device_of(&alice, &token).await;
-            let post = posts::create(&a, &alice, "start", &[])
+            let note = test_notes::create(&a, &alice, "start", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             sync(&a, &server).await;
-            posts::update(&a, &alice, post.id, "edited", &[])
+            test_notes::update(&a, &alice, note.id, "edited")
                 .await
                 .expect("edited");
             let transport = PushLost {
@@ -1597,10 +1603,9 @@ pub(crate) mod tests {
             assert!(report.push_error.is_some());
             assert_eq!(report.pending, 1);
             assert_eq!(
-                posts::get(&a, &alice, post.id)
+                test_notes::get(&a, &alice, note.id)
                     .await
-                    .expect("the post")
-                    .post
+                    .expect("the note")
                     .body,
                 "edited"
             );
@@ -1608,16 +1613,14 @@ pub(crate) mod tests {
             let report = run(&a, &transport).await.expect("a sync");
             assert_eq!(report.pushed, 1);
             assert_eq!(report.pending, 0);
-            let on_server = posts::get(&server, &alice, post.id)
+            let on_server = test_notes::get(&server, &alice, note.id)
                 .await
-                .expect("the post")
-                .post;
+                .expect("the note");
             assert_eq!(on_server.version, 2);
             assert_eq!(
-                posts::get(&a, &alice, post.id)
+                test_notes::get(&a, &alice, note.id)
                     .await
-                    .expect("the post")
-                    .post,
+                    .expect("the note"),
                 on_server
             );
         })
@@ -1631,17 +1634,17 @@ pub(crate) mod tests {
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let a = device_of(&alice, &token).await;
             let b = device_of(&alice, &token).await;
-            let post = posts::create(&a, &alice, "start", &[])
+            let note = test_notes::create(&a, &alice, "start", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             sync(&a, &server).await;
             sync(&b, &server).await;
-            posts::update(&a, &alice, post.id, "a's edit", &[])
+            test_notes::update(&a, &alice, note.id, "a's edit")
                 .await
                 .expect("edited on a");
             sync(&a, &server).await;
 
-            posts::update(&b, &alice, post.id, "b's edit, offline", &[])
+            test_notes::update(&b, &alice, note.id, "b's edit, offline")
                 .await
                 .expect("edited on b");
             let transport = PushLost {
@@ -1652,10 +1655,9 @@ pub(crate) mod tests {
             assert!(report.push_error.is_some());
             assert_eq!(report.pulled, 2, "a's edit, and alice's row in the overlap");
             assert_eq!(
-                posts::get(&b, &alice, post.id)
+                test_notes::get(&b, &alice, note.id)
                     .await
-                    .expect("the post")
-                    .post
+                    .expect("the note")
                     .body,
                 "b's edit, offline"
             );
@@ -1669,7 +1671,7 @@ pub(crate) mod tests {
         server: InProcess<'a>,
         device: &'a Deployment,
         user: &'a User,
-        post_id: Uuid,
+        note_id: Uuid,
     }
 
     impl Transport for EditDuringPush<'_> {
@@ -1679,12 +1681,11 @@ pub(crate) mod tests {
             request: PushRequest,
         ) -> Result<PushResponse, SyncError> {
             let response = self.server.push(token, request).await?;
-            posts::update(
+            test_notes::update(
                 self.device,
                 self.user,
-                self.post_id,
+                self.note_id,
                 "edited during the push",
-                &[],
             )
             .await
             .map_err(|error| SyncError::Table(error.into()))?;
@@ -1753,27 +1754,26 @@ pub(crate) mod tests {
             let server = Deployment::new(database, Role::Server);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let a = device_of(&alice, &token).await;
-            let post = posts::create(&a, &alice, "start", &[])
+            let note = test_notes::create(&a, &alice, "start", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             sync(&a, &server).await;
-            posts::update(&a, &alice, post.id, "first edit", &[])
+            test_notes::update(&a, &alice, note.id, "first edit")
                 .await
                 .expect("edited");
             let transport = EditDuringPush {
                 server: InProcess { server: &server },
                 device: &a,
                 user: &alice,
-                post_id: post.id,
+                note_id: note.id,
             };
 
             let report = run(&a, &transport).await.expect("a sync");
             assert_eq!(report.pushed, 1);
             assert_eq!(report.pending, 1);
-            let on_a = posts::get(&a, &alice, post.id)
+            let on_a = test_notes::get(&a, &alice, note.id)
                 .await
-                .expect("the post")
-                .post;
+                .expect("the note");
             assert_eq!(on_a.body, "edited during the push");
             assert_eq!(on_a.version, 1);
 
@@ -1785,10 +1785,9 @@ pub(crate) mod tests {
                 vec!["edited during the push"]
             );
             assert_eq!(
-                posts::get(&a, &alice, post.id)
+                test_notes::get(&a, &alice, note.id)
                     .await
-                    .expect("the post")
-                    .post
+                    .expect("the note")
                     .version,
                 3
             );
@@ -1803,15 +1802,15 @@ pub(crate) mod tests {
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let a = device_of(&alice, &token).await;
             let b = device_of(&alice, &token).await;
-            let post = posts::create(&a, &alice, "start", &[])
+            let note = test_notes::create(&a, &alice, "start", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             sync(&a, &server).await;
             sync(&b, &server).await;
-            posts::update(&a, &alice, post.id, "a's edit", &[])
+            test_notes::update(&a, &alice, note.id, "a's edit")
                 .await
                 .expect("edited on a");
-            posts::update(&b, &alice, post.id, "b's edit", &[])
+            test_notes::update(&b, &alice, note.id, "b's edit")
                 .await
                 .expect("edited on b");
             sync(&a, &server).await;
@@ -1823,10 +1822,9 @@ pub(crate) mod tests {
                 .expect("reapplied");
             assert!(conflicts::list(&b).await.expect("the conflicts").is_empty());
             assert_eq!(
-                posts::get(&b, &alice, post.id)
+                test_notes::get(&b, &alice, note.id)
                     .await
-                    .expect("the post")
-                    .post
+                    .expect("the note")
                     .body,
                 "b's edit"
             );
@@ -1836,10 +1834,10 @@ pub(crate) mod tests {
             assert_eq!(bodies(&server, &alice).await, vec!["b's edit"]);
             assert_eq!(bodies(&a, &alice).await, vec!["b's edit"]);
 
-            posts::update(&a, &alice, post.id, "a again", &[])
+            test_notes::update(&a, &alice, note.id, "a again")
                 .await
                 .expect("edited on a");
-            posts::update(&b, &alice, post.id, "b again", &[])
+            test_notes::update(&b, &alice, note.id, "b again")
                 .await
                 .expect("edited on b");
             sync(&a, &server).await;
@@ -1863,15 +1861,15 @@ pub(crate) mod tests {
             let alice = users::create(&server, "alice@example.com", "Alice")
                 .await
                 .expect("a user");
-            let first = posts::create(&server, &alice, "first", &[])
+            let first = test_notes::create(&server, &alice, "first", None)
                 .await
-                .expect("a post");
-            let second = posts::create(&server, &alice, "second", &[])
+                .expect("a note");
+            let second = test_notes::create(&server, &alice, "second", None)
                 .await
-                .expect("a post");
-            let third = posts::create(&server, &alice, "third", &[])
+                .expect("a note");
+            let third = test_notes::create(&server, &alice, "third", None)
                 .await
-                .expect("a post");
+                .expect("a note");
 
             let page = pull(
                 &server,
@@ -1902,7 +1900,7 @@ pub(crate) mod tests {
             )
             .await
             .expect("a page");
-            assert_eq!(page.rows.len(), 3, "alice again, for the posts");
+            assert_eq!(page.rows.len(), 3, "alice again, for the notes");
             assert_eq!(page.rows[0].row["id"], json!(alice.id));
             assert_eq!(page.rows[1].row["id"], json!(second.id));
             assert_eq!(page.rows[2].row["id"], json!(third.id));
@@ -2013,9 +2011,9 @@ pub(crate) mod tests {
             let a = device_of(&alice, &token).await;
             set_offline(&a, true).await.expect("offline");
             assert!(status(&a).await.expect("the status").offline);
-            posts::create(&a, &alice, "written offline", &[])
+            test_notes::create(&a, &alice, "written offline", None)
                 .await
-                .expect("a post");
+                .expect("a note");
 
             let report = run(&a, &Unreachable).await.expect("a sync");
             assert!(report.offline);
@@ -2036,18 +2034,18 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn sync_a_delete_on_the_server_hides_the_post_on_the_device() {
+    async fn sync_a_delete_on_the_server_hides_the_note_on_the_device() {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let a = device_of(&alice, &token).await;
-            let post = posts::create(&server, &alice, "on the web", &[])
+            let note = test_notes::create(&server, &alice, "on the web", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             sync(&a, &server).await;
             assert_eq!(bodies(&a, &alice).await, vec!["on the web"]);
 
-            posts::delete(&server, &alice, post.id)
+            test_notes::delete(&server, &alice, note.id)
                 .await
                 .expect("deleted");
             sync(&a, &server).await;
@@ -2090,9 +2088,9 @@ pub(crate) mod tests {
             let server = Deployment::new(database, Role::Server);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
             let a = device_of(&alice, &token).await;
-            let post = posts::create(&a, &alice, "fine", &[])
+            let note = test_notes::create(&a, &alice, "fine", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             {
                 // Rewrite the queued create to one the server refuses
                 let mut tx = a.begin().await.expect("a transaction");
@@ -2116,8 +2114,10 @@ pub(crate) mod tests {
             assert_eq!(report.pending, 0);
             assert!(bodies(&a, &alice).await.is_empty());
             assert!(bodies(&server, &alice).await.is_empty());
-            let error = posts::get(&a, &alice, post.id).await.expect_err("dropped");
-            assert!(matches!(error, PostError::NotFound { .. }));
+            let error = test_notes::get(&a, &alice, note.id)
+                .await
+                .expect_err("dropped");
+            assert!(matches!(error, NoteError::NotFound { .. }));
         })
         .await;
     }
@@ -2148,9 +2148,9 @@ pub(crate) mod tests {
             let gardening = communities::create(&server, &alice, "Gardening")
                 .await
                 .expect("a community");
-            let post = posts::create(&server, &alice, "roses", &[gardening.id])
+            let note = test_notes::create(&server, &alice, "roses", Some(gardening.id))
                 .await
-                .expect("a post");
+                .expect("a note");
             let b = device_of(&bob, &bob_token).await;
             let report = sync(&b, &server).await;
             assert_eq!(report.backfilled, 0);
@@ -2165,15 +2165,20 @@ pub(crate) mod tests {
             let report = sync(&b, &server).await;
             assert!(report.backfilled > 0, "{report:?}");
             assert_eq!(bodies(&b, &bob).await, vec!["roses"]);
-            assert_eq!(community_names(&b, &bob, post.id).await, vec!["Gardening"]);
             assert_eq!(
-                posts::get(&b, &bob, post.id)
+                test_notes::get(&b, &bob, note.id)
                     .await
-                    .expect("the post")
-                    .owner
-                    .name,
-                "alice"
+                    .expect("the note")
+                    .community_id,
+                Some(gardening.id)
             );
+            let mut tx = b.begin().await.expect("a transaction");
+            let owner = users::get_in(&mut tx, alice.id)
+                .await
+                .expect("the owner")
+                .expect("pulled with the note");
+            tx.commit().await.expect("committed");
+            assert_eq!(owner.name, "alice");
             let listed = communities::list(&b, &bob).await.expect("the communities");
             assert!(listed[0].membership.is_some());
 
@@ -2186,8 +2191,8 @@ pub(crate) mod tests {
             let report = sync(&b, &server).await;
             assert_eq!(report.pruned, 1);
             assert!(bodies(&b, &bob).await.is_empty());
-            let error = posts::get(&b, &bob, post.id).await.expect_err("gone");
-            assert!(matches!(error, PostError::NotFound { .. }));
+            let error = test_notes::get(&b, &bob, note.id).await.expect_err("gone");
+            assert!(matches!(error, NoteError::NotFound { .. }));
         })
         .await;
     }
@@ -2204,9 +2209,9 @@ pub(crate) mod tests {
             memberships::create(&server, &bob, gardening.id)
                 .await
                 .expect("joined");
-            posts::create(&server, &alice, "roses", &[gardening.id])
+            test_notes::create(&server, &alice, "roses", Some(gardening.id))
                 .await
-                .expect("a post");
+                .expect("a note");
             let b = device_of(&bob, &bob_token).await;
             sync(&b, &server).await;
             assert_eq!(bodies(&b, &bob).await, vec!["roses"]);
@@ -2356,9 +2361,9 @@ pub(crate) mod tests {
             let gardening = communities::create(&server, &alice, "Gardening")
                 .await
                 .expect("a community");
-            posts::create(&server, &alice, "roses", &[gardening.id])
+            test_notes::create(&server, &alice, "roses", Some(gardening.id))
                 .await
-                .expect("a post");
+                .expect("a note");
             let b = device_of(&bob, &bob_token).await;
             sync(&b, &server).await;
 
@@ -2403,21 +2408,21 @@ pub(crate) mod tests {
                 .expect("a post");
             let b = device_of(&bob, &bob_token).await;
             sync(&b, &server).await;
-            assert_eq!(bodies(&b, &bob).await, vec!["roses"]);
+            assert_eq!(post_bodies(&b, &bob).await, vec!["roses"]);
 
             posts_communities::remove(&server, &alice, post.id, gardening.id)
                 .await
                 .expect("removed");
             let report = sync(&b, &server).await;
             assert_eq!(report.pruned, 1);
-            assert!(bodies(&b, &bob).await.is_empty());
+            assert!(post_bodies(&b, &bob).await.is_empty());
 
             posts_communities::add(&server, &alice, post.id, gardening.id)
                 .await
                 .expect("added back");
             let report = sync(&b, &server).await;
             assert_eq!(report.pruned, 0);
-            assert_eq!(bodies(&b, &bob).await, vec!["roses"]);
+            assert_eq!(post_bodies(&b, &bob).await, vec!["roses"]);
         })
         .await;
     }
@@ -2494,7 +2499,7 @@ pub(crate) mod tests {
             assert_eq!(report.pushed, 1, "the post");
             assert_eq!(report.rejected, 1, "its community row");
             assert_eq!(report.pending, 0);
-            assert_eq!(bodies(&b, &bob).await, vec!["late"]);
+            assert_eq!(post_bodies(&b, &bob).await, vec!["late"]);
             assert!(community_names(&b, &bob, post.id).await.is_empty());
             assert!(community_names(&server, &bob, post.id).await.is_empty());
             assert!(
@@ -2523,14 +2528,14 @@ pub(crate) mod tests {
             memberships::create(&server, &bob, gardening.id)
                 .await
                 .expect("joined");
-            let post = posts::create(&server, &alice, "roses", &[gardening.id])
+            let note = test_notes::create(&server, &alice, "roses", Some(gardening.id))
                 .await
-                .expect("a post");
-            // The post changes last, so by the cursor alone it would come
-            // after its community row
-            posts::update(&server, &alice, post.id, "roses, pruned", &[gardening.id])
+                .expect("a note");
+            // The community changes last, so by the cursor alone it would
+            // come after the note
+            communities::update(&server, &alice, gardening.id, "Gardens")
                 .await
-                .expect("edited");
+                .expect("renamed");
 
             let page = pull(
                 &server,
@@ -2550,30 +2555,17 @@ pub(crate) mod tests {
                     .position(|row| row.table == table && row.row["id"] == json!(id))
                     .unwrap_or_else(|| panic!("{table} {id} in {tables:?}"))
             };
-            let row = posts_communities::list_live_of_posts(
-                &mut server.begin().await.expect("a transaction"),
-                &[post.id],
-            )
-            .await
-            .expect("the row")
-            .remove(0);
-            assert!(position(app_users::TABLE, alice.id) < position(app_posts::TABLE, post.id));
-            assert!(
-                position(app_posts::TABLE, post.id)
-                    < position(app_posts_communities::TABLE, row.id)
-            );
+            assert!(position(app_users::TABLE, alice.id) < position(test_notes::TABLE, note.id));
             assert!(
                 position(app_communities::TABLE, gardening.id)
-                    < position(app_posts_communities::TABLE, row.id)
-            );
-            assert!(
-                position(app_users_communities::TABLE, row.users_communities_id)
-                    < position(app_posts_communities::TABLE, row.id)
+                    < position(test_notes::TABLE, note.id)
             );
             assert_eq!(
                 page.rows
                     .iter()
-                    .filter(|row| row.table == app_posts::TABLE)
+                    .filter(|row| {
+                        row.table == app_communities::TABLE && row.row["id"] == json!(gardening.id)
+                    })
                     .count(),
                 1,
                 "sent once"
@@ -2609,25 +2601,19 @@ pub(crate) mod tests {
         tx.commit().await.expect("committed");
     }
 
-    /// Deletes the post on the server as if long ago, and purges it.
-    async fn delete_long_ago_and_purge(server: &Deployment, alice: &User, post_id: Uuid) {
-        posts::delete(server, alice, post_id)
+    /// Deletes the note on the server as if long ago, and purges it.
+    async fn delete_long_ago_and_purge(server: &Deployment, alice: &User, note_id: Uuid) {
+        test_notes::delete(server, alice, note_id)
             .await
             .expect("deleted");
         backdate(
             server,
-            "UPDATE app_posts SET deleted_at = $1, last_synced_at = $1 WHERE id = $2",
-            post_id,
-        )
-        .await;
-        backdate(
-            server,
-            "UPDATE app_posts_communities SET deleted_at = $1, last_synced_at = $1 WHERE post_id = $2",
-            post_id,
+            "UPDATE app_test_notes SET deleted_at = $1, last_synced_at = $1 WHERE id = $2",
+            note_id,
         )
         .await;
         let report = purge::run(server, now()).await.expect("purged");
-        assert_eq!(report.removed[app_posts::TABLE], 1);
+        assert_eq!(report.removed[test_notes::TABLE], 1);
     }
 
     /// Makes the device's last pull look older than the purge window.
@@ -2648,12 +2634,12 @@ pub(crate) mod tests {
             let gardening = communities::create(&server, &alice, "Gardening")
                 .await
                 .expect("a community");
-            let kept = posts::create(&server, &alice, "kept", &[gardening.id])
+            let kept = test_notes::create(&server, &alice, "kept", Some(gardening.id))
                 .await
-                .expect("a post");
-            let gone = posts::create(&server, &alice, "gone", &[gardening.id])
+                .expect("a note");
+            let gone = test_notes::create(&server, &alice, "gone", Some(gardening.id))
                 .await
-                .expect("a post");
+                .expect("a note");
             let a = device_of(&alice, &token).await;
             sync(&a, &server).await;
             assert_eq!(bodies(&a, &alice).await, vec!["gone", "kept"]);
@@ -2667,11 +2653,16 @@ pub(crate) mod tests {
                 "joined again, as far as the device knows"
             );
             assert_eq!(bodies(&a, &alice).await, vec!["kept"]);
-            let error = posts::get(&a, &alice, gone.id).await.expect_err("gone");
-            assert!(matches!(error, PostError::NotFound { .. }));
+            let error = test_notes::get(&a, &alice, gone.id)
+                .await
+                .expect_err("gone");
+            assert!(matches!(error, NoteError::NotFound { .. }));
             assert_eq!(
-                community_names(&a, &alice, kept.id).await,
-                vec!["Gardening"]
+                test_notes::get(&a, &alice, kept.id)
+                    .await
+                    .expect("the note")
+                    .community_id,
+                Some(gardening.id)
             );
             assert_eq!(
                 memberships::list_mine(&a, &alice)
@@ -2693,15 +2684,15 @@ pub(crate) mod tests {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
-            let post = posts::create(&server, &alice, "start", &[])
+            let note = test_notes::create(&server, &alice, "start", None)
                 .await
-                .expect("a post");
-            let old = posts::create(&server, &alice, "old", &[])
+                .expect("a note");
+            let old = test_notes::create(&server, &alice, "old", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             let a = device_of(&alice, &token).await;
             sync(&a, &server).await;
-            posts::update(&a, &alice, post.id, "edited offline", &[])
+            test_notes::update(&a, &alice, note.id, "edited offline")
                 .await
                 .expect("edited");
             delete_long_ago_and_purge(&server, &alice, old.id).await;
@@ -2726,10 +2717,9 @@ pub(crate) mod tests {
             assert!(!report.resynced);
             assert_eq!(bodies(&server, &alice).await, vec!["edited offline"]);
             assert_eq!(
-                posts::get(&a, &alice, post.id)
+                test_notes::get(&a, &alice, note.id)
                     .await
-                    .expect("the post")
-                    .post
+                    .expect("the note")
                     .version,
                 2
             );
@@ -2742,15 +2732,15 @@ pub(crate) mod tests {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
-            let post = posts::create(&server, &alice, "start", &[])
+            let note = test_notes::create(&server, &alice, "start", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             let a = device_of(&alice, &token).await;
             sync(&a, &server).await;
-            posts::update(&a, &alice, post.id, "edited offline", &[])
+            test_notes::update(&a, &alice, note.id, "edited offline")
                 .await
                 .expect("edited");
-            delete_long_ago_and_purge(&server, &alice, post.id).await;
+            delete_long_ago_and_purge(&server, &alice, note.id).await;
 
             let report = sync(&a, &server).await;
             assert_eq!(report.rejected, 1);
@@ -2762,7 +2752,7 @@ pub(crate) mod tests {
             );
             let conflicts = conflicts::list(&a).await.expect("the conflicts");
             assert_eq!(conflicts.len(), 1);
-            assert_eq!(conflicts[0].about, None, "a post that is gone");
+            assert_eq!(conflicts[0].about, None, "a note that is gone");
             assert_eq!(conflicts[0].fields[0].yours, json!("edited offline"));
             assert_eq!(conflicts[0].fields[0].now, Value::Null);
             let error = conflicts::reapply(&a, &alice, conflicts[0].id)

@@ -185,12 +185,12 @@ pub(crate) async fn show_communities_in(
 mod tests {
     use super::*;
     use crate::accounts::{self, CodeMatched};
-    use crate::app::{memberships, posts};
+    use crate::app::memberships;
     use crate::data::app_communities;
-    use crate::data::app_posts;
     use crate::database::with_each_database;
     use crate::services::mailer::Mailer;
     use crate::services::mailer::mails;
+    use crate::sync::test_notes;
     use crate::sync::{self, PullRequest};
 
     fn server(database: crate::database::Database) -> Deployment {
@@ -262,9 +262,9 @@ mod tests {
                 1
             );
 
-            posts::create(&server, &user, "trying it", &[])
+            test_notes::create(&server, &user, "trying it", None)
                 .await
-                .expect("a trial user posts like anyone");
+                .expect("a trial user notes like anyone");
             assert_eq!(count(&server).await.expect("counted"), 1);
         })
         .await;
@@ -304,9 +304,9 @@ mod tests {
                 .expect("their own")
                 .community
                 .clone();
-            posts::create(&server, &trial, "in the trial", &[trial_community.id])
+            test_notes::create(&server, &trial, "in the trial", Some(trial_community.id))
                 .await
-                .expect("a post");
+                .expect("a note");
 
             assert_eq!(names_seen_by(&server, &alice).await, ["Baking", "Personal"]);
             assert!(matches!(
@@ -332,7 +332,12 @@ mod tests {
                     .all(|(_, id)| *id != trial_community.id && *id != trial.id),
                 "nothing of the trial's reaches her devices"
             );
-            assert!(posts::list(&server, &alice).await.expect("hers").is_empty());
+            assert!(
+                test_notes::list(&server, &alice)
+                    .await
+                    .expect("hers")
+                    .is_empty()
+            );
 
             assert_eq!(
                 names_seen_by(&server, &trial).await,
@@ -370,24 +375,24 @@ mod tests {
             tx.commit().await.expect("committed");
             assert_eq!(made, 2, "their community and their membership");
             for number in made..MAX_WRITES {
-                posts::create(&server, &trial, &format!("post {number}"), &[])
+                test_notes::create(&server, &trial, &format!("note {number}"), None)
                     .await
                     .expect("within the maximum");
             }
 
-            let error = posts::create(&server, &trial, "one more", &[])
+            let error = test_notes::create(&server, &trial, "one more", None)
                 .await
                 .expect_err("refused");
             assert!(matches!(
                 error,
-                posts::PostError::Record(crate::sync::events::RecordError::TrialWritesFull)
+                test_notes::NoteError::Record(crate::sync::events::RecordError::TrialWritesFull)
             ));
             assert_eq!(
                 error.to_string(),
                 "This trial has reached its limit. Sign up to keep going."
             );
             let pushed = crate::data::app_events::Event::create(
-                app_posts::TABLE,
+                test_notes::TABLE,
                 Uuid::now_v7(),
                 crate::data::app_events::Fields::from_iter([("body".to_string(), "pushed".into())]),
                 now(),
@@ -411,10 +416,13 @@ mod tests {
                 .expect("counted");
             tx.commit().await.expect("committed");
             assert_eq!(recorded, MAX_WRITES, "a refused write leaves no row");
-            let posts_made = usize::try_from(MAX_WRITES - made).expect("a count");
+            let notes_made = usize::try_from(MAX_WRITES - made).expect("a count");
             assert_eq!(
-                posts::list(&server, &trial).await.expect("theirs").len(),
-                posts_made
+                test_notes::list(&server, &trial)
+                    .await
+                    .expect("theirs")
+                    .len(),
+                notes_made
             );
             assert_eq!(names_seen_by(&server, &trial).await, ["Guest"]);
 
@@ -423,7 +431,7 @@ mod tests {
                 .await
                 .expect("signed up");
             let bob = users::get(&server, trial.id).await.expect("the same user");
-            posts::create(&server, &bob, "signed up", &[])
+            test_notes::create(&server, &bob, "signed up", None)
                 .await
                 .expect("a full user has no maximum");
         })
@@ -468,9 +476,9 @@ mod tests {
             .cursor;
             let session = create(&server, 10).await.expect("a trial");
             let trial = session.user.clone();
-            let post = posts::create(&server, &trial, "made on a trial", &[])
+            let note = test_notes::create(&server, &trial, "made on a trial", None)
                 .await
-                .expect("a post");
+                .expect("a note");
 
             let matched = signed_up(&server, &trial, " Bob@Example.com ").await;
             assert!(matched.new_account, "a sign-up");
@@ -495,10 +503,10 @@ mod tests {
                 Err(UserError::UnknownToken)
             ));
 
-            let kept = posts::get(&server, &signed_up.user, post.id)
+            let kept = test_notes::get(&server, &signed_up.user, note.id)
                 .await
-                .expect("the post");
-            assert_eq!(kept.post, post);
+                .expect("the note");
+            assert_eq!(kept, note);
             assert_eq!(
                 names_seen_by(&server, &signed_up.user).await,
                 ["Guest", "Personal"],
@@ -603,9 +611,10 @@ mod tests {
                 .iter()
                 .find(|listed| listed.membership.is_some())
                 .expect("their own");
-            let post = posts::create(&server, &trial, "soon gone", &[community.community.id])
-                .await
-                .expect("a post");
+            let note =
+                test_notes::create(&server, &trial, "soon gone", Some(community.community.id))
+                    .await
+                    .expect("a note");
             let made = now();
 
             let an_hour_short = made + Duration::hours(SHOWN_HOURS + KEPT_AFTER_HOURS - 1);
@@ -630,7 +639,7 @@ mod tests {
             ));
             let mut tx = server.begin().await.expect("a transaction");
             assert!(
-                posts::get_in(&mut tx, post.id)
+                test_notes::get_in(&mut tx, note.id)
                     .await
                     .expect("looked")
                     .is_none()
@@ -642,7 +651,7 @@ mod tests {
                     .is_none()
             );
             assert_eq!(
-                crate::data::app_events::list_of_table(&mut tx, app_posts::TABLE)
+                crate::data::app_events::list_of_table(&mut tx, test_notes::TABLE)
                     .await
                     .expect("the log")
                     .len(),

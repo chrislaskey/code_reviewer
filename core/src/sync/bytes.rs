@@ -37,7 +37,6 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::synced_tables;
 use crate::app::users::{self, UserError};
 use crate::data::app_events::{self, Event, EventKind, StoredEvent};
 use crate::data::app_users::User;
@@ -52,6 +51,7 @@ use crate::services::storage::{Storage, StorageError};
 use crate::services::web_server::Transport;
 use crate::sync::SyncError;
 use crate::sync::synced_table::{SyncedTable, TableError};
+use crate::sync::tables;
 
 /// Why a device refuses a waiting row itself: there is nothing to send.
 pub const BYTES_GONE: &str = "the file's bytes are no longer on this device";
@@ -259,14 +259,14 @@ impl From<FieldErrors> for BytesError {
 
 /// The table, if its rows carry bytes.
 pub fn of_table(table: &str) -> Result<&'static dyn SyncedBytes, BytesError> {
-    synced_tables::get(table)
+    tables::get(table)
         .and_then(|synced| synced.bytes())
         .ok_or_else(|| BytesError::UnknownTable(table.to_string()))
 }
 
 /// Every synced table whose rows carry bytes, with those bytes.
 fn tables() -> impl Iterator<Item = (&'static dyn SyncedTable, &'static dyn SyncedBytes)> {
-    synced_tables::list()
+    tables::list()
         .iter()
         .filter_map(|synced| Some((*synced, synced.bytes()?)))
 }

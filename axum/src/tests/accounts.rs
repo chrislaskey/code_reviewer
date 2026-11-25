@@ -6,7 +6,7 @@ use crate::rate_limits;
 #[tokio::test]
 async fn accounts_sign_in_of_a_new_email_the_code_and_the_last_step_then_sign_out_over_the_cookie()
 {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let bob = json!({ "email": "Bob@example.com" });
     let (status, body) = send_as(
         &router.router,
@@ -139,17 +139,6 @@ async fn accounts_sign_in_of_a_new_email_the_code_and_the_last_step_then_sign_ou
             .subject,
         "Your password was changed"
     );
-    let (_, _, posts) = send_with(
-        &router.router,
-        None,
-        Some(&cookie),
-        Method::GET,
-        "/api/posts",
-        None,
-    )
-    .await;
-    assert_eq!(posts, json!([]), "bob does not see alice's post");
-
     let (status, headers, _) = send_with(
         &router.router,
         None,
@@ -211,7 +200,7 @@ async fn accounts_sign_in_of_a_new_email_the_code_and_the_last_step_then_sign_ou
 
 #[tokio::test]
 async fn accounts_password_tries_are_limited_per_address_and_the_code_still_works() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     for _ in 0..rate_limits::PASSWORD_TRIES_PER_ADDRESS {
         let (status, _) = send_as(
             &router.router,
@@ -244,7 +233,7 @@ async fn accounts_password_tries_are_limited_per_address_and_the_code_still_work
 
 #[tokio::test]
 async fn accounts_keep_signed_in_makes_the_cookie_outlast_the_browser_on_every_last_step() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let sixty_days = "Max-Age=5184000";
 
     let body = code_matched(&router, "bob@example.com").await;
@@ -309,7 +298,7 @@ async fn accounts_keep_signed_in_makes_the_cookie_outlast_the_browser_on_every_l
 
 #[tokio::test]
 async fn accounts_trial_makes_a_user_whose_cookie_lasts_two_days_and_who_signs_up_as_themselves() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, available) = send_as(
         &router.router,
         None,
@@ -471,7 +460,7 @@ async fn accounts_sign_in_makes_no_account_and_trials_are_refused_when_the_setti
         },
         ..ServerSettings::default()
     };
-    let (router, _) = test_router_with(TrialUsersMax(2), false, closed).await;
+    let router = test_router_with(TrialUsersMax(2), false, closed).await;
     let ask = |method: Method, path: &'static str, body: Option<Value>| {
         let router = router.router.clone();
         async move { send_as(&router, None, method, path, body).await }
@@ -508,7 +497,7 @@ async fn accounts_sign_in_codes_are_refused_and_a_password_signs_in_when_the_set
         },
         ..ServerSettings::default()
     };
-    let (router, _) = test_router_with(TrialUsersMax(2), false, password_only).await;
+    let router = test_router_with(TrialUsersMax(2), false, password_only).await;
     app_core::accounts::users::create(&router.deployment, "dana@example.com", PASSWORD)
         .await
         .expect("created");
@@ -566,7 +555,7 @@ async fn accounts_sign_in_codes_are_refused_and_a_password_signs_in_when_the_set
 
 #[tokio::test]
 async fn accounts_trial_is_refused_at_the_cap() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     for _ in 0..2 {
         let (status, _) = send_as(
             &router.router,
@@ -621,7 +610,7 @@ async fn trial_create_forwarded_for(router: &TestRouter, forwarded_for: &str) ->
 
 #[tokio::test]
 async fn accounts_trial_is_limited_per_client_by_the_address_the_proxy_wrote() {
-    let (router, _) = test_router_with(TrialUsersMax(100), true, ServerSettings::default()).await;
+    let router = test_router_with(TrialUsersMax(100), true, ServerSettings::default()).await;
     for _ in 0..rate_limits::TRIAL_USERS_PER_HOUR_PER_IP {
         let status = trial_create_forwarded_for(&router, "203.0.113.9").await;
         assert_eq!(status, StatusCode::CREATED);
@@ -645,7 +634,7 @@ async fn accounts_trial_is_limited_per_client_by_the_address_the_proxy_wrote() {
 
 #[tokio::test]
 async fn trial_users_are_refused_past_their_writes_and_see_only_their_communities() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let trial = app_core::accounts::trial_users::create(&router.deployment, 2)
         .await
         .expect("a trial");
@@ -667,11 +656,11 @@ async fn trial_users_are_refused_past_their_writes_and_see_only_their_communitie
     assert_eq!(names, [&json!("Guest")], "not Alice's Personal");
 
     for number in 2..app_core::accounts::trial_users::MAX_WRITES {
-        app_core::app::posts::create(
+        app_core::sync::test_notes::create(
             &router.deployment,
             &trial.user,
-            &format!("post {number}"),
-            &[],
+            &format!("note {number}"),
+            None,
         )
         .await
         .expect("within the maximum");
@@ -679,9 +668,9 @@ async fn trial_users_are_refused_past_their_writes_and_see_only_their_communitie
     let (status, body) = send_as(
         &router.router,
         Some(&trial.token),
-        Method::POST,
-        "/api/posts",
-        Some(json!({ "body": "one more", "community_ids": [] })),
+        Method::PUT,
+        "/api/users/current",
+        Some(json!({ "name": "One more" })),
     )
     .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
@@ -693,7 +682,7 @@ async fn trial_users_are_refused_past_their_writes_and_see_only_their_communitie
 
 #[tokio::test]
 async fn accounts_routes_are_rate_limited_per_address_per_sign_in_and_per_client() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let alice = json!({ "email": "alice@example.com" });
     let mut pending = Value::Null;
     for _ in 0..rate_limits::EMAILS_PER_HOUR_PER_ADDRESS {
@@ -740,7 +729,7 @@ async fn accounts_routes_are_rate_limited_per_address_per_sign_in_and_per_client
         StatusCode::TOO_MANY_REQUESTS,
         "counted as an email to alice too"
     );
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (_, body) = send_as(
         &router.router,
         None,
@@ -773,7 +762,7 @@ async fn accounts_routes_are_rate_limited_per_address_per_sign_in_and_per_client
         "one a minute per sign-in"
     );
 
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let garbage = json!({ "code": "nope", "verifier": "nope" });
     for _ in 0..rate_limits::ACCOUNT_REQUESTS_PER_MINUTE_PER_IP {
         let (status, _) = send_as(
@@ -822,7 +811,7 @@ async fn accounts_routes_are_rate_limited_per_address_per_sign_in_and_per_client
 
 #[tokio::test]
 async fn accounts_a_device_signs_in_through_the_browser_and_exchanges_its_code() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (verifier, challenge) = app_core::accounts::verifier_and_challenge();
     let body = code_matched(&router, "alice@example.com").await;
     let (status, headers, body) = send_with(
@@ -887,7 +876,7 @@ async fn accounts_a_device_signs_in_through_the_browser_and_exchanges_its_code()
 
 #[tokio::test]
 async fn accounts_deletions_delete_with_the_mailed_code_then_the_token_is_gone() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let token = Some(router.token.as_str());
     let (status, _headers, body) = send_with(
         &router.router,
@@ -922,15 +911,22 @@ async fn accounts_deletions_delete_with_the_mailed_code_then_the_token_is_gone()
     .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
 
-    let (status, _headers, body) =
-        send_with(&router.router, token, None, Method::GET, "/api/posts", None).await;
+    let (status, _headers, body) = send_with(
+        &router.router,
+        token,
+        None,
+        Method::GET,
+        "/api/users/current",
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::GONE);
     assert_eq!(body["code"], json!("account_deleted"));
 }
 
 #[tokio::test]
 async fn app_store_routes_are_not_found_without_the_app_store() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, _headers, _body) = send_with(
         &router.router,
         Some(&router.token),
@@ -1002,7 +998,7 @@ fn stripe_signature(body: &str, secret: &str) -> String {
 
 #[tokio::test]
 async fn stripe_webhooks_create_records_a_signed_event_once() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let body = stripe_event_body("evt_1");
     let signature = stripe_signature(&body, STRIPE_SIGNING_SECRET);
 
@@ -1020,7 +1016,7 @@ async fn stripe_webhooks_create_records_a_signed_event_once() {
 
 #[tokio::test]
 async fn stripe_webhooks_create_refuses_what_stripe_did_not_sign() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let body = stripe_event_body("evt_1");
     let forged = stripe_signature(&body, "whsec_another_secret");
     for signature in [Some(forged.as_str()), None] {
@@ -1036,7 +1032,7 @@ async fn stripe_webhooks_create_refuses_what_stripe_did_not_sign() {
 
 #[tokio::test]
 async fn stripe_webhooks_create_is_not_found_without_a_secret() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let state = AppState {
         deployment: router.deployment.clone(),
         mailer: router.mailer.clone(),
@@ -1068,7 +1064,7 @@ async fn accounts_purchasing_routes_are_refused_when_the_settings_turn_purchasin
         },
         ..ServerSettings::default()
     };
-    let (router, _) = test_router_with(TrialUsersMax(2), false, selling_nothing).await;
+    let router = test_router_with(TrialUsersMax(2), false, selling_nothing).await;
     let refused = json!({ "error": "This server sells nothing" });
     for path in [
         "/api/accounts/products",
@@ -1099,7 +1095,7 @@ async fn accounts_purchasing_routes_are_refused_when_the_settings_turn_purchasin
 
 #[tokio::test]
 async fn accounts_products_list_and_get_show_the_catalog() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     router
         .stripe
         .memory_product_put(app_core::services::stripe::StripeProduct {
@@ -1152,7 +1148,7 @@ async fn accounts_checkouts_create_then_get_records_the_purchase() {
         StripeCheckoutSession, StripeCheckoutSessionStatus, StripePaymentStatus, StripePrice,
         StripeProduct,
     };
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     router.stripe.memory_product_put(StripeProduct {
         id: "prod_license".to_string(),
         name: "License".to_string(),
@@ -1237,7 +1233,7 @@ async fn accounts_subscriptions_and_the_plan_on_the_current_user() {
         StripeCheckoutSession, StripeCheckoutSessionStatus, StripePaymentStatus, StripePrice,
         StripeProduct, StripeSubscription,
     };
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     router.stripe.memory_product_put(StripeProduct {
         id: "prod_single".to_string(),
         name: "Single user subscription".to_string(),
@@ -1395,7 +1391,7 @@ async fn accounts_subscriptions_and_the_plan_on_the_current_user() {
 
 #[tokio::test]
 async fn accounts_mails_go_in_the_persons_language_else_the_requests_else_english() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let request = Request::builder()
         .method(Method::POST)
         .uri("/api/accounts/sign-in")
@@ -1465,7 +1461,7 @@ async fn accounts_mails_go_in_the_persons_language_else_the_requests_else_englis
 #[tokio::test]
 async fn accounts_current_user_from_bearer_token_takes_the_header_and_never_the_cookie() {
     use crate::user_auth::CurrentUserFromBearerToken;
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let probe = Router::new()
         .route(
             "/probe",
@@ -1507,7 +1503,7 @@ async fn accounts_current_user_from_bearer_token_takes_the_header_and_never_the_
 #[tokio::test]
 async fn accounts_current_user_from_cookie_takes_the_cookie_and_never_the_header() {
     use crate::user_auth::CurrentUserFromCookie;
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let probe = Router::new()
         .route(
             "/probe",

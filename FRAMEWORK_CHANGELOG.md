@@ -18,6 +18,34 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-25: the framework's tests on a table of its own
+
+- **What changed**: the framework's tests use `app_test_notes`, a synced
+  table built for tests alone (`core/src/sync/test_notes.rs`), in place
+  of posts, see `docs/design/examples-delete.md`. It is behind
+  `#[cfg(any(test, feature = "test-tables"))]`, a new core feature that
+  `axum/Cargo.toml` and `tauri/Cargo.toml` turn on in
+  `[dev-dependencies]`. Sync runs over `sync::tables::list()`, the
+  app's `synced_tables::list()` and the test table after it in tests;
+  `synced_tables::get` and `position` are now `sync::tables::get` and
+  `position`, and the test that every table with sync columns is
+  listed moved there too. The axum tests' `test_router()` and
+  `test_router_with()` return the `TestRouter` alone, with no post;
+  `axum/src/tests/app.rs` has `test_router_with_a_post()`.
+- **What an app does**:
+  - **Required**: keep `app_core = { workspace = true, features =
+    ["test-tables"] }` in the `[dev-dependencies]` of `axum/Cargo.toml`
+    and `tauri/Cargo.toml` when the merge conflicts.
+  - **Required**, for an app whose `core/src/app/synced_tables.rs`
+    conflicts: keep its own `list()`, and drop `get`, `position` and
+    the test below it, which are in `sync::tables` now. Code of the
+    app's that called `synced_tables::get` or `position` calls
+    `sync::tables::get` or `position`.
+  - **Required**, for an app with axum tests of its own: write
+    `let router = test_router().await;` for
+    `let (router, _) = test_router().await;`, and use
+    `test_router_with_a_post()` where a test used the post.
+
 ## 2026-11-25: the framework names no example
 
 - **What changed**: the framework's code no longer names posts or

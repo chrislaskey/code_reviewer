@@ -976,10 +976,10 @@ pub async fn device_accounts_remove(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use app_core::app::posts;
     use app_core::services::mailer::Mailer;
     use app_core::services::mailer::mails;
     use app_core::services::web_server::InProcess;
+    use app_core::sync::test_notes;
 
     async fn server() -> Deployment {
         let database = Database::open_sqlite_in_memory()
@@ -1082,14 +1082,14 @@ mod tests {
             .await
             .expect("alice kept");
         let alice_account = id_of(&device, alice.id).await;
-        let post = posts::create(
+        let note = test_notes::create(
             &device.active().await.expect("alice's"),
             &alice,
             "hers",
-            &[],
+            None,
         )
         .await
-        .expect("a post");
+        .expect("a note");
         sync::run(&device.active().await.expect("alice's"), &transport)
             .await
             .expect("synced");
@@ -1116,11 +1116,11 @@ mod tests {
 
         let again = device.activate(alice_account).await.expect("alice again");
         assert_eq!(again, alice);
-        let hers = posts::list(&device.active().await.expect("alice's"), &alice)
+        let hers = test_notes::list(&device.active().await.expect("alice's"), &alice)
             .await
-            .expect("her posts");
+            .expect("her notes");
         assert_eq!(hers.len(), 1, "her file was kept while bob was active");
-        assert_eq!(hers[0].post.id, post.id);
+        assert_eq!(hers[0].id, note.id);
 
         device.sign_out(&transport).await.expect("signed out");
         assert_eq!(active_user_id(&device).await, None);
@@ -1309,9 +1309,9 @@ mod tests {
         assert!(matches!(error, DeviceAccountsError::AccountsExist));
 
         let deployment = device.active().await.expect("the local user's");
-        posts::create(&deployment, &local, "only here", &[])
+        test_notes::create(&deployment, &local, "only here", None)
             .await
-            .expect("a post");
+            .expect("a note");
         let report = sync::run(&deployment, &transport).await.expect("a sync");
         assert!(report.local, "nothing is sent");
         let error = device.sign_out(&transport).await.expect_err("no sign-out");
@@ -1347,14 +1347,14 @@ mod tests {
             .expect("opened");
         let local = device.local_user_create("Laptop").await.expect("skipped");
         let local_account = id_of(&device, local.id).await;
-        let post = posts::create(
+        let note = test_notes::create(
             &device.active().await.expect("the local user's"),
             &local,
             "made before signing up",
-            &[],
+            None,
         )
         .await
-        .expect("a post");
+        .expect("a note");
         assert!(matches!(
             device.local_user_move(None).await,
             Err(DeviceAccountsError::NoPendingMove)
@@ -1394,10 +1394,10 @@ mod tests {
         let deployment = device.active().await.expect("alice's");
         let report = sync::run(&deployment, &transport).await.expect("a sync");
         assert_eq!(report.pending, 0);
-        let on_server = posts::get(&server, &alice, post.id)
+        let on_server = test_notes::get(&server, &alice, note.id)
             .await
             .expect("on the server");
-        assert_eq!(on_server.post.inserted_at, post.inserted_at);
+        assert_eq!(on_server.inserted_at, note.inserted_at);
 
         drop(deployment);
         drop(device);
@@ -1409,9 +1409,9 @@ mod tests {
             file_exists(&device, local_account),
             "the sweep keeps a folder its row names"
         );
-        let hers = posts::list(&device.active().await.expect("alice's"), &alice)
+        let hers = test_notes::list(&device.active().await.expect("alice's"), &alice)
             .await
-            .expect("her posts");
+            .expect("her notes");
         assert_eq!(hers.len(), 1);
 
         let removed = device
@@ -1430,14 +1430,14 @@ mod tests {
             .await
             .expect("opened");
         let local = device.local_user_create("Laptop").await.expect("skipped");
-        posts::create(
+        test_notes::create(
             &device.active().await.expect("the local user's"),
             &local,
             "stays here",
-            &[],
+            None,
         )
         .await
-        .expect("a post");
+        .expect("a note");
 
         let session = signed_up(&server, "alice@example.com").await;
         let finished = device
@@ -1450,9 +1450,9 @@ mod tests {
         let listed = device.list().await.expect("listed");
         assert_eq!(listed.len(), 2);
         assert!(listed.iter().any(|account| account.local));
-        let hers = posts::list(&device.active().await.expect("alice's"), &alice)
+        let hers = test_notes::list(&device.active().await.expect("alice's"), &alice)
             .await
-            .expect("her posts");
+            .expect("her notes");
         assert!(hers.is_empty(), "nothing moved");
 
         let again = signed_up(&server, "alice@example.com").await;
@@ -1470,9 +1470,9 @@ mod tests {
             .await
             .expect("switched back");
         assert_eq!(back, local);
-        let theirs = posts::list(&device.active().await.expect("the local user's"), &local)
+        let theirs = test_notes::list(&device.active().await.expect("the local user's"), &local)
             .await
-            .expect("their posts");
+            .expect("their notes");
         assert_eq!(theirs.len(), 1);
     }
 
@@ -1528,14 +1528,14 @@ mod tests {
             .await
             .expect("alice kept");
         let alice_account = id_of(&device, alice.id).await;
-        let post = posts::create(
+        let note = test_notes::create(
             &device.active().await.expect("alice's"),
             &alice,
             "never synced",
-            &[],
+            None,
         )
         .await
-        .expect("a post");
+        .expect("a note");
 
         let asked = device
             .remove(&transport, alice_account, false)
@@ -1562,7 +1562,7 @@ mod tests {
         assert_eq!(active_user_id(&device).await, None);
         assert!(!file_exists(&device, alice_account));
         assert!(
-            posts::get(&server, &alice, post.id).await.is_err(),
+            test_notes::get(&server, &alice, note.id).await.is_err(),
             "the change never reached the server"
         );
     }
@@ -1639,14 +1639,14 @@ mod tests {
             .keep_signed_in(default_server_id(&device).await, session.clone())
             .await
             .expect("alice kept");
-        posts::create(
+        test_notes::create(
             &device.active().await.expect("alice's"),
             &alice,
             "kept through it",
-            &[],
+            None,
         )
         .await
-        .expect("a post");
+        .expect("a note");
         accounts::sign_out(&server, &session.token)
             .await
             .expect("the token deleted elsewhere");
@@ -1692,14 +1692,14 @@ mod tests {
             .keep_signed_in(default_server_id(&device).await, session.clone())
             .await
             .expect("alice kept");
-        posts::create(
+        test_notes::create(
             &device.active().await.expect("alice's"),
             &alice,
             "lost with it",
-            &[],
+            None,
         )
         .await
-        .expect("a post");
+        .expect("a note");
         let mailer = Mailer::memory();
         app_core::accounts::deletions::code::create(
             &server,
@@ -1749,14 +1749,14 @@ mod tests {
             )
             .await
             .expect("alice kept");
-        posts::create(
+        test_notes::create(
             &device.active().await.expect("alice's"),
             &alice,
             "kept through the sign-out",
-            &[],
+            None,
         )
         .await
-        .expect("a post");
+        .expect("a note");
 
         device
             .sign_out(&unreachable)
@@ -1774,14 +1774,14 @@ mod tests {
             .await
             .expect("bob kept");
         let bob_id = id_of(&device, bob.id).await;
-        posts::create(
+        test_notes::create(
             &device.active().await.expect("bob's"),
             &bob,
             "not pushed",
-            &[],
+            None,
         )
         .await
-        .expect("a post");
+        .expect("a note");
         let removal = device
             .remove(&unreachable, bob_id, false)
             .await

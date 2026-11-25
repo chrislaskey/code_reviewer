@@ -37,7 +37,6 @@ use crate::accounts::trial_users;
 use crate::accounts::{AccountError, MAX_CODE_ATTEMPTS};
 use crate::app::communities::{self, CommunityError};
 use crate::app::memberships::{self, MembershipError};
-use crate::app::synced_tables;
 use crate::app::users::{self, UserError};
 use crate::data::accounts_tokens;
 use crate::data::accounts_users::{self, AccountUser, AccountUserError};
@@ -49,6 +48,7 @@ use crate::services::mailer::mails;
 use crate::services::mailer::{MailError, Mailer};
 use crate::sync::events::{Answer, AnswerStatus};
 use crate::sync::synced_table::TableError;
+use crate::sync::tables;
 
 #[derive(Debug, Error)]
 pub enum DeletionError {
@@ -181,7 +181,7 @@ async fn delete_and_commit(
 /// staff row and the account.
 async fn delete_in(tx: &mut Transaction, user: &User) -> Result<(), DeletionError> {
     let role = Role::Server;
-    for table in synced_tables::list().iter().rev() {
+    for table in tables::list().iter().rev() {
         table.delete_of_user(tx, role, user).await?;
     }
     for membership in
@@ -342,13 +342,13 @@ mod tests {
     use super::*;
     use crate::accounts::tests::{code_sent_to, signed_up_for_a_device};
     use crate::accounts::{self, Session};
-    use crate::app::posts;
     use crate::app::users;
     use crate::app::users::tests::device_of;
     use crate::database::with_each_database;
     use crate::services::web_server::InProcess;
     use crate::sync;
     use crate::sync::purge;
+    use crate::sync::test_notes;
 
     fn server(database: crate::database::Database) -> Deployment {
         Deployment::new(database, Role::Server)
@@ -373,11 +373,11 @@ mod tests {
     }
 
     async fn bodies(deployment: &Deployment, user: &User) -> Vec<String> {
-        let mut bodies: Vec<String> = posts::list(deployment, user)
+        let mut bodies: Vec<String> = test_notes::list(deployment, user)
             .await
-            .expect("the posts")
+            .expect("the notes")
             .into_iter()
-            .map(|listed| listed.post.body)
+            .map(|listed| listed.body)
             .collect();
         bodies.sort();
         bodies
@@ -396,12 +396,12 @@ mod tests {
             memberships::create(&server, &bob.user, shared.id)
                 .await
                 .expect("joined");
-            posts::create(&server, &alice.user, "alice's", &[shared.id])
+            test_notes::create(&server, &alice.user, "alice's", Some(shared.id))
                 .await
-                .expect("a post");
-            posts::create(&server, &bob.user, "bob's", &[shared.id])
+                .expect("a note");
+            test_notes::create(&server, &bob.user, "bob's", Some(shared.id))
                 .await
-                .expect("a post");
+                .expect("a note");
             preferences::update(
                 &server,
                 &alice.user,
@@ -736,9 +736,9 @@ mod tests {
             let server = server(database);
             let mailer = Mailer::memory();
             let alice = signed_up_for_a_device(&server, "alice@example.com").await;
-            posts::create(&server, &alice.user, "alice's", &[])
+            test_notes::create(&server, &alice.user, "alice's", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             let code = code_mailed(&server, &mailer, &alice).await;
             create(
                 &server,
