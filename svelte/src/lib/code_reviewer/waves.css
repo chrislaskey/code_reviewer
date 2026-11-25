@@ -2,10 +2,12 @@
    room below the content for them; the top pattern (TopBackgroundPattern)
    uses the theme's colours as they are. */
 
-/* The page above the waves and the pattern, which are at z-index 0 so they
-   show above the body's background; all below the gutter and the header.
-   Not an isolated body with the waves at -1: in the desktop app's WebKit
-   that hid the gutter's edge and open tab. */
+/* The page and the banners above it, such as the flash messages, above
+   the waves and the pattern, which are at z-index 0 so they show above the
+   body's background; all below the gutter and the header. Not an isolated
+   body with the waves at -1: in the desktop app's WebKit that hid the
+   gutter's edge and open tab. */
+.app-banner,
 .page,
 .full-page {
   position: relative;

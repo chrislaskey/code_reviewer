@@ -27,6 +27,7 @@
     inset: calc(var(--app-header-inset-top) + var(--app-header-height)) 0 auto var(--gutter-width);
     height: 150px;
     z-index: 0;
+    pointer-events: none;
   }
 
   @media (width < 40rem) {

@@ -100,7 +100,10 @@ user's id, and the sweep keeps whatever folder a row names.
 - **An accounts page in the app**, `/accounts`, lists the accounts on
   the device with Switch, Add account and Remove from device, and is
   where the sign-in and sign-up pages are reached from. The web never
-  links it.
+  links it. Since 2026-11-25 a tap anywhere on an account opens it,
+  except on Remove from device and its other buttons. The active account
+  opens on its last visited page, read by `last_visited_page_get`, a
+  signed-in one switches, and a logged-out one starts Log in.
 - **A double tap on the avatar switches to the next account**, added
   2026-11-24: the next signed-in one in the order they were added to the
   device, back to the first after the last, `device_accounts_switch_next`.
