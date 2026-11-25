@@ -39,6 +39,7 @@ export const accountsSignOut = core.accountsSignOut;
 export const hasDeviceAccounts = core.hasDeviceAccounts;
 export const deviceAccountsList = core.deviceAccountsList;
 export const deviceAccountsSwitch = core.deviceAccountsSwitch;
+export const deviceAccountsSwitchNext = core.deviceAccountsSwitchNext;
 export const deviceAccountsDeactivate = core.deviceAccountsDeactivate;
 export const deviceAccountsRemove = core.deviceAccountsRemove;
 export const multiServerGet = core.multiServerGet;

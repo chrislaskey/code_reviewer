@@ -95,6 +95,11 @@ user's id, and the sweep keeps whatever folder a row names.
   the device with Switch, Add account and Remove from device, and is
   where the sign-in and sign-up pages are reached from. The web never
   links it.
+- **A double tap on the avatar switches to the next account**, added
+  2026-11-24: the next signed-in one in the order they were added to the
+  device, back to the first after the last, `device_accounts_switch_next`.
+  A signed-out account is skipped, since it needs the browser. With no
+  other account signed in, nothing happens.
 - **The web is single-account**, sign in and sign out, now and later.
 
 ## What `device.db` is, concretely

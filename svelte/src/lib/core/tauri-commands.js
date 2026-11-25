@@ -213,6 +213,15 @@ export function deviceAccountsSwitch(id) {
   return invoke("device_accounts_switch", { id });
 }
 
+/**
+ * Switches to the next signed-in account, in the order they were added to
+ * this device, which then syncs. Answers the user switched to, or null
+ * when no other account is signed in.
+ */
+export function deviceAccountsSwitchNext() {
+  return invoke("device_accounts_switch_next");
+}
+
 /** Closes the active account, which stays signed in, before adding another. */
 export function deviceAccountsDeactivate() {
   return invoke("device_accounts_deactivate");

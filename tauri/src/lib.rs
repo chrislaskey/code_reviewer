@@ -117,6 +117,7 @@ pub fn run() {
             sync::pending_changes::pending_changes_list,
             device_accounts::device_accounts_list,
             device_accounts::device_accounts_switch,
+            device_accounts::device_accounts_switch_next,
             device_accounts::device_accounts_deactivate,
             device_accounts::device_accounts_remove,
             device_accounts::servers::device_servers_create,

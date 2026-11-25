@@ -243,6 +243,10 @@ export function deviceAccountsSwitch(_id) {
   return Promise.reject(new Error("no accounts are kept on the web"));
 }
 
+export function deviceAccountsSwitchNext() {
+  return Promise.resolve(null);
+}
+
 export function deviceAccountsDeactivate() {
   return Promise.resolve(null);
 }

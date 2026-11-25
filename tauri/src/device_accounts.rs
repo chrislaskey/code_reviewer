@@ -392,6 +392,19 @@ impl DeviceAccounts {
         Ok(user)
     }
 
+    /// Makes the next signed-in account the active one, see
+    /// `next_signed_in`: `None`, with nothing done, when there is no other.
+    pub async fn activate_next(&self) -> Result<Option<User>, DeviceAccountsError> {
+        let Some(active_id) = self.active_id().await else {
+            return Ok(None);
+        };
+        let accounts = self.list().await?;
+        match next_signed_in(&accounts, active_id) {
+            Some(next_id) => Ok(Some(self.activate(next_id).await?)),
+            None => Ok(None),
+        }
+    }
+
     /// Closes the active account, if any, which stays signed in. The
     /// commands hold the sync lock around this, so no sync is mid-way.
     pub async fn deactivate(&self) -> Result<(), DeviceAccountsError> {
@@ -853,6 +866,22 @@ fn delete_folder(path: &Path) -> std::io::Result<()> {
     }
 }
 
+/// The signed-in account after the active one, in the order they were
+/// added to the device, going back to the first after the last. The ids
+/// are UUIDv7, so they sort by when they were made. `None` when no other
+/// account is signed in.
+fn next_signed_in(accounts: &[DeviceAccount], active_id: Uuid) -> Option<Uuid> {
+    let mut signed_in: Vec<Uuid> = accounts
+        .iter()
+        .filter(|account| account.signed_in || account.id == active_id)
+        .map(|account| account.id)
+        .collect();
+    signed_in.sort();
+    let position = signed_in.iter().position(|id| *id == active_id)?;
+    let next = signed_in[(position + 1) % signed_in.len()];
+    (next != active_id).then_some(next)
+}
+
 #[tauri::command]
 pub async fn device_accounts_list(
     device: State<'_, DeviceAccounts>,
@@ -873,6 +902,24 @@ pub async fn device_accounts_switch(
         device.activate(id).await?
     };
     crate::sync::spawn(app);
+    Ok(user)
+}
+
+/// Switches to the next signed-in account, in the order they were added
+/// to the device, which then syncs: `None` when there is no other.
+#[tauri::command]
+pub async fn device_accounts_switch_next(
+    app: AppHandle,
+    device: State<'_, DeviceAccounts>,
+    server: State<'_, SyncServer>,
+) -> Result<Option<User>, CommandError> {
+    let user = {
+        let _no_sync_meanwhile = server.hold().await;
+        device.activate_next().await?
+    };
+    if user.is_some() {
+        crate::sync::spawn(app);
+    }
     Ok(user)
 }
 
@@ -1093,6 +1140,108 @@ mod tests {
             .expect("a signed-out account removes too");
         assert_eq!(removed, Removal::Removed);
         assert!(device.list().await.expect("listed").is_empty());
+    }
+
+    fn listed(id: Uuid, signed_in: bool, active: bool) -> DeviceAccount {
+        DeviceAccount {
+            id,
+            server_id: None,
+            user_id: Uuid::now_v7(),
+            email: format!("{id}@example.com"),
+            signed_in,
+            local: false,
+            active,
+            last_active_at: Utc::now(),
+            server_host: None,
+            server_display_name: None,
+        }
+    }
+
+    #[test]
+    fn device_accounts_next_signed_in_goes_around_in_the_order_added() {
+        let first = Uuid::now_v7();
+        let second = Uuid::now_v7();
+        let third = Uuid::now_v7();
+        let accounts = [
+            listed(third, true, false),
+            listed(first, true, true),
+            listed(second, false, false),
+        ];
+        assert_eq!(
+            next_signed_in(&accounts, first),
+            Some(third),
+            "the signed-out one is skipped, whatever the list's order"
+        );
+        assert_eq!(
+            next_signed_in(&accounts, third),
+            Some(first),
+            "back to the first"
+        );
+        assert_eq!(next_signed_in(&[listed(first, true, true)], first), None);
+        assert_eq!(
+            next_signed_in(
+                &[listed(first, true, true), listed(second, false, false)],
+                first
+            ),
+            None
+        );
+        assert_eq!(
+            next_signed_in(&accounts, Uuid::now_v7()),
+            None,
+            "not listed"
+        );
+    }
+
+    #[tokio::test]
+    async fn device_accounts_switch_next_goes_around_the_signed_in_accounts() {
+        let directory = tempfile::tempdir().expect("a directory");
+        let server = server().await;
+        let transport = InProcess { server: &server };
+        let device = DeviceAccounts::open(directory.path(), SERVER_URL)
+            .await
+            .expect("opened");
+        assert_eq!(device.activate_next().await.expect("nobody active"), None);
+
+        let mut users = Vec::new();
+        for email in ["alice@example.com", "bob@example.com", "carol@example.com"] {
+            let user = device
+                .keep_signed_in(
+                    default_server_id(&device).await,
+                    signed_up(&server, email).await,
+                )
+                .await
+                .expect("kept");
+            users.push(user);
+        }
+        let [alice, bob, carol] = [&users[0], &users[1], &users[2]];
+        assert_eq!(active_user_id(&device).await, Some(carol.id));
+
+        let next = device.activate_next().await.expect("switched");
+        assert_eq!(next.as_ref(), Some(alice), "back to the first added");
+        assert_eq!(active_user_id(&device).await, Some(alice.id));
+        let next = device.activate_next().await.expect("switched");
+        assert_eq!(next.as_ref(), Some(bob));
+
+        device.sign_out(&transport).await.expect("bob signed out");
+        device
+            .activate(id_of(&device, carol.id).await)
+            .await
+            .expect("carol again");
+        let next = device.activate_next().await.expect("switched");
+        assert_eq!(next.as_ref(), Some(alice), "bob is skipped");
+        let next = device.activate_next().await.expect("switched");
+        assert_eq!(next.as_ref(), Some(carol));
+
+        device
+            .remove(&transport, id_of(&device, alice.id).await, false)
+            .await
+            .expect("alice removed");
+        assert_eq!(
+            device.activate_next().await.expect("nobody else"),
+            None,
+            "carol is the only one signed in"
+        );
+        assert_eq!(active_user_id(&device).await, Some(carol.id));
     }
 
     #[tokio::test]
