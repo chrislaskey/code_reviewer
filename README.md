@@ -34,7 +34,7 @@ bin/storage runs Garage, the S3-style bucket uploads go to in dev
 Rust is here for the one language running on the web, the desktop and
 phones, not for speed; `AGENTS.md` says how the code is written.
 
-## How a page reaches the application
+## How a page reaches the app
 
 A page calls `postsList()`, `postsGet(id)`, `postsCreate(body)`,
 `postsUpdate(id, body)` or `postsDelete(id)` from `svelte/src/lib/core/`.
