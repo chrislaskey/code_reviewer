@@ -18,6 +18,17 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-24: bin/dev creates .env from .env.example
+
+- **What changed**: `bin/dev` copies `.env.example` to `.env` when there
+  is no `.env`, as in a new checkout or worktree, and says so. It never
+  changes a `.env` that exists.
+- **What an app does**:
+  - **Required**, for an app that declared a `[[divergence]]` for
+    `bin/dev` to do this: remove it from `framework.toml`.
+  - **Optional**: keep `.env.example` ready to run as it is, since a new
+    worktree's `bin/dev` now starts from it.
+
 ## 2026-11-24: Wi-Fi sync icons, no name in the header, a closer page top
 
 - **What changed**: the header's sync status is a Wi-Fi icon online and
