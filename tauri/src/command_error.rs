@@ -14,11 +14,9 @@ use app_core::accounts::preferences::PreferenceError;
 use app_core::app::avatars::AvatarError;
 use app_core::app::communities::CommunityError;
 use app_core::app::current_community::CurrentCommunityError;
-use app_core::app::files::FileError;
 use app_core::app::last_visited_page::LastVisitedPageError;
 use app_core::app::local_users::LocalUserError;
 use app_core::app::memberships::MembershipError;
-use app_core::app::posts::PostError;
 use app_core::app::users::UserError;
 use app_core::helpers::field_errors::FieldErrors;
 use app_core::sync::SyncError;
@@ -89,7 +87,6 @@ from_message!(
     MembershipError,
     OnlineError,
     PendingChangeError,
-    PostError,
     PreferenceError,
     SyncError,
     UserError,
@@ -101,15 +98,6 @@ impl From<AvatarError> for CommandError {
     fn from(error: AvatarError) -> CommandError {
         match error {
             AvatarError::Invalid(errors) => CommandError::of_fields(errors),
-            other => CommandError::from(other.to_string()),
-        }
-    }
-}
-
-impl From<FileError> for CommandError {
-    fn from(error: FileError) -> CommandError {
-        match error {
-            FileError::Invalid(errors) => CommandError::of_fields(errors),
             other => CommandError::from(other.to_string()),
         }
     }

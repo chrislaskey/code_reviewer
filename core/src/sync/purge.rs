@@ -23,12 +23,12 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::accounts::preferences;
-use crate::app::synced_tables;
 use crate::app::users;
 use crate::data::accounts_preferences;
 use crate::data::accounts_tokens;
 use crate::data::accounts_users;
 use crate::deployment::{Deployment, Role};
+use crate::sync::tables;
 
 /// How long a deleted row is kept, and how long a device may stay away.
 pub const RETENTION_DAYS: i64 = 90;
@@ -66,13 +66,13 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
     let mut tx = deployment.begin().await?;
     let mut removed = BTreeMap::new();
     // Children first, so a purged parent's rows have already gone
-    for synced in synced_tables::list().iter().rev() {
+    for synced in tables::list().iter().rev() {
         let table = synced.table();
         let count = app_purges::maintenance::delete_deleted_before(&mut tx, table, horizon).await?;
         removed.insert(table.to_string(), count);
     }
     let mut events = 0;
-    for synced in synced_tables::list() {
+    for synced in tables::list() {
         events += app_events::maintenance::delete_of_missing_rows(&mut tx, synced.table()).await?;
     }
     removed.insert("app_events".to_string(), events);
@@ -109,13 +109,12 @@ pub async fn horizon(deployment: &Deployment) -> Result<Option<DateTime<Utc>>, P
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::{communities, posts};
+    use crate::app::communities;
     use crate::data::app_communities;
     use crate::data::app_events::EventStatus;
-    use crate::data::app_posts;
-    use crate::data::app_posts_communities;
     use crate::database::{Database, with_each_database};
     use crate::deployment::now;
+    use crate::sync::test_notes;
 
     #[tokio::test]
     async fn purge_removes_what_was_deleted_before_the_horizon_with_its_rows_and_events() {
@@ -127,13 +126,13 @@ mod tests {
             let gardening = communities::create(&deployment, &alice, "Gardening")
                 .await
                 .expect("a community");
-            let gone = posts::create(&deployment, &alice, "gone", &[gardening.id])
+            let gone = test_notes::create(&deployment, &alice, "gone", Some(gardening.id))
                 .await
-                .expect("a post");
-            let kept = posts::create(&deployment, &alice, "kept", &[gardening.id])
+                .expect("a note");
+            let kept = test_notes::create(&deployment, &alice, "kept", Some(gardening.id))
                 .await
-                .expect("a post");
-            posts::delete(&deployment, &alice, gone.id)
+                .expect("a note");
+            test_notes::delete(&deployment, &alice, gone.id)
                 .await
                 .expect("deleted");
             assert_eq!(horizon(&deployment).await.expect("none"), None);
@@ -151,22 +150,21 @@ mod tests {
 
             let later = now() + Duration::days(RETENTION_DAYS + 1);
             let report = run(&deployment, later).await.expect("purged");
-            assert_eq!(report.removed[app_posts::TABLE], 1);
-            assert_eq!(report.removed[app_posts_communities::TABLE], 1);
+            assert_eq!(report.removed[test_notes::TABLE], 1);
             assert_eq!(report.removed[app_communities::TABLE], 0);
             assert_eq!(
-                report.removed["app_events"], 3,
-                "the post's create, delete and its row's"
+                report.removed["app_events"], 2,
+                "the note's create and delete"
             );
             let mut tx = deployment.begin().await.expect("a transaction");
             assert!(
-                posts::get_in(&mut tx, gone.id)
+                test_notes::get_in(&mut tx, gone.id)
                     .await
                     .expect("looked")
                     .is_none()
             );
             assert!(
-                posts::get_in(&mut tx, kept.id)
+                test_notes::get_in(&mut tx, kept.id)
                     .await
                     .expect("looked")
                     .is_some()
@@ -175,8 +173,8 @@ mod tests {
                 app_events::count(&mut tx, EventStatus::Applied)
                     .await
                     .expect("counted"),
-                4,
-                "alice's community, her membership, the kept post and its row"
+                3,
+                "alice's community, her membership and the kept note"
             );
             tx.commit().await.expect("committed");
             assert_eq!(

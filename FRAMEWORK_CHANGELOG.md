@@ -18,6 +18,139 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-25: an app deletes the examples
+
+- **What changed**: an app can delete posts, files or both, see "How an
+  app deletes an example" in `docs/design/examples-delete.md`. The
+  framework's tests name no example: the tests of the examples' own
+  rules moved into them (`posts_communities.rs`, `files.rs`,
+  `files_communities.rs`, and `files_uploads_are_refused_to_a_trial_user`
+  in `axum/src/tests/app.rs`), and
+  `framework_check_finds_no_example_named_in_the_framework` reads tests
+  too. `sync_two_devices_over_http` syncs a community; the files
+  example's over-HTTP tests are `files_a_file_over_http` and
+  `files_many_files_over_http`. `users::list_by_ids` is `pub`, and
+  Tauri's `user_auth::signed_in_with_transport` allows being unused, so
+  a deleted example leaves no dead framework code. `framework.toml`
+  lists the quick picker's page, `svelte/src/quick-picker/**` and
+  `svelte/src/quick-picker.html`, and `tauri/capabilities/quick-picker.json`
+  as the files example's, and `core/src/app.rs` and
+  `core/src/data/mod.rs` as seams.
+- **What an app does**:
+  - **Optional**, for an app that hid an example, keeping its core
+    modules, its table and its line in `synced_tables.rs` for the
+    framework's sake: delete it, by the design's steps, and reset the
+    local databases (`bin/reset`). Remove any `[[divergence]]` it
+    declared for a framework file it changed to do so.
+  - **Required**, for an app that changed the moved tests in its copy
+    of `sync.rs`, `memberships.rs`, `local_users.rs` or `deletions.rs`:
+    keep the template's, and carry its own changes over to the
+    example's files.
+
+## 2026-11-25: the framework's tests on a table of its own
+
+- **What changed**: the framework's tests use `app_test_notes`, a synced
+  table built for tests alone (`core/src/sync/test_notes.rs`), in place
+  of posts, see `docs/design/examples-delete.md`. It is behind
+  `#[cfg(any(test, feature = "test-tables"))]`, a new core feature that
+  `axum/Cargo.toml` and `tauri/Cargo.toml` turn on in
+  `[dev-dependencies]`. Sync runs over `sync::tables::list()`, the
+  app's `synced_tables::list()` and the test table after it in tests;
+  `synced_tables::get` and `position` are now `sync::tables::get` and
+  `position`, and the test that every table with sync columns is
+  listed moved there too. The axum tests' `test_router()` and
+  `test_router_with()` return the `TestRouter` alone, with no post;
+  `axum/src/tests/app.rs` has `test_router_with_a_post()`.
+- **What an app does**:
+  - **Required**: keep `app_core = { workspace = true, features =
+    ["test-tables"] }` in the `[dev-dependencies]` of `axum/Cargo.toml`
+    and `tauri/Cargo.toml` when the merge conflicts.
+  - **Required**, for an app whose `core/src/app/synced_tables.rs`
+    conflicts: keep its own `list()`, and drop `get`, `position` and
+    the test below it, which are in `sync::tables` now. Code of the
+    app's that called `synced_tables::get` or `position` calls
+    `sync::tables::get` or `position`.
+  - **Required**, for an app with axum tests of its own: write
+    `let router = test_router().await;` for
+    `let (router, _) = test_router().await;`, and use
+    `test_router_with_a_post()` where a test used the post.
+
+## 2026-11-25: the framework names no example
+
+- **What changed**: the framework's code no longer names posts or
+  files, see `docs/design/examples-delete.md`. What goes with a deleted
+  account, a left or rejoined membership and a deleted community is
+  each table's own, by four `SyncedTable` methods with defaults that do
+  nothing: `delete_of_user`, `delete_with_membership`,
+  `revive_with_membership` and `delete_with_community`. Posts implement
+  the first, posts' community rows the two membership ones, and files'
+  community rows the last. `DeletionError::Post` is now
+  `DeletionError::Table`, and `MembershipError` and `CommunityError`
+  have a `Table` variant. The conflicts page links back to Home. A test,
+  `framework_check_finds_no_example_named_in_the_framework`, fails on a
+  framework file naming an example outside its tests. `framework.toml`
+  lists `svelte/src/posts/**` and `svelte/src/files/**` as examples.
+- **What an app does**:
+  - **Required**, for an app that matches `DeletionError`,
+    `MembershipError` or `CommunityError` in its own code: answer the
+    `Table` variant, as `axum/src/api_error.rs` does.
+  - **Required**, for an app that changed `core/src/app/posts.rs`,
+    `posts_communities.rs` or `files_communities.rs`: keep the new
+    `SyncedTable` methods in its copy when the merge conflicts, or a
+    deleted account keeps its posts, and a left membership its posts'
+    community rows.
+  - **Optional**: a table of the app's own whose rows go with their
+    maker's account, leave with a membership, or go with a community
+    implements the method.
+
+## 2026-11-25: the theme per person
+
+- **What changed**: the theme is a preference, `theme` in
+  `accounts_preferences`, beside `locale`: per person, so each account
+  on a device has its own, synced to their other devices. Its values are
+  `helpers::themes::SUPPORTED`, which a core test keeps in step with
+  `THEMES` in `svelte/src/lib/layouts/themes.js`, or null for "System".
+  `Preferences` has a `theme` field. The theme menu writes it, and the
+  pages follow it with `themesFollow` when the current user loads.
+  `theme_script.js` keeps the last theme shown on the device for the
+  first paint, takes `app:set-theme` with the theme in `detail.theme`,
+  and dispatches `app:theme-changed`. A theme chosen before this change
+  on a device is replaced by the person's preference, "System" until
+  they choose. See `docs/design/locales.md`, "The theme".
+- **What an app does**:
+  - **Required**, for an app that changed the themes in `themes.js` or
+    `theme.css`: list the same ones in `core/src/helpers/themes.rs`,
+    declared as a `[[divergence]]`.
+  - **Required**, for an app that dispatches `app:set-theme` itself:
+    call `themesFollow` instead.
+  - **Required**, for an app that builds `Preferences` field by field:
+    add `theme: None`.
+
+## 2026-11-25: a file's content on its row
+
+- **What changed**: a row with bytes may keep small text content on the
+  row instead, with nothing in the bucket, see
+  `docs/design/files-content.md`. `SyncedBytes` has two methods for it,
+  with defaults: `content_of_create`, a create's `content` field, and
+  `content`, none. A create that carries `content` does not wait for an
+  upload, `bytes::local_copy` writes the content on a device with no
+  fetch, and `bytes::row_content` answers it on the server, which
+  `GET /api/sync/bytes/{table}/{id}/content` now sends itself, sandboxed
+  (`content_response` in `axum/src/sync/bytes.rs`). The files example
+  uses it: `app_files.content`, by the migration
+  `20261125000000_app_files_content_add.sql`, `content` on `FileNew`,
+  with `size` and `sha256` worked out from it, at most 64 KB, and
+  `files::row_content`, which `GET /api/files/{id}/content` answers.
+- **What an app does**:
+  - **Required**, for an app that kept the files example: keep the
+    migration, and add `content: None` to any `File` or `FileNew` it
+    builds field by field.
+  - **Required**, for an app that changed `app_files` itself: merge the
+    example's changes into its own, or delete the migration if it has
+    no `app_files`.
+  - **Optional**: a table of the app's own with bytes keeps content on
+    its rows by a `content` field in its create and by answering
+    `SyncedBytes::content`.
 ## 2026-11-24: Flash messages
 
 - **What changed**: flash messages are short notices above the page,

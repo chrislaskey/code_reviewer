@@ -34,7 +34,7 @@
     Text,
   } from "../lib/components/index.js";
 
-  /** @type {{name: string, kind?: string, avatar_url?: string | null, trial_expires_at?: string | null, preferences?: {locale: string | null}} | null} */
+  /** @type {{name: string, kind?: string, avatar_url?: string | null, trial_expires_at?: string | null, preferences?: {locale: string | null, theme: string | null}} | null} */
   let currentUser = $state(null);
   /** @type {File | null} */
   let file = $state(null);

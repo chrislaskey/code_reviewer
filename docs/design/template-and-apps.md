@@ -136,6 +136,11 @@ These are trait methods with defaults that do nothing:
   backfill, and each table lists its live rows in a community.
 - **Bytes**: `fn bytes(&self) -> Option<&dyn SyncedBytes>`, for a
   table whose rows carry bytes, see below.
+- **What goes with a user, a membership or a community**:
+  `delete_of_user`, `delete_with_membership`, `revive_with_membership`
+  and `delete_with_community`, so deleting an account, leaving or
+  rejoining a community and deleting one name no table of the app's,
+  see `examples-delete.md`.
 
 ### Communities are framework
 

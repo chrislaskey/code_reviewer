@@ -36,8 +36,8 @@ const PASSWORD: &str = "correct horse battery";
 const NEW_PASSWORD: &str = "another horse battery";
 const STRIPE_SIGNING_SECRET: &str = "whsec_test_secret";
 
-/// A router over an in-memory database with Alice signed up and one
-/// post of hers, and a stand-in `index.html`. Every request `send`
+/// A router over an in-memory database with Alice signed up, and a
+/// stand-in `index.html`. Every request `send`
 /// makes is hers, with her token. The emails go to `mailer`, where
 /// a test reads the code, and uploads to `storage`, in memory, where
 /// a test puts the file a page would have.
@@ -50,7 +50,7 @@ struct TestRouter {
     stripe: Stripe,
 }
 
-async fn test_router() -> (TestRouter, Value) {
+async fn test_router() -> TestRouter {
     test_router_with(TrialUsersMax(2), false, ServerSettings::default()).await
 }
 
@@ -60,7 +60,7 @@ async fn test_router_with(
     trial_users_max: TrialUsersMax,
     trust_proxy_headers: bool,
     settings: ServerSettings,
-) -> (TestRouter, Value) {
+) -> TestRouter {
     let dist = std::env::temp_dir().join(format!("app_web_test_{}", std::process::id()));
     fs::create_dir_all(&dist).expect("a temp dir");
     fs::write(dist.join("index.html"), "<html>pages</html>").expect("index.html");
@@ -98,13 +98,6 @@ async fn test_router_with(
     let mailer = Mailer::memory();
     let stripe = Stripe::memory();
     let alice = signed_up(&deployment, &mailer, "alice@example.com").await;
-    let post = app_core::app::posts::create(&deployment, &alice.user, "the first post", &[])
-        .await
-        .expect("a post");
-    let post = app_core::app::posts::get(&deployment, &alice.user, post.id)
-        .await
-        .expect("the post");
-    let post = serde_json::to_value(post).expect("json");
     let state = AppState {
         deployment: deployment.clone(),
         mailer: mailer.clone(),
@@ -121,15 +114,14 @@ async fn test_router_with(
         listed_servers: std::sync::Arc::new(test_listed_servers()),
         server_state: std::sync::Arc::default(),
     };
-    let test_router = TestRouter {
+    TestRouter {
         router: router(&dist, &ops_dist, state),
         deployment,
         token: alice.token,
         mailer,
         storage,
         stripe,
-    };
-    (test_router, post)
+    }
 }
 
 /// The server the tests describe: `test`, "Test Server".

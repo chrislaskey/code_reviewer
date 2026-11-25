@@ -1,6 +1,8 @@
 // Sets the daisyUI theme on <html> before the first paint and switches it on
-// the `app:set-theme` events the theme menu dispatches. The choice is kept
-// in localStorage under `app:theme`, and "system" follows the OS setting.
+// the `app:set-theme` events themes.js dispatches, then dispatches
+// `app:theme-changed`. The theme is the signed-in person's `theme`
+// preference; the last one shown on this device is kept in localStorage
+// under `app:theme`, for the first paint, and "system" follows the OS setting.
 // The theme's page colour is kept too, under `app:theme-background`, and
 // painted on <html> before the stylesheet arrives, so the window opens in
 // it rather than in white.
@@ -43,6 +45,7 @@
       root.setAttribute("data-theme-source", "user");
     }
     rememberBackground();
+    window.dispatchEvent(new Event("app:theme-changed"));
   };
   if (!root.hasAttribute("data-theme")) {
     setTheme(localStorage.getItem(THEME_KEY) || "system");
@@ -50,7 +53,7 @@
   }
   window.addEventListener("load", rememberBackground);
   window.addEventListener("storage", (e) => e.key === THEME_KEY && setTheme(e.newValue || "system"));
-  window.addEventListener("app:set-theme", (e) => setTheme(/** @type {HTMLElement} */ (e.target).dataset.theme));
+  window.addEventListener("app:set-theme", (e) => setTheme(/** @type {CustomEvent} */ (e).detail.theme));
 
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if (root.getAttribute("data-theme-source") === "system") {

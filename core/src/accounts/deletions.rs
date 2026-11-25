@@ -2,13 +2,14 @@
 //! `docs/design/accounts-delete.md`. A full user asks for a code,
 //! `code::create`, which is mailed as a sign-in's is, and gives it back
 //! to `create`, which deletes everything of theirs in one transaction:
-//! their posts and memberships, and a community nobody else is in, each
-//! soft-deleted as an event in their name, so every device that pulled
-//! a row sees it go; their user, named "Deleted user"; their staff row;
-//! and their account, so sign-in finds it no longer and a token of
-//! theirs is answered `410`. Their files belong to their communities:
-//! those in a community deleted with them go with it, the rest stay,
-//! see `files_communities`. Then, outside the transaction, a Stripe plan
+//! their rows of each synced table, by the table's own rule
+//! (`SyncedTable::delete_of_user`), their memberships, and a community
+//! nobody else is in, each soft-deleted as an event in their name, so
+//! every device that pulled a row sees it go; their user, named "Deleted
+//! user"; their staff row; and their account, so sign-in finds it no
+//! longer and a token of theirs is answered `410`. A table's rows that
+//! belong to a community rather than their maker go with the community,
+//! or stay. Then, outside the transaction, a Stripe plan
 //! is ended at once and the customer deleted, their pictures are
 //! deleted, and they are mailed; a failure there is logged and left to
 //! the daily jobs. The purge removes the rows 90 days later, and the
@@ -26,7 +27,6 @@ pub mod code;
 #[cfg(feature = "stripe")]
 use crate::data::accounts_subscriptions;
 use crate::data::app_communities;
-use crate::data::app_posts;
 use crate::data::app_users_communities;
 use crate::data::ops_staff;
 use thiserror::Error;
@@ -37,7 +37,6 @@ use crate::accounts::trial_users;
 use crate::accounts::{AccountError, MAX_CODE_ATTEMPTS};
 use crate::app::communities::{self, CommunityError};
 use crate::app::memberships::{self, MembershipError};
-use crate::app::posts::{self, PostError};
 use crate::app::users::{self, UserError};
 use crate::data::accounts_tokens;
 use crate::data::accounts_users::{self, AccountUser, AccountUserError};
@@ -48,6 +47,8 @@ use crate::deployment::{Deployment, Role, now};
 use crate::services::mailer::mails;
 use crate::services::mailer::{MailError, Mailer};
 use crate::sync::events::{Answer, AnswerStatus};
+use crate::sync::synced_table::TableError;
+use crate::sync::tables;
 
 #[derive(Debug, Error)]
 pub enum DeletionError {
@@ -65,8 +66,9 @@ pub enum DeletionError {
     User(#[from] UserError),
     #[error(transparent)]
     AccountUser(#[from] AccountUserError),
+    /// A synced table's own module failed.
     #[error(transparent)]
-    Post(#[from] PostError),
+    Table(#[from] TableError),
     #[error(transparent)]
     Membership(#[from] MembershipError),
     #[error(transparent)]
@@ -179,11 +181,8 @@ async fn delete_and_commit(
 /// staff row and the account.
 async fn delete_in(tx: &mut Transaction, user: &User) -> Result<(), DeletionError> {
     let role = Role::Server;
-    for post in
-        crate::data::app_posts::list(tx, crate::data::app_posts::Filter::OwnedBy(user.id)).await?
-    {
-        let event = deleted_event(app_posts::TABLE, post.id, post.version);
-        refused_unless_applied(&posts::apply_in(tx, role, user, &event).await?.answer)?;
+    for table in tables::list().iter().rev() {
+        table.delete_of_user(tx, role, user).await?;
     }
     for membership in
         app_users_communities::list(&mut *tx, app_users_communities::Filter::User(user.id)).await?
@@ -337,7 +336,7 @@ async fn bucket_empty(deployment: &Deployment, user_id: Uuid) {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use chrono::Duration;
 
     use super::*;
@@ -349,13 +348,18 @@ mod tests {
     use crate::services::web_server::InProcess;
     use crate::sync;
     use crate::sync::purge;
+    use crate::sync::test_notes;
 
     fn server(database: crate::database::Database) -> Deployment {
         Deployment::new(database, Role::Server)
     }
 
     /// The code mailed to the address for deleting its account.
-    async fn code_mailed(server: &Deployment, mailer: &Mailer, session: &Session) -> String {
+    pub(crate) async fn code_mailed(
+        server: &Deployment,
+        mailer: &Mailer,
+        session: &Session,
+    ) -> String {
         code::create(
             server,
             mailer,
@@ -373,11 +377,11 @@ mod tests {
     }
 
     async fn bodies(deployment: &Deployment, user: &User) -> Vec<String> {
-        let mut bodies: Vec<String> = posts::list(deployment, user)
+        let mut bodies: Vec<String> = test_notes::list(deployment, user)
             .await
-            .expect("the posts")
+            .expect("the notes")
             .into_iter()
-            .map(|listed| listed.post.body)
+            .map(|listed| listed.body)
             .collect();
         bodies.sort();
         bodies
@@ -396,12 +400,12 @@ mod tests {
             memberships::create(&server, &bob.user, shared.id)
                 .await
                 .expect("joined");
-            posts::create(&server, &alice.user, "alice's", &[shared.id])
+            test_notes::create(&server, &alice.user, "alice's", Some(shared.id))
                 .await
-                .expect("a post");
-            posts::create(&server, &bob.user, "bob's", &[shared.id])
+                .expect("a note");
+            test_notes::create(&server, &bob.user, "bob's", Some(shared.id))
                 .await
-                .expect("a post");
+                .expect("a note");
             preferences::update(
                 &server,
                 &alice.user,
@@ -538,90 +542,6 @@ mod tests {
         .await;
     }
 
-    #[cfg(feature = "object-storage")]
-    #[tokio::test]
-    async fn deletions_create_leaves_the_files_of_communities_with_other_members() {
-        use crate::app::files::tests::{new_file, server as server_with_bucket};
-        use crate::app::files::{self, FileNew};
-
-        with_each_database(|database| async move {
-            let (server, storage) = server_with_bucket(database);
-            let mailer = Mailer::memory();
-            let alice = signed_up_for_a_device(&server, "alice@example.com").await;
-            let bob = signed_up_for_a_device(&server, "bob@example.com").await;
-            let shared = communities::create(&server, &alice.user, "Shared")
-                .await
-                .expect("a community");
-            memberships::create(&server, &bob.user, shared.id)
-                .await
-                .expect("joined");
-            let personal = memberships::list_mine(&server, &alice.user)
-                .await
-                .expect("the memberships")
-                .into_iter()
-                .map(|membership| membership.community_id)
-                .find(|id| *id != shared.id)
-                .expect("alice's own community");
-            let mut created = Vec::new();
-            for (name, community_id) in [("shared.txt", shared.id), ("private.txt", personal)] {
-                let new = FileNew {
-                    community_ids: vec![community_id],
-                    ..new_file(name, b"bytes", community_id)
-                };
-                storage
-                    .put(
-                        &crate::sync::bytes::storage_key(&files::Synced, alice.user.id, new.id),
-                        b"bytes".to_vec(),
-                    )
-                    .await
-                    .expect("the upload");
-                created.push(
-                    files::create(&server, &alice.user, &new)
-                        .await
-                        .expect("a file"),
-                );
-            }
-
-            let code = code_mailed(&server, &mailer, &alice).await;
-            create(
-                &server,
-                &mailer,
-                &alice.user,
-                Some(&code),
-                crate::helpers::locales::DEFAULT,
-            )
-            .await
-            .expect("deleted");
-
-            let shown = files::get(&server, &bob.user, created[0].id)
-                .await
-                .expect("the community keeps it");
-            assert_eq!(shown.creator, None);
-            let mut tx = server.begin().await.expect("a transaction");
-            let private = files::get_in(&mut tx, created[1].id)
-                .await
-                .expect("read")
-                .expect("kept until the purge");
-            tx.commit().await.expect("committed");
-            assert!(private.deleted_at.is_some(), "it went with her community");
-            for file in &created {
-                assert!(
-                    storage
-                        .size(&crate::sync::bytes::storage_key(
-                            &files::Synced,
-                            alice.user.id,
-                            file.id
-                        ))
-                        .await
-                        .expect("looked")
-                        .is_some(),
-                    "the bytes go by the sweep, not by person"
-                );
-            }
-        })
-        .await;
-    }
-
     #[tokio::test]
     async fn deletions_create_refuses_a_wrong_or_used_code() {
         with_each_database(|database| async move {
@@ -736,9 +656,9 @@ mod tests {
             let server = server(database);
             let mailer = Mailer::memory();
             let alice = signed_up_for_a_device(&server, "alice@example.com").await;
-            posts::create(&server, &alice.user, "alice's", &[])
+            test_notes::create(&server, &alice.user, "alice's", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             let code = code_mailed(&server, &mailer, &alice).await;
             create(
                 &server,

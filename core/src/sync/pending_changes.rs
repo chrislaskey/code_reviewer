@@ -8,10 +8,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::synced_tables;
 use crate::data::app_events::{self, EventKind, Fields, StoredEvent};
 use crate::deployment::Deployment;
 use crate::sync::synced_table::TableError;
+use crate::sync::tables;
 
 /// A change waiting to reach the server, as the page shows it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -43,7 +43,7 @@ pub async fn list(deployment: &Deployment) -> Result<Vec<PendingChange>, Pending
     let mut tx = deployment.begin().await?;
     let mut changes = Vec::new();
     for stored in app_events::pending(&mut tx).await? {
-        let about = match synced_tables::get(&stored.event.table) {
+        let about = match tables::get(&stored.event.table) {
             Some(synced) => synced.label(&mut tx, stored.event.row_id).await?,
             None => None,
         };
@@ -68,12 +68,12 @@ fn pending_change(stored: StoredEvent, about: Option<String>) -> PendingChange {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::posts;
     use crate::app::users;
     use crate::database::with_each_database;
     use crate::deployment::Role;
     use crate::services::web_server::InProcess;
     use crate::sync;
+    use crate::sync::test_notes;
 
     #[tokio::test]
     async fn pending_changes_list_what_waits_and_nothing_once_synced() {
@@ -81,10 +81,10 @@ mod tests {
             let server = Deployment::new(database, Role::Server);
             let (alice, token) = sync::tests::user_with_token(&server, "alice@example.com").await;
             let device = users::tests::device_of(&alice, &token).await;
-            let post = posts::create(&device, &alice, "first line\nsecond", &[])
+            let note = test_notes::create(&device, &alice, "first line\nsecond", None)
                 .await
-                .expect("a post");
-            posts::update(&device, &alice, post.id, "changed\nsecond", &[])
+                .expect("a note");
+            test_notes::update(&device, &alice, note.id, "changed\nsecond")
                 .await
                 .expect("updated");
 

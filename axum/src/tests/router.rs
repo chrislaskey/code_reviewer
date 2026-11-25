@@ -4,12 +4,12 @@ use super::*;
 
 #[tokio::test]
 async fn a_bearer_token_names_the_user_and_an_unknown_one_is_401() {
-    let (router, post) = test_router().await;
+    let router = test_router().await;
     let (status, body) = send_as(
         &router.router,
         Some("nope"),
         Method::GET,
-        "/api/posts",
+        "/api/users/current",
         None,
     )
     .await;
@@ -30,25 +30,26 @@ async fn a_bearer_token_names_the_user_and_an_unknown_one_is_401() {
     .await;
     assert_eq!(status, StatusCode::OK, "signed up");
     let token = body["token"].as_str().unwrap();
-    let (status, created) = send_as(
+    let (_, bob) = send_as(
         &router.router,
         Some(token),
-        Method::POST,
-        "/api/posts",
-        Some(json!({ "body": "bob's" })),
+        Method::GET,
+        "/api/users/current",
+        None,
     )
     .await;
-    assert_eq!(status, StatusCode::CREATED);
-    assert_eq!(created["user_id"], body["user"]["id"]);
-    let (_, bobs) = send_as(&router.router, Some(token), Method::GET, "/api/posts", None).await;
-    assert_eq!(bobs[0]["post"], created);
-    let (_, alices) = get(&router, "/api/posts").await;
-    assert_eq!(alices, json!([post]), "alice does not see bob's post");
+    assert_eq!(bob["id"], body["user"]["id"]);
+    let (_, alice) = get(&router, "/api/users/current").await;
+    assert_eq!(
+        alice["email"],
+        json!("alice@example.com"),
+        "alice's token is still hers"
+    );
 }
 
 #[tokio::test]
 async fn api_path_without_a_route_is_a_json_404_not_the_pages() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, body) = get(&router, "/api/no-such-thing").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert_eq!(
@@ -58,7 +59,7 @@ async fn api_path_without_a_route_is_a_json_404_not_the_pages() {
     let (status, _) = send(&router, Method::POST, "/api", None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 
-    let (status, body) = get(&router, "/posts").await;
+    let (status, body) = get(&router, "/communities").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
         body,
@@ -69,8 +70,8 @@ async fn api_path_without_a_route_is_a_json_404_not_the_pages() {
 
 #[tokio::test]
 async fn pages_answer_any_path_with_index_html() {
-    let (router, _) = test_router().await;
-    for path in ["/home", "/posts/new"] {
+    let router = test_router().await;
+    for path in ["/home", "/communities/new"] {
         let (status, body) = get(&router, path).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body, json!("<html>pages</html>"));
@@ -79,7 +80,7 @@ async fn pages_answer_any_path_with_index_html() {
 
 #[tokio::test]
 async fn public_pages_answer_at_their_file_names() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let cookie = format!("token={}", router.token);
     for cookie in [None, Some(cookie.as_str())] {
         for (path, page) in [

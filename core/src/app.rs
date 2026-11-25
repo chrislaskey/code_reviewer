@@ -7,8 +7,6 @@ pub mod avatars;
 pub mod communities;
 pub mod current_community;
 pub mod features;
-pub mod files;
-pub mod files_communities;
 #[cfg(feature = "host")]
 pub mod groups;
 pub mod identity;
@@ -17,8 +15,6 @@ pub mod last_visited_page;
 pub mod local_users;
 pub mod locales;
 pub mod memberships;
-pub mod posts;
-pub mod posts_communities;
 pub mod reviews;
 pub mod server_state;
 pub mod server_tasks;

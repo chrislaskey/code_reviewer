@@ -29,7 +29,7 @@ fn repository_with_two_commits(directory: &Path) {
 
 #[tokio::test]
 async fn reviews_routes_answer_a_bearer_token_and_refuse_the_cookie() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let directory = tempfile::tempdir().expect("a directory");
     repository_with_two_commits(directory.path());
     let repo_path = directory.path().to_string_lossy().to_string();
@@ -82,7 +82,7 @@ async fn reviews_routes_answer_a_bearer_token_and_refuse_the_cookie() {
 
 #[tokio::test]
 async fn sessions_routes_refuse_the_cookie_and_the_terminal_window_refuses_the_tailnet() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let cookie = format!("token={}", router.token);
     let (status, _, _) = send_with(
         &router.router,
@@ -139,7 +139,7 @@ async fn sessions_routes_refuse_the_cookie_and_the_terminal_window_refuses_the_t
 
 #[tokio::test]
 async fn artifacts_answer_without_a_token_and_sandboxed() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
 
     // The index committed in the main checkout of the repository the tests run in.
     for (path, status) in [

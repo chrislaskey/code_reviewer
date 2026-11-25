@@ -18,6 +18,12 @@
   function closeOnEscape(event) {
     if (event.key === "Escape") open = false;
   }
+
+  $effect(() => {
+    const showCurrent = () => (current = currentTheme());
+    window.addEventListener("app:theme-changed", showCurrent);
+    return () => window.removeEventListener("app:theme-changed", showCurrent);
+  });
 </script>
 
 <svelte:window onclick={closeWhenClickedOutside} onkeydown={closeOnEscape} />

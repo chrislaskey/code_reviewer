@@ -1,28 +1,14 @@
-//! The app's routes: posts, files, communities, the current user and community, and the sync;
+//! The app's routes: communities, the current user and community, and the sync;
 //! reviews, traces and sessions in `host`.
 
 use super::*;
+use app_core::sync::test_notes;
 
 mod host;
 
 #[tokio::test]
-async fn posts_list_as_json() {
-    let (router, post) = test_router().await;
-    let (status, body) = get(&router, "/api/posts").await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, json!([post]));
-    assert_eq!(post["owner"]["name"], json!("alice"));
-    assert_eq!(
-        post["owner"]["email"],
-        Value::Null,
-        "an email is the account's"
-    );
-    assert_eq!(post["communities"], json!([]));
-}
-
-#[tokio::test]
 async fn current_user_is_the_tokens_user_and_nobody_without_one() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, body) = get(&router, "/api/users/current").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["email"], json!("alice@example.com"));
@@ -37,13 +23,13 @@ async fn current_user_is_the_tokens_user_and_nobody_without_one() {
     .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     assert_eq!(body, json!({ "error": "Sign in first" }));
-    let (status, _) = send_as(&router.router, None, Method::GET, "/api/posts", None).await;
+    let (status, _) = send_as(&router.router, None, Method::GET, "/api/communities", None).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
 async fn avatars_upload_then_update_with_field_errors_as_json() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let wrong = json!({ "content_type": "text/html", "size": 0 });
     let (status, body) = send(
         &router,
@@ -89,26 +75,8 @@ async fn avatars_upload_then_update_with_field_errors_as_json() {
 }
 
 #[tokio::test]
-async fn posts_create_refuses_a_body_over_the_maximum_length() {
-    let (router, _) = test_router().await;
-    let too_long = "a".repeat(app_core::data::app_posts::MAX_BODY_LENGTH + 1);
-    let (status, body) = send(
-        &router,
-        Method::POST,
-        "/api/posts",
-        Some(json!({ "body": too_long, "community_ids": [] })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-    assert_eq!(
-        body,
-        json!({ "error": "a post has 10000 characters at most" })
-    );
-}
-
-#[tokio::test]
-async fn communities_create_join_leave_and_a_post_in_one() {
-    let (router, _) = test_router().await;
+async fn communities_create_join_and_leave() {
+    let router = test_router().await;
     let (status, community) = send(
         &router,
         Method::POST,
@@ -124,42 +92,15 @@ async fn communities_create_join_leave_and_a_post_in_one() {
     assert_eq!(listed[0]["community"], community);
     assert_eq!(listed[0]["membership"]["role"], json!("member"));
 
-    let (status, created) = send(
-        &router,
-        Method::POST,
-        "/api/posts",
-        Some(json!({ "body": "roses", "community_ids": [community_id] })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::CREATED);
-    let (_, shown) = get(
-        &router,
-        &format!("/api/posts/{}", created["id"].as_str().unwrap()),
-    )
-    .await;
-    assert_eq!(shown["communities"][0]["name"], json!("Gardening"));
-
     let path = format!("/api/communities/{community_id}/membership");
     let (status, _) = send(&router, Method::DELETE, &path, None).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
     let (_, listed) = get(&router, "/api/communities").await;
     assert_eq!(listed[0]["membership"], Value::Null);
-    let (_, shown) = get(
-        &router,
-        &format!("/api/posts/{}", created["id"].as_str().unwrap()),
-    )
-    .await;
-    assert_eq!(shown["communities"], json!([]), "left with the member");
 
     let (status, membership) = send(&router, Method::POST, &path, None).await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(membership["community_id"], json!(community_id));
-    let (_, shown) = get(
-        &router,
-        &format!("/api/posts/{}", created["id"].as_str().unwrap()),
-    )
-    .await;
-    assert_eq!(shown["communities"][0]["name"], json!("Gardening"));
 
     let (status, _) = send(
         &router,
@@ -181,7 +122,7 @@ async fn communities_create_join_leave_and_a_post_in_one() {
 
 #[tokio::test]
 async fn current_community_settles_on_the_first_and_keeps_a_choice_in_its_cookie() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let token = Some(router.token.as_str());
     let (status, _, personal) = send_with(
         &router.router,
@@ -272,7 +213,7 @@ async fn current_community_settles_on_the_first_and_keeps_a_choice_in_its_cookie
 
 #[tokio::test]
 async fn communities_show_update_and_delete() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (_, community) = send(
         &router,
         Method::POST,
@@ -312,233 +253,21 @@ async fn communities_show_update_and_delete() {
 }
 
 #[tokio::test]
-async fn posts_get_as_json() {
-    let (router, post) = test_router().await;
-    let (status, body) = get(
-        &router,
-        &format!("/api/posts/{}", post["post"]["id"].as_str().unwrap()),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, post);
-}
-
-#[tokio::test]
-async fn posts_get_missing_is_404() {
-    let (router, _) = test_router().await;
-    let (status, body) = get(&router, &format!("/api/posts/{MISSING_ID}")).await;
-    assert_eq!(status, StatusCode::NOT_FOUND);
-    assert_eq!(
-        body,
-        json!({ "error": format!("post {MISSING_ID} not found") })
-    );
-}
-
-#[tokio::test]
-async fn posts_get_rejects_an_id_that_is_not_a_uuid() {
-    let (router, _) = test_router().await;
-    let (status, _) = get(&router, "/api/posts/not-a-uuid").await;
-    assert_eq!(status, StatusCode::BAD_REQUEST);
-}
-
-#[tokio::test]
-async fn posts_create() {
-    let (router, _) = test_router().await;
-    let (status, created) = send(
-        &router,
-        Method::POST,
-        "/api/posts",
-        Some(json!({ "body": "a new post" })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::CREATED);
-    assert_eq!(created["body"], json!("a new post"));
-
-    let (_, posts) = get(&router, "/api/posts").await;
-    assert_eq!(posts[0]["post"], created);
-}
-
-#[tokio::test]
-async fn posts_create_refuses_blank() {
-    let (router, _) = test_router().await;
-    let (status, body) = send(
-        &router,
-        Method::POST,
-        "/api/posts",
-        Some(json!({ "body": "   " })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-    assert_eq!(body, json!({ "error": "a post needs some text" }));
-}
-
-#[tokio::test]
-async fn posts_update() {
-    let (router, post) = test_router().await;
-    let path = format!("/api/posts/{}", post["post"]["id"].as_str().unwrap());
-    let (status, updated) = send(
-        &router,
-        Method::PUT,
-        &path,
-        Some(json!({ "body": "edited" })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(updated["body"], json!("edited"));
-    assert_eq!(updated["inserted_at"], post["post"]["inserted_at"]);
-
-    let (_, read) = get(&router, &path).await;
-    assert_eq!(read["post"], updated);
-}
-
-#[tokio::test]
-async fn posts_delete() {
-    let (router, post) = test_router().await;
-    let path = format!("/api/posts/{}", post["post"]["id"].as_str().unwrap());
-    let (status, _) = send(&router, Method::DELETE, &path, None).await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
-
-    let (status, _) = get(&router, &path).await;
-    assert_eq!(status, StatusCode::NOT_FOUND);
-    let (status, _) = send(&router, Method::DELETE, &path, None).await;
-    assert_eq!(status, StatusCode::NOT_FOUND);
-}
-
-#[tokio::test]
-async fn files_upload_create_show_rename_and_delete() {
-    let (router, _) = test_router().await;
-    let bytes = b"some notes".to_vec();
-    let sha256 = app_core::helpers::sha256::hex(&bytes);
-    let picked = json!({ "content_type": "text/plain", "size": bytes.len(), "sha256": sha256 });
-    let (status, upload) = send(&router, Method::POST, "/api/files/uploads", Some(picked)).await;
-    assert_eq!(status, StatusCode::CREATED);
-    assert_eq!(upload["uploaded"], json!(false));
-    let id = upload["id"].as_str().expect("an id").to_string();
-    let (_, communities) = get(&router, "/api/communities").await;
-    let community_id = communities[0]["community"]["id"].clone();
-    let new = json!({
-        "id": id,
-        "name": "notes.txt",
-        "content_type": "text/plain",
-        "size": bytes.len(),
-        "sha256": sha256,
-        "community_ids": [community_id],
-    });
-
-    let (status, body) = send(&router, Method::POST, "/api/files", Some(new.clone())).await;
-    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-    assert_eq!(body["error"], json!("the file did not arrive; try again"));
-
-    let (_, me) = get(&router, "/api/users/current").await;
-    let key = format!("files/{}/{id}", me["id"].as_str().expect("an id"));
-    router.storage.put(&key, bytes).await.expect("the upload");
-    let (status, file) = send(&router, Method::POST, "/api/files", Some(new)).await;
-    assert_eq!(status, StatusCode::CREATED);
-    assert_eq!(file["name"], json!("notes.txt"));
-
-    let (status, found) = get(&router, "/api/files?name=NOTES&limit=10").await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(found["total"], json!(1));
-    assert_eq!(found["files"][0]["file"], file);
-    assert_eq!(found["files"][0]["state"], json!("synced"));
-    assert_eq!(found["files"][0]["communities"][0]["id"], community_id);
-    let (_, found) = get(&router, "/api/files?name=other&limit=10").await;
-    assert_eq!(found["total"], json!(0));
-    let (_, found) = get(
-        &router,
-        "/api/files?content_types=image/png,text/plain&limit=10",
-    )
-    .await;
-    assert_eq!(found["total"], json!(1));
-    let (_, found) = get(&router, "/api/files?content_types=image/png&limit=10").await;
-    assert_eq!(found["total"], json!(0));
-    let (status, _) = get(&router, "/api/files?limit=501").await;
-    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-    let other = app_core::helpers::sha256::hex(b"other");
-    let checked = json!({ "sha256s": [other, sha256] });
-    let (status, same) = send(
-        &router,
-        Method::POST,
-        "/api/files/duplicates",
-        Some(checked),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(same.as_array().expect("a list").len(), 1);
-    assert_eq!(same[0]["file"], file);
-    let checked = json!({ "sha256s": ["nope"] });
-    let (status, _) = send(
-        &router,
-        Method::POST,
-        "/api/files/duplicates",
-        Some(checked),
-    )
-    .await;
-    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-
-    let path = format!("/api/files/{id}");
-    let (status, headers, _) = send_with(
-        &router.router,
-        Some(&router.token),
-        None,
-        Method::GET,
-        &format!("{path}/content"),
-        None,
-    )
-    .await;
-    assert_eq!(status, StatusCode::FOUND);
-    assert_eq!(headers[header::LOCATION], format!("memory:///{key}"));
-    assert_eq!(headers[header::CACHE_CONTROL], "private, max-age=3300");
-
-    let (status, synced) = send(
-        &router,
-        Method::POST,
-        "/api/sync/bytes/app_files/uploads",
-        Some(json!({ "id": id, "content_type": "text/plain", "size": 10, "sha256": sha256 })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::CREATED);
-    assert_eq!(synced["uploaded"], json!(true));
-    let (status, headers, _) = send_with(
-        &router.router,
-        Some(&router.token),
-        None,
-        Method::GET,
-        &format!("/api/sync/bytes/app_files/{id}/content"),
-        None,
-    )
-    .await;
-    assert_eq!(status, StatusCode::FOUND);
-    assert_eq!(headers[header::LOCATION], format!("memory:///{key}"));
-    assert_eq!(headers[header::CACHE_CONTROL], "private, max-age=3300");
-
-    let renamed = json!({ "name": "renamed.txt", "community_ids": [community_id] });
-    let (status, file) = send(&router, Method::PUT, &path, Some(renamed)).await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(file["name"], json!("renamed.txt"));
-    let blank = json!({ "name": " ", "community_ids": [community_id] });
-    let (status, body) = send(&router, Method::PUT, &path, Some(blank)).await;
-    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-    assert_eq!(body["errors"], json!({ "name": ["is blank"] }));
-
-    let (status, _) = send(&router, Method::DELETE, &path, None).await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
-    let (status, _) = get(&router, &path).await;
-    assert_eq!(status, StatusCode::NOT_FOUND);
-    let (status, _) = get(&router, &format!("{path}/content")).await;
-    assert_eq!(status, StatusCode::NOT_FOUND);
-}
-
-#[tokio::test]
 async fn sync_push_applies_an_event_and_pull_returns_the_row() {
-    let (router, post) = test_router().await;
+    let router = test_router().await;
+    let alice = app_core::app::users::get_by_token(&router.deployment, &router.token)
+        .await
+        .expect("alice");
+    let note = test_notes::create(&router.deployment, &alice, "the first note", None)
+        .await
+        .expect("a note");
     let event = json!({
         "id": "01900000-0000-7000-8000-000000000001",
-        "table": "app_posts",
-        "row_id": post["post"]["id"],
+        "table": test_notes::TABLE,
+        "row_id": note.id,
         "type": "update",
         "base_version": 1,
-        "base": { "body": "the first post" },
+        "base": { "body": "the first note" },
         "changes": { "body": "pushed" },
         "made_at": "2026-11-08T10:00:00Z"
     });
@@ -568,9 +297,9 @@ async fn sync_push_applies_an_event_and_pull_returns_the_row() {
             "app_users",
             "app_communities",
             "app_users_communities",
-            "app_posts"
+            test_notes::TABLE
         ],
-        "her row, her sign-up's community and the post"
+        "her row, her sign-up's community and the note"
     );
     assert_eq!(body["rows"][3]["row"]["body"], json!("pushed"));
     assert_eq!(body["next"], Value::Null);
@@ -580,11 +309,11 @@ async fn sync_push_applies_an_event_and_pull_returns_the_row() {
 
 #[tokio::test]
 async fn sync_push_takes_a_request_up_to_the_most_a_device_sends_and_no_larger() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let event = |body: String| {
         json!({
             "id": uuid::Uuid::now_v7(),
-            "table": "app_posts",
+            "table": test_notes::TABLE,
             "row_id": uuid::Uuid::now_v7(),
             "type": "create",
             "base_version": 0,
@@ -593,7 +322,7 @@ async fn sync_push_takes_a_request_up_to_the_most_a_device_sends_and_no_larger()
             "made_at": "2026-11-08T10:00:00Z"
         })
     };
-    let longest = "a".repeat(app_core::data::app_posts::MAX_BODY_LENGTH);
+    let longest = "a".repeat(test_notes::MAX_BODY_LENGTH);
     let four_megabytes: Vec<Value> = (0..400).map(|_| event(longest.clone())).collect();
     let (status, body) = send(
         &router,
@@ -617,8 +346,8 @@ async fn sync_push_takes_a_request_up_to_the_most_a_device_sends_and_no_larger()
     let (status, _) = send(
         &router,
         Method::POST,
-        "/api/posts",
-        Some(json!({ "body": over, "community_ids": [] })),
+        "/api/communities",
+        Some(json!({ "name": over })),
     )
     .await;
     assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE, "2 MB elsewhere");
@@ -626,7 +355,7 @@ async fn sync_push_takes_a_request_up_to_the_most_a_device_sends_and_no_larger()
 
 #[tokio::test]
 async fn sync_push_rejects_a_malformed_request() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, _) = send(
         &router,
         Method::POST,
@@ -639,7 +368,7 @@ async fn sync_push_rejects_a_malformed_request() {
 
 #[tokio::test]
 async fn current_user_get_shows_their_email_and_whether_they_are_staff() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, me) = get(&router, "/api/users/current").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(me["name"], json!("alice"));
@@ -649,7 +378,7 @@ async fn current_user_get_shows_their_email_and_whether_they_are_staff() {
 
 #[tokio::test]
 async fn current_user_update_changes_their_name() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, me) = send(
         &router,
         Method::PUT,

@@ -735,10 +735,11 @@ async fn live_user_in(tx: &mut Transaction, id: Uuid) -> Result<Option<User>, Ac
 pub(crate) mod tests {
     use super::*;
     use crate::accounts::password::{self, PasswordUpdate};
-    use crate::app::{posts, users};
+    use crate::app::users;
     use crate::database::with_each_database;
     use crate::services::web_server::InProcess;
     use crate::sync;
+    use crate::sync::test_notes;
 
     pub(crate) const PASSWORD: &str = "correct horse battery";
 
@@ -1395,17 +1396,16 @@ pub(crate) mod tests {
             let alice = keep_signed_in(&device, session).await.expect("kept");
             assert_eq!(users::signed_in(&device).await.expect("alice"), alice);
 
-            let post = posts::create(&device, &alice, "from the device", &[])
+            let note = test_notes::create(&device, &alice, "from the device", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             sync::run(&device, &transport).await.expect("synced");
             let cursor = sync::status(&device).await.expect("status").cursor;
             assert!(cursor.is_some(), "the first pull set the cursor");
             assert_eq!(
-                posts::get(&server, &alice, post.id)
+                test_notes::get(&server, &alice, note.id)
                     .await
                     .expect("on the server")
-                    .post
                     .body,
                 "from the device"
             );
@@ -1426,7 +1426,7 @@ pub(crate) mod tests {
             ));
             let mut tx = device.begin().await.expect("a transaction");
             assert!(
-                posts::get_in(&mut tx, post.id)
+                test_notes::get_in(&mut tx, note.id)
                     .await
                     .expect("looked")
                     .is_some(),
@@ -1457,7 +1457,10 @@ pub(crate) mod tests {
             let report = sync::run(&device, &transport).await.expect("synced");
             assert!(!report.resynced);
             assert_eq!(
-                posts::list(&device, &alice).await.expect("her posts").len(),
+                test_notes::list(&device, &alice)
+                    .await
+                    .expect("her notes")
+                    .len(),
                 1
             );
         })
@@ -1472,14 +1475,14 @@ pub(crate) mod tests {
             let device = users::tests::device().await;
             let session = signed_up_for_a_device(&server, "alice@example.com").await;
             let alice = keep_signed_in(&device, session).await.expect("kept");
-            let post = posts::create(&device, &alice, "written, then signed out", &[])
+            let note = test_notes::create(&device, &alice, "written, then signed out", None)
                 .await
-                .expect("a post");
+                .expect("a note");
             sign_out_on_device(&device, &transport)
                 .await
                 .expect("signed out");
             assert!(
-                posts::get(&server, &alice, post.id).await.is_err(),
+                test_notes::get(&server, &alice, note.id).await.is_err(),
                 "not on the server yet"
             );
             assert_eq!(sync::status(&device).await.expect("status").pending, 1);
@@ -1495,7 +1498,7 @@ pub(crate) mod tests {
                 .expect("signed in again");
             let report = sync::run(&device, &transport).await.expect("synced");
             assert_eq!(report.pushed, 1);
-            assert!(posts::get(&server, &alice, post.id).await.is_ok());
+            assert!(test_notes::get(&server, &alice, note.id).await.is_ok());
         })
         .await;
     }
@@ -1515,9 +1518,9 @@ pub(crate) mod tests {
                 .await
                 .expect("kept");
             assert_eq!(users::signed_in(&device).await.expect("alice"), alice);
-            posts::create(&device, &alice, "kept through it", &[])
+            test_notes::create(&device, &alice, "kept through it", None)
                 .await
-                .expect("a post");
+                .expect("a note");
 
             sign_out(&server, &session.token)
                 .await

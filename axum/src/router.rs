@@ -22,8 +22,7 @@ use crate::accounts::{
 };
 use crate::api_error::ApiError;
 use crate::app::{
-    avatars, communities, current_community, current_user, files, memberships, posts, reviews,
-    sessions, traces,
+    avatars, communities, current_community, current_user, memberships, reviews, sessions, traces,
 };
 use crate::state::AppState;
 use crate::sync;
@@ -62,20 +61,6 @@ fn app_api() -> Router<AppState> {
             "/api/users/current/avatar/uploads",
             post(avatars::uploads::create),
         )
-        .route("/api/posts", get(posts::list).post(posts::create))
-        .route(
-            "/api/posts/{id}",
-            get(posts::get).put(posts::update).delete(posts::delete),
-        )
-        .route("/api/files", get(files::list).post(files::create))
-        .route("/api/files/uploads", post(files::uploads::create))
-        // A read, but a POST: hundreds of checksums do not fit a URL.
-        .route("/api/files/duplicates", post(files::duplicates::list))
-        .route(
-            "/api/files/{id}",
-            get(files::get).put(files::update).delete(files::delete),
-        )
-        .route("/api/files/{id}/content", get(files::content))
         .route(
             "/api/communities",
             get(communities::list).post(communities::create),

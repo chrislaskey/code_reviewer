@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use crate::data::app_sync_state::Cursor;
 use crate::database::Transaction;
-use crate::helpers::locales;
+use crate::helpers::{locales, themes};
 
 pub const TABLE: &str = "accounts_preferences";
 
@@ -20,8 +20,12 @@ pub const TABLE: &str = "accounts_preferences";
 /// null to follow the device's.
 pub const LOCALE: &str = "locale";
 
+/// The daisyUI theme the pages are shown in: one of `helpers::themes::SUPPORTED`,
+/// or null to follow the device's light or dark setting.
+pub const THEME: &str = "theme";
+
 /// Every key a preference may have.
-pub const KEYS: &[&str] = &[LOCALE];
+pub const KEYS: &[&str] = &[LOCALE, THEME];
 
 /// One of a person's choices, with the sync columns every synced row
 /// carries, see `docs/design/offline-sync.md`.
@@ -75,6 +79,11 @@ pub fn checked_value(key: &str, value: &Value) -> Result<(), PreferenceInvalid> 
         LOCALE => match value {
             Value::Null => true,
             Value::String(locale) => locales::is_supported(locale),
+            _ => false,
+        },
+        THEME => match value {
+            Value::Null => true,
+            Value::String(theme) => themes::is_supported(theme),
             _ => false,
         },
         _ => return Err(PreferenceInvalid::Key(key.to_string())),
@@ -207,5 +216,19 @@ mod tests {
             checked_value("colour", &json!("red")),
             Err(PreferenceInvalid::Key("colour".to_string()))
         );
+    }
+
+    #[test]
+    fn accounts_preferences_checked_value_takes_a_supported_theme_or_null() {
+        assert_eq!(checked_value(THEME, &json!("dracula")), Ok(()));
+        assert_eq!(checked_value(THEME, &Value::Null), Ok(()));
+        assert!(matches!(
+            checked_value(THEME, &json!("system")),
+            Err(PreferenceInvalid::Value { .. })
+        ));
+        assert!(matches!(
+            checked_value(THEME, &json!(true)),
+            Err(PreferenceInvalid::Value { .. })
+        ));
     }
 }

@@ -27,7 +27,7 @@
   {#if community}
     <Heading>{t`Delete ${community.name}?`}</Heading>
     <Text>
-      {t`Every member leaves it, and the posts in it are taken out of it. The posts themselves stay with the people who wrote them.`}
+      {t`Every member leaves it, and everything in it is taken out of it.`}
     </Text>
     <DialogActions>
       <Button size="sm" variant="ghost" onclick={oncancel} disabled={busy}>{t`Keep`}</Button>

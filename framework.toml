@@ -40,6 +40,7 @@ framework = [
     "core/src/helpers/locales.rs",
     "core/src/helpers/random.rs",
     "core/src/helpers/sha256.rs",
+    "core/src/helpers/themes.rs",
     "core/src/helpers/translations.rs",
     "core/src/services/app_store.rs",
     "core/src/services/mailer.rs",
@@ -163,6 +164,8 @@ framework = [
 ]
 
 seams = [
+    "core/src/app.rs",
+    "core/src/data/mod.rs",
     "core/src/app/identity.rs",
     "core/src/app/synced_tables.rs",
     "core/src/app/jobs.rs",
@@ -201,6 +204,7 @@ examples = [
     "core/src/data/app_files_communities/**",
     "core/migrations/*/*_app_posts_create.sql",
     "core/migrations/*/*_app_files_create.sql",
+    "core/migrations/*/*_app_files_content_add.sql",
 
     "axum/src/app/posts.rs",
     "axum/src/app/files.rs",
@@ -212,7 +216,12 @@ examples = [
     "tauri/src/quick_picker/**",
     "tauri/src/clipboard/**",
     "tauri/src/macos/**",
+    "tauri/capabilities/quick-picker.json",
 
+    "svelte/src/posts/**",
+    "svelte/src/files/**",
+    "svelte/src/quick-picker/**",
+    "svelte/src/quick-picker.html",
     "svelte/src/lib/FileImage.svelte",
     "svelte/src/lib/file_size.js",
 ]

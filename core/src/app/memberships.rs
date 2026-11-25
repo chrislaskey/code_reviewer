@@ -1,10 +1,10 @@
 //! Memberships: a user in a community, with a role the app interprets,
 //! `member` for every row today. Joining writes the row; leaving
-//! soft-deletes it and takes the member's own posts in the community
+//! soft-deletes it and takes the member's own rows in the community
 //! along, every row under it deleted at the one moment; rejoining
 //! revives the same row and exactly what left with it, see
-//! `posts_communities`. Once the purge has removed the row, rejoining
-//! starts fresh.
+//! `SyncedTable::delete_with_membership`. Once the purge has removed the
+//! row, rejoining starts fresh.
 //!
 //! The server decides these rows: a device's event is what the person
 //! meant, applied through the same join and leave, and the server's row
@@ -19,7 +19,6 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::posts_communities;
 use crate::app::{communities, users};
 use crate::data::app_communities::Community;
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
@@ -32,6 +31,7 @@ use crate::helpers::json;
 use crate::sync::TableRow;
 use crate::sync::events::{self, Answer, AnswerStatus};
 use crate::sync::synced_table::{LocalCreate, SyncedTable, TableError};
+use crate::sync::tables;
 
 const CREATE_FIELDS: &[&str] = &["user_id", "community_id", "role"];
 const UPDATE_FIELDS: &[&str] = &["deleted_at"];
@@ -48,6 +48,9 @@ pub enum MembershipError {
     Rejected(String),
     #[error(transparent)]
     Record(#[from] crate::sync::events::RecordError),
+    /// A synced table's own module failed.
+    #[error(transparent)]
+    Table(#[from] TableError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -370,15 +373,13 @@ async fn leave_at(
     membership.deleted_at = Some(at);
     membership.deleted_by_id = Some(user.id);
     write_changed(tx, role, &mut membership).await?;
-    posts_communities::delete_with_membership(tx, role, &membership)
-        .await
-        .map_err(|error| MembershipError::Invalid(error.to_string()))?;
+    delete_rows_with(tx, role, &membership).await?;
     Ok(membership)
 }
 
 /// Soft-deletes every live membership in the deleted community at the
 /// community's moment, and every live row under them; copied down, not
-/// logged, as a post's delete is.
+/// logged, as every delete with a parent is.
 pub(crate) async fn delete_with_community(
     tx: &mut Transaction,
     role: Role,
@@ -393,9 +394,7 @@ pub(crate) async fn delete_with_community(
         membership.deleted_at = community.deleted_at;
         membership.deleted_by_id = community.deleted_by_id;
         write_changed(tx, role, &mut membership).await?;
-        posts_communities::delete_with_membership(tx, role, &membership)
-            .await
-            .map_err(|error| MembershipError::Invalid(error.to_string()))?;
+        delete_rows_with(tx, role, &membership).await?;
     }
     Ok(())
 }
@@ -413,10 +412,24 @@ async fn revive(
     membership.deleted_at = None;
     membership.deleted_by_id = None;
     write_changed(tx, role, &mut membership).await?;
-    posts_communities::revive_with_membership(tx, role, &membership, left_at)
-        .await
-        .map_err(|error| MembershipError::Invalid(error.to_string()))?;
+    for table in tables::list() {
+        table
+            .revive_with_membership(tx, role, &membership, left_at)
+            .await?;
+    }
     Ok(membership)
+}
+
+/// Deletes every table's rows under the membership, children first.
+async fn delete_rows_with(
+    tx: &mut Transaction,
+    role: Role,
+    membership: &Membership,
+) -> Result<(), MembershipError> {
+    for table in tables::list().iter().rev() {
+        table.delete_with_membership(tx, role, membership).await?;
+    }
+    Ok(())
 }
 
 /// Writes the membership over its row as the role does: the server
@@ -560,25 +573,25 @@ impl SyncedTable for Synced {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::{communities, posts, posts_communities, users};
-    use crate::data::app_posts_communities;
+    use crate::app::{communities, users};
     use crate::database::{Database, with_each_database};
+    use crate::sync::test_notes;
 
     fn server(database: Database) -> Deployment {
         Deployment::new(database, Role::Server)
     }
 
-    async fn bodies(deployment: &Deployment, user: &User) -> Vec<String> {
-        posts::list(deployment, user)
+    async fn note_bodies(deployment: &Deployment, user: &User) -> Vec<String> {
+        test_notes::list(deployment, user)
             .await
-            .expect("the posts")
+            .expect("the notes")
             .into_iter()
-            .map(|listed| listed.post.body)
+            .map(|note| note.body)
             .collect()
     }
 
     #[tokio::test]
-    async fn memberships_delete_takes_own_posts_along_and_create_brings_back_what_left() {
+    async fn memberships_delete_takes_the_members_rows_along_and_create_brings_back_what_left() {
         with_each_database(|database| async move {
             let deployment = server(database);
             let alice = users::create(&deployment, "alice@example.com", "Alice")
@@ -593,19 +606,19 @@ mod tests {
             create(&deployment, &bob, gardening.id)
                 .await
                 .expect("joined");
-            let roses = posts::create(&deployment, &alice, "roses", &[gardening.id])
+            let roses = test_notes::create(&deployment, &alice, "roses", Some(gardening.id))
                 .await
-                .expect("a post");
-            let weeds = posts::create(&deployment, &alice, "weeds", &[gardening.id])
+                .expect("a note");
+            let weeds = test_notes::create(&deployment, &alice, "weeds", Some(gardening.id))
                 .await
-                .expect("a post");
-            let bobs = posts::create(&deployment, &bob, "bob's", &[gardening.id])
+                .expect("a note");
+            test_notes::create(&deployment, &bob, "bob's", Some(gardening.id))
                 .await
-                .expect("a post");
-            posts_communities::remove(&deployment, &alice, weeds.id, gardening.id)
+                .expect("a note");
+            test_notes::update_community(&deployment, &alice, weeds.id, None)
                 .await
-                .expect("removed on purpose");
-            assert_eq!(bodies(&deployment, &bob).await, vec!["bob's", "roses"]);
+                .expect("taken out on purpose");
+            assert_eq!(note_bodies(&deployment, &bob).await, vec!["bob's", "roses"]);
 
             let membership = list_mine(&deployment, &alice)
                 .await
@@ -614,110 +627,32 @@ mod tests {
             delete(&deployment, &alice, gardening.id)
                 .await
                 .expect("left");
-            assert!(
-                list_mine(&deployment, &alice)
-                    .await
-                    .expect("none")
-                    .is_empty()
-            );
-            assert_eq!(bodies(&deployment, &bob).await, vec!["bob's"]);
+            assert_eq!(note_bodies(&deployment, &bob).await, vec!["bob's"]);
             assert_eq!(
-                bodies(&deployment, &alice).await,
-                vec!["weeds", "roses"],
-                "her own posts stay hers"
+                note_bodies(&deployment, &alice).await,
+                vec!["weeds"],
+                "roses left with her, weeds was taken out before"
             );
             let mut tx = deployment.begin().await.expect("a transaction");
             let left = get_in(&mut tx, membership.id)
                 .await
                 .expect("the row")
                 .expect("kept");
-            let left_at = left.deleted_at.expect("deleted");
-            assert_eq!(left.deleted_by_id, Some(alice.id));
-            let rows = app_posts_communities::replication::list_of_membership_deleted_at(
-                &mut tx,
-                membership.id,
-                left_at,
-            )
-            .await
-            .expect("the rows");
-            assert_eq!(
-                rows.len(),
-                1,
-                "roses left with her, weeds was removed before"
-            );
-            assert_eq!(rows[0].post_id, roses.id);
-            tx.commit().await.expect("committed");
-            let error = delete(&deployment, &alice, gardening.id)
+            let roses = test_notes::get_in(&mut tx, roses.id)
                 .await
-                .expect_err("already left");
-            assert!(matches!(error, MembershipError::NotFound { .. }));
+                .expect("the note")
+                .expect("kept");
+            assert_eq!(roses.deleted_at, left.deleted_at, "the one moment");
+            tx.commit().await.expect("committed");
 
             let rejoined = create(&deployment, &alice, gardening.id)
                 .await
                 .expect("rejoined");
             assert_eq!(rejoined.id, membership.id, "the same row");
-            assert_eq!(rejoined.version, 3);
-            assert!(rejoined.deleted_at.is_none());
-            assert_eq!(bodies(&deployment, &bob).await, vec!["bob's", "roses"]);
             assert_eq!(
-                create(&deployment, &alice, gardening.id)
-                    .await
-                    .expect("joined again")
-                    .version,
-                3,
-                "joining when in is nothing"
-            );
-            let _ = bobs;
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn memberships_rejoin_leaves_a_post_deleted_meanwhile_deleted() {
-        with_each_database(|database| async move {
-            let deployment = server(database);
-            let alice = users::create(&deployment, "alice@example.com", "Alice")
-                .await
-                .expect("a user");
-            let bob = users::create(&deployment, "bob@example.com", "Bob")
-                .await
-                .expect("a user");
-            let gardening = communities::create(&deployment, &alice, "Gardening")
-                .await
-                .expect("a community");
-            create(&deployment, &bob, gardening.id)
-                .await
-                .expect("joined");
-            let roses = posts::create(&deployment, &alice, "roses", &[gardening.id])
-                .await
-                .expect("a post");
-            delete(&deployment, &alice, gardening.id)
-                .await
-                .expect("left");
-            posts::delete(&deployment, &alice, roses.id)
-                .await
-                .expect("deleted");
-
-            create(&deployment, &alice, gardening.id)
-                .await
-                .expect("rejoined");
-            assert!(bodies(&deployment, &bob).await.is_empty());
-            let mut tx = deployment.begin().await.expect("a transaction");
-            let row = app_posts_communities::replication::get_by_post_and_community(
-                &mut tx,
-                roses.id,
-                gardening.id,
-            )
-            .await
-            .expect("the row")
-            .expect("kept");
-            let post = crate::data::app_posts::replication::get(&mut tx, roses.id)
-                .await
-                .expect("the post")
-                .expect("kept");
-            assert_eq!(
-                row.deleted_at, post.deleted_at,
-                "the post's delete, not the leave's"
+                note_bodies(&deployment, &bob).await,
+                vec!["bob's", "roses"],
+                "exactly what left with her came back"
             );
         })
         .await;

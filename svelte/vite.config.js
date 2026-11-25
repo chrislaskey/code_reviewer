@@ -165,7 +165,6 @@ export default defineConfig(({ mode }) => ({
           rolldownOptions: {
             input: {
               main: resolve(import.meta.dirname, "src/index.html"),
-              quick_picker: resolve(import.meta.dirname, "src/quick-picker.html"),
               ...Object.fromEntries(
                 publicPageNames().map((name) => [`public_${name}`, resolve(PUBLIC_PAGES, `${name}.html`)]),
               ),

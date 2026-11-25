@@ -1,5 +1,5 @@
-//! What a person chooses for themselves, the language the pages are
-//! shown in to start with: one row per user and key in
+//! What a person chooses for themselves, the language and the theme the
+//! pages are shown in: one row per user and key in
 //! `accounts_preferences`, the one accounts table that syncs, to its own
 //! user's devices only, so every app reads it, accounts included, and a
 //! device changes it offline. Each write is an event, as a name is, and
@@ -14,7 +14,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::data::accounts_preferences::{
-    self, AcceptedPreference, LOCALE, Preference, PreferenceInvalid, TABLE,
+    self, AcceptedPreference, LOCALE, Preference, PreferenceInvalid, TABLE, THEME,
 };
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
 use crate::data::app_sync_state::Cursor;
@@ -37,6 +37,8 @@ const UPDATE_FIELDS: &[&str] = &["value"];
 pub struct Preferences {
     /// The language chosen, or none to follow the device's.
     pub locale: Option<String>,
+    /// The theme chosen, or none to follow the device's light or dark setting.
+    pub theme: Option<String>,
 }
 
 #[derive(Debug, Error)]
@@ -69,8 +71,11 @@ pub async fn get_in(tx: &mut Transaction, user_id: Uuid) -> Result<Preferences, 
         if accounts_preferences::checked_value(&row.key, &row.value).is_err() {
             continue;
         }
-        if row.key == LOCALE {
-            preferences.locale = row.value.as_str().map(str::to_string);
+        let value = row.value.as_str().map(str::to_string);
+        match row.key.as_str() {
+            LOCALE => preferences.locale = value,
+            THEME => preferences.theme = value,
+            _ => {}
         }
     }
     Ok(preferences)
@@ -456,6 +461,26 @@ mod tests {
             assert_eq!(rows.len(), 1, "one row, written over");
             assert_eq!(rows[0].version, 2);
             assert!(rows[0].last_synced_at.is_some());
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn preferences_update_keeps_the_theme_beside_the_locale() {
+        with_each_database(|database| async move {
+            let server = server(database);
+            let alice = accounts::tests::signed_up_for_a_device(&server, "alice@example.com")
+                .await
+                .user;
+            update(&server, &alice, LOCALE, json!("es"))
+                .await
+                .expect("a language");
+            let chosen = update(&server, &alice, THEME, json!("dracula"))
+                .await
+                .expect("a theme");
+            assert_eq!(chosen.theme.as_deref(), Some("dracula"));
+            assert_eq!(chosen.locale.as_deref(), Some("es"));
+            assert_eq!(rows_of(&server, alice.id).await.len(), 2);
         })
         .await;
     }

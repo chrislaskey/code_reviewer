@@ -5,7 +5,7 @@ use app_core::servers::settings::SETTINGS_VERSION_HEADER;
 
 #[tokio::test]
 async fn servers_current_get_describes_the_server_to_anyone() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let (status, _headers, body) = send_with(
         &router.router,
         None,
@@ -37,7 +37,7 @@ async fn servers_settings_get_answers_the_settings_with_their_version_to_anyone(
         },
         ..ServerSettings::default()
     };
-    let (router, _) = test_router_with(TrialUsersMax(2), false, closed.clone()).await;
+    let router = test_router_with(TrialUsersMax(2), false, closed.clone()).await;
     let ask = |path: &'static str| {
         let router = router.router.clone();
         async move { send_with(&router, None, None, Method::GET, path, None).await }
@@ -66,7 +66,7 @@ async fn servers_settings_get_answers_the_settings_with_their_version_to_anyone(
 
 #[tokio::test]
 async fn servers_get_answers_only_the_name_and_the_origin_together() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let ask = |path: &'static str| {
         let router = router.router.clone();
         async move { send_with(&router, None, None, Method::GET, path, None).await }
@@ -96,7 +96,7 @@ async fn servers_get_answers_only_the_name_and_the_origin_together() {
 
 #[tokio::test]
 async fn sync_routes_refuse_another_protocol_version_426_and_send_the_settings_version() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let pull = |version: Option<&str>| {
         let mut request = Request::builder()
             .method(Method::POST)

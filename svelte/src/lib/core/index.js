@@ -9,7 +9,6 @@ import * as tauriCommands from "./tauri-commands.js";
 import { putFile } from "./uploads.js";
 
 export { FormError } from "./form_error.js";
-export { sha256Of as filesSha256 } from "./checksums.js";
 
 const core = isTauri() ? tauriCommands : httpApi;
 
@@ -92,26 +91,6 @@ export const sessionsBellUpdate = core.sessionsBellUpdate;
 export const onSessionNotificationClicked = core.onSessionNotificationClicked;
 export const tracesTestsList = core.tracesTestsList;
 export const tracesCallStacksGet = core.tracesCallStacksGet;
-export const postsList = core.postsList;
-export const postsGet = core.postsGet;
-export const postsCreate = core.postsCreate;
-export const postsUpdate = core.postsUpdate;
-export const postsDelete = core.postsDelete;
-export const filesList = core.filesList;
-export const filesListWaitMs = core.filesListWaitMs;
-export const filesDuplicatesList = core.filesDuplicatesList;
-export const filesGet = core.filesGet;
-export const filesCreate = core.filesCreate;
-export const filesCreateAtOnce = core.filesCreateAtOnce;
-export const filesUpdate = core.filesUpdate;
-export const filesDelete = core.filesDelete;
-export const filesContentUrl = core.filesContentUrl;
-export const filesCacheGet = core.filesCacheGet;
-export const filesCacheDelete = core.filesCacheDelete;
-export const filesCopySupported = core.filesCopySupported;
-export const filesCopy = core.filesCopy;
-export const filesDownloadSupported = core.filesDownloadSupported;
-export const filesDownload = core.filesDownload;
 export const communitiesList = core.communitiesList;
 export const communitiesGet = core.communitiesGet;
 export const communitiesCreate = core.communitiesCreate;
@@ -128,12 +107,6 @@ export const conflictsReapply = core.conflictsReapply;
 export const conflictsTryAgain = core.conflictsTryAgain;
 export const conflictsDelete = core.conflictsDelete;
 export const pendingChangesList = core.pendingChangesList;
-export const quickPickerFilesList = core.quickPickerFilesList;
-export const quickPickerPaste = core.quickPickerPaste;
-export const quickPickerClose = core.quickPickerClose;
-export const quickPickerOpenApp = core.quickPickerOpenApp;
-export const quickPickerAccessibilityRequest = core.quickPickerAccessibilityRequest;
-export const onQuickPickerOpened = core.onQuickPickerOpened;
 export const publicPagesOpen = core.publicPagesOpen;
 
 /**

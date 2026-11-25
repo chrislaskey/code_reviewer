@@ -1,5 +1,5 @@
 // app_core over the Tauri app's commands (../../../../tauri/src/).
-import { addPluginListener, convertFileSrc, invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { addPluginListener, invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { FormError } from "./form_error.js";
 
@@ -115,8 +115,9 @@ export function accountsPasswordUpdate(password) {
 
 /**
  * The signed-in person's preferences, kept on this device and synced:
- * `locale`, the language chosen, or null to follow the device's.
- * @returns {Promise<{locale: string | null}>}
+ * `locale`, the language chosen, and `theme`, the theme chosen,
+ * each null to follow the device.
+ * @returns {Promise<{locale: string | null, theme: string | null}>}
  */
 export function accountsPreferencesGet() {
   return invoke("accounts_preferences_get");
@@ -125,9 +126,9 @@ export function accountsPreferencesGet() {
 /**
  * One of the signed-in person's preferences, null for its default,
  * written on this device and synced when it next can, then all of them.
- * @param {"locale"} key
+ * @param {"locale" | "theme"} key
  * @param {unknown} value
- * @returns {Promise<{locale: string | null}>}
+ * @returns {Promise<{locale: string | null, theme: string | null}>}
  */
 export function accountsPreferencesUpdate(key, value) {
   return invoke("accounts_preferences_update", { key, value });
@@ -396,146 +397,6 @@ export function localUsersKeepSeparate() {
   return invoke("local_users_keep_separate");
 }
 
-export function postsList() {
-  return invoke("posts_list");
-}
-
-/** @param {string} id */
-export function postsGet(id) {
-  return invoke("posts_get", { id });
-}
-
-/**
- * @param {string} body
- * @param {string[]} communityIds the communities the post is in
- */
-export function postsCreate(body, communityIds) {
-  return invoke("posts_create", { body, communityIds });
-}
-
-/**
- * @param {string} id
- * @param {string} body
- * @param {string[]} communityIds the communities the post is in, exactly
- */
-export function postsUpdate(id, body, communityIds) {
-  return invoke("posts_update", { id, body, communityIds });
-}
-
-/**
- * A page of the files the user sees on this device whose names contain
- * `name` in any case, of one of `content_types` (any for none), newest
- * first: `{total, files}`, each file
- * `{file, creator, communities, shown_as, state, error}`.
- * @param {{name?: string, content_types?: string[], offset?: number, limit: number}} filter at most 500 at once
- */
-export function filesList(filter) {
-  return invoke("files_list", { filter });
-}
-
-/** How long a list's name filter waits for a pause in typing: each a local read. */
-export const filesListWaitMs = 50;
-
-/**
- * The files the user sees on this device with any of these checksums,
- * up to 500 at once.
- * @param {string[]} sha256s
- */
-export function filesDuplicatesList(sha256s) {
-  return invoke("files_duplicates_list", { sha256s });
-}
-
-/** @param {string} id */
-export function filesGet(id) {
-  return invoke("files_get", { id });
-}
-
-/**
- * @param {string} id
- * @param {string} name
- * @param {string[]} communityIds its communities among the user's, exactly
- */
-export function filesUpdate(id, name, communityIds) {
-  return invoke("files_update", { id, name, communityIds });
-}
-
-/** @param {string} id */
-export function filesDelete(id) {
-  return invoke("files_delete", { id });
-}
-
-/** How many files a page creates at once: one, each a local write. */
-export const filesCreateAtOnce = 1;
-
-/**
- * Creates the file the person picked: kept on this device at once, and
- * sent to the server by the next sync; answers the file. The bytes are
- * the command's body, the name, the type and the communities its headers.
- * @param {File} file
- * @param {string} name
- * @param {string[]} communityIds the communities the file is in, one at least
- * @param {(fraction: number) => void} [_onProgress] nothing to wait for here
- * @param {string} [_sha256] worked out again in Rust, from the bytes it keeps
- */
-export async function filesCreate(file, name, communityIds, _onProgress, _sha256) {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const headers = {
-    "x-file-name": encodeURIComponent(name),
-    "x-file-content-type": file.type,
-    "x-file-community-ids": communityIds.join(","),
-  };
-  return invoke("files_create", bytes, { headers });
-}
-
-/**
- * The copies this device keeps of files the server holds too.
- * @returns {Promise<{count: number, bytes: number} | null>}
- */
-export function filesCacheGet() {
-  return invoke("files_cache_get");
-}
-
-/** Removes those copies; each is fetched again when next shown. */
-export function filesCacheDelete() {
-  return invoke("files_cache_delete");
-}
-
-/** Whether this device copies an image to the clipboard. */
-export function filesCopySupported() {
-  return invoke("files_copy_supported");
-}
-
-/**
- * Copies the image to the clipboard.
- * @param {string} id
- */
-export function filesCopy(id) {
-  return invoke("files_copy", { id });
-}
-
-/** Whether this device saves a copy of a file outside the app. */
-export function filesDownloadSupported() {
-  return invoke("files_download_supported");
-}
-
-/**
- * Saves a copy of the file in the Downloads folder.
- * @param {string} id
- * @returns {Promise<string | null>} where it was saved
- */
-export function filesDownload(id) {
-  return invoke("files_download", { id });
-}
-
-/**
- * Where a page reads the file's bytes from: the app's `files` protocol,
- * which serves the copy on this device.
- * @param {string} id
- */
-export function filesContentUrl(id) {
-  return convertFileSrc(id, "files");
-}
-
 /** Every community, each with the user's membership when they are in it. */
 export function communitiesList() {
   return invoke("communities_list");
@@ -572,11 +433,6 @@ export function membershipsCreate(communityId) {
 /** @param {string} communityId */
 export function membershipsDelete(communityId) {
   return invoke("memberships_delete", { communityId });
-}
-
-/** @param {string} id */
-export function postsDelete(id) {
-  return invoke("posts_delete", { id });
 }
 
 /** One sync now: the report, or the error as the message. */
@@ -633,55 +489,6 @@ export function conflictsTryAgain(id) {
 /** @param {string} id */
 export function conflictsDelete(id) {
   return invoke("conflicts_delete", { id });
-}
-
-// The quick picker, the desktop app's second window (../../quick-picker/).
-
-/**
- * A page of the signed-in person's images the clipboard takes whose
- * names contain `name` in any case, newest first: `{total, files}`, as
- * `filesList` answers.
- * @param {{name?: string, offset?: number, limit: number}} filter at most 500 at once
- */
-export function quickPickerFilesList(filter) {
-  return invoke("quick_picker_files_list", { filter });
-}
-
-/**
- * Copies the file's image, closes the picker and pastes where the person was typing.
- * @param {string} id
- */
-export function quickPickerPaste(id) {
-  return invoke("quick_picker_paste", { id });
-}
-
-export function quickPickerClose() {
-  return invoke("quick_picker_close");
-}
-
-/** Closes the picker and brings the app's window to the front, where a sign-in starts. */
-export function quickPickerOpenApp() {
-  return invoke("quick_picker_open_app");
-}
-
-/**
- * Asks macOS for the Accessibility access pasting needs.
- * @returns {Promise<boolean>} whether it is granted now
- */
-export function quickPickerAccessibilityRequest() {
-  return invoke("quick_picker_accessibility_request");
-}
-
-/**
- * Calls back each time the picker opens, with `{accessibility_trusted}`.
- * @param {(opened: {accessibility_trusted: boolean}) => void} callback
- * @returns {() => void} stops listening
- */
-export function onQuickPickerOpened(callback) {
-  const stopping = listen("quick-picker-opened", (event) => callback(event.payload));
-  return () => {
-    stopping.then((stop) => stop());
-  };
 }
 
 /**
@@ -898,4 +705,3 @@ export async function onSessionNotificationClicked(callback) {
   }
   return unlisten;
 }
-

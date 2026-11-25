@@ -4,7 +4,7 @@ use super::*;
 
 #[tokio::test]
 async fn ops_is_a_404_to_anyone_who_is_not_staff() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let cookie = format!("token={}", router.token);
     let (_, missing) = get(&router, "/api/nothing-here").await;
     for path in ["/api/ops/current-staff", "/api/ops/nothing-here"] {
@@ -36,7 +36,7 @@ async fn ops_is_a_404_to_anyone_who_is_not_staff() {
 
 #[tokio::test]
 async fn ops_answers_staff_with_its_api_its_pages_and_its_files() {
-    let (router, _) = test_router().await;
+    let router = test_router().await;
     let staff = app_core::ops::staff::create(&router.deployment, "alice@example.com")
         .await
         .expect("alice is staff");

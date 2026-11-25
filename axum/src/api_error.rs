@@ -22,11 +22,7 @@ use app_core::accounts::subscriptions::SubscriptionError;
 use app_core::app::avatars::AvatarError;
 use app_core::app::communities::CommunityError;
 use app_core::app::current_community::CurrentCommunityError;
-use app_core::app::files::FileError;
-use app_core::app::files_communities::FileCommunityError;
 use app_core::app::memberships::MembershipError;
-use app_core::app::posts::PostError;
-use app_core::app::posts_communities::PostCommunityError;
 use app_core::app::reviews::ReviewError;
 use app_core::app::sessions::host::SessionError;
 use app_core::app::traces::TraceError;
@@ -109,64 +105,6 @@ impl From<TraceError> for ApiError {
     }
 }
 
-impl From<PostError> for ApiError {
-    fn from(error: PostError) -> Self {
-        let status = match &error {
-            PostError::NotFound { .. } => StatusCode::NOT_FOUND,
-            PostError::NotOwner => StatusCode::FORBIDDEN,
-            PostError::Validation(_) | PostError::Invalid(_) | PostError::Rejected(_) => {
-                StatusCode::UNPROCESSABLE_ENTITY
-            }
-            PostError::Community(error) => return ApiError::from_post_community(error),
-            PostError::Record(error) => return ApiError::from_record(error),
-            PostError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        };
-        ApiError::new(status, error.to_string())
-    }
-}
-
-impl ApiError {
-    fn from_post_community(error: &PostCommunityError) -> ApiError {
-        let status = match error {
-            PostCommunityError::UnknownPost { .. } | PostCommunityError::NotFound { .. } => {
-                StatusCode::NOT_FOUND
-            }
-            PostCommunityError::NotOwner | PostCommunityError::NotAMember { .. } => {
-                StatusCode::FORBIDDEN
-            }
-            PostCommunityError::Invalid(_) | PostCommunityError::Rejected(_) => {
-                StatusCode::UNPROCESSABLE_ENTITY
-            }
-            PostCommunityError::Record(error) => return ApiError::from_record(error),
-            PostCommunityError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        };
-        ApiError::new(status, error.to_string())
-    }
-}
-
-impl ApiError {
-    fn from_file_community(error: &FileCommunityError) -> ApiError {
-        let status = match error {
-            FileCommunityError::UnknownFile { .. } | FileCommunityError::NotFound { .. } => {
-                StatusCode::NOT_FOUND
-            }
-            FileCommunityError::NotAMember { .. } => StatusCode::FORBIDDEN,
-            FileCommunityError::Invalid(_) | FileCommunityError::Rejected(_) => {
-                StatusCode::UNPROCESSABLE_ENTITY
-            }
-            FileCommunityError::Record(error) => return ApiError::from_record(error),
-            FileCommunityError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        };
-        ApiError::new(status, error.to_string())
-    }
-}
-
-impl From<FileCommunityError> for ApiError {
-    fn from(error: FileCommunityError) -> Self {
-        ApiError::from_file_community(&error)
-    }
-}
-
 impl ApiError {
     /// A write the server did not record: 403 for a trial user who has
     /// made all the writes a trial may.
@@ -176,12 +114,6 @@ impl ApiError {
             RecordError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         ApiError::new(status, error.to_string())
-    }
-}
-
-impl From<PostCommunityError> for ApiError {
-    fn from(error: PostCommunityError) -> Self {
-        ApiError::from_post_community(&error)
     }
 }
 
@@ -198,7 +130,9 @@ impl From<CommunityError> for ApiError {
             }
             CommunityError::Membership(error) => return ApiError::from_membership(error),
             CommunityError::Record(error) => return ApiError::from_record(error),
-            CommunityError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            CommunityError::Table(_) | CommunityError::Database(_) => {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         };
         ApiError::new(status, error.to_string())
     }
@@ -214,7 +148,9 @@ impl ApiError {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
             MembershipError::Record(error) => return ApiError::from_record(error),
-            MembershipError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            MembershipError::Table(_) | MembershipError::Database(_) => {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         };
         ApiError::new(status, error.to_string())
     }
@@ -308,25 +244,6 @@ impl From<AvatarError> for ApiError {
     }
 }
 
-impl From<FileError> for ApiError {
-    fn from(error: FileError) -> Self {
-        let status = match error {
-            FileError::Invalid(field_errors) => return ApiError::from_field_errors(field_errors),
-            FileError::NotFound { .. } => StatusCode::NOT_FOUND,
-            FileError::Record(error) => return ApiError::from_record(&error),
-            FileError::Community(error) => return ApiError::from_file_community(&error),
-            FileError::NotUploaded | FileError::Rejected(_) | FileError::Malformed(_) => {
-                StatusCode::UNPROCESSABLE_ENTITY
-            }
-            FileError::Bytes(error) => return error.into(),
-            FileError::DeviceOnly | FileError::Table(_) | FileError::Database(_) => {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
-        };
-        ApiError::new(status, error.to_string())
-    }
-}
-
 impl From<BytesError> for ApiError {
     fn from(error: BytesError) -> Self {
         let status = match error {
@@ -379,7 +296,6 @@ impl From<DeletionError> for ApiError {
         let status = match error {
             DeletionError::User(error) => return error.into(),
             DeletionError::AccountUser(error) => return error.into(),
-            DeletionError::Post(error) => return error.into(),
             DeletionError::Membership(error) => return error.into(),
             DeletionError::Community(error) => return error.into(),
             // Never 401, which a device takes for a sign-out
@@ -388,9 +304,10 @@ impl From<DeletionError> for ApiError {
             }
             DeletionError::Mail(_) => StatusCode::SERVICE_UNAVAILABLE,
             DeletionError::NoAccount { .. } => StatusCode::NOT_FOUND,
-            DeletionError::ServerOnly | DeletionError::Refused(_) | DeletionError::Database(_) => {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            DeletionError::ServerOnly
+            | DeletionError::Refused(_)
+            | DeletionError::Table(_)
+            | DeletionError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         ApiError::new(status, error.to_string())
     }

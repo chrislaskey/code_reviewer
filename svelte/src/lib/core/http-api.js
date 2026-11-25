@@ -5,7 +5,6 @@
 // request, so a server without the route never passes for one with it.
 import { t } from "ttag";
 import { FormError } from "./form_error.js";
-import { sha256Of } from "./checksums.js";
 import { putFile } from "./uploads.js";
 
 /**
@@ -44,9 +43,6 @@ async function errorWithMessageOf(response) {
   }
   return new Error(`${response.status} ${response.statusText}`);
 }
-
-/** @param {string} id */
-const postPath = (id) => `/api/posts/${encodeURIComponent(id)}`;
 
 /** The user signed in, whom the server takes the request to be from; null when nobody is. */
 export async function currentUserGet() {
@@ -170,9 +166,9 @@ export function accountsPasswordUpdate(password) {
 }
 
 /**
- * The signed-in person's preferences: `locale`, the language chosen, or
- * null to follow the device's.
- * @returns {Promise<{locale: string | null}>}
+ * The signed-in person's preferences: `locale`, the language chosen, and
+ * `theme`, the theme chosen, each null to follow the device.
+ * @returns {Promise<{locale: string | null, theme: string | null}>}
  */
 export function accountsPreferencesGet() {
   return send("GET", "/api/accounts/current/preferences");
@@ -181,9 +177,9 @@ export function accountsPreferencesGet() {
 /**
  * One of the signed-in person's preferences, null for its default, then
  * all of them.
- * @param {"locale"} key
+ * @param {"locale" | "theme"} key
  * @param {unknown} value
- * @returns {Promise<{locale: string | null}>}
+ * @returns {Promise<{locale: string | null, theme: string | null}>}
  */
 export function accountsPreferencesUpdate(key, value) {
   return send("PUT", "/api/accounts/current/preferences", { key, value });
@@ -411,184 +407,6 @@ export function localUsersKeepSeparate() {
   return Promise.reject(new Error("only the app has local users"));
 }
 
-export function postsList() {
-  return send("GET", "/api/posts");
-}
-
-/** @param {string} id */
-export function postsGet(id) {
-  return send("GET", postPath(id));
-}
-
-/**
- * @param {string} body
- * @param {string[]} communityIds the communities the post is in
- */
-export function postsCreate(body, communityIds) {
-  return send("POST", "/api/posts", { body, community_ids: communityIds });
-}
-
-/**
- * @param {string} id
- * @param {string} body
- * @param {string[]} communityIds the communities the post is in, exactly
- */
-export function postsUpdate(id, body, communityIds) {
-  return send("PUT", postPath(id), { body, community_ids: communityIds });
-}
-
-/** @param {string} id */
-export function postsDelete(id) {
-  return send("DELETE", postPath(id));
-}
-
-/** @param {string} id */
-const filePath = (id) => `/api/files/${encodeURIComponent(id)}`;
-
-/**
- * A page of the files the user sees whose names contain `name` in any
- * case, of one of `content_types` (any for none), newest first:
- * `{total, files}`, each file
- * `{file, creator, communities, shown_as, state, error}`.
- * @param {{name?: string, content_types?: string[], offset?: number, limit: number}} filter at most 500 at once
- */
-export function filesList({ name = "", content_types = [], offset = 0, limit }) {
-  const query = new URLSearchParams({
-    name,
-    content_types: content_types.join(","),
-    offset: String(offset),
-    limit: String(limit),
-  });
-  return send("GET", `/api/files?${query}`);
-}
-
-/** How long a list's name filter waits for a pause in typing: each asks the server. */
-export const filesListWaitMs = 200;
-
-/**
- * The files the user sees with any of these checksums, up to 500 at once.
- * @param {string[]} sha256s
- */
-export function filesDuplicatesList(sha256s) {
-  return send("POST", "/api/files/duplicates", { sha256s });
-}
-
-/** @param {string} id */
-export function filesGet(id) {
-  return send("GET", filePath(id));
-}
-
-/** How many files a page creates at once: each waits on its upload. */
-export const filesCreateAtOnce = 3;
-
-/**
- * Creates the file the person picked: its bytes go straight to object
- * storage, checked against their SHA-256, then the server writes its
- * row; answers the file.
- * @param {File} file
- * @param {string} name
- * @param {string[]} communityIds the communities the file is in, one at least
- * @param {(fraction: number) => void} [onProgress] from 0 to 1
- * @param {string} [sha256] the file's, when the page already has it
- */
-export async function filesCreate(file, name, communityIds, onProgress, sha256) {
-  sha256 ??= await sha256Of(file);
-  const upload = await send("POST", "/api/files/uploads", { content_type: file.type, size: file.size, sha256 });
-  if (!upload.uploaded) await putFile(upload, file, onProgress);
-  return send("POST", "/api/files", {
-    id: upload.id,
-    name,
-    content_type: upload.content_type,
-    size: file.size,
-    sha256,
-    community_ids: communityIds,
-  });
-}
-
-
-/**
- * @param {string} id
- * @param {string} name
- * @param {string[]} communityIds its communities among the user's, exactly
- */
-export function filesUpdate(id, name, communityIds) {
-  return send("PUT", filePath(id), { name, community_ids: communityIds });
-}
-
-/** @param {string} id */
-export function filesDelete(id) {
-  return send("DELETE", filePath(id));
-}
-
-/**
- * Where a page reads the file's bytes from, for an `<img>` or a frame.
- * @param {string} id
- */
-export function filesContentUrl(id) {
-  return `${filePath(id)}/content`;
-}
-
-/** A browser keeps no copies of its own: null. */
-export function filesCacheGet() {
-  return Promise.resolve(null);
-}
-
-export function filesCacheDelete() {
-  return Promise.resolve(null);
-}
-
-/** Whether this browser writes images to the clipboard. */
-export function filesCopySupported() {
-  return Promise.resolve(typeof ClipboardItem !== "undefined" && Boolean(navigator.clipboard?.write));
-}
-
-/**
- * Copies the image to the clipboard as a PNG, the one image type
- * browsers write, so an animated GIF is copied as its first frame. The
- * write starts before any await, inside the click, as Safari requires;
- * the bytes come with no cache, since a copy the page's <img> left in
- * the cache lacks the bucket's CORS headers this read needs.
- * @param {string} id
- */
-export function filesCopy(id) {
-  const png = fetch(`${filePath(id)}/content`, { cache: "no-store" }).then(async (response) => {
-    if (!response.ok) throw new Error(t`Could not read the image (${response.status})`);
-    return asPng(await response.blob());
-  });
-  return navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
-}
-
-/**
- * @param {Blob} image
- * @returns {Promise<Blob>}
- */
-async function asPng(image) {
-  if (image.type === "image/png") return image;
-  const bitmap = await createImageBitmap(image);
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
-  bitmap.close();
-  return new Promise((resolve, reject) =>
-    canvas.toBlob((png) => (png ? resolve(png) : reject(new Error(t`Could not copy the image`))), "image/png"),
-  );
-}
-
-export function filesDownloadSupported() {
-  return Promise.resolve(true);
-}
-
-/**
- * Has the browser save the file under its name.
- * @param {string} id
- * @returns {Promise<string | null>} where it was saved, when known
- */
-export function filesDownload(id) {
-  window.location.assign(`${filePath(id)}/content?download=1`);
-  return Promise.resolve(null);
-}
-
 /** Every community, each with the user's membership when they are in it. */
 export function communitiesList() {
   return send("GET", "/api/communities");
@@ -675,38 +493,6 @@ export function conflictsTryAgain(_id) {
 /** @param {string} _id */
 export function conflictsDelete(_id) {
   return Promise.reject(new Error("nothing to let go on the web"));
-}
-
-// The quick picker is the desktop app's: a browser has none.
-
-/** @param {{name?: string, offset?: number, limit: number}} _filter */
-export function quickPickerFilesList(_filter) {
-  return Promise.reject(new Error("the quick picker is the desktop app's"));
-}
-
-/** @param {string} _id */
-export function quickPickerPaste(_id) {
-  return Promise.reject(new Error("the quick picker is the desktop app's"));
-}
-
-export function quickPickerClose() {
-  return Promise.resolve();
-}
-
-export function quickPickerOpenApp() {
-  return Promise.reject(new Error("the quick picker is the desktop app's"));
-}
-
-export function quickPickerAccessibilityRequest() {
-  return Promise.resolve(false);
-}
-
-/**
- * @param {(opened: {accessibility_trusted: boolean}) => void} _callback
- * @returns {() => void} stops listening
- */
-export function onQuickPickerOpened(_callback) {
-  return () => {};
 }
 
 /**
@@ -908,4 +694,3 @@ export function sessionsBellUpdate(name, enabled) {
 export function onSessionNotificationClicked(_callback) {
   return Promise.resolve(() => {});
 }
-

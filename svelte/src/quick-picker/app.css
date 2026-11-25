@@ -1,4 +1,0 @@
-/* The app's stylesheet, then the quick picker's own styles. */
-
-@import "../app.css";
-@import "./styles.css" layer(base);

@@ -22,14 +22,6 @@ export const ACCOUNTS_PURCHASES_INDEX_PATH = "/accounts/purchases";
 export const ACCOUNTS_PURCHASES_SHOW_PATH = "/accounts/purchases/:id";
 export const ACCOUNTS_SUBSCRIPTIONS_INDEX_PATH = "/accounts/subscriptions";
 export const ACCOUNTS_SUBSCRIPTIONS_SHOW_PATH = "/accounts/subscriptions/:id";
-export const POSTS_INDEX_PATH = "/posts";
-export const POSTS_NEW_PATH = "/posts/new";
-export const POSTS_SHOW_PATH = "/posts/:id";
-export const POSTS_EDIT_PATH = "/posts/:id/edit";
-export const FILES_INDEX_PATH = "/files";
-export const FILES_NEW_PATH = "/files/new";
-export const FILES_SHOW_PATH = "/files/:id";
-export const FILES_EDIT_PATH = "/files/:id/edit";
 export const COMMUNITIES_INDEX_PATH = "/communities";
 export const COMMUNITIES_NEW_PATH = "/communities/new";
 export const COMMUNITIES_SHOW_PATH = "/communities/:id";
@@ -126,42 +118,6 @@ function withQuery(path, values) {
   }
   const string = query.toString();
   return string ? `${path}?${string}` : path;
-}
-
-export function postsIndexUrl() {
-  return POSTS_INDEX_PATH;
-}
-
-export function postsNewUrl() {
-  return POSTS_NEW_PATH;
-}
-
-/** @param {string} id */
-export function postsShowUrl(id) {
-  return POSTS_SHOW_PATH.replace(":id", encodeURIComponent(id));
-}
-
-/** @param {string} id */
-export function postsEditUrl(id) {
-  return POSTS_EDIT_PATH.replace(":id", encodeURIComponent(id));
-}
-
-export function filesIndexUrl() {
-  return FILES_INDEX_PATH;
-}
-
-export function filesNewUrl() {
-  return FILES_NEW_PATH;
-}
-
-/** @param {string} id */
-export function filesShowUrl(id) {
-  return FILES_SHOW_PATH.replace(":id", encodeURIComponent(id));
-}
-
-/** @param {string} id */
-export function filesEditUrl(id) {
-  return FILES_EDIT_PATH.replace(":id", encodeURIComponent(id));
 }
 
 export function communitiesIndexUrl() {

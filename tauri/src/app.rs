@@ -8,11 +8,9 @@ pub mod avatars;
 pub mod communities;
 pub mod current_community;
 pub mod current_user;
-pub mod files;
 pub mod last_visited_page;
 pub mod local_users;
 pub mod memberships;
-pub mod posts;
 pub mod reviews;
 #[cfg(desktop)]
 pub mod session_notifications;

@@ -12,6 +12,8 @@ sqlite = ["sqlx/sqlite"]
 postgres = ["sqlx/postgres"]
 # The HTTP transport to the web server's sync endpoints, for the apps; never on the server
 sync-http = ["dep:reqwest"]
+# The framework's own test table, sync::test_notes; for tests alone, never in a build that ships
+test-tables = []
 # Sending email through Resend, for the server in production
 mail-resend = ["dep:reqwest", "dep:secrecy"]
 # Uploads straight to S3-style object storage, for the server; never in the Tauri app

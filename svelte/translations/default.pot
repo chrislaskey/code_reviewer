@@ -75,8 +75,6 @@ msgid "Trace"
 msgstr ""
 
 #: src/communities/CommunitiesShowPage.svelte:42
-#: src/files/FilesShowPage.svelte:90
-#: src/posts/PostsShowPage.svelte:35
 #: src/reviews/ReviewsShowPage.svelte:124
 #: src/traces/TracesShowPage.svelte:107
 msgid "Edit"
@@ -443,7 +441,6 @@ msgstr ""
 msgid "Which messages the chat shows"
 msgstr ""
 
-#: src/posts/PostsIndexPage.svelte:23
 #: src/reviews/ReviewsShowPage.svelte:135
 #: src/sessions/SessionsShowPage.svelte:151
 msgid "Show"
@@ -579,7 +576,6 @@ msgid ""
 msgstr ""
 
 #: src/communities/components/CommunitiesForm.svelte:25
-#: src/files/FilesEditPage.svelte:53
 #: src/profile/ProfileEditPage.svelte:129
 #: src/sessions/SessionsNewPage.svelte:57
 msgid "Name"
@@ -674,7 +670,6 @@ msgstr ""
 msgid "Finding…"
 msgstr ""
 
-#: src/files/FilesNewPage.svelte:350
 #: src/sessions/SessionsNewPage.svelte:78
 msgid "Creating…"
 msgstr ""
@@ -1350,8 +1345,6 @@ msgid_plural "${ count } callers still calling a removed or renamed function"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/files/FilesIndexPage.svelte:89
-#: src/files/FilesNewPage.svelte:334
 #: src/reviews/ReviewsShowPage.svelte:24
 #: src/reviews/nodes/GroupCardNode.svelte:55
 msgid "Files"
@@ -1567,7 +1560,6 @@ msgid_plural "${ file.functions.length } functions"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/files/FilesShowPage.svelte:63
 #: src/reviews/ledger/LedgerFile.svelte:76
 msgid "File"
 msgstr ""
@@ -1629,56 +1621,6 @@ msgid_plural "${ functions.length } changed functions"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/quick-picker/QuickPickerPage.svelte:137
-msgid "Search images by name…"
-msgstr ""
-
-#: src/quick-picker/QuickPickerPage.svelte:150
-msgid "No images have that in their name"
-msgstr ""
-
-#: src/quick-picker/QuickPickerPage.svelte:150
-msgid "No images yet"
-msgstr ""
-
-#: src/quick-picker/QuickPickerPage.svelte:154
-msgid "allow Accessibility access"
-msgstr ""
-
-#: src/quick-picker/QuickPickerPage.svelte:155
-#, javascript-format
-msgid "Copies only: ${ accessibilityButton } to paste."
-msgstr ""
-
-#: src/quick-picker/QuickPickerPage.svelte:157
-msgid "select"
-msgstr ""
-
-#: src/quick-picker/QuickPickerPage.svelte:158
-msgid "paste"
-msgstr ""
-
-#: src/quick-picker/QuickPickerPage.svelte:159
-#: src/quick-picker/QuickPickerPage.svelte:165
-msgid "close"
-msgstr ""
-
-#: src/quick-picker/QuickPickerPage.svelte:160
-msgid "Log in to Starter Pack to pick from your images."
-msgstr ""
-
-#: src/quick-picker/QuickPickerPage.svelte:162
-msgid "Open Starter Pack"
-msgstr ""
-
-#: src/quick-picker/QuickPickerPage.svelte:164
-msgid "open"
-msgstr ""
-
-#: src/quick-picker/QuickPickerPage.svelte:82
-msgid "Copying…"
-msgstr ""
-
 #: src/lib/layouts/AccountMenu.svelte:67
 #: src/profile/ProfileEditPage.svelte:120
 msgid "Profile"
@@ -1695,7 +1637,7 @@ msgid ""
 "it on your other devices."
 msgstr ""
 
-#: src/accounts/AccountsIndexPage.svelte:52
+#: src/accounts/AccountsIndexPage.svelte:53
 #: src/lib/AccountsNeeded.svelte:16
 #: src/profile/ProfileEditPage.svelte:124
 msgid "Sign up or log in"
@@ -1722,71 +1664,6 @@ msgstr ""
 msgid "Save picture"
 msgstr ""
 
-#: src/posts/PostsShowPage.svelte:28
-#: src/posts/components/PostsForm.svelte:47
-msgid "Post"
-msgstr ""
-
-#: src/files/FilesIndexPage.svelte:112
-#: src/files/FilesShowPage.svelte:66
-#: src/posts/PostsIndexPage.svelte:20
-#: src/posts/PostsShowPage.svelte:32
-#, javascript-format
-msgid "in ${ communityNames }"
-msgstr ""
-
-#: src/communities/CommunitiesShowPage.svelte:44
-#: src/files/FilesShowPage.svelte:92
-#: src/posts/PostsShowPage.svelte:37
-msgid "Delete"
-msgstr ""
-
-#: src/conflicts/ConflictsIndexPage.svelte:67
-#: src/posts/PostsNewPage.svelte:47
-#: src/posts/PostsShowPage.svelte:39
-msgid "Back to posts"
-msgstr ""
-
-#: src/posts/PostsShowPage.svelte:18
-msgid "Delete this post?"
-msgstr ""
-
-#: src/posts/PostsIndexPage.svelte:15
-#: src/posts/PostsNewPage.svelte:43
-msgid "New post"
-msgstr ""
-
-#: src/posts/PostsIndexPage.svelte:13
-msgid "Posts"
-msgstr ""
-
-#: src/posts/PostsIndexPage.svelte:17
-msgid "No posts yet."
-msgstr ""
-
-#: src/posts/PostsEditPage.svelte:43
-msgid "Edit post"
-msgstr ""
-
-#: src/communities/CommunitiesEditPage.svelte:46
-#: src/files/FilesEditPage.svelte:59
-#: src/posts/PostsEditPage.svelte:44
-msgid "Save"
-msgstr ""
-
-#: src/posts/PostsEditPage.svelte:48
-msgid "Back to the post"
-msgstr ""
-
-#: src/posts/components/PostsForm.svelte:48
-msgid "What's on your mind?"
-msgstr ""
-
-#: src/files/components/FilesCommunitiesField.svelte:39
-#: src/posts/components/PostsForm.svelte:49
-msgid "In"
-msgstr ""
-
 #: src/lib/router.js:76
 #, javascript-format
 msgid "Could not check who is signed in: ${ reason }"
@@ -1795,21 +1672,6 @@ msgstr ""
 #: src/lib/router.js:97
 #, javascript-format
 msgid "This page could not load: ${ reason }"
-msgstr ""
-
-#: src/lib/file_size.js:9
-#, javascript-format
-msgid "${ bytes } B"
-msgstr ""
-
-#: src/lib/file_size.js:11
-#, javascript-format
-msgid "${ kilobytes } KB"
-msgstr ""
-
-#: src/lib/file_size.js:13
-#, javascript-format
-msgid "${ megabytes } MB"
 msgstr ""
 
 #: src/lib/PublicPagesLinks.svelte:18
@@ -1823,18 +1685,6 @@ msgstr ""
 #: src/lib/PublicPagesLinks.svelte:22
 #, javascript-format
 msgid "${ termsLink } and ${ privacyLink }"
-msgstr ""
-
-#: src/lib/FileImage.svelte:15
-#. *
-#.    * @typedef {Object} Props
-#.    * @property {string} src
-#.    * @property {string} alt
-#.    * @property {string} [class]
-#.    * @property {string} [missing]
-#.    
-#. * @type {Props} 
-msgid "Not on this device"
 msgstr ""
 
 #: src/lib/AnimationsToggle.svelte:12
@@ -1883,18 +1733,23 @@ msgstr ""
 msgid "Your guest visit ended. Sign up before ${ deletedAt } to keep what you made."
 msgstr ""
 
-#: src/lib/layouts/ThemeMenu.svelte:21
+#: src/lib/layouts/ThemeMenu.svelte:27
 #, javascript-format
 msgid "Theme: ${ current }"
 msgstr ""
 
 #: src/lib/layouts/BottomBar.svelte:45
-#: src/lib/layouts/ThemeMenu.svelte:22
+#: src/lib/layouts/ThemeMenu.svelte:28
 msgid "Theme"
 msgstr ""
 
-#: src/lib/layouts/ThemeChoices.svelte:22
+#: src/lib/layouts/ThemeChoices.svelte:36
 msgid "System"
+msgstr ""
+
+#: src/lib/layouts/ThemeChoices.svelte:31
+#, javascript-format
+msgid "Could not keep the theme: ${ reason }"
 msgstr ""
 
 #: src/accounts/deletions/AccountsDeletionsNewPage.svelte:53
@@ -2051,7 +1906,7 @@ msgstr ""
 msgid "Guest"
 msgstr ""
 
-#: src/accounts/AccountsIndexPage.svelte:206
+#: src/accounts/AccountsIndexPage.svelte:223
 #: src/lib/layouts/AccountMenu.svelte:64
 msgid "On this device only"
 msgstr ""
@@ -2068,8 +1923,8 @@ msgstr ""
 msgid "Log out"
 msgstr ""
 
-#: src/accounts/AccountsIndexPage.svelte:52
-#: src/accounts/AccountsIndexPage.svelte:219
+#: src/accounts/AccountsIndexPage.svelte:53
+#: src/accounts/AccountsIndexPage.svelte:236
 #: src/accounts/AccountsSignInPage.svelte:89
 #: src/accounts/AccountsSignInPage.svelte:99
 #: src/accounts/components/AccountsSignInSteps.svelte:30
@@ -2097,25 +1952,16 @@ msgstr ""
 msgid "The upload could not reach the storage; try again"
 msgstr ""
 
-#: src/lib/core/http-api.js:551
-#, javascript-format
-msgid "Could not read the image (${ response.status })"
-msgstr ""
-
-#: src/lib/core/http-api.js:739
+#: src/lib/core/http-api.js:529
 msgid "On the web, plans and products are bought through Stripe"
 msgstr ""
 
-#: src/lib/core/http-api.js:743
+#: src/lib/core/http-api.js:533
 msgid "Restoring purchases is in the iPhone app"
 msgstr ""
 
-#: src/lib/core/http-api.js:747
+#: src/lib/core/http-api.js:537
 msgid "A plan from a phone's store is managed on the phone"
-msgstr ""
-
-#: src/lib/core/http-api.js:570
-msgid "Could not copy the image"
 msgstr ""
 
 #: src/lib/components/CodeInput.svelte:31
@@ -2280,244 +2126,6 @@ msgid ""
 "with each function marked against the base of the comparison."
 msgstr ""
 
-#: src/files/FilesShowPage.svelte:65
-msgid "A former member"
-msgstr ""
-
-#: src/files/FilesShowPage.svelte:70
-msgid "waiting to upload"
-msgstr ""
-
-#: src/files/FilesShowPage.svelte:71
-msgid "not saved on the server"
-msgstr ""
-
-#: src/files/FilesShowPage.svelte:74
-msgid "Try again or let it go"
-msgstr ""
-
-#: src/files/FilesShowPage.svelte:75
-msgid "Copy to the clipboard"
-msgstr ""
-
-#: src/accounts/components/AccountsDeviceCode.svelte:28
-#: src/files/FilesShowPage.svelte:79
-msgid "Copied"
-msgstr ""
-
-#: src/files/FilesShowPage.svelte:79
-msgid "Click the image to copy it"
-msgstr ""
-
-#: src/files/FilesShowPage.svelte:86
-msgid "This kind of file is not shown here."
-msgstr ""
-
-#: src/files/FilesShowPage.svelte:88
-msgid "Download"
-msgstr ""
-
-#: src/files/FilesNewPage.svelte:365
-#: src/files/FilesShowPage.svelte:95
-msgid "Back to files"
-msgstr ""
-
-#: src/files/FilesShowPage.svelte:46
-#, javascript-format
-msgid "Saved to ${ path }"
-msgstr ""
-
-#: src/files/FilesShowPage.svelte:53
-msgid "Delete this file from your communities? A community you are not in keeps it."
-msgstr ""
-
-#: src/files/FilesNewPage.svelte:130
-#, javascript-format
-msgid "A list holds ${ maxFiles } files; ${ leftOut } was left out."
-msgid_plural "A list holds ${ maxFiles } files; ${ leftOut } were left out."
-msgstr[0] ""
-msgstr[1] ""
-
-#: src/files/FilesIndexPage.svelte:91
-#: src/files/FilesNewPage.svelte:327
-msgid "New files"
-msgstr ""
-
-#: src/files/FilesNewPage.svelte:329
-msgid "Files to create"
-msgstr ""
-
-#: src/files/FilesNewPage.svelte:337
-#, javascript-format
-msgid "Pick one file or many, or drop them here, up to ${ maxFiles }."
-msgstr ""
-
-#: src/files/FilesNewPage.svelte:347
-#, javascript-format
-msgid ""
-"Creating ${ run.done } of ${ run.total }. Stay on this page until they are "
-"done."
-msgstr ""
-
-#: src/files/FilesNewPage.svelte:351
-#, javascript-format
-msgid ""
-"${ counts.created } created, ${ counts.put } put in, ${ counts.skipped } "
-"skipped, ${ counts.failed } failed."
-msgstr ""
-
-#: src/files/FilesNewPage.svelte:352
-#, javascript-format
-msgid "Looking for files already here… ${ hashedCount } of ${ askingCount } read."
-msgstr ""
-
-#: src/files/FilesNewPage.svelte:353
-msgid "One file is already here; choose what to do with it."
-msgid_plural "${ toDecideCount } files are already here; choose what to do with each."
-msgstr[0] ""
-msgstr[1] ""
-
-#: src/files/FilesNewPage.svelte:359
-msgid "Create files"
-msgstr ""
-
-#: src/files/FilesNewPage.svelte:360
-msgid "Create file"
-msgid_plural "Create ${ openCount } files"
-msgstr[0] ""
-msgstr[1] ""
-
-#: src/files/FilesNewPage.svelte:363
-msgid "Retry failed"
-msgstr ""
-
-#: src/files/FilesIndexPage.svelte:18
-#. * @type {{ view: import("./files_view.js").FilesView, label: string, icon: string }[]} 
-msgid "List"
-msgstr ""
-
-#: src/files/FilesIndexPage.svelte:19
-#. * @type {{ view: import("./files_view.js").FilesView, label: string, icon: string }[]} 
-msgid "Grid"
-msgstr ""
-
-#: src/files/FilesIndexPage.svelte:93
-msgid "No files yet."
-msgstr ""
-
-#: src/files/FilesIndexPage.svelte:95
-#: src/files/FilesIndexPage.svelte:96
-msgid "Search by name"
-msgstr ""
-
-#: src/files/FilesIndexPage.svelte:102
-msgid "No files have that in their name."
-msgstr ""
-
-#: src/files/FilesIndexPage.svelte:114
-#: src/files/components/FilesGrid.svelte:23
-msgid "Waiting to upload"
-msgstr ""
-
-#: src/files/FilesIndexPage.svelte:115
-#: src/files/components/FilesGrid.svelte:24
-msgid "Not saved on the server"
-msgstr ""
-
-#: src/files/FilesIndexPage.svelte:117
-msgid "Show more"
-msgstr ""
-
-#: src/files/FilesIndexPage.svelte:118
-#, javascript-format
-msgid "${ cache.count } file kept on this device, ${ cachedSize }."
-msgid_plural "${ cache.count } files kept on this device, ${ cachedSize }."
-msgstr[0] ""
-msgstr[1] ""
-
-#: src/files/FilesIndexPage.svelte:123
-msgid "Removing them frees the space; each is fetched again when it is next shown."
-msgstr ""
-
-#: src/files/FilesIndexPage.svelte:126
-msgid "Remove cached files"
-msgstr ""
-
-#: src/files/FilesEditPage.svelte:51
-msgid "Edit file"
-msgstr ""
-
-#: src/files/FilesEditPage.svelte:62
-msgid "Back to the file"
-msgstr ""
-
-#: src/files/components/FilesNewRow.svelte:25
-msgid "Put it in the communities chosen"
-msgstr ""
-
-#: src/files/components/FilesNewRow.svelte:25
-msgid "Create a copy"
-msgstr ""
-
-#: src/accounts/AccountsIndexPage.svelte:228
-#: src/files/components/FilesNewRow.svelte:25
-msgid "Skip"
-msgstr ""
-
-#: src/files/components/FilesNewRow.svelte:26
-msgid "Waiting"
-msgstr ""
-
-#: src/files/components/FilesNewRow.svelte:26
-msgid "Created"
-msgstr ""
-
-#: src/files/components/FilesNewRow.svelte:26
-msgid "Put in"
-msgstr ""
-
-#: src/files/components/FilesNewRow.svelte:26
-msgid "Skipped"
-msgstr ""
-
-#: src/files/components/FilesNewRow.svelte:50
-msgid "Rename"
-msgstr ""
-
-#: src/files/components/FilesNewRow.svelte:61
-msgid "Failed"
-msgstr ""
-
-#: src/files/components/FilesNewRow.svelte:64
-msgid "Take it off the list"
-msgstr ""
-
-#: src/files/components/FilesNewRow.svelte:65
-msgid "Remove"
-msgstr ""
-
-#: src/files/components/FilesNewRow.svelte:68
-#, javascript-format
-msgid "Already here, as ${ existingLink }."
-msgstr ""
-
-#: src/files/components/FilesNewRow.svelte:71
-#, javascript-format
-msgid "Already here, as ${ existingLink } in ${ communityNames }."
-msgstr ""
-
-#: src/files/components/FilesNewRow.svelte:72
-#, javascript-format
-msgid "The same file as ${ earlier.name }, earlier in this list."
-msgstr ""
-
-#: src/files/components/FilesNewRow.svelte:77
-#, javascript-format
-msgid "The same for ${ count } more"
-msgid_plural "The same for ${ count } more"
-msgstr[0] ""
-msgstr[1] ""
-
 #: src/conflicts/ConflictsIndexPage.svelte:42
 msgid "Changes not on the server"
 msgstr ""
@@ -2563,6 +2171,10 @@ msgstr ""
 msgid "Let it go"
 msgstr ""
 
+#: src/conflicts/ConflictsIndexPage.svelte:67
+msgid "Back to Home"
+msgstr ""
+
 #: src/communities/CommunitiesShowPage.svelte:34
 msgid "Community"
 msgstr ""
@@ -2574,6 +2186,10 @@ msgstr ""
 
 #: src/communities/CommunitiesShowPage.svelte:37
 msgid "you are a member"
+msgstr ""
+
+#: src/communities/CommunitiesShowPage.svelte:44
+msgid "Delete"
 msgstr ""
 
 #: src/communities/CommunitiesNewPage.svelte:36
@@ -2602,6 +2218,10 @@ msgstr ""
 msgid "Edit community"
 msgstr ""
 
+#: src/communities/CommunitiesEditPage.svelte:46
+msgid "Save"
+msgstr ""
+
 #: src/communities/CommunitiesEditPage.svelte:50
 msgid "Back to the community"
 msgstr ""
@@ -2620,9 +2240,7 @@ msgid "Delete ${ community.name }?"
 msgstr ""
 
 #: src/communities/components/CommunitiesDeleteDialog.svelte:26
-msgid ""
-"Every member leaves it, and the posts in it are taken out of it. The posts "
-"themselves stay with the people who wrote them."
+msgid "Every member leaves it, and everything in it is taken out of it."
 msgstr ""
 
 #: src/accounts/components/AccountsRemoveDialog.svelte:48
@@ -2757,40 +2375,44 @@ msgstr ""
 msgid "By continuing, you accept the ${ publicPagesLinks }."
 msgstr ""
 
-#: src/accounts/AccountsIndexPage.svelte:203
+#: src/accounts/AccountsIndexPage.svelte:218
 msgid "Accounts on this device"
 msgstr ""
 
-#: src/accounts/AccountsIndexPage.svelte:205
+#: src/accounts/AccountsIndexPage.svelte:220
 msgid "No account yet."
 msgstr ""
 
-#: src/accounts/AccountsIndexPage.svelte:212
+#: src/accounts/AccountsIndexPage.svelte:229
 #: src/accounts/subscriptions/subscription_status.js:8
 msgid "Active"
 msgstr ""
 
-#: src/accounts/AccountsIndexPage.svelte:215
+#: src/accounts/AccountsIndexPage.svelte:232
 #: src/accounts/products/AccountsProductsShowPage.svelte:99
 #: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:101
 #: src/accounts/subscriptions/AccountsSubscriptionsShowPage.svelte:111
 msgid "Switch"
 msgstr ""
 
-#: src/accounts/AccountsIndexPage.svelte:216
+#: src/accounts/AccountsIndexPage.svelte:233
 msgid "Logged out"
 msgstr ""
 
-#: src/accounts/AccountsIndexPage.svelte:222
+#: src/accounts/AccountsIndexPage.svelte:239
 #: src/accounts/components/AccountsRemoveDialog.svelte:51
 msgid "Remove from device"
 msgstr ""
 
-#: src/accounts/AccountsIndexPage.svelte:225
+#: src/accounts/AccountsIndexPage.svelte:242
 msgid "Add account"
 msgstr ""
 
-#: src/accounts/AccountsIndexPage.svelte:229
+#: src/accounts/AccountsIndexPage.svelte:245
+msgid "Skip"
+msgstr ""
+
+#: src/accounts/AccountsIndexPage.svelte:246
 msgid "Use the app on this device only, with no account. You can sign up later."
 msgstr ""
 
@@ -3340,6 +2962,10 @@ msgid ""
 msgstr ""
 
 #: src/accounts/components/AccountsDeviceCode.svelte:28
+msgid "Copied"
+msgstr ""
+
+#: src/accounts/components/AccountsDeviceCode.svelte:28
 msgid "Copy"
 msgstr ""
 
@@ -3430,9 +3056,4 @@ msgstr ""
 
 #: src/accounts/checkouts/AccountsCheckoutsShowPage.svelte:62
 msgid "This checkout expired, and nothing was charged."
-msgstr ""
-
-#: src/posts/PostsNewPage.svelte:44
-msgctxt "verb"
-msgid "Post"
 msgstr ""

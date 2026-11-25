@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+use crate::data::app_communities::Community;
 use crate::data::app_events::{Event, Fields};
 use crate::data::app_sync_state::{self, Cursor};
 use crate::data::app_users::User;
@@ -151,6 +152,52 @@ pub trait SyncedTable: Send + Sync {
         _tx: &mut Transaction,
         _from_community_id: Uuid,
         _to: &Membership,
+    ) -> Result<(), TableError> {
+        Ok(())
+    }
+
+    /// Deletes the user's rows with their account, as events in their
+    /// name; nothing for a table whose rows outlive their maker.
+    async fn delete_of_user(
+        &self,
+        _tx: &mut Transaction,
+        _role: Role,
+        _user: &User,
+    ) -> Result<(), TableError> {
+        Ok(())
+    }
+
+    /// Deletes the live rows under the membership at its moment, when it
+    /// is left or its community deleted; nothing for a table whose rows
+    /// are not a member's.
+    async fn delete_with_membership(
+        &self,
+        _tx: &mut Transaction,
+        _role: Role,
+        _membership: &Membership,
+    ) -> Result<(), TableError> {
+        Ok(())
+    }
+
+    /// Revives the rows that left with the membership at `left_at`, when
+    /// it is joined again.
+    async fn revive_with_membership(
+        &self,
+        _tx: &mut Transaction,
+        _role: Role,
+        _membership: &Membership,
+        _left_at: DateTime<Utc>,
+    ) -> Result<(), TableError> {
+        Ok(())
+    }
+
+    /// Deletes the live rows in the community at its moment, when it is
+    /// deleted; nothing for a table not in communities.
+    async fn delete_with_community(
+        &self,
+        _tx: &mut Transaction,
+        _role: Role,
+        _community: &Community,
     ) -> Result<(), TableError> {
         Ok(())
     }

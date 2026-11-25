@@ -8,23 +8,17 @@
 //! `device_accounts`; the other commands read and write the active one
 //! as its user, see `user_auth` and `accounts`, and it syncs with the web
 //! server, see `sync`. A sign-in happens in the system browser, see
-//! `accounts`. On macOS ⌃⌘T anywhere opens the quick picker, a second
-//! window, see `quick_picker`. On iOS the bar above the keyboard is
+//! `accounts`. On iOS the bar above the keyboard is
 //! hidden, see `keyboard_accessory_bar`, and the web view is shortened
 //! to above the keyboard, see `web_view_keyboard_resize`.
 
 mod accounts;
 mod app;
-#[cfg(any(target_os = "macos", target_os = "ios"))]
-mod clipboard;
 mod command_error;
 mod device_accounts;
 #[cfg(target_os = "ios")]
 mod keyboard_accessory_bar;
-#[cfg(target_os = "macos")]
-mod macos;
 mod public_pages;
-mod quick_picker;
 mod server_urls;
 mod servers;
 mod sync;
@@ -48,12 +42,6 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_notification::init());
     builder
         .plugin(tauri_plugin_opener::init())
-        .register_asynchronous_uri_scheme_protocol("files", |context, request, responder| {
-            let app = context.app_handle().clone();
-            tauri::async_runtime::spawn(async move {
-                responder.respond(app::files::content_response(&app, request.uri()).await);
-            });
-        })
         .setup(|app| {
             #[cfg(target_os = "ios")]
             keyboard_accessory_bar::hide();
@@ -64,7 +52,6 @@ pub fn run() {
             app.manage(accounts::sign_in_loopback::AccountsLoopback::default());
             sync::setup(app)?;
             accounts::store_transactions::spawn_send_unfinished(app.handle().clone());
-            quick_picker::register(app.handle())?;
             #[cfg(desktop)]
             app::session_notifications::spawn(app.handle().clone());
             #[cfg(target_os = "ios")]
@@ -104,23 +91,6 @@ pub fn run() {
             app::memberships::memberships_create,
             app::memberships::memberships_delete,
             public_pages::public_pages_open,
-            app::posts::posts_list,
-            app::posts::posts_get,
-            app::posts::posts_create,
-            app::posts::posts_update,
-            app::posts::posts_delete,
-            app::files::files_list,
-            app::files::duplicates::files_duplicates_list,
-            app::files::files_get,
-            app::files::files_create,
-            app::files::files_update,
-            app::files::files_delete,
-            app::files::files_cache_get,
-            app::files::files_cache_delete,
-            app::files::files_copy_supported,
-            app::files::files_copy,
-            app::files::files_download_supported,
-            app::files::files_download,
             sync::sync_run,
             sync::sync_status,
             sync::sync_set_offline,
@@ -142,11 +112,6 @@ pub fn run() {
             app::local_users::local_users_create,
             app::local_users::local_users_move,
             app::local_users::local_users_keep_separate,
-            quick_picker::quick_picker_files_list,
-            quick_picker::quick_picker_paste,
-            quick_picker::quick_picker_close,
-            quick_picker::quick_picker_open_app,
-            quick_picker::quick_picker_accessibility_request,
             accounts::products::accounts_products_list,
             accounts::products::accounts_products_get,
             accounts::checkouts::accounts_checkouts_create,

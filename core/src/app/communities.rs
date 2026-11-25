@@ -1,12 +1,13 @@
 //! Communities: the soft boundary inside a deployment, see
 //! `docs/design/offline-sync.md`. A user joins communities, see
-//! `memberships`, and a post is in the communities its owner chose, see
-//! `posts_communities`. Any user creates a community and joins it as
+//! `memberships`, and an app's rows are in communities, each table by
+//! its own rule. Any user creates a community and joins it as
 //! they do; every user sees every community, so a device can list them
 //! and join, but a trial user's, which nobody else sees or joins, see
 //! `trial_users`. Any live member renames or deletes one, `member` being the
 //! only role yet. A delete takes every membership in the community along,
-//! and with them the posts' community rows, all at the one moment.
+//! and every table's rows in it, all at the one moment, see
+//! `SyncedTable::delete_with_community`.
 
 use crate::data::app_communities::{self, AcceptedCommunity, Community, TABLE};
 use crate::data::app_users_communities;
@@ -16,7 +17,6 @@ use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::app::files_communities;
 use crate::app::memberships::{self, MembershipError};
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
 use crate::data::app_sync_state::Cursor;
@@ -29,6 +29,7 @@ use crate::helpers::json;
 use crate::sync::TableRow;
 use crate::sync::events::{self, Answer, AnswerStatus};
 use crate::sync::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
+use crate::sync::tables;
 
 const CREATE_FIELDS: &[&str] = &["name"];
 pub(crate) const UPDATE_FIELDS: &[&str] = &["name", "deleted_at"];
@@ -57,6 +58,9 @@ pub enum CommunityError {
     Membership(#[from] MembershipError),
     #[error(transparent)]
     Record(#[from] crate::sync::events::RecordError),
+    /// A synced table's own module failed.
+    #[error(transparent)]
+    Table(#[from] TableError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -410,9 +414,9 @@ pub(crate) async fn apply_in(
             let updated = updated.into_row();
             if changes.contains_key("deleted_at") && updated.deleted_at.is_some() {
                 memberships::delete_with_community(tx, role, &updated).await?;
-                files_communities::delete_with_community(tx, role, &updated)
-                    .await
-                    .map_err(|error| CommunityError::Malformed(error.to_string()))?;
+                for table in tables::list().iter().rev() {
+                    table.delete_with_community(tx, role, &updated).await?;
+                }
             }
             finish(tx, role, user, event, conflicts, updated).await
         }
@@ -574,9 +578,9 @@ impl SyncedTable for Synced {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::{posts, users};
-    use crate::data::app_posts_communities;
+    use crate::app::users;
     use crate::database::{Database, with_each_database};
+    use crate::sync::test_notes;
 
     fn server(database: Database) -> Deployment {
         Deployment::new(database, Role::Server)
@@ -638,9 +642,9 @@ mod tests {
             let community = create(&deployment, &alice, "Gardening")
                 .await
                 .expect("community");
-            let post = posts::create(&deployment, &alice, "roses", &[community.id])
+            let note = test_notes::create(&deployment, &alice, "roses", Some(community.id))
                 .await
-                .expect("post");
+                .expect("note");
             delete(&deployment, &alice, community.id)
                 .await
                 .expect("delete");
@@ -656,15 +660,6 @@ mod tests {
                     .await
                     .expect("read")
                     .is_none()
-            );
-            assert!(
-                app_posts_communities::list(
-                    &mut tx,
-                    app_posts_communities::Filter::Posts(&[post.id])
-                )
-                .await
-                .expect("read")
-                .is_empty()
             );
             assert!(
                 app_communities::replication::get(&mut tx, community.id)
@@ -687,16 +682,12 @@ mod tests {
                 .is_some()
             );
             assert!(
-                app_posts_communities::replication::get_by_post_and_community(
-                    &mut tx,
-                    post.id,
-                    community.id
-                )
-                .await
-                .expect("read")
-                .expect("tombstone")
-                .deleted_at
-                .is_some()
+                test_notes::get_in(&mut tx, note.id)
+                    .await
+                    .expect("read")
+                    .expect("tombstone")
+                    .deleted_at
+                    .is_some()
             );
         })
         .await;
@@ -848,7 +839,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn communities_delete_takes_every_membership_and_its_posts_along() {
+    async fn communities_delete_takes_every_membership_and_every_row_in_it_along() {
         with_each_database(|database| async move {
             let deployment = server(database);
             let alice = user(&deployment, "alice@example.com").await;
@@ -860,9 +851,9 @@ mod tests {
             memberships::create(&deployment, &bob, gardening.id)
                 .await
                 .expect("joined");
-            posts::create(&deployment, &alice, "roses", &[gardening.id])
+            let note = test_notes::create(&deployment, &alice, "roses", Some(gardening.id))
                 .await
-                .expect("a post");
+                .expect("a note");
 
             let error = delete(&deployment, &carol, gardening.id)
                 .await
@@ -877,16 +868,15 @@ mod tests {
                 .expect_err("gone");
             assert!(matches!(error, CommunityError::NotFound { .. }));
             assert!(list(&deployment, &alice).await.expect("none").is_empty());
-            assert!(
-                posts::list(&deployment, &bob)
-                    .await
-                    .expect("the posts")
-                    .is_empty(),
-                "the post left with the community"
-            );
-            let alices = posts::list(&deployment, &alice).await.expect("the posts");
-            assert_eq!(alices.len(), 1, "her own post stays hers");
-            assert!(alices[0].communities.is_empty());
+            for member in [&alice, &bob] {
+                assert!(
+                    test_notes::list(&deployment, member)
+                        .await
+                        .expect("the notes")
+                        .is_empty(),
+                    "the note went with the community"
+                );
+            }
 
             let mut tx = deployment.begin().await.expect("a transaction");
             let row = get_in(&mut tx, gardening.id)
@@ -906,6 +896,12 @@ mod tests {
                 assert_eq!(membership.deleted_at, row.deleted_at, "the one moment");
                 assert_eq!(membership.deleted_by_id, Some(bob.id));
             }
+            let note = test_notes::get_in(&mut tx, note.id)
+                .await
+                .expect("the note")
+                .expect("kept");
+            assert_eq!(note.deleted_at, row.deleted_at, "the one moment");
+            assert_eq!(note.deleted_by_id, Some(bob.id));
             tx.commit().await.expect("committed");
 
             let error = memberships::create(&deployment, &alice, gardening.id)
