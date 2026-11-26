@@ -16,6 +16,12 @@ struct OpenArgs: Decodable {
 
 class WebAuthSessionPlugin: Plugin, ASWebAuthenticationPresentationContextProviding {
   private var session: ASWebAuthenticationSession?
+  private weak var appWebView: WKWebView?
+
+  /// Keeps the app webview for layout after the sign-in sheet closes.
+  public override func load(webview: WKWebView) {
+    appWebView = webview
+  }
 
   /// The sheet at the URL, until a page in it goes to the scheme:
   /// answers `returned` with that URL, or `cancelled` when the person
@@ -31,13 +37,16 @@ class WebAuthSessionPlugin: Plugin, ASWebAuthenticationPresentationContextProvid
       self.session?.cancel()
       let session = ASWebAuthenticationSession(url: url, callbackURLScheme: args.callbackScheme) {
         returnedUrl, error in
-        self.session = nil
-        if let returnedUrl {
-          invoke.resolve(["outcome": "returned", "url": returnedUrl.absoluteString])
-        } else if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
-          invoke.resolve(["outcome": "cancelled"])
-        } else {
-          invoke.reject(error?.localizedDescription ?? "The sign-in sheet ended with nothing")
+        DispatchQueue.main.async {
+          self.session = nil
+          if let returnedUrl {
+            self.restoreAppLayout()
+            invoke.resolve(["outcome": "returned", "url": returnedUrl.absoluteString])
+          } else if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+            invoke.resolve(["outcome": "cancelled"])
+          } else {
+            invoke.reject(error?.localizedDescription ?? "The sign-in sheet ended with nothing")
+          }
         }
       }
       session.presentationContextProvider = self
@@ -48,6 +57,20 @@ class WebAuthSessionPlugin: Plugin, ASWebAuthenticationPresentationContextProvid
         invoke.reject("The sign-in sheet could not open")
       }
     }
+  }
+
+  // Sheet dismissal can leave the app viewport at zero size.
+  private func restoreAppLayout() {
+    guard let webView = appWebView, let parent = webView.superview else { return }
+    webView.window?.setNeedsLayout()
+    webView.window?.layoutIfNeeded()
+    parent.setNeedsLayout()
+    parent.layoutIfNeeded()
+    if parent.bounds.width > 0 && parent.bounds.height > 0 {
+      webView.frame = parent.bounds
+    }
+    webView.setNeedsLayout()
+    webView.layoutIfNeeded()
   }
 
   func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {

@@ -7,8 +7,9 @@
 # DATA_DIR when set, else in the app data directory, named by the
 # identifier in tauri/tauri.conf.json; and drops the dev
 # PostgreSQL database, the one
-# DATABASE_URL names when it is a postgres URL, else starter_pack, then
-# creates it again, empty, so a postgres DATABASE_URL still starts.
+# DATABASE_URL names when it is a postgres URL, else the one named by the
+# productName in tauri/tauri.conf.json, starter_pack for "Starter Pack",
+# then creates it again, empty, so a postgres DATABASE_URL still starts.
 #
 # Stop bin/dev first: a running server would recreate its file at once
 # and hold the PostgreSQL database open, which stops the drop.
@@ -21,7 +22,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP_IDENTIFIER="$(sed -n 's/^ *"identifier": *"\([^"]*\)".*/\1/p' "$ROOT/tauri/tauri.conf.json" | head -n 1)"
 [ -n "$APP_IDENTIFIER" ] || { echo "error: no identifier in tauri/tauri.conf.json" >&2; exit 1; }
 APP_DATA_DIR="$HOME/Library/Application Support/$APP_IDENTIFIER"
-DEFAULT_POSTGRES_URL="postgres://postgres@localhost/starter_pack"
+APP_NAME="$(sed -n 's/^ *"productName": *"\([^"]*\)".*/\1/p' "$ROOT/tauri/tauri.conf.json" | head -n 1)"
+[ -n "$APP_NAME" ] || { echo "error: no productName in tauri/tauri.conf.json" >&2; exit 1; }
+DATABASE_NAME="$(printf '%s' "$APP_NAME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/_/g; s/^_+//; s/_+$//')"
+DEFAULT_POSTGRES_URL="postgres://postgres@localhost/$DATABASE_NAME"
 
 help() {
   cat <<USAGE
