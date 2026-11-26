@@ -301,6 +301,15 @@ callback, iOS 17.4 and later, would need the associated domain, and the
 app supports iOS 15. Android still pastes. Universal links stay for
 links in emails, later.
 
+After a successful return, the native plugin handles the callback on
+its next main-queue turn. It requests layout for the app window and
+the webview's parent, restores the webview's frame to the parent's
+nonzero bounds, and requests layout for the webview before returning
+the code to Rust. Without this, the viewport can stay at zero size
+after the sheet closes: login succeeds and Home loads, but the screen
+stays white until the app restarts. The layout work runs on the main
+thread and keeps no strong reference to the app webview.
+
 ## Before that
 
 A sign-up or a sign-in was one request with an email and a

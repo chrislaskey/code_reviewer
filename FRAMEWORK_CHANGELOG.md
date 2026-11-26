@@ -18,6 +18,24 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-26: restore the iPhone app layout after login
+
+- **What changed**: after a successful return from the iPhone's sign-in
+  sheet, the native plugin handles the callback on the main queue and
+  restores the app webview's layout before returning the code. This
+  fixes a white screen after login with a zero-size viewport, even
+  though the account was saved and the Home page had loaded.
+- **What an app does**:
+  - **Required**, for an iOS app: rebuild and reinstall the native app.
+    Updating the frontend alone does not include the Swift fix.
+  - **Required**, if the app applied the temporary diagnostic or its
+    own copy of this fix: remove its `[[divergence]]` for
+    `tauri/plugins/web-auth-session/ios/Sources/WebAuthSessionPlugin.swift`
+    and use the template's version without the diagnostic logs. Remove
+    any temporary Accounts-page navigation override and its divergence.
+  - **Verify** successful login opens the app at full size, cancelling
+    the sheet returns to Accounts, and another login still succeeds.
+
 ## 2026-11-25: the dev database and buckets named by the app
 
 - **What changed**: `bin/reset` and `bin/storage` name what they make
