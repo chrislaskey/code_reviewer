@@ -16,7 +16,7 @@
   let { children } = $props();
 
   // Asked again on every page, so a sign-in or a sign-out shows here; a
-  // failure leaves nobody shown, and the page that needs someone says why.
+  // failure keeps the last known user, and the page that needs someone says why.
   $effect(() => {
     currentPathname();
     currentUserLoad().catch(() => {});
