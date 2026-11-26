@@ -11,11 +11,11 @@
     FormError,
     accountsPreferencesUpdate,
     avatarsUpload,
-    currentUserGet,
     currentUserUpdate,
   } from "../lib/core/index.js";
   import { errorMessageOf } from "../lib/error_message.js";
-  import { currentUserForget } from "../lib/current_user.svelte.js";
+  import { currentUser, currentUserLoad, currentUserReload } from "../lib/current_user.svelte.js";
+  import { loaded } from "../lib/loaded.svelte.js";
   import { accountsIndexUrl } from "../lib/routes.js";
   import AccountsGuestNotice from "../lib/AccountsGuestNotice.svelte";
   import { TRANSLATIONS_LOCALES, translationsFollow, translationsLocaleShown } from "../lib/translations.js";
@@ -34,8 +34,6 @@
     Text,
   } from "../lib/components/index.js";
 
-  /** @type {{name: string, kind?: string, avatar_url?: string | null, trial_expires_at?: string | null, preferences?: {locale: string | null, theme: string | null}} | null} */
-  let currentUser = $state(null);
   /** @type {File | null} */
   let file = $state(null);
   /** @type {Record<string, string[]>} */
@@ -49,6 +47,11 @@
   let progress = $state(null);
   let localeError = $state("");
   let localeBusy = $state(false);
+
+  const profile = loaded(async () => {
+    await currentUserLoad();
+    name = currentUser.value?.name ?? "";
+  });
 
   /** @param {string} locale */
   function languageName(locale) {
@@ -70,15 +73,6 @@
     }
   }
 
-  async function load() {
-    try {
-      currentUser = await currentUserGet();
-      name = currentUser?.name ?? "";
-    } catch (problem) {
-      error = errorMessageOf(problem);
-    }
-  }
-
   /** @param {Event & {currentTarget: HTMLInputElement}} event */
   function pick(event) {
     file = event.currentTarget.files?.[0] ?? null;
@@ -94,8 +88,8 @@
     errors = {};
     error = "";
     try {
-      currentUser = await avatarsUpload(file, (fraction) => (progress = fraction));
-      currentUserForget();
+      await avatarsUpload(file, (fraction) => (progress = fraction));
+      await currentUserReload();
     } catch (problem) {
       if (problem instanceof FormError) errors = problem.errors;
       error = errorMessageOf(problem);
@@ -111,23 +105,21 @@
     nameBusy = true;
     nameError = "";
     try {
-      currentUser = await currentUserUpdate(name);
-      name = currentUser?.name ?? "";
-      currentUserForget();
+      await currentUserUpdate(name);
+      await currentUserReload();
+      name = currentUser.value?.name ?? "";
     } catch (problem) {
       nameError = errorMessageOf(problem);
     } finally {
       nameBusy = false;
     }
   }
-
-  load();
 </script>
 
 <Page>
   <Heading level={1}>{t`Profile`}</Heading>
-  {#if currentUser}
-    {#if currentUser.kind === "local"}
+  {#if currentUser.value}
+    {#if currentUser.value.kind === "local"}
       <Alert tone="warning" class="flex flex-col items-start gap-2" data-local-user>
         <Text>
           <strong>{t`This account is only on this device.`}</strong>
@@ -135,14 +127,14 @@
         </Text>
         <Button size="sm" href={accountsIndexUrl()}>{t`Sign up or log in`}</Button>
       </Alert>
-    {:else if currentUser.kind === "trial" && currentUser.trial_expires_at}
+    {:else if currentUser.value.kind === "trial" && currentUser.value.trial_expires_at}
       <Alert tone="warning">
-        <AccountsGuestNotice trialExpiresAt={currentUser.trial_expires_at} />
+        <AccountsGuestNotice trialExpiresAt={currentUser.value.trial_expires_at} />
       </Alert>
     {/if}
     <div class="flex items-center gap-4">
-      <Avatar user={currentUser} size="lg" />
-      <span>{currentUser.name}</span>
+      <Avatar user={currentUser.value} size="lg" />
+      <span>{currentUser.value.name}</span>
     </div>
     <form onsubmit={saveName} class="flex flex-col gap-3">
       <Label text={t`Name`}>
@@ -150,13 +142,13 @@
       </Label>
       <ErrorMessage message={nameError} />
       <div>
-        <Button variant="primary" type="submit" disabled={nameBusy || name.trim() === currentUser.name}>{t`Save name`}</Button>
+        <Button variant="primary" type="submit" disabled={nameBusy || name.trim() === currentUser.value.name}>{t`Save name`}</Button>
       </div>
     </form>
     {#if TRANSLATIONS_LOCALES.length > 1}
       {@const systemLanguage = languageName(translationsLocaleShown(null))}
       <Label text={t`Language`}>
-        <Select value={currentUser.preferences?.locale ?? ""} onchange={chooseLocale} disabled={localeBusy}>
+        <Select value={currentUser.value.preferences?.locale ?? ""} onchange={chooseLocale} disabled={localeBusy}>
           <option value="">{t`Follow the system (${systemLanguage})`}</option>
           {#each TRANSLATIONS_LOCALES as locale (locale)}
             <!-- untranslated: each language in its own name -->
@@ -166,7 +158,7 @@
       </Label>
       <ErrorMessage message={localeError} />
     {/if}
-    {#if currentUser.kind === "full"}
+    {#if currentUser.value.kind === "full"}
       <form onsubmit={save} class="flex flex-col gap-3">
         <Label text={t`Picture`}>
           <FileInput
@@ -187,7 +179,7 @@
         </div>
       </form>
     {/if}
-  {:else if error}
-    <ErrorMessage message={error} />
+  {:else if profile.error}
+    <ErrorMessage message={profile.error} />
   {/if}
 </Page>
