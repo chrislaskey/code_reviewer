@@ -18,6 +18,26 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-25: the dev database and buckets named by the app
+
+- **What changed**: `bin/reset` and `bin/storage` name what they make
+  after the `productName` in `tauri/tauri.conf.json`, as `bin/reset`
+  already names the app data directory after its `identifier`.
+  `bin/reset` drops the PostgreSQL database `starter_pack` for
+  "Starter Pack", when `DATABASE_URL` names none. `bin/storage` makes
+  the buckets `starter-pack` and `starter-pack-private` and the key
+  `starter-pack-dev`. So two apps on one computer no longer share a dev
+  database. The template's names are as before.
+- **What an app does**:
+  - **Optional**, for an app with its own `productName` and a dev
+    PostgreSQL database: make it under the new name, such as
+    `createdb emoji_status` for "Emoji Status", and point `DATABASE_URL`
+    at it. Drop the old `starter_pack` database once no app uses it.
+  - **Optional**, for an app with its own `productName` and files in
+    Garage: the next `bin/storage start` makes the new buckets, empty,
+    and the files in the old ones are no longer read. Run `bin/reset`,
+    and delete `axum/data/garage/` to drop the old buckets.
+
 ## 2026-11-25: an app deletes the examples
 
 - **What changed**: an app can delete posts, files or both, see "How an

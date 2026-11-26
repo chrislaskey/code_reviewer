@@ -3,7 +3,8 @@
 # Runs Garage, an S3-compatible object store, as the web server's buckets
 # in dev, set up on every start, each step only when it is missing. Its
 # files, its config and its dev key are under axum/data/garage/, which git
-# ignores.
+# ignores. The buckets and the key are named by the productName in
+# tauri/tauri.conf.json: starter-pack for "Starter Pack".
 #
 # Run `bin/storage --help` for the commands.
 
@@ -11,8 +12,12 @@ set -eo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIR="$ROOT/axum/data/garage"
-BUCKET="starter-pack"
-PRIVATE_BUCKET="starter-pack-private"
+APP_NAME="$(sed -n 's/^ *"productName": *"\([^"]*\)".*/\1/p' "$ROOT/tauri/tauri.conf.json" | head -n 1)"
+[ -n "$APP_NAME" ] || { echo "error: no productName in tauri/tauri.conf.json" >&2; exit 1; }
+APP_SLUG="$(printf '%s' "$APP_NAME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')"
+BUCKET="$APP_SLUG"
+PRIVATE_BUCKET="$APP_SLUG-private"
+KEY="$APP_SLUG-dev"
 REGION="garage"
 
 help() {
@@ -105,14 +110,14 @@ allow_pages() {
 set_up() {
   local key_output key_id secret bucket
   set_up_layout
-  key_output=$(garage key info starter-pack-dev --show-secret 2>/dev/null ||
-    garage key create starter-pack-dev)
+  key_output=$(garage key info "$KEY" --show-secret 2>/dev/null ||
+    garage key create "$KEY")
   key_id=$(echo "$key_output" | awk '/Key ID:/ {print $3}')
   secret=$(echo "$key_output" | awk '/Secret key:/ {print $3}')
-  [ -n "$key_id" ] && [ -n "$secret" ] || fail "could not read the key starter-pack-dev"
+  [ -n "$key_id" ] && [ -n "$secret" ] || fail "could not read the key $KEY"
   for bucket in "$BUCKET" "$PRIVATE_BUCKET"; do
     garage bucket info "$bucket" > /dev/null 2>&1 || garage bucket create "$bucket" > /dev/null
-    garage bucket allow --read --write --owner "$bucket" --key starter-pack-dev > /dev/null
+    garage bucket allow --read --write --owner "$bucket" --key "$KEY" > /dev/null
     allow_pages "$bucket" "$key_id" "$secret"
   done
   garage bucket website --allow "$BUCKET" > /dev/null
