@@ -44,18 +44,17 @@ pub enum ProcessState {
 
 impl Process {
     pub fn is_claude_code(&self) -> bool {
-        self.name == "claude"
+        self.name.eq_ignore_ascii_case("claude")
     }
 
     /// Cursor's agent CLI, installed as `agent` and `cursor-agent`.
     pub fn is_cursor_agent(&self) -> bool {
-        self.name == "agent" || self.name == "cursor-agent"
+        self.name.eq_ignore_ascii_case("agent") || self.name.eq_ignore_ascii_case("cursor-agent")
     }
 
-    /// OpenAI's Codex CLI. Installed with npm, it is a `node` process
-    /// running the native `codex` binary, which is the one found.
+    /// OpenAI's Codex CLI. macOS can report its process name as `Codex`.
     pub fn is_codex(&self) -> bool {
-        self.name == "codex"
+        self.name.eq_ignore_ascii_case("codex")
     }
 }
 
@@ -174,6 +173,35 @@ mod tests {
         assert_eq!(codex.name, "codex");
         assert!(codex.is_codex());
         assert!(!codex.is_cursor_agent());
+    }
+
+    #[test]
+    fn agents_recognize_process_names() {
+        for (command, claude, cursor, codex) in [
+            ("claude", true, false, false),
+            ("Claude", true, false, false),
+            ("agent", false, true, false),
+            ("Agent", false, true, false),
+            ("cursor-agent", false, true, false),
+            ("Cursor-Agent", false, true, false),
+            ("codex", false, false, true),
+            ("Codex", false, false, true),
+            ("/opt/homebrew/bin/codex", false, false, true),
+            ("/opt/homebrew/bin/Claude", true, false, false),
+            ("/opt/homebrew/bin/Agent", false, true, false),
+            ("claude-helper", false, false, false),
+            ("cursor-agent-helper", false, false, false),
+            ("codex-helper", false, false, false),
+            ("node", false, false, false),
+            ("bash", false, false, false),
+        ] {
+            let process =
+                parse_process(&format!("35481 34713 35481 35481 ttys014 S+ 1.0 {command}"))
+                    .expect("the line parses");
+            assert_eq!(process.is_claude_code(), claude, "Claude: {command}");
+            assert_eq!(process.is_cursor_agent(), cursor, "Cursor: {command}");
+            assert_eq!(process.is_codex(), codex, "Codex: {command}");
+        }
     }
 
     #[test]
