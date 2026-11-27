@@ -1,6 +1,7 @@
 # Communities: what was left out
 
-Built in the port of `phoenix/docs/design/multi-tenancy.md`: communities,
+Built in the port of `phoenix/docs/design/multi-tenancy.md` (in the
+history: `phoenix/` was removed after `f100d21`): communities,
 memberships with join, leave and rejoin, a post in the communities its
 owner chose, visibility, backfill and prune, see
 `docs/design/offline-sync.md`. Left for later, on purpose:

@@ -30,9 +30,8 @@ Commands:
 Both commands:
   - push nothing.
   - refuse when the worktree has uncommitted changes, which would be lost.
-    That includes changes inside the phoenix submodule. Ignored files in
-    the worktree, such as phoenix/deps, phoenix/_build and
-    tauri/src-tauri/target, are deleted with it.
+    Ignored files in the worktree, such as tauri/src-tauri/target, are
+    deleted with it.
   - close the tmux session they run in when that session was started in
     the worktree. Any other session stays open, whatever its name. Outside tmux
     there is nothing to close.
@@ -69,8 +68,6 @@ read_worktree() {
     fail "this is the main checkout, run it from inside a worktree"
   [[ -n "$branch" ]] || fail "no branch is checked out in $worktree"
   [[ "$branch" != "$main_branch" ]] || fail "the worktree is on $main_branch itself"
-  # Also fails on changes inside the phoenix submodule (" m phoenix"),
-  # which `git worktree remove` would delete along with the worktree.
   [[ -z "$(git status --porcelain)" ]] ||
     fail "$worktree has uncommitted changes, commit or remove them first"
 

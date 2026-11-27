@@ -1,5 +1,7 @@
 # Using an Elixir workflow engine with Svelte, Tauri and Axum
 
+**Superseded by [the backend seam](../design/backend-seam.md).** The `phoenix/` links below point at a directory removed after `f100d21`.
+
 **Design proposal.** Give the existing Elixir engine authority over one workflow from request through completion. Keep Svelte as the shared UI, Axum as the public HTTP boundary, and Rust core as the device's SQLite application layer. Start with a workflow that already has an aggregate, a meaningful business decision and a visible outcome. A signed-in user should be able to request it, disconnect, and later see the same outcome on another device.
 
 The deciding question is **what the server promises when it answers a write**. For example, accepting a request to submit a review can be immediate and durable. Finishing the review can take hours. The app can show both accurately. Treating a job insertion as a completed review would let the phone discard its only pending edit and display a result the engine might subsequently refuse.

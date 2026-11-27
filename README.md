@@ -20,7 +20,6 @@ bin/dev    starts a deployment in dev mode
 bin/lint   runs the checks a change passes before it is committed
 bin/reset  deletes the local SQLite files and drops the dev PostgreSQL database
 bin/storage runs Garage, the S3-style bucket uploads go to in dev
-phoenix/   the Phoenix version this one replaces in stages, kept as the reference
 ```
 
 Rust is here for the one language running on the web, the desktop and
@@ -272,7 +271,8 @@ communities its owner chose, zero or more
 checkboxes set. A user sees their own posts and the posts in their
 communities; leaving a community takes the member's own posts there
 along, and rejoining brings them back. The decisions are
-`phoenix/docs/design/multi-tenancy.md`, the port is in
+`phoenix/docs/design/multi-tenancy.md` (in the history, before
+`phoenix/` was removed after `f100d21`), the port is in
 `docs/design/offline-sync.md` under "Communities and what a user sees",
 and what was left out is `docs/suggestions/communities.md`.
 

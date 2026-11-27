@@ -2,7 +2,8 @@
 
 How the desktop and mobile apps keep a SQLite file of their own, write to
 it with the network off, and converge with the web server, the system of
-record. The design is the one `phoenix/docs/design/offline-sync.md`,
+record. The design is the one `phoenix/docs/design/offline-sync.md`
+(in the history: `phoenix/` was removed after `f100d21`),
 `offline-sync-client.md` and `multi-tenancy.md` settled, with the
 reasons, kept here only as the decisions; what changes is how much code
 it takes, since `core/` runs on the server and on every device.
