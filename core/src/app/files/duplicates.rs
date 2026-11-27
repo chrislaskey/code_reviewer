@@ -38,7 +38,11 @@ pub async fn list(
         return Ok(Vec::new());
     }
     let mut tx = deployment.begin().await?;
-    let files = app_files::list_with_sha256s(&mut tx, user.id, sha256s).await?;
+    let files = app_files::list(
+        &mut tx,
+        app_files::Filter::VisibleToWithSha256s(user.id, sha256s),
+    )
+    .await?;
     let listed = files::with_states(&mut tx, deployment.role, user, files).await?;
     tx.commit().await?;
     Ok(listed)

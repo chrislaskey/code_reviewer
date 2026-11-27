@@ -157,7 +157,6 @@ pub(crate) async fn apply_in(
     user: &User,
     event: &Event,
 ) -> Result<Answer, PreferenceError> {
-    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -165,6 +164,9 @@ pub(crate) async fn apply_in(
         let server = row.as_ref().map(table_row).transpose()?;
         return Ok(recorded.answer(server));
     }
+    // A retry is answered above without waiting for the feed. Two at once
+    // both reach here, and the second fails on the event's id.
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     let allowed = match event.kind {
         EventKind::Create => CREATE_FIELDS,
         EventKind::Update => UPDATE_FIELDS,
@@ -221,13 +223,12 @@ pub(crate) async fn apply_in(
         updated.version += 1;
         updated.last_synced_at = Some(now);
     }
-    let mut updated = match AcceptedPreference::new(updated) {
+    let updated = match AcceptedPreference::new(updated) {
         Ok(updated) => updated,
         Err(invalid) => return rejected(event, format!("invalid: {invalid}"), Some(&row)),
     };
-    updated.record_sync_change(tx, role).await?;
-    accounts_preferences::update(tx, &updated).await?;
-    finish(tx, role, user, event, updated.row()).await
+    let updated = accounts_preferences::update(tx, role, updated).await?;
+    finish(tx, role, user, event, &updated).await
 }
 
 async fn create(
@@ -256,13 +257,12 @@ async fn create(
         deleted_at: None,
         deleted_by_id: None,
     };
-    let mut preference = match AcceptedPreference::new(preference) {
+    let preference = match AcceptedPreference::new(preference) {
         Ok(preference) => preference,
         Err(invalid) => return rejected(event, format!("invalid: {invalid}"), None),
     };
-    preference.record_sync_change(tx, role).await?;
-    accounts_preferences::create(tx, &preference).await?;
-    finish(tx, role, user, event, preference.row()).await
+    let preference = accounts_preferences::create(tx, role, preference).await?;
+    finish(tx, role, user, event, &preference).await
 }
 
 /// Answers an applied event and does the role's part.

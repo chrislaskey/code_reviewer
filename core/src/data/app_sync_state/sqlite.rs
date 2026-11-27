@@ -8,10 +8,12 @@ use super::Cursor;
 use crate::database::identifier;
 
 pub async fn cursor(connection: &mut SqliteConnection) -> Result<Option<Cursor>, sqlx::Error> {
-    let row: Option<(Hyphenated, i64)> =
-        sqlx::query_as("SELECT feed_id, global_sync_version FROM app_sync_state WHERE id = 1")
-            .fetch_optional(connection)
-            .await?;
+    let row: Option<(Hyphenated, i64)> = sqlx::query_as(
+        "SELECT feed_id, global_sync_version FROM app_sync_state
+             WHERE id = 1 AND feed_id IS NOT NULL",
+    )
+    .fetch_optional(connection)
+    .await?;
     Ok(row.map(|(feed_id, global_sync_version)| Cursor {
         feed_id: feed_id.into_uuid(),
         global_sync_version,
@@ -23,12 +25,39 @@ pub async fn save_cursor(
     cursor: &Cursor,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_sync_state (id, feed_id, global_sync_version) VALUES (1, $1, $2)
+        "INSERT INTO app_sync_state (id, feed_id, global_sync_version, continuation)
+         VALUES (1, $1, $2, NULL)
          ON CONFLICT (id) DO UPDATE SET
-           feed_id = excluded.feed_id, global_sync_version = excluded.global_sync_version",
+           feed_id = excluded.feed_id, global_sync_version = excluded.global_sync_version,
+           continuation = NULL",
     )
     .bind(cursor.feed_id.hyphenated())
     .bind(cursor.global_sync_version)
+    .execute(connection)
+    .await?;
+    Ok(())
+}
+
+/// The continuation of an unfinished first pull, as JSON.
+pub async fn continuation(
+    connection: &mut SqliteConnection,
+) -> Result<Option<String>, sqlx::Error> {
+    let continuation: Option<Option<String>> =
+        sqlx::query_scalar("SELECT continuation FROM app_sync_state WHERE id = 1")
+            .fetch_optional(connection)
+            .await?;
+    Ok(continuation.flatten())
+}
+
+pub async fn save_continuation(
+    connection: &mut SqliteConnection,
+    continuation: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO app_sync_state (id, continuation) VALUES (1, $1)
+         ON CONFLICT (id) DO UPDATE SET continuation = excluded.continuation",
+    )
+    .bind(continuation)
     .execute(connection)
     .await?;
     Ok(())
@@ -63,4 +92,36 @@ pub async fn delete_cursor_and_backfills(
         sqlx::query(statement).execute(&mut *connection).await?;
     }
     Ok(())
+}
+
+/// Clears the global sync versions of a synced table's rows, kept
+/// through a resync, so the new feed's rows replace them.
+pub async fn clear_versions(
+    connection: &mut SqliteConnection,
+    table: &str,
+) -> Result<(), sqlx::Error> {
+    let table = identifier(table)?;
+    sqlx::query(AssertSqlSafe(format!(
+        "UPDATE {table} SET global_sync_version = NULL WHERE global_sync_version IS NOT NULL"
+    )))
+    .execute(connection)
+    .await?;
+    Ok(())
+}
+
+/// The global sync version of a device's row, none for a row the server
+/// has not confirmed, or no such row.
+pub async fn row_version(
+    connection: &mut SqliteConnection,
+    table: &str,
+    id: uuid::Uuid,
+) -> Result<Option<i64>, sqlx::Error> {
+    let table = identifier(table)?;
+    let version: Option<Option<i64>> = sqlx::query_scalar(AssertSqlSafe(format!(
+        "SELECT global_sync_version FROM {table} WHERE id = $1"
+    )))
+    .bind(id.hyphenated())
+    .fetch_optional(connection)
+    .await?;
+    Ok(version.flatten())
 }

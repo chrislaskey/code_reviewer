@@ -57,7 +57,7 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
     let horizon = now - Duration::days(RETENTION_DAYS);
     let mut tx = deployment.begin().await?;
     app_sync_versions::lock(&mut tx).await?;
-    let floor = app_sync_changes::purge(&mut tx, horizon).await?;
+    let floor = app_sync_changes::maintenance::delete_written_before(&mut tx, horizon).await?;
     let mut removed = BTreeMap::new();
     // Children first, so a purged parent's rows have already gone
     for synced in tables::list().iter().rev() {

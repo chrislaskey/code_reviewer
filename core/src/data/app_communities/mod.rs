@@ -7,7 +7,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::data::app_sync_changes;
 use crate::database::Transaction;
+use crate::deployment::Role;
 use crate::helpers::field_errors::FieldErrors;
 use crate::sync::VersionRange;
 
@@ -35,20 +37,6 @@ pub struct Community {
 pub struct AcceptedCommunity(Community);
 
 impl AcceptedCommunity {
-    /// Records a validated server change in the same transaction as its row.
-    pub(crate) async fn record_sync_change(
-        &mut self,
-        tx: &mut Transaction,
-        role: crate::deployment::Role,
-    ) -> Result<(), sqlx::Error> {
-        if let Some(version) =
-            crate::data::app_sync_changes::record(tx, role, TABLE, self.0.id).await?
-        {
-            self.0.global_sync_version = Some(version);
-        }
-        Ok(())
-    }
-
     /// Checks the community, with its name as it is kept.
     pub fn new(community: Community) -> Result<AcceptedCommunity, FieldErrors> {
         let name = checked_name(&community.name)?;
@@ -113,20 +101,35 @@ pub async fn get(
     Ok(row)
 }
 
-/// Persists a row accepted by the resource workflow.
+/// Inserts a new row. On the server this publishes it: the row gets the
+/// next global sync version, recorded in `app_sync_changes` in this
+/// transaction. On a device the row keeps the version it has.
 pub(crate) async fn create(
     tx: &mut Transaction,
-    community: &AcceptedCommunity,
-) -> Result<(), sqlx::Error> {
-    query!(tx, insert(community.row()))
+    role: Role,
+    community: AcceptedCommunity,
+) -> Result<Community, sqlx::Error> {
+    let mut community = community.into_row();
+    community.global_sync_version =
+        app_sync_changes::stamp(tx, role, TABLE, community.id, community.global_sync_version)
+            .await?;
+    query!(tx, insert(&community))?;
+    Ok(community)
 }
 
-/// Persists a row accepted by the resource workflow.
+/// Writes the row over its stored one, a soft delete included, and
+/// publishes it on the server as `create` does.
 pub(crate) async fn update(
     tx: &mut Transaction,
-    community: &AcceptedCommunity,
-) -> Result<(), sqlx::Error> {
-    query!(tx, update(community.row()))
+    role: Role,
+    community: AcceptedCommunity,
+) -> Result<Community, sqlx::Error> {
+    let mut community = community.into_row();
+    community.global_sync_version =
+        app_sync_changes::stamp(tx, role, TABLE, community.id, community.global_sync_version)
+            .await?;
+    query!(tx, update(&community))?;
+    Ok(community)
 }
 
 /// Explicit replication access for internal resource workflows.

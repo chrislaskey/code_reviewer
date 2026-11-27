@@ -25,12 +25,16 @@ CREATE TABLE app_events (
 CREATE INDEX app_events_row ON app_events (table_name, row_id);
 CREATE INDEX app_events_status ON app_events (status, made_at, id);
 
--- A device's pull cursor, see src/app/sync.rs: one row, the key of the
--- last row pulled. The server has the table too and leaves it empty.
+-- A device's pull cursor, see src/sync.rs: one row, the feed and the
+-- global sync version the device has pulled through, or, while a first
+-- pull is not finished, the continuation of its next page instead. The
+-- server has the table too and leaves it empty.
 CREATE TABLE app_sync_state (
   id INTEGER PRIMARY KEY NOT NULL,
-  feed_id TEXT NOT NULL,
-  global_sync_version INTEGER NOT NULL CHECK (global_sync_version >= 0)
+  feed_id TEXT,
+  global_sync_version INTEGER CHECK (global_sync_version >= 0),
+  continuation TEXT,
+  CHECK ((feed_id IS NULL) = (global_sync_version IS NULL))
 );
 
 -- The communities a device still has to ask the server for everything
@@ -38,7 +42,9 @@ CREATE TABLE app_sync_state (
 -- membership of the device's user arrives and removed once the backfill
 -- is done. The server has the table and leaves it empty.
 CREATE TABLE app_sync_backfills (
-  community_id TEXT PRIMARY KEY NOT NULL
+  community_id TEXT PRIMARY KEY NOT NULL,
+  -- The continuation of the next page, once one page is in
+  continuation TEXT
 );
 
 -- One row per purge run, see src/app/purge.rs: the horizon, the oldest

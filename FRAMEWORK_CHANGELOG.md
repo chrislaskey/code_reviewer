@@ -20,26 +20,62 @@ completes.
 
 ## 2026-11-27: global sync versions replace timestamp cursors
 
-- **What changed**. Rust servers on SQLite and PostgreSQL assign a durable
-  `global_sync_version` to each device-visible change. The server and
-  native apps use sync protocol 2. The baseline schemas changed.
+Commits: `5861a22` and the step 0 commit of `docs/design/backend-seam.md`
+after it.
+
+- **What changed**.
+  - The server gives each change to a synced row a `global_sync_version`.
+    The version commits in the write's own transaction, with an
+    `app_sync_changes` entry. A device pulls through the versions,
+    not the server's clock. Sync protocol 2 replaces protocol 1, and
+    the baseline schemas changed.
+  - A data context's `create` and `update` for a synced table take the
+    `Role`, stamp the row, and return it. On the server they publish
+    the change; on a device they keep the row's version.
+  - A pull pages by the rows the user sees. Other users' changes cost
+    no round trips.
+  - An interrupted first pull, or community backfill, continues from
+    its last page on the next sync.
+  - A retried event is answered before its transaction waits for the
+    feed lock. A sign-in that writes no synced row takes no feed lock.
+  - The core sync tests fail on any server row written without
+    publishing its change, `assert_every_row_published`.
 - **What an app does**.
-  - **Required**. Update app-owned synced row schemas and database
-    adapters for `global_sync_version`. Record each accepted server
-    change in its write transaction, update the `SyncedTable` page
-    methods to take a version range, and declare its synced foreign
-    keys for resync and purge. Remove a divergence when adopting the
-    framework's version of the same change.
+  - **Required**. For each synced table of the app's own:
+    - In its create migration, add `global_sync_version INTEGER CHECK
+      (global_sync_version > 0)` (`BIGINT` on PostgreSQL) and an index
+      on it. Drop the `(last_synced_at, id)` index.
+    - Add the field to its struct, with
+      `#[serde(with = "crate::sync::version::optional")]`, and to its
+      SQL.
+    - Give its data context's `create` and `update` the `Role`. Stamp
+      the row with `app_sync_changes::stamp` before writing it, and
+      return it, as `data/app_files` does. Make the write paths call
+      them, and stamp nothing by hand. Direct SQL that changes synced
+      rows on the server records one change per row, as
+      `trial_users::maintenance` does.
+    - In its `apply_in`, answer a retried event first. Then call
+      `app_sync_versions::lock_for_role` before reading the row it
+      decides on.
+    - Make `list_synced_after` and `list_live_in_community_after` take a
+      `&VersionRange`. Select `global_sync_version > after AND
+      global_sync_version <= through`, ordered by it. Declare
+      `foreign_keys()` on its `SyncedTable`.
+  - **Required**. Remove any divergence for these files that the
+    framework's version now covers.
   - **Required**. Stop the development server and desktop app. Run
     `bin/reset` for the development checkout and database, then
     restart. This deletes local account databases, pending changes
-    and device files, and recreates the configured development
-    PostgreSQL database when reachable. Use `bin/reset --dry-run` to
-    inspect its targets. Clear data on test phones, simulators and
-    other machines separately, then install builds matching the server.
-  - **Verify**. Sign in on two clean devices. Make an offline edit and
-    see it on the other device after reconnecting. Check that an online
-    edit, deletion and change in community access also reach the devices.
+    and device files. It also recreates the configured development
+    PostgreSQL database when it can be reached. Use `bin/reset --dry-run`
+    to see its targets first. Clear the data on test phones, simulators
+    and other machines separately. Then install builds that match the
+    server.
+  - **Verify**. Run the app's sync tests through the core `sync` test
+    helper, which checks that every row is published. Sign in on two
+    clean devices. Make an offline edit and see it on the other device
+    after reconnecting. Check that an online edit, a deletion and a
+    change in community access also reach the devices.
 
 ## 2026-11-26: restore the iPhone app layout after login
 

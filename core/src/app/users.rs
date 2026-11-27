@@ -139,10 +139,8 @@ pub(crate) async fn create_in(
         deleted_by_id: None,
         avatar_url: None,
     };
-    let mut user = AcceptedUser::new(user)?;
-    user.record_sync_change(tx, Role::Server).await?;
-    app_users::create(&mut *tx, &user).await?;
-    let user = user.into_row();
+    let user = AcceptedUser::new(user)?;
+    let user = app_users::create(&mut *tx, Role::Server, user).await?;
     Ok(user)
 }
 
@@ -212,7 +210,6 @@ pub(crate) async fn apply_in(
     user: &User,
     event: &Event,
 ) -> Result<Applied, UserError> {
-    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -223,6 +220,9 @@ pub(crate) async fn apply_in(
             user: row,
         });
     }
+    // A retry is answered above without waiting for the feed. Two at once
+    // both reach here, and the second fails on the event's id.
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     let Some(row) = get_in(tx, event.row_id).await? else {
         return rejected(event, "unknown_user", None);
     };
@@ -262,10 +262,8 @@ pub(crate) async fn apply_in(
         updated.version += 1;
         updated.last_synced_at = Some(now);
     }
-    let mut updated = AcceptedUser::new(updated)?;
-    updated.record_sync_change(tx, role).await?;
-    app_users::update(&mut *tx, &updated).await?;
-    let updated = updated.into_row();
+    let updated = AcceptedUser::new(updated)?;
+    let updated = app_users::update(&mut *tx, role, updated).await?;
     finish(tx, role, user, event, conflicts, updated).await
 }
 
@@ -322,10 +320,8 @@ pub(crate) async fn update_name_in(
         global_sync_version: None,
         ..user
     };
-    let mut updated = AcceptedUser::new(updated)?;
-    updated.record_sync_change(tx, Role::Server).await?;
-    app_users::update(&mut *tx, &updated).await?;
-    let updated = updated.into_row();
+    let updated = AcceptedUser::new(updated)?;
+    let updated = app_users::update(&mut *tx, Role::Server, updated).await?;
     Ok(updated)
 }
 
@@ -360,10 +356,8 @@ pub(crate) async fn update_avatar_url_in(
         global_sync_version: None,
         ..user
     };
-    let mut updated = AcceptedUser::new(updated)?;
-    updated.record_sync_change(tx, Role::Server).await?;
-    app_users::update(&mut *tx, &updated).await?;
-    let updated = updated.into_row();
+    let updated = AcceptedUser::new(updated)?;
+    let updated = app_users::update(&mut *tx, Role::Server, updated).await?;
     let answer = Answer::applied(
         event.id,
         updated.version,
@@ -411,10 +405,8 @@ pub(crate) async fn delete_in(tx: &mut Transaction, id: Uuid) -> Result<User, Us
         deleted_by_id: Some(id),
         ..user
     };
-    let mut deleted = AcceptedUser::new(deleted)?;
-    deleted.record_sync_change(tx, Role::Server).await?;
-    app_users::delete(&mut *tx, &deleted).await?;
-    let deleted = deleted.into_row();
+    let deleted = AcceptedUser::new(deleted)?;
+    let deleted = app_users::delete(&mut *tx, Role::Server, deleted).await?;
     let answer = Answer::applied(
         event.id,
         deleted.version,

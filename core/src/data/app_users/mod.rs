@@ -7,7 +7,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::data::app_sync_changes;
 use crate::database::Transaction;
+use crate::deployment::Role;
 use crate::sync::VersionRange;
 use uuid::Uuid;
 
@@ -46,20 +48,6 @@ pub enum UserInvalid {
 pub struct AcceptedUser(User);
 
 impl AcceptedUser {
-    /// Records a validated server change in the same transaction as its row.
-    pub(crate) async fn record_sync_change(
-        &mut self,
-        tx: &mut Transaction,
-        role: crate::deployment::Role,
-    ) -> Result<(), sqlx::Error> {
-        if let Some(version) =
-            crate::data::app_sync_changes::record(tx, role, TABLE, self.0.id).await?
-        {
-            self.0.global_sync_version = Some(version);
-        }
-        Ok(())
-    }
-
     /// Checks the user, with their name as it is kept.
     pub fn new(user: User) -> Result<AcceptedUser, UserInvalid> {
         let name = checked_name(&user.name)?;
@@ -105,19 +93,47 @@ pub async fn get(tx: &mut Transaction, id: Uuid) -> Result<Option<User>, sqlx::E
     Ok(query!(tx, get(id))?.filter(|user| user.deleted_at.is_none()))
 }
 
-/// Persists a row accepted by the resource workflow.
-pub(crate) async fn update(tx: &mut Transaction, user: &AcceptedUser) -> Result<(), sqlx::Error> {
-    query!(tx, update(user.row()))
+/// Writes the row over its stored one, a soft delete included, and
+/// publishes it on the server as `create` does.
+pub(crate) async fn update(
+    tx: &mut Transaction,
+    role: Role,
+    user: AcceptedUser,
+) -> Result<User, sqlx::Error> {
+    let mut user = user.into_row();
+    user.global_sync_version =
+        app_sync_changes::stamp(tx, role, TABLE, user.id, user.global_sync_version).await?;
+    query!(tx, update(&user))?;
+    Ok(user)
 }
 
-/// Persists a row accepted by the resource workflow.
-pub(crate) async fn delete(tx: &mut Transaction, user: &AcceptedUser) -> Result<(), sqlx::Error> {
-    query!(tx, update_deleted(user.row()))
+/// Writes a soft delete over the stored row, and publishes it on the
+/// server as `create` does.
+pub(crate) async fn delete(
+    tx: &mut Transaction,
+    role: Role,
+    user: AcceptedUser,
+) -> Result<User, sqlx::Error> {
+    let mut user = user.into_row();
+    user.global_sync_version =
+        app_sync_changes::stamp(tx, role, TABLE, user.id, user.global_sync_version).await?;
+    query!(tx, update_deleted(&user))?;
+    Ok(user)
 }
 
-/// Persists a row accepted by the resource workflow.
-pub(crate) async fn create(tx: &mut Transaction, user: &AcceptedUser) -> Result<(), sqlx::Error> {
-    query!(tx, insert(user.row()))
+/// Inserts a new row. On the server this publishes it: the row gets the
+/// next global sync version, recorded in `app_sync_changes` in this
+/// transaction. On a device the row keeps the version it has.
+pub(crate) async fn create(
+    tx: &mut Transaction,
+    role: Role,
+    user: AcceptedUser,
+) -> Result<User, sqlx::Error> {
+    let mut user = user.into_row();
+    user.global_sync_version =
+        app_sync_changes::stamp(tx, role, TABLE, user.id, user.global_sync_version).await?;
+    query!(tx, insert(&user))?;
+    Ok(user)
 }
 
 /// Whether a live user other than the one with the id has the name, in any case.

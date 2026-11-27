@@ -115,8 +115,17 @@ async fn assert_writer_order(database: Database) {
     }
 }
 
+/// The notes on a page, without the rows sent before them as parents.
+fn note_ids(page: &Page) -> Vec<Uuid> {
+    page.rows
+        .iter()
+        .filter(|row| row.table == test_notes::TABLE)
+        .filter_map(TableRow::id)
+        .collect()
+}
+
 #[tokio::test]
-async fn versions_pull_advances_through_a_private_page_and_keeps_its_bound() {
+async fn versions_pull_pages_by_visible_rows_and_keeps_its_bound() {
     crate::database::with_each_database(|database| async move {
         let server = Deployment::new(database, Role::Server);
         let alice = users::create(&server, "alice@example.com", "Alice")
@@ -130,12 +139,19 @@ async fn versions_pull_advances_through_a_private_page_and_keeps_its_bound() {
             .expect("a baseline")
             .cursor;
 
-        let private = test_notes::create(&server, &bob, "private", None)
+        for body in ["private", "also private"] {
+            test_notes::create(&server, &bob, body, None)
+                .await
+                .expect("Bob's");
+        }
+        let first = test_notes::create(&server, &alice, "first", None)
             .await
-            .expect("Bob's");
-        let shared = test_notes::create(&server, &alice, "first", None)
+            .expect("Alice's first");
+        let second = test_notes::create(&server, &alice, "second", None)
             .await
-            .expect("Alice's");
+            .expect("Alice's second");
+
+        // Bob's changes take no page of their own
         let page = pull(
             &server,
             &alice,
@@ -146,14 +162,16 @@ async fn versions_pull_advances_through_a_private_page_and_keeps_its_bound() {
             },
         )
         .await
-        .expect("another page");
+        .expect("a page");
+        let ids = note_ids(&page);
+        assert_eq!(ids, vec![first.id]);
         assert_eq!(
             page.cursor.map(|cursor| cursor.global_sync_version),
-            private.global_sync_version
+            first.global_sync_version
         );
-        assert!(page.rows.is_empty());
+        assert!(page.next.is_some());
 
-        let new = test_notes::create(&server, &alice, "second", None)
+        let later = test_notes::create(&server, &alice, "later", None)
             .await
             .expect("after the bound");
         let page = pull(
@@ -166,14 +184,15 @@ async fn versions_pull_advances_through_a_private_page_and_keeps_its_bound() {
             },
         )
         .await
-        .expect("through the earlier bound");
+        .expect("the page up to the bound");
+        let ids = note_ids(&page);
+        assert_eq!(ids, vec![second.id]);
         assert!(page.next.is_none());
         assert_eq!(
             page.cursor.map(|cursor| cursor.global_sync_version),
-            shared.global_sync_version
+            second.global_sync_version
         );
-        assert!(page.rows.iter().any(|row| row.id() == Some(shared.id)));
-        assert!(!page.rows.iter().any(|row| row.id() == Some(new.id)));
+
         let next = pull(
             &server,
             &alice,
@@ -183,8 +202,8 @@ async fn versions_pull_advances_through_a_private_page_and_keeps_its_bound() {
             },
         )
         .await
-        .expect("the next bounded pull");
-        assert!(next.rows.iter().any(|row| row.id() == Some(new.id)));
+        .expect("the next pull");
+        assert!(next.rows.iter().any(|row| row.id() == Some(later.id)));
     })
     .await;
 }

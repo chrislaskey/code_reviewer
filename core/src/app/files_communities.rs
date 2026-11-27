@@ -247,7 +247,7 @@ pub(crate) async fn create_with_file(
     rows: &[FileCommunityNew],
 ) -> Result<(), FileCommunityError> {
     for new in rows {
-        let mut row = FileCommunity {
+        let row = FileCommunity {
             id: new.id,
             file_id: file.id,
             community_id: new.community_id,
@@ -260,12 +260,7 @@ pub(crate) async fn create_with_file(
             deleted_at: None,
             deleted_by_id: None,
         };
-        if let Some(version) =
-            crate::data::app_sync_changes::record(tx, role, TABLE, row.id).await?
-        {
-            row.global_sync_version = Some(version);
-        }
-        app_files_communities::create(&mut *tx, &row).await?;
+        app_files_communities::create(&mut *tx, role, row).await?;
     }
     Ok(())
 }
@@ -419,7 +414,6 @@ async fn apply_in(
     user: &User,
     event: &Event,
 ) -> Result<Applied, FileCommunityError> {
-    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -430,6 +424,9 @@ async fn apply_in(
             row,
         });
     }
+    // A retry is answered above without waiting for the feed. Two at once
+    // both reach here, and the second fails on the event's id.
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
 
     let allowed = match event.kind {
         EventKind::Create => CREATE_FIELDS,
@@ -475,7 +472,7 @@ async fn apply_in(
                         Role::Server => (1, Some(now)),
                         Role::Device => (0, None),
                     };
-                    let mut row = FileCommunity {
+                    let row = FileCommunity {
                         id: event.row_id,
                         file_id,
                         community_id,
@@ -488,13 +485,7 @@ async fn apply_in(
                         deleted_at: None,
                         deleted_by_id: None,
                     };
-                    if let Some(version) =
-                        crate::data::app_sync_changes::record(tx, role, TABLE, row.id).await?
-                    {
-                        row.global_sync_version = Some(version);
-                    }
-                    app_files_communities::create(&mut *tx, &row).await?;
-                    row
+                    app_files_communities::create(&mut *tx, role, row).await?
                 }
             }
         }
@@ -598,10 +589,7 @@ async fn write_changed(
         row.version += 1;
         row.last_synced_at = Some(now);
     }
-    if let Some(version) = crate::data::app_sync_changes::record(tx, role, TABLE, row.id).await? {
-        row.global_sync_version = Some(version);
-    }
-    app_files_communities::update(&mut *tx, row).await?;
+    *row = app_files_communities::update(&mut *tx, role, row.clone()).await?;
     Ok(())
 }
 

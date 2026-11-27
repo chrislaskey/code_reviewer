@@ -241,7 +241,6 @@ async fn apply_in(
     user: &User,
     event: &Event,
 ) -> Result<Applied, MembershipError> {
-    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -252,6 +251,9 @@ async fn apply_in(
             membership,
         });
     }
+    // A retry is answered above without waiting for the feed. Two at once
+    // both reach here, and the second fails on the event's id.
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
 
     let allowed = match event.kind {
         EventKind::Create => CREATE_FIELDS,
@@ -298,7 +300,7 @@ async fn apply_in(
                         Role::Server => (1, Some(now)),
                         Role::Device => (0, None),
                     };
-                    let mut membership = Membership {
+                    let membership = Membership {
                         id: event.row_id,
                         user_id: user.id,
                         community_id,
@@ -311,14 +313,7 @@ async fn apply_in(
                         deleted_at: None,
                         deleted_by_id: None,
                     };
-                    if let Some(version) =
-                        crate::data::app_sync_changes::record(tx, role, TABLE, membership.id)
-                            .await?
-                    {
-                        membership.global_sync_version = Some(version);
-                    }
-                    app_users_communities::create(&mut *tx, &membership).await?;
-                    membership
+                    app_users_communities::create(&mut *tx, role, membership).await?
                 }
             }
         }
@@ -453,12 +448,7 @@ async fn write_changed(
         membership.version += 1;
         membership.last_synced_at = Some(now);
     }
-    if let Some(version) =
-        crate::data::app_sync_changes::record(tx, role, TABLE, membership.id).await?
-    {
-        membership.global_sync_version = Some(version);
-    }
-    app_users_communities::update(&mut *tx, membership).await?;
+    *membership = app_users_communities::update(&mut *tx, role, membership.clone()).await?;
     Ok(())
 }
 

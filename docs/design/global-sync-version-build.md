@@ -1,6 +1,8 @@
 # Implement global sync versions in Rust core
 
-**Implementation notes for the template.** Replace timestamp-based discovery with a server-assigned `global_sync_version` on SQLite and PostgreSQL. Ship the server, device schema and sync protocol together. There are no deployed apps to migrate. Edit the original migrations and require a hard development reset downstream. The [offline sync design](offline-sync.md) describes the running protocol.
+**Implementation notes for the template.** As built, the pull pages by visible rows instead of by scanned change entries, see [the review](../suggestions/global-sync-version-review.md) §3.2 and `scan_page` in `core/src/sync.rs`. Steps 1 and 4 of "Incremental pull" in section 3, and the example after them, describe the first version.
+
+Replace timestamp-based discovery with a server-assigned `global_sync_version` on SQLite and PostgreSQL. Ship the server, device schema and sync protocol together. There are no deployed apps to migrate. Edit the original migrations and require a hard development reset downstream. The [offline sync design](offline-sync.md) describes the running protocol.
 
 ## Contract to build
 

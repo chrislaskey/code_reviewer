@@ -31,7 +31,7 @@ pub mod version;
 mod version_tests;
 
 use crate::data::app_sync_state;
-use crate::data::{app_sync_backfills, app_sync_changes, app_sync_versions};
+use crate::data::{app_sync_backfills, app_sync_versions};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[cfg(test)]
@@ -389,23 +389,17 @@ impl Continuation {
     }
 }
 
-/// Bounds incremental work by changes examined, including private or superseded rows.
-/// The current row's globally unique stamp identifies the exact change in that range.
+/// Reads the next page of the scan: from each table, the first rows the
+/// user sees with a global sync version in the range, merged in version
+/// order and cut at `limit`. A row's version is unique across tables, so
+/// the page holds every visible row up to its last one.
 async fn scan_page(
     tx: &mut Transaction,
     user: &User,
     continuation: Continuation,
     limit: usize,
 ) -> Result<Page, SyncError> {
-    let mut range = continuation.range;
-    let mut next = None;
-    if continuation.scan == Scan::Incremental {
-        let versions = app_sync_changes::list_versions(tx, &range, limit + 1).await?;
-        if versions.len() > limit {
-            range.through = versions[limit - 1];
-            next = Some(continuation.continued_after(range.through));
-        }
-    }
+    let range = continuation.range;
     let mut rows = Vec::new();
     for synced in tables::list() {
         let rows_of_table = match continuation.scan {
@@ -414,7 +408,7 @@ async fn scan_page(
                     .list_live_in_community_after(tx, id, &range, limit + 1)
                     .await?
             }
-            _ => {
+            Scan::Incremental | Scan::Bootstrap => {
                 synced
                     .list_synced_after(tx, user, &range, limit + 1)
                     .await?
@@ -425,6 +419,7 @@ async fn scan_page(
         }
     }
     rows.sort_by_key(|(version, _)| *version);
+    let mut next = None;
     if rows.len() > limit {
         next = Some(continuation.continued_after(rows[limit - 1].0));
         rows.truncate(limit);
@@ -816,9 +811,17 @@ async fn pull_pages<T: Transport>(
     user: &User,
     report: &mut Report,
 ) -> Result<(), SyncError> {
+    let mut tx = deployment.begin().await?;
+    let cursor = app_sync_state::get(&mut tx).await?;
+    // A first pull cut short goes on from its last page
+    let after = match cursor {
+        Some(_) => None,
+        None => app_sync_state::get_continuation(&mut tx).await?,
+    };
+    tx.commit().await?;
     let mut request = PullRequest {
-        cursor: status(deployment).await?.cursor,
-        after: None,
+        cursor,
+        after,
         limit: Some(DEFAULT_LIMIT),
     };
     loop {
@@ -838,8 +841,10 @@ async fn pull_pages<T: Transport>(
             apply_row(&mut tx, user, row).await?;
         }
         report.pulled += page.rows.len();
-        if let Some(cursor) = page.cursor {
-            app_sync_state::upsert(&mut tx, &cursor).await?;
+        match (page.cursor, page.next) {
+            (Some(cursor), _) => app_sync_state::upsert(&mut tx, &cursor).await?,
+            (None, Some(next)) => app_sync_state::upsert_continuation(&mut tx, &next).await?,
+            (None, None) => {}
         }
         tx.commit().await?;
         match page.next {
@@ -883,10 +888,12 @@ async fn backfill_pending<T: Transport>(
     report: &mut Report,
 ) -> Result<(), SyncError> {
     let mut tx = deployment.begin().await?;
-    let communities = app_sync_backfills::list(&mut tx).await?;
+    let backfills = app_sync_backfills::list(&mut tx).await?;
     tx.commit().await?;
-    for community_id in communities {
-        let mut after = None;
+    for backfill in backfills {
+        let community_id = backfill.community_id;
+        // A backfill cut short goes on from its last page
+        let mut after = backfill.continuation;
         loop {
             let result = transport
                 .backfill(
@@ -911,7 +918,12 @@ async fn backfill_pending<T: Transport>(
                 Err(error) => return Err(error),
             };
             if page.resync {
-                // Keep this community queued and retry after the next pull.
+                // Keep this community queued and start it again after the
+                // next pull.
+                let mut tx = deployment.begin().await?;
+                app_sync_backfills::delete(&mut tx, community_id).await?;
+                app_sync_backfills::create(&mut tx, community_id).await?;
+                tx.commit().await?;
                 break;
             }
             let mut tx = deployment.begin().await?;
@@ -919,8 +931,11 @@ async fn backfill_pending<T: Transport>(
                 apply_row(&mut tx, user, row).await?;
             }
             report.backfilled += page.rows.len();
-            if page.next.is_none() {
-                app_sync_backfills::delete(&mut tx, community_id).await?;
+            match &page.next {
+                Some(next) => {
+                    app_sync_backfills::update_continuation(&mut tx, community_id, next).await?
+                }
+                None => app_sync_backfills::delete(&mut tx, community_id).await?,
             }
             tx.commit().await?;
             match page.next {
@@ -1026,7 +1041,27 @@ pub(crate) mod tests {
     }
 
     async fn sync(device: &Deployment, server: &Deployment) -> Report {
-        run(device, &InProcess { server }).await.expect("a sync")
+        let report = run(device, &InProcess { server }).await.expect("a sync");
+        assert_every_row_published(server).await;
+        report
+    }
+
+    /// Fails for a server row written without publishing its change, so
+    /// a write path that skips `app_sync_changes::record` fails its tests.
+    pub(crate) async fn assert_every_row_published(server: &Deployment) {
+        let mut tx = server.begin().await.expect("a transaction");
+        for synced in tables::list() {
+            let unpublished =
+                crate::data::app_sync_changes::list_unpublished(&mut tx, synced.table())
+                    .await
+                    .expect("the unpublished rows");
+            assert!(
+                unpublished.is_empty(),
+                "rows of {} written without a published change: {unpublished:?}",
+                synced.table()
+            );
+        }
+        tx.commit().await.expect("committed");
     }
 
     async fn bodies(deployment: &Deployment, user: &User) -> Vec<String> {
@@ -1121,7 +1156,12 @@ pub(crate) mod tests {
                         .is_some(),
                     commit
                 );
-                let backfills = app_sync_backfills::list(&mut tx).await.expect("backfills");
+                let backfills: Vec<Uuid> = app_sync_backfills::list(&mut tx)
+                    .await
+                    .expect("backfills")
+                    .into_iter()
+                    .map(|backfill| backfill.community_id)
+                    .collect();
                 assert_eq!(
                     backfills,
                     if commit {
@@ -2868,5 +2908,211 @@ pub(crate) mod tests {
             protocol_version_refusal(Some("one")).is_some(),
             "not a number"
         );
+    }
+
+    /// The server in this process, until `pages` pull or backfill pages
+    /// have been answered: then the network is gone. It keeps the
+    /// requests it was sent.
+    struct CutShort<'a> {
+        server: InProcess<'a>,
+        pages: usize,
+        pulls: std::sync::Mutex<Vec<PullRequest>>,
+        backfills: std::sync::Mutex<Vec<BackfillRequest>>,
+    }
+
+    impl<'a> CutShort<'a> {
+        fn after(server: &'a Deployment, pages: usize) -> CutShort<'a> {
+            CutShort {
+                server: InProcess { server },
+                pages,
+                pulls: std::sync::Mutex::new(Vec::new()),
+                backfills: std::sync::Mutex::new(Vec::new()),
+            }
+        }
+
+        fn answered(&self) -> usize {
+            self.pulls.lock().expect("the pulls").len()
+                + self.backfills.lock().expect("the backfills").len()
+        }
+    }
+
+    impl Transport for CutShort<'_> {
+        async fn push(
+            &self,
+            token: Option<&str>,
+            request: PushRequest,
+        ) -> Result<PushResponse, SyncError> {
+            self.server.push(token, request).await
+        }
+
+        async fn pull(&self, token: Option<&str>, request: PullRequest) -> Result<Page, SyncError> {
+            if self.answered() >= self.pages {
+                return Err(SyncError::Transport("cut short".to_string()));
+            }
+            self.pulls.lock().expect("the pulls").push(request.clone());
+            self.server.pull(token, request).await
+        }
+
+        async fn backfill(
+            &self,
+            token: Option<&str>,
+            request: BackfillRequest,
+        ) -> Result<Page, SyncError> {
+            if self.answered() >= self.pages {
+                return Err(SyncError::Transport("cut short".to_string()));
+            }
+            self.backfills
+                .lock()
+                .expect("the backfills")
+                .push(request.clone());
+            self.server.backfill(token, request).await
+        }
+
+        async fn sign_in_with_device_code(
+            &self,
+            code: &str,
+            verifier: &str,
+        ) -> Result<Session, SyncError> {
+            self.server.sign_in_with_device_code(code, verifier).await
+        }
+
+        async fn sign_out(&self, token: &str) -> Result<(), SyncError> {
+            self.server.sign_out(token).await
+        }
+
+        async fn bytes_uploads_create(
+            &self,
+            token: Option<&str>,
+            table: &str,
+            request: UploadNew,
+        ) -> Result<Upload, SyncError> {
+            self.server
+                .bytes_uploads_create(token, table, request)
+                .await
+        }
+
+        async fn bytes_upload(
+            &self,
+            token: Option<&str>,
+            table: &str,
+            upload: &Upload,
+            path: &Path,
+        ) -> Result<(), SyncError> {
+            self.server.bytes_upload(token, table, upload, path).await
+        }
+
+        async fn bytes_download(
+            &self,
+            token: Option<&str>,
+            table: &str,
+            id: Uuid,
+            path: &Path,
+        ) -> Result<(), SyncError> {
+            self.server.bytes_download(token, table, id, path).await
+        }
+    }
+
+    #[tokio::test]
+    async fn sync_a_first_pull_cut_short_goes_on_from_its_last_page() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let (alice, token) = user_with_token(&server, "alice@example.com").await;
+            for index in 0..DEFAULT_LIMIT + 10 {
+                test_notes::create(&server, &alice, &format!("note {index}"), None)
+                    .await
+                    .expect("a note");
+            }
+            let device = device_of(&alice, &token).await;
+
+            let cut_short = CutShort::after(&server, 1);
+            assert!(run(&device, &cut_short).await.is_err());
+            assert_eq!(bodies(&device, &alice).await.len(), DEFAULT_LIMIT - 1);
+            let mut tx = device.begin().await.expect("a transaction");
+            assert!(
+                app_sync_state::get(&mut tx)
+                    .await
+                    .expect("cursor")
+                    .is_none()
+            );
+            let kept = app_sync_state::get_continuation(&mut tx)
+                .await
+                .expect("continuation");
+            tx.commit().await.expect("committed");
+            assert!(kept.is_some());
+
+            let carried_on = CutShort::after(&server, usize::MAX);
+            run(&device, &carried_on).await.expect("a sync");
+            let pulls = carried_on.pulls.lock().expect("the pulls").clone();
+            assert_eq!(pulls[0].after, kept, "it went on from the page kept");
+            assert_eq!(bodies(&device, &alice).await.len(), DEFAULT_LIMIT + 10);
+            let mut tx = device.begin().await.expect("a transaction");
+            assert!(
+                app_sync_state::get(&mut tx)
+                    .await
+                    .expect("cursor")
+                    .is_some()
+            );
+            assert!(
+                app_sync_state::get_continuation(&mut tx)
+                    .await
+                    .expect("continuation")
+                    .is_none()
+            );
+            tx.commit().await.expect("committed");
+            assert_every_row_published(&server).await;
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn sync_a_backfill_cut_short_goes_on_from_its_last_page() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let (alice, _) = user_with_token(&server, "alice@example.com").await;
+            let (bob, bob_token) = user_with_token(&server, "bob@example.com").await;
+            let gardening = communities::create(&server, &alice, "Gardening")
+                .await
+                .expect("a community");
+            for index in 0..DEFAULT_LIMIT + 10 {
+                test_notes::create(
+                    &server,
+                    &alice,
+                    &format!("note {index}"),
+                    Some(gardening.id),
+                )
+                .await
+                .expect("a note");
+            }
+            let device = device_of(&bob, &bob_token).await;
+            sync(&device, &server).await;
+            memberships::create(&server, &bob, gardening.id)
+                .await
+                .expect("joined");
+
+            // The pull, then one page of the backfill
+            let cut_short = CutShort::after(&server, 2);
+            assert!(run(&device, &cut_short).await.is_err());
+            assert!(!bodies(&device, &bob).await.is_empty());
+            let mut tx = device.begin().await.expect("a transaction");
+            let backfills = app_sync_backfills::list(&mut tx).await.expect("backfills");
+            tx.commit().await.expect("committed");
+            assert_eq!(backfills.len(), 1);
+            assert!(backfills[0].continuation.is_some());
+
+            let carried_on = CutShort::after(&server, usize::MAX);
+            run(&device, &carried_on).await.expect("a sync");
+            let requests = carried_on.backfills.lock().expect("the backfills").clone();
+            assert_eq!(requests[0].after, backfills[0].continuation);
+            assert_eq!(bodies(&device, &bob).await.len(), DEFAULT_LIMIT + 10);
+            let mut tx = device.begin().await.expect("a transaction");
+            assert!(
+                app_sync_backfills::list(&mut tx)
+                    .await
+                    .expect("backfills")
+                    .is_empty()
+            );
+            tx.commit().await.expect("committed");
+        })
+        .await;
     }
 }

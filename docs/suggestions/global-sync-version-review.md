@@ -1,6 +1,8 @@
 # Review: global sync versions as the foundation for other backends
 
 **Review of `cr-otherbackends` at `5861a22` ("v2 sync protocol"), 2026-11-27.**
+§3.2, §3.3 and §3.4, and part of §3.1, are fixed in step 0 of
+[the backend seam](../design/backend-seam.md#as-built-2026-11-27).
 It covers the plan (`docs/design/global-sync-version-build.md`), the two
 Elixir proposals in `docs/suggestions/elixir-workflow-*.md`, and the Rust
 code that carries out the plan. File paths below are paths on that branch.

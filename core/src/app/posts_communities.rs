@@ -378,7 +378,6 @@ async fn apply_in(
     user: &User,
     event: &Event,
 ) -> Result<Applied, PostCommunityError> {
-    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -389,6 +388,9 @@ async fn apply_in(
             row,
         });
     }
+    // A retry is answered above without waiting for the feed. Two at once
+    // both reach here, and the second fails on the event's id.
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
 
     let allowed = match event.kind {
         EventKind::Create => CREATE_FIELDS,
@@ -439,7 +441,7 @@ async fn apply_in(
                         Role::Server => (1, Some(now)),
                         Role::Device => (0, None),
                     };
-                    let mut row = PostCommunity {
+                    let row = PostCommunity {
                         id: event.row_id,
                         post_id: post.id,
                         community_id,
@@ -452,13 +454,7 @@ async fn apply_in(
                         deleted_at: None,
                         deleted_by_id: None,
                     };
-                    if let Some(version) =
-                        crate::data::app_sync_changes::record(tx, role, TABLE, row.id).await?
-                    {
-                        row.global_sync_version = Some(version);
-                    }
-                    app_posts_communities::create(&mut *tx, &row).await?;
-                    row
+                    app_posts_communities::create(&mut *tx, role, row).await?
                 }
             }
         }
@@ -542,10 +538,7 @@ async fn write_changed(
         row.version += 1;
         row.last_synced_at = Some(now);
     }
-    if let Some(version) = crate::data::app_sync_changes::record(tx, role, TABLE, row.id).await? {
-        row.global_sync_version = Some(version);
-    }
-    app_posts_communities::update(&mut *tx, row).await?;
+    *row = app_posts_communities::update(&mut *tx, role, row.clone()).await?;
     Ok(())
 }
 

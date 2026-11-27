@@ -260,7 +260,7 @@ pub(crate) async fn list_all(
     user: &User,
 ) -> Result<Vec<FileWithState>, FileError> {
     let mut tx = deployment.begin().await?;
-    let files = app_files::list(&mut tx, user.id).await?;
+    let files = app_files::list(&mut tx, app_files::Filter::VisibleTo(user.id)).await?;
     let listed = with_states(&mut tx, deployment.role, user, files).await?;
     tx.commit().await?;
     Ok(listed)
@@ -649,9 +649,8 @@ pub(crate) async fn delete_with_last_community(
         file.version += 1;
         file.last_synced_at = Some(file.updated_at);
     }
-    let mut file = AcceptedFile::new(file)?;
-    file.record_sync_change(tx, role).await?;
-    app_files::update(&mut *tx, &file).await?;
+    let file = AcceptedFile::new(file)?;
+    app_files::update(&mut *tx, role, file).await?;
     Ok(())
 }
 
@@ -809,7 +808,6 @@ pub(crate) async fn apply_in(
     event: &Event,
     uploaded: bool,
 ) -> Result<Applied, FileError> {
-    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -820,6 +818,9 @@ pub(crate) async fn apply_in(
             file,
         });
     }
+    // A retry is answered above without waiting for the feed. Two at once
+    // both reach here, and the second fails on the event's id.
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
 
     let allowed = match event.kind {
         EventKind::Create => CREATE_FIELDS,
@@ -861,7 +862,7 @@ pub(crate) async fn apply_in(
             let accepted = blank
                 .with_fields(&event.changes)
                 .and_then(|file| Ok(AcceptedFile::new(file)?));
-            let mut file = match accepted {
+            let file = match accepted {
                 Ok(file) => file,
                 Err(error) => return rejected(event, format!("invalid: {error}"), None),
             };
@@ -880,9 +881,7 @@ pub(crate) async fn apply_in(
             if !uploaded {
                 return rejected(event, bytes::NOT_UPLOADED, None);
             }
-            file.record_sync_change(tx, role).await?;
-            app_files::create(&mut *tx, &file).await?;
-            let file = file.into_row();
+            let file = app_files::create(&mut *tx, role, file).await?;
             files_communities::create_with_file(tx, role, user, &file, &communities).await?;
             finish(tx, role, user, event, Conflicts::new(), file).await
         }
@@ -909,13 +908,11 @@ pub(crate) async fn apply_in(
                     updated.version += 1;
                     updated.last_synced_at = Some(now);
                 }
-                let mut updated = match AcceptedFile::new(updated) {
+                let updated = match AcceptedFile::new(updated) {
                     Ok(updated) => updated,
                     Err(error) => return rejected(event, format!("invalid: {error}"), Some(file)),
                 };
-                updated.record_sync_change(tx, role).await?;
-                app_files::update(&mut *tx, &updated).await?;
-                updated.into_row()
+                app_files::update(&mut *tx, role, updated).await?
             };
             finish(tx, role, user, event, conflicts, file).await
         }
@@ -1110,7 +1107,7 @@ impl SyncedTable for Synced {
         let memberships =
             app_users_communities::list(&mut *tx, app_users_communities::Filter::User(user.id))
                 .await?;
-        let files = app_files::list(&mut *tx, user.id).await?;
+        let files = app_files::list(&mut *tx, app_files::Filter::VisibleTo(user.id)).await?;
         let file_ids: Vec<Uuid> = files.iter().map(|file| file.id).collect();
         let files_communities =
             files_communities::list_visible_of_files(tx, user, &file_ids).await?;
@@ -1436,7 +1433,7 @@ pub(crate) mod tests {
                     .is_none()
             );
             assert!(
-                app_files::list(&mut tx, alice.id)
+                app_files::list(&mut tx, app_files::Filter::VisibleTo(alice.id))
                     .await
                     .expect("list")
                     .is_empty()

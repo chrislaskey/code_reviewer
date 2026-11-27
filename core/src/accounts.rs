@@ -192,7 +192,6 @@ pub async fn sign_in(
     }
     let email = accounts_users::checked_email(email)?;
     let mut tx = deployment.begin().await?;
-    crate::data::app_sync_versions::lock(&mut tx).await?;
     let (mail, pending) = match accounts_users::get_by_email(&mut tx, &email).await? {
         // A trial user's address is made up: nothing to send, nobody to tell
         Some(account) if account.trial_expires_at.is_some() => (None, random::hex(32)),
@@ -206,6 +205,8 @@ pub async fn sign_in(
             )
         }
         None if sign_up_enabled => {
+            // Only a sign-up writes a synced row: its user
+            crate::data::app_sync_versions::lock(&mut tx).await?;
             let account = accounts_users::create(&mut tx, Uuid::now_v7(), &email, false).await?;
             let name = crate::app::users::name_from_email_in(&mut tx, &email, account.id).await?;
             crate::app::users::create_in(&mut tx, account.id, &name).await?;
@@ -250,7 +251,6 @@ pub async fn sign_in_from_trial(
     }
     let email = accounts_users::checked_email(email)?;
     let mut tx = deployment.begin().await?;
-    crate::data::app_sync_versions::lock(&mut tx).await?;
     let account = live_account_in(&mut tx, trial.id).await?;
     if account.trial_expires_at.is_none() {
         return Err(AccountError::NotATrial);

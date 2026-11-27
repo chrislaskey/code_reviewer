@@ -10,7 +10,9 @@ use serde_json::Value;
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::data::app_sync_changes;
 use crate::database::Transaction;
+use crate::deployment::Role;
 use crate::helpers::{locales, themes};
 use crate::sync::VersionRange;
 
@@ -58,20 +60,6 @@ pub enum PreferenceInvalid {
 pub struct AcceptedPreference(Preference);
 
 impl AcceptedPreference {
-    /// Records a validated server change in the same transaction as its row.
-    pub(crate) async fn record_sync_change(
-        &mut self,
-        tx: &mut Transaction,
-        role: crate::deployment::Role,
-    ) -> Result<(), sqlx::Error> {
-        if let Some(version) =
-            crate::data::app_sync_changes::record(tx, role, TABLE, self.0.id).await?
-        {
-            self.0.global_sync_version = Some(version);
-        }
-        Ok(())
-    }
-
     /// Checks the preference's key and its value for that key.
     pub fn new(preference: Preference) -> Result<AcceptedPreference, PreferenceInvalid> {
         checked_value(&preference.key, &preference.value)?;
@@ -142,20 +130,45 @@ pub async fn get_by_user_and_key(
     query!(tx, get_by_user_and_key(user_id, key))
 }
 
-/// Persists a row accepted by the resource workflow.
+/// Inserts a new row. On the server this publishes it: the row gets the
+/// next global sync version, recorded in `app_sync_changes` in this
+/// transaction. On a device the row keeps the version it has.
 pub(crate) async fn create(
     tx: &mut Transaction,
-    preference: &AcceptedPreference,
-) -> Result<(), sqlx::Error> {
-    query!(tx, insert(preference.row()))
+    role: Role,
+    preference: AcceptedPreference,
+) -> Result<Preference, sqlx::Error> {
+    let mut preference = preference.into_row();
+    preference.global_sync_version = app_sync_changes::stamp(
+        tx,
+        role,
+        TABLE,
+        preference.id,
+        preference.global_sync_version,
+    )
+    .await?;
+    query!(tx, insert(&preference))?;
+    Ok(preference)
 }
 
-/// Persists a row accepted by the resource workflow.
+/// Writes the row over its stored one, a soft delete included, and
+/// publishes it on the server as `create` does.
 pub(crate) async fn update(
     tx: &mut Transaction,
-    preference: &AcceptedPreference,
-) -> Result<(), sqlx::Error> {
-    query!(tx, update(preference.row()))
+    role: Role,
+    preference: AcceptedPreference,
+) -> Result<Preference, sqlx::Error> {
+    let mut preference = preference.into_row();
+    preference.global_sync_version = app_sync_changes::stamp(
+        tx,
+        role,
+        TABLE,
+        preference.id,
+        preference.global_sync_version,
+    )
+    .await?;
+    query!(tx, update(&preference))?;
+    Ok(preference)
 }
 
 /// Explicit replication access for internal resource workflows.

@@ -290,7 +290,6 @@ pub(crate) async fn apply_in(
     user: &User,
     event: &Event,
 ) -> Result<Applied, PostError> {
-    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -301,6 +300,9 @@ pub(crate) async fn apply_in(
             post,
         });
     }
+    // A retry is answered above without waiting for the feed. Two at once
+    // both reach here, and the second fails on the event's id.
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
 
     let allowed = match event.kind {
         EventKind::Create => CREATE_FIELDS,
@@ -336,13 +338,12 @@ pub(crate) async fn apply_in(
             let accepted = blank
                 .with_fields(&event.changes)
                 .and_then(|post| Ok(AcceptedPost::new(post)?));
-            let mut post = match accepted {
+            let post = match accepted {
                 Ok(post) => post,
                 Err(error) => return rejected(event, format!("invalid: {error}"), None),
             };
-            post.record_sync_change(tx, role).await?;
-            app_posts::create(tx, &post).await?;
-            finish(tx, role, user, event, Conflicts::new(), post.into_row()).await?
+            let post = app_posts::create(tx, role, post).await?;
+            finish(tx, role, user, event, Conflicts::new(), post).await?
         }
         EventKind::Update => {
             let Some(post) = get_in(tx, event.row_id).await? else {
@@ -373,13 +374,11 @@ pub(crate) async fn apply_in(
                     updated.version += 1;
                     updated.last_synced_at = Some(now);
                 }
-                let mut updated = match AcceptedPost::new(updated) {
+                let updated = match AcceptedPost::new(updated) {
                     Ok(updated) => updated,
                     Err(error) => return rejected(event, format!("invalid: {error}"), Some(post)),
                 };
-                updated.record_sync_change(tx, role).await?;
-                app_posts::update(tx, &updated).await?;
-                let updated = updated.into_row();
+                let updated = app_posts::update(tx, role, updated).await?;
                 if changes.contains_key("deleted_at") && updated.deleted_at.is_some() {
                     posts_communities::delete_with_post(tx, role, &updated).await?;
                 }

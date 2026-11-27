@@ -300,8 +300,9 @@ takes them away. So, as in Phoenix:
   became visible through a new community row, however old, arrives with
   it. A row taken out of a community brings nothing along: its post may
   be one the user never saw, from before they joined, and a device
-  without the post skips the row. `Page.cursor` advances through scanned changes. A parent brought along for
-  another row does not advance it.
+  without the post skips the row. `Page.cursor` is the version of the
+  page's last row, not counting what was brought along. A parent
+  brought along for another row does not advance it.
 - **Joining is the device asking for everything in that community.** When
   a device applies a live membership of its own user that it did not
   have, or had left, it records the community in `app_sync_backfills` and,
@@ -341,13 +342,21 @@ POST /api/sync/backfill
 ```
 
 A push applies the events in the order given, each in its own transaction.
-A pull scans through an upper bound taken from the committed feed on the
-first page. `after` carries the previous page's `next` value and keeps that
-bound. An intermediate incremental page returns the last version examined,
-even if its changes were hidden from the caller. The final page advances to
-the bound. A fresh device bootstraps from the current authorized rows and saves
-its baseline cursor on the final page. Backfill has its own continuation and
-leaves the main cursor alone.
+A pull reads up to an upper bound, the feed's head when the first page
+is read. `after` carries the previous page's `next` value and keeps that
+bound. A page holds the rows the user sees, in version order: from each
+table its first rows in the range, merged and cut at the limit. Other
+users' changes take no room on a page. An intermediate page's cursor is
+the version of its last row. The final page's cursor is the bound, even
+when the last versions were someone else's.
+
+A fresh device bootstraps from the current rows it may see. It saves its
+cursor on the final page only. Until then it keeps the `next` of its last
+page in `app_sync_state`, so a first pull cut short goes on from there on
+the next sync. Backfill has its own continuation, kept on its row of
+`app_sync_backfills` the same way, and leaves the main cursor alone. A
+continuation the server no longer answers, from another feed or below
+its floor, gets `resync`.
 
 Cursor versions and row global sync versions are decimal strings on the wire.
 Requests carry the sync protocol version in `x-protocol-version`. Responses

@@ -7,7 +7,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::data::app_sync_changes;
 use crate::database::Transaction;
+use crate::deployment::Role;
 use crate::sync::VersionRange;
 
 pub const TABLE: &str = "app_users_communities";
@@ -72,20 +74,45 @@ pub async fn get(
     )
 }
 
-/// Persists a row accepted by the resource workflow.
+/// Inserts a new row. On the server this publishes it: the row gets the
+/// next global sync version, recorded in `app_sync_changes` in this
+/// transaction. On a device the row keeps the version it has.
 pub(crate) async fn create(
     tx: &mut Transaction,
-    membership: &Membership,
-) -> Result<(), sqlx::Error> {
-    query!(tx, insert(membership))
+    role: Role,
+    membership: Membership,
+) -> Result<Membership, sqlx::Error> {
+    let mut membership = membership;
+    membership.global_sync_version = app_sync_changes::stamp(
+        tx,
+        role,
+        TABLE,
+        membership.id,
+        membership.global_sync_version,
+    )
+    .await?;
+    query!(tx, insert(&membership))?;
+    Ok(membership)
 }
 
-/// Persists a row accepted by the resource workflow.
+/// Writes the row over its stored one, a soft delete included, and
+/// publishes it on the server as `create` does.
 pub(crate) async fn update(
     tx: &mut Transaction,
-    membership: &Membership,
-) -> Result<bool, sqlx::Error> {
-    query!(tx, update(membership))
+    role: Role,
+    membership: Membership,
+) -> Result<Membership, sqlx::Error> {
+    let mut membership = membership;
+    membership.global_sync_version = app_sync_changes::stamp(
+        tx,
+        role,
+        TABLE,
+        membership.id,
+        membership.global_sync_version,
+    )
+    .await?;
+    query!(tx, update(&membership))?;
+    Ok(membership)
 }
 
 /// Explicit replication access for internal resource workflows.

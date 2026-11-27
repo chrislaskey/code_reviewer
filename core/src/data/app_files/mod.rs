@@ -8,7 +8,9 @@ use garde::Validate;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::data::app_sync_changes;
 use crate::database::Transaction;
+use crate::deployment::Role;
 use crate::helpers::content_type::{content_type_or_unknown, is_content_type};
 use crate::helpers::field_errors::FieldErrors;
 use crate::helpers::sha256::{self, is_sha256};
@@ -71,20 +73,6 @@ pub struct File {
 pub struct AcceptedFile(File);
 
 impl AcceptedFile {
-    /// Records a validated server change in the same transaction as its row.
-    pub(crate) async fn record_sync_change(
-        &mut self,
-        tx: &mut Transaction,
-        role: crate::deployment::Role,
-    ) -> Result<(), sqlx::Error> {
-        if let Some(version) =
-            crate::data::app_sync_changes::record(tx, role, TABLE, self.0.id).await?
-        {
-            self.0.global_sync_version = Some(version);
-        }
-        Ok(())
-    }
-
     /// Checks the file, with its name trimmed, a missing content type
     /// filled in, and the size and SHA-256 of content the row keeps.
     pub fn new(file: File) -> Result<AcceptedFile, FieldErrors> {
@@ -164,9 +152,23 @@ macro_rules! query {
     };
 }
 
-/// Lists the live files the user sees, newest first with an ID tie-breaker.
-pub async fn list(tx: &mut Transaction, user_id: Uuid) -> Result<Vec<File>, sqlx::Error> {
-    query!(tx, list_visible(user_id))
+/// A required read scope.
+pub enum Filter<'a> {
+    /// The live files the user sees, newest first with an ID tie-breaker.
+    VisibleTo(Uuid),
+    /// The live files the user sees with any of these checksums, newest
+    /// first.
+    VisibleToWithSha256s(Uuid, &'a [String]),
+}
+
+/// Lists live rows within the required scope.
+pub async fn list(tx: &mut Transaction, filter: Filter<'_>) -> Result<Vec<File>, sqlx::Error> {
+    match filter {
+        Filter::VisibleTo(user_id) => query!(tx, list_visible(user_id)),
+        Filter::VisibleToWithSha256s(user_id, sha256s) => {
+            query!(tx, list_visible_with_sha256s(user_id, sha256s))
+        }
+    }
 }
 
 /// Counts the live files the user sees whose names contain `name` in
@@ -186,16 +188,6 @@ pub(crate) async fn search(
     )
 }
 
-/// Lists the live files the user sees with any of these checksums,
-/// newest first.
-pub async fn list_with_sha256s(
-    tx: &mut Transaction,
-    user_id: Uuid,
-    sha256s: &[String],
-) -> Result<Vec<File>, sqlx::Error> {
-    query!(tx, list_visible_with_sha256s(user_id, sha256s))
-}
-
 /// Gets a live file the user sees.
 pub async fn get(
     tx: &mut Transaction,
@@ -205,14 +197,33 @@ pub async fn get(
     query!(tx, get_visible(user_id, id))
 }
 
-/// Persists a row accepted by the resource workflow.
-pub(crate) async fn create(tx: &mut Transaction, file: &AcceptedFile) -> Result<(), sqlx::Error> {
-    query!(tx, insert(file.row()))
+/// Inserts a new row. On the server this publishes it: the row gets the
+/// next global sync version, recorded in `app_sync_changes` in this
+/// transaction. On a device the row keeps the version it has.
+pub(crate) async fn create(
+    tx: &mut Transaction,
+    role: Role,
+    file: AcceptedFile,
+) -> Result<File, sqlx::Error> {
+    let mut file = file.into_row();
+    file.global_sync_version =
+        app_sync_changes::stamp(tx, role, TABLE, file.id, file.global_sync_version).await?;
+    query!(tx, insert(&file))?;
+    Ok(file)
 }
 
-/// Persists a row accepted by the resource workflow.
-pub(crate) async fn update(tx: &mut Transaction, file: &AcceptedFile) -> Result<bool, sqlx::Error> {
-    query!(tx, update(file.row()))
+/// Writes the row over its stored one, a soft delete included, and
+/// publishes it on the server as `create` does.
+pub(crate) async fn update(
+    tx: &mut Transaction,
+    role: Role,
+    file: AcceptedFile,
+) -> Result<File, sqlx::Error> {
+    let mut file = file.into_row();
+    file.global_sync_version =
+        app_sync_changes::stamp(tx, role, TABLE, file.id, file.global_sync_version).await?;
+    query!(tx, update(&file))?;
+    Ok(file)
 }
 
 /// Explicit replication access for internal resource workflows.

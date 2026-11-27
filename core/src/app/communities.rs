@@ -312,7 +312,6 @@ pub(crate) async fn apply_in(
     user: &User,
     event: &Event,
 ) -> Result<Applied, CommunityError> {
-    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -323,6 +322,9 @@ pub(crate) async fn apply_in(
             community,
         });
     }
+    // A retry is answered above without waiting for the feed. Two at once
+    // both reach here, and the second fails on the event's id.
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
 
     let allowed = match event.kind {
         EventKind::Create => CREATE_FIELDS,
@@ -357,21 +359,12 @@ pub(crate) async fn apply_in(
             let accepted = blank
                 .with_fields(&event.changes)
                 .and_then(|community| Ok(AcceptedCommunity::new(community)?));
-            let mut community = match accepted {
+            let community = match accepted {
                 Ok(community) => community,
                 Err(error) => return rejected(event, format!("invalid: {error}"), None),
             };
-            community.record_sync_change(tx, role).await?;
-            app_communities::create(&mut *tx, &community).await?;
-            finish(
-                tx,
-                role,
-                user,
-                event,
-                Conflicts::new(),
-                community.into_row(),
-            )
-            .await
+            let community = app_communities::create(&mut *tx, role, community).await?;
+            finish(tx, role, user, event, Conflicts::new(), community).await
         }
         EventKind::Update => {
             let Some(community) = get_in(tx, event.row_id).await? else {
@@ -407,15 +400,13 @@ pub(crate) async fn apply_in(
                 updated.version += 1;
                 updated.last_synced_at = Some(now);
             }
-            let mut updated = match AcceptedCommunity::new(updated) {
+            let updated = match AcceptedCommunity::new(updated) {
                 Ok(updated) => updated,
                 Err(error) => {
                     return rejected(event, format!("invalid: {error}"), Some(community));
                 }
             };
-            updated.record_sync_change(tx, role).await?;
-            app_communities::update(&mut *tx, &updated).await?;
-            let updated = updated.into_row();
+            let updated = app_communities::update(&mut *tx, role, updated).await?;
             if changes.contains_key("deleted_at") && updated.deleted_at.is_some() {
                 memberships::delete_with_community(tx, role, &updated).await?;
                 for table in tables::list().iter().rev() {

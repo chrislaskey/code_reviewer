@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::data::app_sync_changes;
 use crate::database::Transaction;
+use crate::deployment::Role;
 
 pub const TABLE: &str = "app_posts";
 /// The longest body, in characters.
@@ -47,20 +49,6 @@ pub enum PostInvalid {
 pub struct AcceptedPost(Post);
 
 impl AcceptedPost {
-    /// Records a validated server change in the same transaction as its row.
-    pub(crate) async fn record_sync_change(
-        &mut self,
-        tx: &mut Transaction,
-        role: crate::deployment::Role,
-    ) -> Result<(), sqlx::Error> {
-        if let Some(version) =
-            crate::data::app_sync_changes::record(tx, role, TABLE, self.0.id).await?
-        {
-            self.0.global_sync_version = Some(version);
-        }
-        Ok(())
-    }
-
     /// Checks the post, with its body as it is kept.
     pub fn new(post: Post) -> Result<AcceptedPost, PostInvalid> {
         let body = checked_body(&post.body)?;
@@ -129,14 +117,33 @@ pub async fn get(
     Ok(query!(tx, get_visible(user_id, id))?.filter(|post| post.deleted_at.is_none()))
 }
 
-/// Persists a create accepted by the event handler.
-pub(crate) async fn create(tx: &mut Transaction, post: &AcceptedPost) -> Result<(), sqlx::Error> {
-    query!(tx, insert(post.row()))
+/// Inserts a new row. On the server this publishes it: the row gets the
+/// next global sync version, recorded in `app_sync_changes` in this
+/// transaction. On a device the row keeps the version it has.
+pub(crate) async fn create(
+    tx: &mut Transaction,
+    role: Role,
+    post: AcceptedPost,
+) -> Result<Post, sqlx::Error> {
+    let mut post = post.into_row();
+    post.global_sync_version =
+        app_sync_changes::stamp(tx, role, TABLE, post.id, post.global_sync_version).await?;
+    query!(tx, insert(&post))?;
+    Ok(post)
 }
 
-/// Persists an accepted update, including a soft delete.
-pub(crate) async fn update(tx: &mut Transaction, post: &AcceptedPost) -> Result<bool, sqlx::Error> {
-    query!(tx, update(post.row()))
+/// Writes the row over its stored one, a soft delete included, and
+/// publishes it on the server as `create` does.
+pub(crate) async fn update(
+    tx: &mut Transaction,
+    role: Role,
+    post: AcceptedPost,
+) -> Result<Post, sqlx::Error> {
+    let mut post = post.into_row();
+    post.global_sync_version =
+        app_sync_changes::stamp(tx, role, TABLE, post.id, post.global_sync_version).await?;
+    query!(tx, update(&post))?;
+    Ok(post)
 }
 
 /// Protocol reads include tombstones; authoritative writes retain server versions.

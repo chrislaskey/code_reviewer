@@ -221,6 +221,48 @@ adapters. The work is mostly in the high-level layer.
 None of these needs the remote backend to exist. Each can be verified by
 the current test suite.
 
+### As built (2026-11-27)
+
+Done:
+
+- **4.** `app_sync_changes` and `app_sync_versions` are directories with
+  private `sqlite.rs` and `postgres.rs` adapters. `app_sync_state` keeps
+  all its SQL in its adapters.
+- **5.** `app_files::list` takes a `Filter`, as `app_posts::list` does. It
+  replaces `list_with_sha256s`. `search` stays: it answers a count with a
+  page, which a list does not.
+- **7, stamping.** The `create` and `update` of each synced table's data
+  context take the `Role`. They stamp the row with
+  `app_sync_changes::stamp` and return it. No write path stamps by hand.
+  The bulk trial conversion still records each row itself.
+  `assert_every_row_published` runs after every sync in the core sync
+  tests, and fails on a server row whose stamp is not its latest change.
+- **7, paging.** A pull pages by the rows the user sees, as bootstrap did.
+  The change log is now used only for the floor.
+- **7, resuming.** `app_sync_state.continuation` keeps an unfinished first
+  pull's next page. `app_sync_backfills.continuation` does the same for
+  each backfill. Two tests cut the network after a page and check that
+  the next sync goes on from it.
+- **7, the feed lock.** A sign-in code request takes the lock only to
+  sign someone up. A retried event is answered before the lock. The
+  lock still comes before an `apply_in` reads the row it decides on.
+  Going further needs row locks (`SELECT … FOR UPDATE`) in each context,
+  and a tested lock order.
+
+Moved to step 1, the seam itself:
+
+- **1 and 2.** These become concrete function by function, as each entry
+  gets its dispatch. Changing visibility before then would be guesswork.
+- **3.** Splitting `SyncedTable` adds a second list to every app's
+  `synced_tables.rs`. Nothing yet needs only one half. The remote
+  backend is the first that will, so the split waits for it.
+- **6.** Moving `device_settings::upgrade`'s transaction to its caller
+  would put a transaction into Tauri. The better fix is to move the
+  function to a high-level module, which is a change of its own.
+
+Still open from the review: the membership backfill trigger, and the
+purge holding the feed lock (§3.5).
+
 ## 6. Decided (2026-11-27)
 
 - **Mail.** The backend returns the mail to send: its kind, address,

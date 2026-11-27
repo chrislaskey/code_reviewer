@@ -333,7 +333,6 @@ async fn apply_in(
     user: &User,
     event: &Event,
 ) -> Result<Applied, NoteError> {
-    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -344,6 +343,9 @@ async fn apply_in(
             note,
         });
     }
+    // A retry is answered above without waiting for the feed. Two at once
+    // both reach here, and the second fails on the event's id.
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
 
     let allowed = match event.kind {
         EventKind::Create => CREATE_FIELDS,
@@ -388,11 +390,14 @@ async fn apply_in(
             if !in_its_community(tx, user, &note).await? {
                 return rejected(event, "not_a_member", None);
             }
-            if let Some(version) =
-                crate::data::app_sync_changes::record(tx, role, TABLE, note.id).await?
-            {
-                note.global_sync_version = Some(version);
-            }
+            note.global_sync_version = crate::data::app_sync_changes::stamp(
+                tx,
+                role,
+                TABLE,
+                note.id,
+                note.global_sync_version,
+            )
+            .await?;
             query!(tx, insert(&note))?;
             finish(tx, role, user, event, Conflicts::new(), note).await
         }
@@ -433,11 +438,14 @@ async fn apply_in(
                 updated.version += 1;
                 updated.last_synced_at = Some(now);
             }
-            if let Some(version) =
-                crate::data::app_sync_changes::record(tx, role, TABLE, updated.id).await?
-            {
-                updated.global_sync_version = Some(version);
-            }
+            updated.global_sync_version = crate::data::app_sync_changes::stamp(
+                tx,
+                role,
+                TABLE,
+                updated.id,
+                updated.global_sync_version,
+            )
+            .await?;
             query!(tx, update(&updated))?;
             finish(tx, role, user, event, conflicts, updated).await
         }
@@ -491,9 +499,9 @@ async fn write_copied(
         note.version += 1;
         note.last_synced_at = Some(note.updated_at);
     }
-    if let Some(version) = crate::data::app_sync_changes::record(tx, role, TABLE, note.id).await? {
-        note.global_sync_version = Some(version);
-    }
+    note.global_sync_version =
+        crate::data::app_sync_changes::stamp(tx, role, TABLE, note.id, note.global_sync_version)
+            .await?;
     Ok(query!(tx, update(&note))?)
 }
 
