@@ -48,8 +48,9 @@ Built as written, in `core/src/app/files.rs`; what was left out is
 - **A file is waiting, refused or synced**, and never stuck: waiting
   retries on its own, refused waits for the person, and removing a file
   in either state needs nothing from the server.
-- **An event is tried 30 times**, every event, a post's too, counting
-  only the server's no to that event.
+- **A file waiting for its bytes is tried 30 times**, counting only the
+  server's no to that event. Any other rejection is final at once, see
+  "Events" in `docs/design/offline-sync.md`.
 
 ## The row
 

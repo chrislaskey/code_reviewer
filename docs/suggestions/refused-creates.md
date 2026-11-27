@@ -51,5 +51,16 @@ Things to decide:
   `not_a_member`, and kept. Until the person lets it go, the device still
   shows the post in that community.
 
+- **Updates, decided with the user the same day.** An update rejected
+  with the server's row used to give way silently. Now the server's row
+  wins and the person's change is kept as a refused conflict, to reapply
+  or let go, and nothing waits on it. An update rejected without a row is
+  refused at once, not tried 30 times: a rejection is final, and a
+  temporary failure is a transport error. Only a file waiting for its
+  bytes still counts tries.
+- **A create rejected with the server's row** means the server already
+  has a row under that id, such as `exists`. The server's row wins, with
+  nothing to tell.
+
 Open: should a refused row show a mark in its list, as a refused file
 does? That is a page change, posts' own.

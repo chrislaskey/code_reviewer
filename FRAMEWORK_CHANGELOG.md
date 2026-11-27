@@ -18,7 +18,7 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
-## 2026-11-27: a refused create is kept for the person, in every table
+## 2026-11-27: every rejection is shown to the person, and a refused create is kept
 
 Commits: this one.
 
@@ -32,6 +32,11 @@ Commits: this one.
     held back from each push.
   - A resync keeps it. The conflicts page offers Try again and Let go;
     letting it go removes the row and the rows waiting with it.
+  - An update the server rejects is refused at once, not tried 30
+    times. When the server sends its row, the row wins and the person's
+    change is kept as a refused conflict, to reapply or let go; before,
+    it gave way without a word. Only a file waiting for its bytes still
+    counts tries.
   - `app_sync_state::maintenance::delete_not_pending` is now
     `delete_not_pending_or_refused`.
 - **What an app does**.

@@ -7,12 +7,12 @@
 //! answered, with the conflicts the person has not resolved; its records
 //! are `data::app_events`.
 //!
-//! An event in the queue is tried by every sync, but not for ever: each
-//! time the server or the bucket says no to it and it stays pending
-//! counts, `count_attempt`, and at `MAX_ATTEMPTS` it is refused, kept
-//! as a conflict with the reason until the person tries it again or
-//! lets it go. Not reaching the server counts nothing, and neither does
-//! a server or a bucket that is failing, so an outage of any length
+//! A rejection is final: the event is refused at once, kept as a
+//! conflict with the reason until the person resolves it. A file waiting
+//! for its bytes is the exception: each time the server or the bucket
+//! says no to it counts, `count_attempt`, and at `MAX_ATTEMPTS` it is
+//! refused. Not reaching the server counts nothing, and neither does a
+//! server or a bucket that is failing, so an outage of any length
 //! refuses nothing.
 
 use crate::data::app_events::{

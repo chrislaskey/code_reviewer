@@ -220,12 +220,21 @@ it is the log: every event answered is recorded with its answer, in the
 same transaction as the row, so a retried event gets the same answer and
 nothing applies twice. On a device it is the queue: an event is `pending`
 until the server answers it, deleted when applied, and kept as a
-`conflict` until the person resolves it. A rejected create the server
-sent no row for is refused: kept as a conflict with the reason, its row
-kept on the device, and never sent again on its own. A rejected update
-the server sent no row for stays pending with the reason in
-`last_error`, unless the reason is that the row is unknown to the
-server, see "Purge and resync".
+`conflict` until the person resolves it. A rejection is final: the
+event is never sent again on its own, and the person sees it, on the
+conflicts page, with the reason:
+
+- **An update rejected with the server's row.** The server's row wins,
+  and nothing waits: the person's change is kept as a refused conflict,
+  to reapply or let go.
+- **An update rejected without a row.** Refused at once. When the row
+  is unknown to the server, the device's copy goes too, see "Purge and
+  resync".
+- **A create rejected with the server's row**, which already has a row
+  under that id. The server's row wins; there is nothing to tell.
+- **A create rejected without a row.** Refused, with its row kept on the
+  device. The row is not in the system of record, so what depends on
+  it waits, below.
 
 **A refused create is never dropped.** The person decides, on the
 conflicts page: Try again or Let it go, see "What the person must still
@@ -236,11 +245,10 @@ file's), wait with it: held back from each push, as a file's events are
 while its bytes wait. A resync keeps the row. Letting it go removes the
 row, its events and the rows waiting with it.
 
-**A pending event is not tried for ever.** Each time the server
-rejects it and it stays pending counts in `attempts`, and at 30,
-`events::MAX_ATTEMPTS`, the event is refused: kept as a conflict with
-the reason and nothing on the server's side, for the conflicts page.
-Only the server's no to that event counts. No network, a timeout,
+**A file waiting for its bytes is not tried for ever.** It is the one
+rejection that is not final: the server only lacks the bytes yet. Each
+time counts in `attempts`, and at 30, `events::MAX_ATTEMPTS`, the
+create is refused. Only the server's no to that event counts. No network, a timeout,
 working offline, and a server or a bucket that is failing count
 nothing, so an outage of any length refuses nothing.
 
@@ -390,15 +398,17 @@ As the user signed in, with the device's token:
    applied before the next is sent, so a push cut short has kept what
    was answered. Apply the answers:
    `applied` deletes the event; `conflict` keeps it with the conflicts;
-   a `rejected` with a server row deletes the event, the server wins; a
-   rejected `create` without one is refused and kept for the person,
+   a `rejected` update with a server row is refused for the person and
+   the server's row wins; a rejected `create` with one deletes the
+   event, the server already has the row; a rejected `create` without
+   one is refused and kept for the person,
    with its row, and the later events in the request of that row and of
    rows pointing at it stay pending, waiting with it; a file's create
    the server only lacks the bytes of counts a try instead; a rejected
    update without one for a
    row the server does not know deletes the device's copy and keeps the
    change as a conflict with nothing on the other side; any other
-   `rejected` without one keeps the event pending with the reason. Then,
+   rejected update without one is refused at once. Then,
    for each row the push answered, once no event for it is still pending,
    apply the server's row from its last answer, parents first, which
    brings the merged values and the new version; a server row under

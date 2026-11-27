@@ -202,8 +202,10 @@ never removes the other two.
   unavailable, is a transport error, not `rejected`. The device then
   keeps the event pending and retries it.
 
-The Rust device keeps every refused create for the person, with its
-row, and holds back the events that wait with it, see "Events" in
+The Rust device shows every rejection to the person, except a create
+the server already has a row for. A refused create keeps its row and
+holds back the events that wait with it. A refused update takes the
+server's row and holds back nothing. See "Events" in
 `docs/design/offline-sync.md`.
 
 **`sync/pull`** (sample).

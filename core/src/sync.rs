@@ -766,8 +766,14 @@ async fn push_batch<T: Transport>(
                     continue;
                 }
                 match (event.kind, server.is_some()) {
-                    // The server's row wins
-                    (_, true) => app_events::delete(&mut tx, event.id).await?,
+                    // The server already has the row: its row wins
+                    (EventKind::Create, true) => app_events::delete(&mut tx, event.id).await?,
+                    // The server's row wins, and the person sees why their
+                    // change did not, to reapply or let go
+                    (EventKind::Update, true) => {
+                        app_events::refuse(&mut tx, event.id, &reason).await?;
+                        report.conflicts += 1;
+                    }
                     // Never dropped: the row stays, a file's bytes may be
                     // their only copy, and the person tries again or lets
                     // it go. A file waits while the server only lacks its
@@ -808,12 +814,10 @@ async fn push_batch<T: Transport>(
                         report.conflicts += 1;
                         continue;
                     }
-                    // Kept pending with the reason, and tried again by the
-                    // next sync, up to the limit
+                    // Refused once, not tried again: a rejection is final
                     (EventKind::Update, false) => {
-                        if app_events::count_attempt(&mut tx, event.id, &reason).await? {
-                            report.conflicts += 1;
-                        }
+                        app_events::refuse(&mut tx, event.id, &reason).await?;
+                        report.conflicts += 1;
                         continue;
                     }
                 }
@@ -2256,8 +2260,9 @@ pub(crate) mod tests {
         .await;
     }
 
-    /// Queues the note's create again with a field the server refuses.
-    async fn break_queued_create(device: &Deployment, user: &User) {
+    /// Queues the first pending event again with a field the server
+    /// refuses.
+    async fn break_queued_event(device: &Deployment, user: &User) {
         let mut tx = device.begin().await.expect("a transaction");
         let stored = app_events::pending(&mut tx)
             .await
@@ -2267,7 +2272,7 @@ pub(crate) mod tests {
             .await
             .expect("deleted");
         let mut broken = stored.event.clone();
-        broken.changes = fields(json!({ "body": "x", "version": 5 }));
+        broken.changes.insert("version".to_string(), json!(5));
         crate::sync::events::queue(&mut tx, user.id, &broken)
             .await
             .expect("queued");
@@ -2283,7 +2288,7 @@ pub(crate) mod tests {
             let note = test_notes::create(&a, &alice, "fine", None)
                 .await
                 .expect("a note");
-            break_queued_create(&a, &alice).await;
+            break_queued_event(&a, &alice).await;
 
             let report = sync(&a, &server).await;
             assert_eq!(report.rejected, 1);
@@ -2314,6 +2319,42 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
+    async fn sync_a_rejected_update_takes_the_servers_row_and_tells_the_person() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let (alice, token) = user_with_token(&server, "alice@example.com").await;
+            let note = test_notes::create(&server, &alice, "roses", None)
+                .await
+                .expect("a note");
+            let a = device_of(&alice, &token).await;
+            sync(&a, &server).await;
+            test_notes::update(&a, &alice, note.id, "tulips")
+                .await
+                .expect("edited");
+            break_queued_event(&a, &alice).await;
+
+            let report = sync(&a, &server).await;
+            assert_eq!(report.rejected, 1);
+            assert_eq!(report.conflicts, 1, "the person is told");
+            assert_eq!(report.pending, 0, "not tried again");
+            assert_eq!(bodies(&a, &alice).await, vec!["roses"], "the server's row");
+            let refused = conflicts::list(&a).await.expect("the conflicts");
+            assert_eq!(refused.len(), 1);
+            assert!(refused[0].reason.is_some(), "with why");
+            assert_eq!(refused[0].resolve, conflicts::Resolve::Reapply);
+
+            test_notes::update(&a, &alice, note.id, "daisies")
+                .await
+                .expect("edited again");
+            assert_eq!(sync(&a, &server).await.pushed, 1, "nothing waits on it");
+            assert_eq!(bodies(&server, &alice).await, vec!["daisies"]);
+            conflicts::delete(&a, refused[0].id).await.expect("let go");
+            assert!(conflicts::list(&a).await.expect("the conflicts").is_empty());
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn sync_a_rejected_create_tried_again_is_sent_again() {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
@@ -2322,7 +2363,7 @@ pub(crate) mod tests {
             test_notes::create(&a, &alice, "fine", None)
                 .await
                 .expect("a note");
-            break_queued_create(&a, &alice).await;
+            break_queued_event(&a, &alice).await;
             sync(&a, &server).await;
             assert_eq!(sync(&a, &server).await.rejected, 0, "not sent on its own");
 
@@ -2347,7 +2388,7 @@ pub(crate) mod tests {
             test_notes::create(&a, &alice, "fine", None)
                 .await
                 .expect("a note");
-            break_queued_create(&a, &alice).await;
+            break_queued_event(&a, &alice).await;
             sync(&a, &server).await;
 
             reset(&a, &alice).await.expect("a resync");
@@ -2355,13 +2396,6 @@ pub(crate) mod tests {
             assert_eq!(conflicts::list(&a).await.expect("the conflicts").len(), 1);
         })
         .await;
-    }
-
-    fn fields(value: Value) -> app_events::Fields {
-        match value {
-            Value::Object(fields) => fields,
-            _ => panic!("fields are an object"),
-        }
     }
 
     #[tokio::test]

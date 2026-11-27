@@ -2,7 +2,7 @@
 //! kept until the person resolves each, see "Conflicts" in
 //! `docs/design/offline-sync.md`. Two kinds end up here. A change to a
 //! field someone else changed first, which the person reapplies or lets
-//! go. And a change the server refused, or said no to
+//! go. And a change the server refused, or a file whose bytes it lacked
 //! `app_events::MAX_ATTEMPTS` times. A refused create keeps its row on the
 //! device, a post or a file and its bytes, and the person tries again or
 //! lets it go, see `docs/design/offline-files-decisions.md`. Never is a
