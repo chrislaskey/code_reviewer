@@ -20,8 +20,8 @@ completes.
 
 ## 2026-11-27: global sync versions replace timestamp cursors
 
-Commits: `5861a22` and the step 0 commit of `docs/design/backend-seam.md`
-after it.
+Commits: `5861a22`, `53a21ec`, and the commit after it that splits
+`SyncedTable`.
 
 - **What changed**.
   - The server gives each change to a synced row a `global_sync_version`.
@@ -40,6 +40,13 @@ after it.
     feed lock. A sign-in that writes no synced row takes no feed lock.
   - The core sync tests fail on any server row written without
     publishing its change, `assert_every_row_published`.
+  - `SyncedTable` keeps what a device and the server both use. The
+    Rust server's pull reads, `list_synced_after`, `parents` and
+    `list_live_in_community_after`, move to a new `SyncedTableServer`
+    trait. A table answers `server()` with it, or with none for a table
+    a remote backend serves.
+  - `device_settings::upgrade` moved from `data::device_settings` to
+    `core/src/device_settings.rs`. It opens its own transaction there.
 - **What an app does**.
   - **Required**. For each synced table of the app's own:
     - In its create migration, add `global_sync_version INTEGER CHECK
@@ -61,6 +68,14 @@ after it.
       `&VersionRange`. Select `global_sync_version > after AND
       global_sync_version <= through`, ordered by it. Declare
       `foreign_keys()` on its `SyncedTable`.
+    - Move `list_synced_after`, `parents` and
+      `list_live_in_community_after` from its `impl SyncedTable` to an
+      `impl SyncedTableServer` for the same struct. Add
+      `fn server(&self) -> Option<&dyn SyncedTableServer> { Some(self) }`
+      to its `impl SyncedTable`, as `app/files.rs` does.
+  - **Required** where the app calls it: call
+    `app_core::device_settings::upgrade` in place of
+    `app_core::data::device_settings::upgrade`.
   - **Required**. Remove any divergence for these files that the
     framework's version now covers.
   - **Required**. Stop the development server and desktop app. Run

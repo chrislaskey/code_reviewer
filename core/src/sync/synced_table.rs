@@ -57,6 +57,11 @@ pub trait SyncedTable: Send + Sync {
         &[]
     }
 
+    /// The table's part in the Rust server's sync, or none for a table
+    /// the app's remote backend serves instead, see
+    /// `docs/design/backend-seam.md`.
+    fn server(&self) -> Option<&dyn SyncedTableServer>;
+
     /// Applies an event of the user's in the caller's transaction and
     /// answers it, recording it on the server or queueing it on a device.
     async fn apply_in(
@@ -80,23 +85,6 @@ pub trait SyncedTable: Send + Sync {
         tx.commit().await?;
         Ok(answer)
     }
-
-    /// A page of the rows the server wrote after the cursor that the
-    /// user sees, deleted or not.
-    async fn list_synced_after(
-        &self,
-        tx: &mut Transaction,
-        user: &User,
-        range: &VersionRange,
-        limit: usize,
-    ) -> Result<Vec<TableRow>, TableError>;
-
-    /// The rows this one points at, which a pull sends before it.
-    async fn parents(
-        &self,
-        tx: &mut Transaction,
-        row: &TableRow,
-    ) -> Result<Vec<TableRow>, TableError>;
 
     /// Writes the server's row over the device's, unless an event of the
     /// device's for it is still pending; true when it was written.
@@ -132,18 +120,6 @@ pub trait SyncedTable: Send + Sync {
         _id: Uuid,
     ) -> Result<Option<CurrentFields>, TableError> {
         Ok(None)
-    }
-
-    /// The live rows in a community after the cursor, for a device that
-    /// just joined it; none for a table not in communities.
-    async fn list_live_in_community_after(
-        &self,
-        _tx: &mut Transaction,
-        _community_id: Uuid,
-        _range: &VersionRange,
-        _limit: usize,
-    ) -> Result<Vec<TableRow>, TableError> {
-        Ok(Vec::new())
     }
 
     /// Moves the device's rows from one community to another, through the
@@ -234,5 +210,40 @@ pub trait SyncedTable: Send + Sync {
     /// question asked before a move.
     fn counted_before_a_move(&self) -> bool {
         false
+    }
+}
+
+/// A synced table's part in the Rust server's sync: the pages a pull and a
+/// backfill answer, and the parents sent before a row. A table whose
+/// server is a remote backend needs none of it.
+#[async_trait]
+pub trait SyncedTableServer: Send + Sync {
+    /// A page of the rows the server wrote after the cursor that the
+    /// user sees, deleted or not.
+    async fn list_synced_after(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        range: &VersionRange,
+        limit: usize,
+    ) -> Result<Vec<TableRow>, TableError>;
+
+    /// The rows this one points at, which a pull sends before it.
+    async fn parents(
+        &self,
+        tx: &mut Transaction,
+        row: &TableRow,
+    ) -> Result<Vec<TableRow>, TableError>;
+
+    /// The live rows in a community after the cursor, for a device that
+    /// just joined it; none for a table not in communities.
+    async fn list_live_in_community_after(
+        &self,
+        _tx: &mut Transaction,
+        _community_id: Uuid,
+        _range: &VersionRange,
+        _limit: usize,
+    ) -> Result<Vec<TableRow>, TableError> {
+        Ok(Vec::new())
     }
 }

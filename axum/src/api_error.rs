@@ -426,6 +426,7 @@ impl From<SyncError> for ApiError {
             | SyncError::Refused(_)
             | SyncError::Malformed(_) => ApiError::new(StatusCode::BAD_REQUEST, error.to_string()),
             SyncError::Database(_)
+            | SyncError::NotServed(_)
             | SyncError::Table(_)
             | SyncError::DeviceSettings(_)
             | SyncError::Purge(_) => {

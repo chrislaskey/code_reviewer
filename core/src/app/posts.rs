@@ -30,7 +30,9 @@ use crate::helpers::json;
 use crate::sync::TableRow;
 use crate::sync::VersionRange;
 use crate::sync::events::{self, Answer, AnswerStatus};
-use crate::sync::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
+use crate::sync::synced_table::{
+    CurrentFields, LocalCreate, SyncedTable, SyncedTableServer, TableError,
+};
 
 /// The fields an event may set when it creates a post.
 const CREATE_FIELDS: &[&str] = &["body"];
@@ -453,6 +455,10 @@ impl SyncedTable for Synced {
         TABLE
     }
 
+    fn server(&self) -> Option<&dyn SyncedTableServer> {
+        Some(self)
+    }
+
     fn owner_column(&self) -> Option<&'static str> {
         Some("user_id")
     }
@@ -465,30 +471,6 @@ impl SyncedTable for Synced {
         event: &Event,
     ) -> Result<Answer, TableError> {
         Ok(apply_in(tx, role, user, event).await?.answer)
-    }
-
-    async fn list_synced_after(
-        &self,
-        tx: &mut Transaction,
-        user: &User,
-        range: &VersionRange,
-        limit: usize,
-    ) -> Result<Vec<TableRow>, TableError> {
-        let posts = app_posts::replication::list(tx, user.id, range, limit).await?;
-        Ok(posts.iter().map(table_row).collect::<Result<_, _>>()?)
-    }
-
-    async fn parents(
-        &self,
-        tx: &mut Transaction,
-        row: &TableRow,
-    ) -> Result<Vec<TableRow>, TableError> {
-        let post: Post = serde_json::from_value(row.row.clone())?;
-        let owner = users::get_in(tx, post.user_id).await?;
-        Ok(owner
-            .iter()
-            .map(users::table_row)
-            .collect::<Result<_, _>>()?)
     }
 
     async fn apply_server_row(
@@ -568,6 +550,33 @@ impl SyncedTable for Synced {
 
     fn counted_before_a_move(&self) -> bool {
         true
+    }
+}
+
+#[async_trait]
+impl SyncedTableServer for Synced {
+    async fn list_synced_after(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        range: &VersionRange,
+        limit: usize,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let posts = app_posts::replication::list(tx, user.id, range, limit).await?;
+        Ok(posts.iter().map(table_row).collect::<Result<_, _>>()?)
+    }
+
+    async fn parents(
+        &self,
+        tx: &mut Transaction,
+        row: &TableRow,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let post: Post = serde_json::from_value(row.row.clone())?;
+        let owner = users::get_in(tx, post.user_id).await?;
+        Ok(owner
+            .iter()
+            .map(users::table_row)
+            .collect::<Result<_, _>>()?)
     }
 }
 

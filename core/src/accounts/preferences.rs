@@ -24,7 +24,7 @@ use crate::helpers::locales;
 use crate::sync::TableRow;
 use crate::sync::VersionRange;
 use crate::sync::events::{self, Answer};
-use crate::sync::synced_table::{LocalCreate, SyncedTable, TableError};
+use crate::sync::synced_table::{LocalCreate, SyncedTable, SyncedTableServer, TableError};
 
 /// The fields a create sets.
 const CREATE_FIELDS: &[&str] = &["user_id", "key", "value"];
@@ -342,6 +342,10 @@ impl SyncedTable for Synced {
         TABLE
     }
 
+    fn server(&self) -> Option<&dyn SyncedTableServer> {
+        Some(self)
+    }
+
     fn owner_column(&self) -> Option<&'static str> {
         Some("user_id")
     }
@@ -354,27 +358,6 @@ impl SyncedTable for Synced {
         event: &Event,
     ) -> Result<Answer, TableError> {
         Ok(apply_in(tx, role, user, event).await?)
-    }
-
-    async fn list_synced_after(
-        &self,
-        tx: &mut Transaction,
-        user: &User,
-        range: &VersionRange,
-        limit: usize,
-    ) -> Result<Vec<TableRow>, TableError> {
-        let rows =
-            accounts_preferences::replication::list_synced_after(tx, user.id, range, limit).await?;
-        Ok(rows.iter().map(table_row).collect::<Result<_, _>>()?)
-    }
-
-    /// A preference points at its user, whose own row a device always has.
-    async fn parents(
-        &self,
-        _tx: &mut Transaction,
-        _row: &TableRow,
-    ) -> Result<Vec<TableRow>, TableError> {
-        Ok(Vec::new())
     }
 
     async fn apply_server_row(
@@ -414,6 +397,30 @@ impl SyncedTable for Synced {
     async fn label(&self, tx: &mut Transaction, id: Uuid) -> Result<Option<String>, TableError> {
         let row = accounts_preferences::replication::get(tx, id).await?;
         Ok(row.map(|row| row.key))
+    }
+}
+
+#[async_trait]
+impl SyncedTableServer for Synced {
+    async fn list_synced_after(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        range: &VersionRange,
+        limit: usize,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let rows =
+            accounts_preferences::replication::list_synced_after(tx, user.id, range, limit).await?;
+        Ok(rows.iter().map(table_row).collect::<Result<_, _>>()?)
+    }
+
+    /// A preference points at its user, whose own row a device always has.
+    async fn parents(
+        &self,
+        _tx: &mut Transaction,
+        _row: &TableRow,
+    ) -> Result<Vec<TableRow>, TableError> {
+        Ok(Vec::new())
     }
 }
 

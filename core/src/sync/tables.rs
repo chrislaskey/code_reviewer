@@ -67,6 +67,16 @@ pub(crate) fn without_dependents(table: &str) -> Result<String, sqlx::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tables_list_only_tables_this_server_serves() {
+        let unserved: Vec<_> = list()
+            .iter()
+            .filter(|synced| synced.server().is_none())
+            .map(|synced| synced.table())
+            .collect();
+        assert!(unserved.is_empty(), "no server part: {unserved:?}");
+    }
     use crate::database::Database;
 
     /// A table the app adds that carries the sync columns but is left out

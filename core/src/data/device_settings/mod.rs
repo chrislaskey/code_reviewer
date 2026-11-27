@@ -1,7 +1,8 @@
 //! Device settings: what a person chooses on a device, such as working
 //! offline or who is signed in, kept in the device's database as a JSON
 //! value per key so a new setting needs no migration. Every setting is
-//! declared here, with the value a device starts with, and `upgrade`
+//! declared here, with the value a device starts with, and
+//! `crate::device_settings::upgrade`
 //! brings a device up to date with that list when the app starts, so a
 //! setting is always there to read. Never synced. The reads and
 //! writes of `device_settings`.
@@ -12,7 +13,6 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::database::Transaction;
-use crate::deployment::Deployment;
 
 #[cfg(feature = "postgres")]
 mod postgres;
@@ -80,22 +80,18 @@ pub enum DeviceSettingsError {
     Database(#[from] sqlx::Error),
 }
 
-/// Brings the device's settings up to date with `defaults`: adds each
-/// one that is missing with its first value, and leaves the rest as the
-/// person set them. The place for a release that renames or reshapes a
-/// setting to rewrite what an earlier release stored. Returns how many
-/// were added.
-pub async fn upgrade(deployment: &Deployment) -> Result<usize, DeviceSettingsError> {
-    let mut tx = deployment.begin().await?;
-    let mut added = 0;
+/// Inserts each setting of `defaults` that is missing, with its first
+/// value, and leaves the rest as the person set them. Returns how many
+/// were inserted.
+pub(crate) async fn insert_missing_defaults(tx: &mut Transaction) -> Result<usize, sqlx::Error> {
+    let mut inserted = 0;
     for (key, value) in defaults() {
-        if get_stored(&mut tx, key).await?.is_none() {
-            query!(&mut tx, set(key, &value))?;
-            added += 1;
+        if get_stored(&mut *tx, key).await?.is_none() {
+            query!(&mut *tx, set(key, &value))?;
+            inserted += 1;
         }
     }
-    tx.commit().await?;
-    Ok(added)
+    Ok(inserted)
 }
 
 /// The setting's stored JSON, or none when it was never set up.
@@ -128,50 +124,4 @@ pub async fn set<T: Serialize>(
         source,
     })?;
     Ok(query!(tx, set(key, &value))?)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::app::users::SignedIn;
-    use crate::database::with_each_database;
-    use crate::deployment::Role;
-
-    #[tokio::test]
-    async fn device_settings_upgrade_adds_what_is_missing_and_keeps_what_is_set() {
-        with_each_database(|database| async move {
-            let deployment = Deployment::new(database, Role::Device);
-            let mut tx = deployment.begin().await.expect("a transaction");
-            let error = get::<bool>(&mut tx, WORK_OFFLINE)
-                .await
-                .expect_err("not set up");
-            assert!(matches!(error, DeviceSettingsError::Missing(key) if key == WORK_OFFLINE));
-            tx.commit().await.expect("committed");
-
-            assert_eq!(
-                upgrade(&deployment).await.expect("upgraded"),
-                defaults().len()
-            );
-            let mut tx = deployment.begin().await.expect("a transaction");
-            assert!(!get::<bool>(&mut tx, WORK_OFFLINE).await.expect("read"));
-            assert_eq!(
-                get::<Option<SignedIn>>(&mut tx, SIGNED_IN)
-                    .await
-                    .expect("nobody"),
-                None
-            );
-            set(&mut tx, WORK_OFFLINE, &true).await.expect("set");
-            tx.commit().await.expect("committed");
-
-            assert_eq!(upgrade(&deployment).await.expect("upgraded again"), 0);
-            let mut tx = deployment.begin().await.expect("a transaction");
-            assert!(get::<bool>(&mut tx, WORK_OFFLINE).await.expect("read"));
-            let error = get::<String>(&mut tx, WORK_OFFLINE)
-                .await
-                .expect_err("not a string");
-            assert!(matches!(error, DeviceSettingsError::Invalid { .. }));
-            tx.commit().await.expect("committed");
-        })
-        .await;
-    }
 }

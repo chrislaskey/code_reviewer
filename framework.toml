@@ -27,6 +27,7 @@ framework = [
     "core/src/lib.rs",
     "core/src/database.rs",
     "core/src/deployment.rs",
+    "core/src/device_settings.rs",
     "core/src/servers.rs",
     "core/src/servers/**",
     "core/src/jobs.rs",

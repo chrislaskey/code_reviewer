@@ -30,7 +30,7 @@ use crate::helpers::json;
 use crate::sync::TableRow;
 use crate::sync::VersionRange;
 use crate::sync::events::{self, Answer, AnswerStatus};
-use crate::sync::synced_table::{LocalCreate, SyncedTable, TableError};
+use crate::sync::synced_table::{LocalCreate, SyncedTable, SyncedTableServer, TableError};
 use crate::sync::tables;
 
 const CREATE_FIELDS: &[&str] = &["user_id", "community_id", "role"];
@@ -487,6 +487,10 @@ impl SyncedTable for Synced {
         TABLE
     }
 
+    fn server(&self) -> Option<&dyn SyncedTableServer> {
+        Some(self)
+    }
+
     fn owner_column(&self) -> Option<&'static str> {
         Some("user_id")
     }
@@ -499,36 +503,6 @@ impl SyncedTable for Synced {
         event: &Event,
     ) -> Result<Answer, TableError> {
         Ok(apply_in(tx, role, user, event).await?.answer)
-    }
-
-    async fn list_synced_after(
-        &self,
-        tx: &mut Transaction,
-        user: &User,
-        range: &VersionRange,
-        limit: usize,
-    ) -> Result<Vec<TableRow>, TableError> {
-        let memberships = list_synced_after(tx, user, range, limit).await?;
-        Ok(memberships
-            .iter()
-            .map(table_row)
-            .collect::<Result<_, _>>()?)
-    }
-
-    async fn parents(
-        &self,
-        tx: &mut Transaction,
-        row: &TableRow,
-    ) -> Result<Vec<TableRow>, TableError> {
-        let membership: Membership = serde_json::from_value(row.row.clone())?;
-        let mut parents = Vec::new();
-        if let Some(user) = users::get_in(tx, membership.user_id).await? {
-            parents.push(users::table_row(&user)?);
-        }
-        if let Some(community) = communities::get_in(tx, membership.community_id).await? {
-            parents.push(communities::table_row(&community)?);
-        }
-        Ok(parents)
     }
 
     /// A live membership of the device's user that the device did not
@@ -579,6 +553,39 @@ impl SyncedTable for Synced {
                 })),
             })
             .collect())
+    }
+}
+
+#[async_trait]
+impl SyncedTableServer for Synced {
+    async fn list_synced_after(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        range: &VersionRange,
+        limit: usize,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let memberships = list_synced_after(tx, user, range, limit).await?;
+        Ok(memberships
+            .iter()
+            .map(table_row)
+            .collect::<Result<_, _>>()?)
+    }
+
+    async fn parents(
+        &self,
+        tx: &mut Transaction,
+        row: &TableRow,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let membership: Membership = serde_json::from_value(row.row.clone())?;
+        let mut parents = Vec::new();
+        if let Some(user) = users::get_in(tx, membership.user_id).await? {
+            parents.push(users::table_row(&user)?);
+        }
+        if let Some(community) = communities::get_in(tx, membership.community_id).await? {
+            parents.push(communities::table_row(&community)?);
+        }
+        Ok(parents)
     }
 }
 

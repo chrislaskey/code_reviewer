@@ -66,7 +66,9 @@ use crate::sync::TableRow;
 use crate::sync::VersionRange;
 use crate::sync::bytes::{self, BytesError, BytesRow, Readable, RowContent, SyncedBytes};
 use crate::sync::events::{self, Answer, AnswerStatus};
-use crate::sync::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
+use crate::sync::synced_table::{
+    CurrentFields, LocalCreate, SyncedTable, SyncedTableServer, TableError,
+};
 
 /// The fields an event may set when it creates a file: `communities` is
 /// the rows of its first communities, written with it, and `content`
@@ -1036,6 +1038,10 @@ impl SyncedTable for Synced {
         TABLE
     }
 
+    fn server(&self) -> Option<&dyn SyncedTableServer> {
+        Some(self)
+    }
+
     fn bytes(&self) -> Option<&dyn SyncedBytes> {
         Some(self)
     }
@@ -1063,25 +1069,6 @@ impl SyncedTable for Synced {
         event: &Event,
     ) -> Result<Answer, TableError> {
         Ok(apply_event(deployment, user, event).await?)
-    }
-
-    async fn list_synced_after(
-        &self,
-        tx: &mut Transaction,
-        user: &User,
-        range: &VersionRange,
-        limit: usize,
-    ) -> Result<Vec<TableRow>, TableError> {
-        let files = list_synced_after(tx, user, range, limit).await?;
-        Ok(files.iter().map(table_row).collect::<Result<_, _>>()?)
-    }
-
-    async fn parents(
-        &self,
-        _tx: &mut Transaction,
-        _row: &TableRow,
-    ) -> Result<Vec<TableRow>, TableError> {
-        Ok(Vec::new())
     }
 
     async fn apply_server_row(
@@ -1188,6 +1175,28 @@ impl SyncedTable for Synced {
 
     fn counted_before_a_move(&self) -> bool {
         true
+    }
+}
+
+#[async_trait]
+impl SyncedTableServer for Synced {
+    async fn list_synced_after(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        range: &VersionRange,
+        limit: usize,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let files = list_synced_after(tx, user, range, limit).await?;
+        Ok(files.iter().map(table_row).collect::<Result<_, _>>()?)
+    }
+
+    async fn parents(
+        &self,
+        _tx: &mut Transaction,
+        _row: &TableRow,
+    ) -> Result<Vec<TableRow>, TableError> {
+        Ok(Vec::new())
     }
 }
 

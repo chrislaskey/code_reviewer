@@ -249,16 +249,22 @@ Done:
   Going further needs row locks (`SELECT … FOR UPDATE`) in each context,
   and a tested lock order.
 
+- **3.** `SyncedTableServer` holds the Rust server's pull reads:
+  `list_synced_after`, `parents` and `list_live_in_community_after`.
+  `SyncedTable` keeps the rest, which a device uses too. A table answers
+  `SyncedTable::server()` with its server part, so each app keeps one
+  list in `synced_tables.rs`. A table a remote backend serves answers
+  none. `server()` is required, so a table cannot leave it out by
+  accident. A test checks that every listed table has its server part
+  on a Rust server.
+- **6.** `device_settings::upgrade` is in `core/src/device_settings.rs`,
+  a high-level module that opens the transaction. The data context
+  keeps `insert_missing_defaults`, which borrows the caller's.
+
 Moved to step 1, the seam itself:
 
 - **1 and 2.** These become concrete function by function, as each entry
   gets its dispatch. Changing visibility before then would be guesswork.
-- **3.** Splitting `SyncedTable` adds a second list to every app's
-  `synced_tables.rs`. Nothing yet needs only one half. The remote
-  backend is the first that will, so the split waits for it.
-- **6.** Moving `device_settings::upgrade`'s transaction to its caller
-  would put a transaction into Tauri. The better fix is to move the
-  function to a high-level module, which is a change of its own.
 
 Still open from the review: the membership backfill trigger, and the
 purge holding the feed lock (§3.5).

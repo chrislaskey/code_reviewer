@@ -53,7 +53,7 @@ use crate::services::web_server::Transport;
 use bytes::BytesError;
 use events::{Answer, AnswerStatus};
 use purge::PurgeError;
-use synced_table::{SyncedTable, TableError};
+use synced_table::{SyncedTable, SyncedTableServer, TableError};
 
 /// The version of the sync's protocol, which a server describes itself
 /// with, see `servers`: a device syncs with a server of its own version
@@ -231,6 +231,10 @@ pub enum SyncError {
     InvalidContinuation,
     #[error("the server answered with something unexpected: {0}")]
     Malformed(String),
+    /// A table with no part in this server's sync, which a remote
+    /// backend serves instead.
+    #[error("this server does not serve the table {0}")]
+    NotServed(String),
 }
 
 /// Answers a push from the user: applies the events in the order given,
@@ -402,14 +406,15 @@ async fn scan_page(
     let range = continuation.range;
     let mut rows = Vec::new();
     for synced in tables::list() {
+        let served = server_of(*synced)?;
         let rows_of_table = match continuation.scan {
             Scan::Community(id) => {
-                synced
+                served
                     .list_live_in_community_after(tx, id, &range, limit + 1)
                     .await?
             }
             Scan::Incremental | Scan::Bootstrap => {
-                synced
+                served
                     .list_synced_after(tx, user, &range, limit + 1)
                     .await?
             }
@@ -463,12 +468,22 @@ async fn send_with_parents(
         return Ok(());
     }
     let synced = synced_table_of(&row.table)?;
-    for parent in synced.parents(tx, &row).await? {
+    for parent in server_of(synced)?.parents(tx, &row).await? {
         Box::pin(send_with_parents(tx, out, sent, parent)).await?;
     }
     sent.insert(key);
     out.push(row);
     Ok(())
+}
+
+/// The table's part in this server's sync: every table has one on a
+/// Rust server.
+fn server_of(
+    synced: &'static dyn SyncedTable,
+) -> Result<&'static dyn SyncedTableServer, SyncError> {
+    synced
+        .server()
+        .ok_or_else(|| SyncError::NotServed(synced.table().to_string()))
 }
 
 /// The synced table of the name a row or an event gives.
