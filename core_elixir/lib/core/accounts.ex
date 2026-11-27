@@ -91,34 +91,110 @@ defmodule Core.Accounts do
   end
 
   @doc """
-  Finishes a sign-in whose code matched, as `accounts::sign_in_confirm`
-  does: a new token for the user. A first sign-in confirms the account
-  and makes the user's personal community.
+  The address a pending sign-in's code went to, as `accounts::resend_code_to`
+  answers it, for Rust's limit on how often an address is mailed.
   """
-  def sign_in_confirm(pending) do
-    case AccountsTokens.get_valid(pending || "", AccountsTokens.context_sign_in_confirm()) do
-      nil -> {:error, :sign_in_expired}
-      row -> Repo.transaction(fn -> confirmed(row) end)
+  def resend_code_to(pending) do
+    case AccountsTokens.get_valid(pending || "", AccountsTokens.context_sign_in_code()) do
+      nil -> {:error, :wrong_code}
+      row -> {:ok, %{"email" => AccountsUsers.get(row.user_id).email}}
     end
   end
 
-  defp confirmed(row) do
+  @doc "A new code for a pending sign-in, and ten minutes again, as `accounts::resend_code` does: the mail to send."
+  def resend_code(pending, locale) do
+    case AccountsTokens.get_valid(pending || "", AccountsTokens.context_sign_in_code()) do
+      nil ->
+        {:error, :wrong_code}
+
+      row ->
+        code = AccountsTokens.update_code(row, Random.digits(6))
+        email = AccountsUsers.get(row.user_id).email
+        {:ok, %{"mail" => %{"kind" => "sign_in_code", "to" => email, "locale" => locale, "code" => code}}}
+    end
+  end
+
+  @doc """
+  Finishes a sign-in whose code matched, as `accounts::sign_in_confirm`
+  does: a new token for the user. A first sign-in confirms the account
+  and makes the user's personal community. Every sign-in records the
+  terms the person accepted, the version Rust shows.
+  """
+  def sign_in_confirm(pending, terms_version) do
+    with {:ok, row} <- confirm_row(pending) do
+      Repo.transaction(fn ->
+        account = confirmed(row, terms_version)
+        token = Random.hex(32)
+        AccountsTokens.create(account.id, AccountsTokens.context_api(), token)
+        %{"user" => AppUsers.to_wire(AppUsers.get(account.id)), "email" => account.email, "token" => token}
+      end)
+    end
+  end
+
+  @doc """
+  Finishes it for the device whose challenge it is, as
+  `accounts::sign_in_confirm_for_device` does: a code the device
+  collects with its verifier, and no token.
+  """
+  def sign_in_confirm_for_device(pending, challenge, terms_version) when is_binary(challenge) do
+    with {:ok, row} <- confirm_row(pending) do
+      Repo.transaction(fn ->
+        account = confirmed(row, terms_version)
+        code = Random.hex(16)
+        AccountsTokens.create(account.id, AccountsTokens.context_device_code(), code <> challenge)
+        %{"code" => code}
+      end)
+    end
+  end
+
+  def sign_in_confirm_for_device(_pending, _challenge, _terms_version),
+    do: {:error, {:invalid, %{"challenge" => ["is needed"]}}}
+
+  @doc """
+  Exchanges a device code for the device's token, once, as
+  `accounts::sign_in_with_device_code` does. Rust turns the device's
+  verifier into its challenge, so the row is found by both.
+  """
+  def sign_in_with_device_code(code, challenge) when is_binary(code) and is_binary(challenge) do
+    case AccountsTokens.get_valid(code <> challenge, AccountsTokens.context_device_code()) do
+      nil ->
+        {:error, :unknown_device_code}
+
+      row ->
+        Repo.transaction(fn ->
+          AccountsTokens.delete(row)
+          account = AccountsUsers.get(row.user_id)
+          token = Random.hex(32)
+          AccountsTokens.create(account.id, AccountsTokens.context_api(), token)
+          %{"user" => AppUsers.to_wire(AppUsers.get(account.id)), "email" => account.email, "token" => token}
+        end)
+    end
+  end
+
+  def sign_in_with_device_code(_code, _challenge), do: {:error, :unknown_device_code}
+
+  defp confirm_row(pending) do
+    case AccountsTokens.get_valid(pending || "", AccountsTokens.context_sign_in_confirm()) do
+      nil -> {:error, :sign_in_expired}
+      row -> {:ok, row}
+    end
+  end
+
+  defp confirmed(row, terms_version) do
     AccountsTokens.delete(row)
     account = AccountsUsers.get(row.user_id)
+    now = Time.now()
 
     account =
       if account.confirmed_at do
         account
       else
         AppSyncVersions.lock()
-        now = Time.now()
         Communities.create_personal_in(row.user_id)
-        AccountsUsers.update(%{account | confirmed_at: now, updated_at: now})
+        %{account | confirmed_at: now}
       end
 
-    token = Random.hex(32)
-    AccountsTokens.create(account.id, AccountsTokens.context_api(), token)
-    %{"user" => AppUsers.to_wire(AppUsers.get(account.id)), "email" => account.email, "token" => token}
+    AccountsUsers.update(%{account | terms_version: terms_version, terms_accepted_at: now, updated_at: now})
   end
 
   @doc "Forgets a token."

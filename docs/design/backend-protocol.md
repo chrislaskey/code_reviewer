@@ -36,7 +36,7 @@ them `501 not_implemented`.
 | 404 | `not_found` |
 | 409 | `exists` |
 | 410 | `account_deleted` |
-| 422 | `sign_in_expired`, `wrong_code` |
+| 422 | `sign_in_expired`, `wrong_code`, `unknown_device_code` |
 | 501 | `not_implemented` |
 
 ## Shared shapes
@@ -77,7 +77,8 @@ keeps, see [offline sync](offline-sync.md):
   never see version N+1 committed while N is not. One locked counter
   row, as the Rust server has, does that. So does one ordered projector.
 - The feed has an id, a UUID made when its database is made. A restored
-  backup gets a new one.
+  backup gets a new one, so every device resyncs: in the sample,
+  `mix core.feed_id_renew`.
 - The floor is the lowest cursor a pull still answers. Purging the
   change log moves it.
 
@@ -143,25 +144,59 @@ mailed, as `accounts::sign_in_with_code` does.
 `accounts::sign_in_confirm` does.
 
 ```json
-{"pending": "…"}
+{"pending": "…", "terms_version": "2026-11-22"}
 → {"user": User, "email": "…", "token": "…"}
 ```
 
 - A first sign-in confirms the account. It creates the user's personal
   community, `"Personal"`, and their membership of it. Both are
   published.
+- Every sign-in records `terms_version`, the terms Rust shows, and the
+  time, on the account: `terms_version` and `terms_accepted_at`.
 - `token` is new, and is returned this once. An expired or used
   `pending` is `sign_in_expired`.
-- Specified, not in the sample: `accounts/sign_in_confirm_for_device`.
-  It takes the device's challenge, and answers a device code instead of
-  a token.
+
+**`accounts/sign_in_confirm_for_device`** (sample). The same last step,
+for the desktop or phone app that started the sign-in in a browser.
+
+```json
+{"pending": "…", "challenge": "…", "terms_version": "2026-11-22"}
+→ {"code": "…"}
+```
+
+- It records the terms as `sign_in_confirm` does, and answers a code
+  for the device to collect, not a token.
+- The code is good for five minutes, once, with the challenge it was
+  made for. Keep it hashed with the challenge.
+
+**`accounts/sign_in_with_device_code`** (sample). The device collects its
+token.
+
+```json
+{"code": "…", "challenge": "…"}
+→ {"user": User, "email": "…", "token": "…"}
+```
+
+- Rust turns the device's verifier into its challenge, so the backend
+  only matches the code and the challenge together. A wrong, used or
+  expired code is `unknown_device_code`.
+
+**`accounts/resend_code_to`** (sample). `{"pending"} → {"email"}`: the
+address a pending sign-in's code went to, for Rust's limit on how often
+one address is mailed. An unknown or expired `pending` is `wrong_code`.
+
+**`accounts/resend_code`** (sample). `{"pending", "locale"} → {"mail": Mail}`:
+a new code for the pending sign-in, which starts its ten minutes and
+its five attempts again. The old code no longer matches. Rust sends the
+mail.
 
 **`accounts/sign_out`** (sample). `{"token": "…"} → {}`. Forgets the token.
 
-Specified, not in the sample: `accounts/sign_in_from_trial`,
-`accounts/resend_code`, the password operations, device codes,
-`accounts/deletions/*`, `trial_users/*`, `accounts/preferences/*`, and
-the commerce and ops operations of `backend-seam.md` §2.
+Specified, not in the sample: `accounts/sign_in_from_trial`, the
+password operations, `accounts/deletions/*`, `trial_users/*`,
+`accounts/preferences/*`, and the commerce and ops operations of
+`backend-seam.md` §2. Beside a remote backend the web server offers no
+trials, so a trial sign-in never comes.
 
 ### Sync
 

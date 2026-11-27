@@ -305,6 +305,10 @@ pub async fn resend_code(
     if deployment.role != Role::Server {
         return Err(AccountError::ServerOnly);
     }
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::resend_code(backend, mailer, pending, requested).await;
+    }
     let mut tx = deployment.begin().await?;
     let row = accounts_tokens::get_valid(
         &mut tx,
@@ -333,6 +337,10 @@ pub async fn resend_code_to(
 ) -> Result<String, AccountError> {
     if deployment.role != Role::Server {
         return Err(AccountError::ServerOnly);
+    }
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::resend_code_to(backend, pending).await;
     }
     let mut tx = deployment.begin().await?;
     let row = accounts_tokens::get_valid(
@@ -391,6 +399,10 @@ pub async fn sign_in_confirm_for_device(
     pending: &str,
     challenge: &str,
 ) -> Result<DeviceCode, AccountError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::sign_in_confirm_for_device(backend, pending, challenge).await;
+    }
     confirm(deployment, pending, Finish::Device { challenge }).await
 }
 
@@ -429,6 +441,11 @@ pub async fn sign_in_with_device_code(
 ) -> Result<Session, AccountError> {
     if deployment.role != Role::Server {
         return Err(AccountError::ServerOnly);
+    }
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::sign_in_with_device_code(backend, code, &challenge_of(verifier))
+            .await;
     }
     let mut tx = deployment.begin().await?;
     let token_hash = accounts_tokens::device_code_hash(code, &challenge_of(verifier));
@@ -791,12 +808,80 @@ mod from_backend {
             .map_err(account_error)
     }
 
+    /// The address the pending sign-in's code went to.
+    pub(super) async fn resend_code_to(
+        backend: &RemoteBackend,
+        pending: &str,
+    ) -> Result<String, AccountError> {
+        #[derive(Deserialize)]
+        struct SentTo {
+            email: String,
+        }
+        let sent_to: SentTo = backend
+            .call("accounts/resend_code_to", &json!({ "pending": pending }))
+            .await
+            .map_err(account_error)?;
+        Ok(sent_to.email)
+    }
+
+    pub(super) async fn resend_code(
+        backend: &RemoteBackend,
+        mailer: &Mailer,
+        pending: &str,
+        requested: &str,
+    ) -> Result<(), AccountError> {
+        #[derive(Deserialize)]
+        struct Resent {
+            mail: MailToSend,
+        }
+        let request = json!({ "pending": pending, "locale": requested });
+        let resent: Resent = backend
+            .call("accounts/resend_code", &request)
+            .await
+            .map_err(account_error)?;
+        mailer.send(mail_of(resent.mail)?).await?;
+        Ok(())
+    }
+
+    /// The last step records the terms the person accepted: the version
+    /// Rust shows, `TERMS_VERSION`.
     pub(super) async fn sign_in_confirm(
         backend: &RemoteBackend,
         pending: &str,
     ) -> Result<Session, AccountError> {
+        let request = json!({ "pending": pending, "terms_version": TERMS_VERSION });
         backend
-            .call("accounts/sign_in_confirm", &json!({ "pending": pending }))
+            .call("accounts/sign_in_confirm", &request)
+            .await
+            .map_err(account_error)
+    }
+
+    pub(super) async fn sign_in_confirm_for_device(
+        backend: &RemoteBackend,
+        pending: &str,
+        challenge: &str,
+    ) -> Result<DeviceCode, AccountError> {
+        let request = json!({
+            "pending": pending,
+            "challenge": challenge,
+            "terms_version": TERMS_VERSION,
+        });
+        backend
+            .call("accounts/sign_in_confirm_for_device", &request)
+            .await
+            .map_err(account_error)
+    }
+
+    /// `challenge` is the device's verifier turned into its challenge, as
+    /// Rust checks a device code.
+    pub(super) async fn sign_in_with_device_code(
+        backend: &RemoteBackend,
+        code: &str,
+        challenge: &str,
+    ) -> Result<Session, AccountError> {
+        let request = json!({ "code": code, "challenge": challenge });
+        backend
+            .call("accounts/sign_in_with_device_code", &request)
             .await
             .map_err(account_error)
     }
@@ -824,6 +909,7 @@ mod from_backend {
         match error.code() {
             Some("wrong_code") => AccountError::CodeDoesNotMatch,
             Some("sign_in_expired") => AccountError::SignInExpired,
+            Some("unknown_device_code") => AccountError::UnknownDeviceCode,
             Some("account_deleted") => AccountError::User(UserError::AccountDeleted),
             _ => error.into(),
         }

@@ -99,6 +99,9 @@ pub async fn create(deployment: &Deployment, max: i64) -> Result<Session, TrialU
     if deployment.role != Role::Server {
         return Err(TrialUserError::ServerOnly);
     }
+    if max <= 0 {
+        return Err(TrialUserError::Full);
+    }
     let mut tx = deployment.begin().await?;
     crate::data::app_sync_versions::lock(&mut tx).await?;
     if trial_users::count(&mut tx).await? >= max {

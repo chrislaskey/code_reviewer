@@ -18,6 +18,24 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-27: device sign-in, resent codes and terms through a remote backend
+
+Commits: this one. Step 3 of `docs/design/backend-seam.md`.
+
+- **What changed**.
+  - Beside a remote backend, the desktop and phone apps sign in,
+    a code can be resent, and the last step records the terms
+    accepted: `accounts::sign_in_confirm_for_device`,
+    `sign_in_with_device_code`, `resend_code_to` and `resend_code` call
+    it, and `sign_in_confirm` sends `TERMS_VERSION`.
+  - Beside a remote backend the web server offers no trials:
+    `TrialUsersMax::open_for` is 0 there. `trial_users::create` with a
+    cap of 0 is refused before it opens a transaction, on every
+    backend, and `GET /api/accounts/trial` counts nothing at a cap of 0.
+  - The conformance suite has three more tests, ten in all.
+  - `core_elixir/` has `mix core.feed_id_renew`, for after a restore.
+- **What an app does**. Nothing.
+
 ## 2026-11-27: a conformance suite for remote backends, and Elixir in bin/lint
 
 Commits: this one. Step 2 of `docs/design/backend-seam.md`.

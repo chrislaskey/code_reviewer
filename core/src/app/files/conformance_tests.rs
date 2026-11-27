@@ -23,7 +23,7 @@ use uuid::Uuid;
 
 use crate::accounts::{self, Session};
 use crate::app::files::{self, FileFilter};
-use crate::app::{communities, memberships};
+use crate::app::{communities, memberships, users};
 use crate::data::app_sync_state::Cursor;
 use crate::database::with_each_database;
 use crate::deployment::Deployment;
@@ -326,4 +326,88 @@ async fn conformance_a_cursor_of_another_feed_or_beyond_its_head_resyncs(server:
             .expect("a page");
         assert!(page.resync);
     }
+}
+
+/// The address and pending sign-in of a new sign-in for the address,
+/// with the code mailed.
+async fn sign_in_started(server: &Deployment, mailer: &Mailer, email: &str) -> (String, String) {
+    let sent = accounts::sign_in(server, mailer, email, true, "en")
+        .await
+        .expect("a sign-in");
+    let mail = mailer.last_sent_to(email).expect("mailed");
+    (sent.pending, mails::code_in(&mail).expect("a code"))
+}
+
+conformance!(conformance_a_device_signs_in_with_a_code_it_collects_once);
+async fn conformance_a_device_signs_in_with_a_code_it_collects_once(server: Deployment) {
+    let alice = signed_up(&server).await;
+    let (pending, code) = sign_in_started(&server, &Mailer::memory(), &alice.email).await;
+    let matched = accounts::sign_in_with_code(&server, &pending, &code)
+        .await
+        .expect("the code");
+    assert!(!matched.new_account);
+    let verifier = "a verifier only the device knows";
+    let device_code = accounts::sign_in_confirm_for_device(
+        &server,
+        &matched.pending,
+        &accounts::challenge_of(verifier),
+    )
+    .await
+    .expect("a device code");
+
+    let wrong = accounts::sign_in_with_device_code(&server, &device_code.code, "another")
+        .await
+        .expect_err("another verifier");
+    assert!(matches!(wrong, accounts::AccountError::UnknownDeviceCode));
+    let session = accounts::sign_in_with_device_code(&server, &device_code.code, verifier)
+        .await
+        .expect("the device's session");
+    assert_eq!(session.user.id, alice.user.id);
+    let again = accounts::sign_in_with_device_code(&server, &device_code.code, verifier)
+        .await
+        .expect_err("once");
+    assert!(matches!(again, accounts::AccountError::UnknownDeviceCode));
+    let user = users::get_by_token(&server, &session.token)
+        .await
+        .expect("the token works");
+    assert_eq!(user.id, alice.user.id);
+}
+
+conformance!(conformance_a_resent_code_replaces_the_first);
+async fn conformance_a_resent_code_replaces_the_first(server: Deployment) {
+    let alice = signed_up(&server).await;
+    let mailer = Mailer::memory();
+    let (pending, first) = sign_in_started(&server, &mailer, &alice.email).await;
+    let sent_to = accounts::resend_code_to(&server, &pending)
+        .await
+        .expect("the address");
+    assert_eq!(sent_to, alice.email);
+    accounts::resend_code(&server, &mailer, &pending, "en")
+        .await
+        .expect("resent");
+    let mail = mailer.last_sent_to(&alice.email).expect("mailed again");
+    let second = mails::code_in(&mail).expect("a code");
+
+    if first != second {
+        let error = accounts::sign_in_with_code(&server, &pending, &first)
+            .await
+            .expect_err("the first code");
+        assert!(matches!(error, accounts::AccountError::CodeDoesNotMatch));
+    }
+    accounts::sign_in_with_code(&server, &pending, &second)
+        .await
+        .expect("the second code");
+}
+
+conformance!(conformance_the_last_step_records_the_terms_accepted);
+async fn conformance_the_last_step_records_the_terms_accepted(server: Deployment) {
+    let alice = signed_up(&server).await;
+    let account = accounts::users::get(&server, alice.user.id)
+        .await
+        .expect("the account");
+    assert_eq!(
+        account.terms_version.as_deref(),
+        Some(accounts::TERMS_VERSION)
+    );
+    assert!(account.terms_accepted_at.is_some());
 }

@@ -446,11 +446,20 @@ an app's own resources.
 
 ### Step 3: fill in the sample
 
-- Record the accepted terms at sign-in, as `finish_proven_in` does.
-- `accounts/sign_in_confirm_for_device`, for the desktop and phone
-  apps.
-- Resending a code, and sign-in from a trial.
-- A new feed id for a restored backup.
+**Built, 2026-11-27**, each with a conformance test, ten in all:
+
+- The last step records the accepted terms. Rust sends `terms_version`,
+  since Rust shows the terms.
+- The desktop and phone apps sign in: `accounts/sign_in_confirm_for_device`
+  and `accounts/sign_in_with_device_code`. Rust keeps the check of the
+  device's verifier, and sends its challenge.
+- Resending a code: `accounts/resend_code_to` and `accounts/resend_code`.
+- A restored backup gets a new feed id: `mix core.feed_id_renew`, or
+  `Core.Migrations.feed_id_renew/0` in a release.
+
+Not built: trials. Beside a remote backend the web server offers none:
+`TRIAL_USERS_MAX` is 0 there, and a trial is refused before it touches
+a database. Sign-in from a trial waits with them.
 
 ### Open questions and smaller fixes
 
@@ -464,5 +473,11 @@ an app's own resources.
   kept for the person, see `docs/suggestions/refused-creates.md`.
 - A token cache in remote mode, see
   `docs/suggestions/backend-token-cache.md`.
+- **The Rust server has no feed id renewal either.** Its feed id is made
+  once, by the migration. A restored backup of its database keeps it,
+  so a device could miss changes. It needs a command, as
+  `mix core.feed_id_renew`, see `docs/suggestions/sync-feed-id-renew.md`.
+- Trials on a remote backend: `trial_users/*`, sign-in from a trial,
+  and their expiry job.
 - Hex: `mix deps.get` fails with this machine's Hex key, whose OAuth
   refresh fails. A clean `HEX_HOME` works around it.

@@ -19,4 +19,11 @@ defmodule Core.Migrations do
 
     :ok
   end
+
+  @doc "Gives the sync feed a new id, after restoring a backup; with the repo started for it."
+  def feed_id_renew do
+    Application.load(:core)
+    {:ok, _, _} = Ecto.Migrator.with_repo(Core.Repo, fn _repo -> Core.Data.AppSyncVersions.renew_feed_id() end)
+    :ok
+  end
 end

@@ -113,12 +113,13 @@ async fn main() -> Result<(), String> {
         server_tasks::spawn(deployment.clone(), std::sync::Arc::clone(&server_state));
     }
     let server_settings = config::server_settings()?;
+    let trial_users_max = TrialUsersMax::open_for(&deployment)?;
     let state = AppState {
         deployment,
         mailer,
         rate_limits,
         trust_proxy_headers: config::trust_proxy_headers(),
-        trial_users_max: TrialUsersMax::open()?,
+        trial_users_max,
         stripe_signing_secret: config::stripe::open_signing_secret(),
         stripe,
         server_url: ServerUrl::open()?,

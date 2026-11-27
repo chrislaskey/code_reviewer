@@ -12,7 +12,9 @@ defmodule Core.Data.AccountsTokens do
   @context_api "api"
   @context_sign_in_code "sign_in_code"
   @context_sign_in_confirm "sign_in_confirm"
+  @context_device_code "device_code"
   @sign_in_code_validity_minutes 10
+  @device_code_validity_minutes 5
 
   @primary_key {:id, Ecto.UUID, autogenerate: false}
   schema "accounts_tokens" do
@@ -27,6 +29,7 @@ defmodule Core.Data.AccountsTokens do
   def context_api, do: @context_api
   def context_sign_in_code, do: @context_sign_in_code
   def context_sign_in_confirm, do: @context_sign_in_confirm
+  def context_device_code, do: @context_device_code
 
   @doc "Inserts a token of the context for the user, by the token's hash, with the code's hash for a sign-in."
   def create(user_id, context, token, code \\ nil) do
@@ -40,15 +43,27 @@ defmodule Core.Data.AccountsTokens do
     })
   end
 
-  @doc "Gets the token of the context, by the token itself, or nil. A sign-in's steps expire after ten minutes."
+  @doc """
+  Gets the token of the context, by the token itself, or nil. A sign-in's
+  steps expire after ten minutes, a device code after five.
+  """
   def get_valid(token, context) do
     row = Repo.one(from t in __MODULE__, where: t.token_hash == ^Sha256.hex(token) and t.context == ^context)
 
     cond do
       is_nil(row) -> nil
-      context in [@context_sign_in_code, @context_sign_in_confirm] and expired?(row) -> nil
+      expired?(row) -> nil
       true -> row
     end
+  end
+
+  @doc "Gives the sign-in a new code, and ten minutes again; answers the code."
+  def update_code(row, code) do
+    Repo.update_all(from(t in __MODULE__, where: t.id == ^row.id),
+      set: [code_hash: Sha256.hex(code), attempts: 0, inserted_at: Time.now()]
+    )
+
+    code
   end
 
   @doc "Counts a wrong code against the sign-in, and answers the attempts so far."
@@ -73,7 +88,11 @@ defmodule Core.Data.AccountsTokens do
   @doc "Deletes a row."
   def delete(row), do: Repo.delete!(row)
 
-  defp expired?(row) do
-    DateTime.diff(Time.now(), row.inserted_at, :minute) >= @sign_in_code_validity_minutes
-  end
+  defp expired?(%{context: context} = row) when context in [@context_sign_in_code, @context_sign_in_confirm],
+    do: DateTime.diff(Time.now(), row.inserted_at, :minute) >= @sign_in_code_validity_minutes
+
+  defp expired?(%{context: @context_device_code} = row),
+    do: DateTime.diff(Time.now(), row.inserted_at, :minute) >= @device_code_validity_minutes
+
+  defp expired?(_row), do: false
 end

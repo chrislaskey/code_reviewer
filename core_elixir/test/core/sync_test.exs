@@ -135,6 +135,16 @@ defmodule Core.SyncTest do
     assert Enum.sort(ids_of(rows, "app_files")) == Enum.sort(mine)
   end
 
+  test "sync_a_renewed_feed_id_resyncs_every_cursor" do
+    %{"user" => %{"id" => alice}} = signed_up("alice@example.com")
+    {_rows, cursor} = pull_all(alice, nil)
+    :ok = Core.Data.AppSyncVersions.renew_feed_id()
+
+    assert {:ok, %{"resync" => true}} = Sync.pull(alice, %{"cursor" => cursor, "after" => nil, "limit" => 200})
+    {_rows, fresh} = pull_all(alice, nil)
+    assert fresh["feed_id"] != cursor["feed_id"]
+  end
+
   test "sync_a_cursor_from_another_feed_or_above_the_head_resyncs" do
     %{"user" => %{"id" => alice}} = signed_up("alice@example.com")
     foreign = %{"feed_id" => Ids.new(), "global_sync_version" => "1"}

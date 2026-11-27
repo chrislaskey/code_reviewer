@@ -36,6 +36,12 @@ CONFORMANCE_BACKEND_URL=http://localhost:4100 \
 In production, set `DATABASE_URL`, `BACKEND_SERVICE_TOKEN`, `SECRET_KEY_BASE`
 and `PORT`.
 
+After restoring a backup, run `mix core.feed_id_renew`, or
+`Core.Migrations.feed_id_renew/0` in a release, before the backend
+serves again. The feed gets a new id, and every device resyncs at its
+next pull, since the restored database may give out again versions a
+device already saw.
+
 ## How it is built
 
 | Part | Where | What it does |
@@ -81,10 +87,9 @@ and `PORT`.
 
 - More of the conformance suite, `core/src/app/files/conformance_tests.rs`,
   which this backend passes: a test for each area added below.
-- Sign-in from a trial, resending a code, passwords, signing in a device,
-  deletions, preferences, posts, community writes and commerce. They
-  answer `501 not_implemented`.
-- The protocol's rule that a restored backup gets a new feed id.
-- Recording the accepted terms at sign-in, as Rust's `finish_proven_in` does.
+- Trials and sign-in from a trial, passwords, deletions, preferences,
+  posts, community writes and commerce. They answer
+  `501 not_implemented`. Beside this backend the web server offers no
+  trials.
 - Splitting a Rust migration that someday holds a function or a `DO`
   block: `Core.Migrations.Statements` splits at every `;`.

@@ -10,6 +10,9 @@ defmodule CoreWeb.FallbackController do
   def call(conn, {:error, :exists}), do: error(conn, 409, "exists", "it exists already")
   def call(conn, {:error, :sign_in_expired}), do: error(conn, 422, "sign_in_expired", "the sign-in expired")
 
+  def call(conn, {:error, :unknown_device_code}),
+    do: error(conn, 422, "unknown_device_code", "the device code is wrong or expired")
+
   def call(conn, {:error, :wrong_code}),
     do: error(conn, 422, "wrong_code", "the code is wrong", %{"code" => ["is wrong"]})
 

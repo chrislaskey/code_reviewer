@@ -25,7 +25,11 @@ defmodule CoreWeb.Router do
     post "/accounts/users/get", AccountsController, :users_get
     post "/accounts/sign_in", AccountsController, :sign_in
     post "/accounts/sign_in_with_code", AccountsController, :sign_in_with_code
+    post "/accounts/resend_code_to", AccountsController, :resend_code_to
+    post "/accounts/resend_code", AccountsController, :resend_code
     post "/accounts/sign_in_confirm", AccountsController, :sign_in_confirm
+    post "/accounts/sign_in_confirm_for_device", AccountsController, :sign_in_confirm_for_device
+    post "/accounts/sign_in_with_device_code", AccountsController, :sign_in_with_device_code
     post "/accounts/sign_out", AccountsController, :sign_out
 
     post "/sync/push", SyncController, :push

@@ -15,8 +15,28 @@ defmodule CoreWeb.AccountsController do
     with {:ok, matched} <- Accounts.sign_in_with_code(params["pending"], params["code"]), do: json(conn, matched)
   end
 
+  def resend_code_to(conn, params) do
+    with {:ok, sent_to} <- Accounts.resend_code_to(params["pending"]), do: json(conn, sent_to)
+  end
+
+  def resend_code(conn, params) do
+    with {:ok, sent} <- Accounts.resend_code(params["pending"], params["locale"] || "en"), do: json(conn, sent)
+  end
+
   def sign_in_confirm(conn, params) do
-    with {:ok, session} <- Accounts.sign_in_confirm(params["pending"]), do: json(conn, session)
+    with {:ok, session} <- Accounts.sign_in_confirm(params["pending"], params["terms_version"]),
+         do: json(conn, session)
+  end
+
+  def sign_in_confirm_for_device(conn, params) do
+    with {:ok, code} <-
+           Accounts.sign_in_confirm_for_device(params["pending"], params["challenge"], params["terms_version"]),
+         do: json(conn, code)
+  end
+
+  def sign_in_with_device_code(conn, params) do
+    with {:ok, session} <- Accounts.sign_in_with_device_code(params["code"], params["challenge"]),
+         do: json(conn, session)
   end
 
   def sign_out(conn, params) do

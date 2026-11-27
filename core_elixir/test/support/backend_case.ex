@@ -40,7 +40,7 @@ defmodule Core.BackendCase do
   def signed_up(email) do
     {:ok, %{"pending" => pending, "mail" => %{"code" => code}}} = Core.Accounts.sign_in(email, true, "en")
     {:ok, %{"pending" => confirm}} = Core.Accounts.sign_in_with_code(pending, code)
-    {:ok, session} = Core.Accounts.sign_in_confirm(confirm)
+    {:ok, session} = Core.Accounts.sign_in_confirm(confirm, "2026-11-22")
     session
   end
 

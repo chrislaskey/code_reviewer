@@ -35,6 +35,16 @@ defmodule Core.Data.AppSyncVersions do
     :ok
   end
 
+  @doc """
+  Gives the feed a new id, after a backup is restored: every device's
+  cursor is then of another feed, so its next pull resyncs. A restored
+  database may give out again versions a device already saw.
+  """
+  def renew_feed_id do
+    Repo.query!("UPDATE app_sync_versions SET feed_id = gen_random_uuid() WHERE id = 1")
+    :ok
+  end
+
   @doc "Sets the lowest cursor a pull still answers."
   def update_floor(floor) do
     Repo.query!("UPDATE app_sync_versions SET minimum_global_sync_version = $1 WHERE id = 1", [floor])
