@@ -27,6 +27,8 @@
 //! `delete_unreferenced_on_device` in the account's folder, at the end
 //! of each sync.
 
+#[cfg(all(test, feature = "object-storage"))]
+mod conformance_tests;
 pub mod duplicates;
 #[cfg(feature = "remote-backend")]
 mod from_backend;

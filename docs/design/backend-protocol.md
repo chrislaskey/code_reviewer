@@ -322,7 +322,8 @@ Puts the file in a community, or takes it out.
 
 ## Conformance
 
-The sample is checked by its own tests, against these rules. Next comes
-a Rust suite that runs core's sync tests through Axum against a remote
-backend. That suite is what makes a second backend trustworthy, see
-`backend-seam.md` §4.
+The sample is checked by its own tests, against these rules, and by
+the conformance suite, `core/src/app/files/conformance_tests.rs`: what a
+device sees of sync, files and memberships, the same tests on the Rust
+backend and against a remote one. That suite is what makes a second
+backend trustworthy. How to run it is step 2 of `backend-seam.md`.

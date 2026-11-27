@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
 # Runs the checks a change passes before it is committed: Rust's format,
-# Clippy and the dependency audit, the Svelte pages' type check, and the
-# translations. Runs each, then lists the ones that failed.
+# Clippy and the dependency audit, the Svelte pages' type check, the
+# translations, and the sample Elixir backend's format and compile. Runs
+# each, then lists the ones that failed.
 #
 # Run `bin/lint --help` for the targets and options.
 
@@ -24,13 +25,19 @@ Targets, any number of them, all when none:
   translations   pnpm translations:check, in svelte/: translations/default.pot
                  has every message the pages write, and each <locale>.po
                  translates them all, none fuzzy. Needs GNU gettext for --fix.
+  elixir         mix format --check-formatted
+                 mix compile --warnings-as-errors
+                 in core_elixir/, the sample remote backend; among all only
+                 while core_elixir/ is there.
 
 Options:
-  --fix    Fix what can be fixed first: cargo fmt --all, and
-           pnpm translations:update, then check.
+  --fix    Fix what can be fixed first: cargo fmt --all,
+           pnpm translations:update and mix format, then check.
   help     Show this help. Also -h and --help.
 
-Tests are not run here: cargo test --workspace --all-targets.
+Tests are not run here: cargo test --workspace --all-targets, and
+mix test in core_elixir/, which needs PostgreSQL. The conformance suite
+of a remote backend: core/src/app/files/conformance_tests.rs.
 USAGE
 }
 
@@ -43,13 +50,16 @@ targets=()
 fix=false
 for argument in "$@"; do
   case "$argument" in
-    rust|svelte|translations) targets+=("$argument") ;;
+    rust|svelte|translations|elixir) targets+=("$argument") ;;
     --fix) fix=true ;;
     help|-h|--help) help; exit 0 ;;
     *) fail "unknown target or option '$argument'; run \`$0 --help\`" ;;
   esac
 done
-[ ${#targets[@]} -gt 0 ] || targets=(rust svelte translations)
+if [ ${#targets[@]} -eq 0 ]; then
+  targets=(rust svelte translations)
+  [ -d "$ROOT/core_elixir" ] && targets+=(elixir)
+fi
 
 failed=()
 
@@ -65,6 +75,11 @@ svelte_dependencies_install() {
   if [ ! -d "$ROOT/svelte/node_modules" ]; then
     (cd "$ROOT/svelte" && pnpm install --frozen-lockfile) || fail "pnpm install failed in svelte/"
   fi
+}
+
+# Runs the command in core_elixir/, its dependencies fetched first.
+in_core_elixir() {
+  (cd "$ROOT/core_elixir" && { [ -d deps ] || mix deps.get; } && "$@")
 }
 
 cd "$ROOT" || fail "no folder $ROOT"
@@ -89,6 +104,17 @@ for target in "${targets[@]}"; do
       svelte_dependencies_install
       [ "$fix" = true ] && pnpm --dir svelte --silent translations:update
       check pnpm --dir svelte --silent translations:check
+      ;;
+    elixir)
+      if [ ! -d "$ROOT/core_elixir" ]; then
+        failed+=("elixir: no core_elixir/")
+      elif ! command -v mix > /dev/null; then
+        failed+=("elixir: mix not installed, \`brew install elixir\`")
+      else
+        [ "$fix" = true ] && in_core_elixir mix format
+        check in_core_elixir mix format --check-formatted
+        check in_core_elixir mix compile --warnings-as-errors
+      fi
       ;;
   esac
 done

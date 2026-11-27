@@ -402,6 +402,11 @@ pub(crate) async fn get_from_bucket(
     id: Uuid,
 ) -> Result<Vec<u8>, BytesError> {
     let bytes = of_table(table)?;
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let readable = readable_from_backend(backend, user, table, id).await?;
+        return Ok(bucket(deployment)?.get(&readable.storage_key).await?);
+    }
     let mut tx = deployment.begin().await?;
     let readable = bytes
         .readable(&mut tx, user, id)

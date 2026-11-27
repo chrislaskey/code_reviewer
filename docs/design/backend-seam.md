@@ -325,7 +325,8 @@ For `core_elixir/` the checks are `mix format --check-formatted`,
 **Status, 2026-11-27.** Step 1 is built: the token check, sign-in, the
 current user, sync, communities, memberships and files are dispatched,
 the bucket sweep runs in remote mode, and `BACKEND=elixir bin/dev` runs
-the web over `core_elixir`. Step 2 is next. How it is built:
+the web over `core_elixir`. Step 2, conformance, is built too; step 3 is
+next. How step 1 is built:
 
 - `BACKEND=remote`, `BACKEND_URL` and `BACKEND_SERVICE_TOKEN`, in
   `axum/src/config/backend.rs`. With a `DATABASE_URL` set it refuses to
@@ -402,10 +403,46 @@ the web over `core_elixir`. Step 2 is next. How it is built:
 
 ### Step 2: conformance
 
-Run core's sync tests through the `Http` transport, against Axum in
-remote mode with `core_elixir` behind it. These are the tests of files,
-memberships, paging, resync and conflicts. A failure is a gap in the
-protocol or the sample. Add the Elixir checks to `bin/lint`.
+**Built, 2026-11-27.** `core/src/app/files/conformance_tests.rs`: seven tests
+of what a device sees, each run on the Rust backend with the other
+tests, and against a remote backend when asked:
+
+- a sign-up pulls its community and membership;
+- a file reaches another device, with its bytes;
+- a rename from an old version is a conflict the person sees;
+- a file for a community left meanwhile is refused and kept;
+- joining brings a community's files, and leaving takes them;
+- a pull in pages of one row gets every row;
+- a cursor of another feed, or beyond its head, resyncs.
+
+All seven pass against `core_elixir`, run in parallel too.
+
+How it runs, and why not as planned:
+
+- **Not core's existing sync tests.** Most use `app_test_notes`, a test
+  table no remote backend serves, and set up state by writing the
+  server's database. The suite uses only what the protocol serves:
+  sign-in, joining and leaving, and files.
+- **Not through Axum's HTTP routes.** The device syncs through
+  `InProcess`, whose server is `Deployment::new_with_remote_backend`. So
+  every call goes through the same core entries Axum's handlers call,
+  then over HTTP to the backend. Axum's handlers only parse and answer.
+  They were checked by hand against `core_elixir`.
+- Sign-up reads the code from the memory mailer, since Rust sends the
+  mail. The server keeps the bucket in memory, as Rust keeps it beside
+  a remote backend.
+
+```sh
+cd core_elixir && mix phx.server     # PostgreSQL, see core_elixir/README.md
+CONFORMANCE_BACKEND_URL=http://localhost:4100 \
+  cargo test -p app_core --features object-storage,remote-backend conformance -- --ignored
+```
+
+`bin/lint` runs `mix format --check-formatted` and
+`mix compile --warnings-as-errors` in `core_elixir/` while it is there.
+
+Next for the suite: a test for each area the sample adds in step 3, and
+an app's own resources.
 
 ### Step 3: fill in the sample
 

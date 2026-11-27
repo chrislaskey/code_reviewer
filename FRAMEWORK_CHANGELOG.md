@@ -18,6 +18,26 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-27: a conformance suite for remote backends, and Elixir in bin/lint
+
+Commits: this one. Step 2 of `docs/design/backend-seam.md`.
+
+- **What changed**.
+  - `core/src/app/files/conformance_tests.rs`, with the files example:
+    seven tests of sync, files and
+    memberships, run on the Rust backend with the other tests, and
+    against a remote backend with `CONFORMANCE_BACKEND_URL` and
+    `--ignored`. `core_elixir/` passes them all.
+  - `bin/lint` checks `core_elixir/`'s format and compile while it is
+    there, the `elixir` target.
+  - `core_elixir/` reads its dev port from `BACKEND_PORT`, not `PORT`,
+    which is the web server's.
+- **What an app does**.
+  - **Optional**, for an app that deleted `core_elixir/`: nothing;
+    `bin/lint` skips it.
+  - **Optional**, for an app with its own remote backend: run the suite
+    against it, and add a test for each resource it serves.
+
 ## 2026-11-27: the web server can call a remote backend
 
 Commits: `52bb028`, `25cf524`, which dispatches sign-in and the

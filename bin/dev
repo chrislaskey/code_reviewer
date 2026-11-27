@@ -347,7 +347,7 @@ if [ "$starts_web" = true ] && [ "$backend" = elixir ]; then
   echo "bin/dev: the Elixir backend on http://localhost:$backend_port"
   (
     cd "$ROOT/core_elixir"
-    export DATABASE_URL="$backend_database_url" PORT="$backend_port"
+    export DATABASE_URL="$backend_database_url" BACKEND_PORT="$backend_port"
     [ -d deps ] || mix deps.get
     mix database.create
     exec mix phx.server

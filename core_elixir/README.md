@@ -21,8 +21,16 @@ the same database.
 ```sh
 cd core_elixir
 mix setup                 # deps, database, event store, migrations
-mix phx.server            # http://localhost:4100, or PORT; service token dev-service-token
+mix phx.server            # http://localhost:4100, or BACKEND_PORT; service token dev-service-token
 mix test                  # TEST_DATABASE_URL, else postgres://postgres@localhost/core_test
+```
+
+The conformance suite runs Rust's checks of sync, files and memberships
+against it, with `mix phx.server` up:
+
+```sh
+CONFORMANCE_BACKEND_URL=http://localhost:4100 \
+  cargo test -p app_core --features object-storage,remote-backend conformance -- --ignored
 ```
 
 In production, set `DATABASE_URL`, `BACKEND_SERVICE_TOKEN`, `SECRET_KEY_BASE`
@@ -71,8 +79,8 @@ and `PORT`.
 
 ## Not built yet
 
-- The Rust sync tests run through Axum against this backend, as the
-  conformance suite (step 2 of the seam).
+- More of the conformance suite, `core/src/app/files/conformance_tests.rs`,
+  which this backend passes: a test for each area added below.
 - Sign-in from a trial, resending a code, passwords, signing in a device,
   deletions, preferences, posts, community writes and commerce. They
   answer `501 not_implemented`.
