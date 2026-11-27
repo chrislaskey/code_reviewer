@@ -79,10 +79,20 @@ Other servers:
                  for the session, in place of tauri.conf.json's, so the
                  accounts page offers Custom server.
 
+The backend, see docs/design/backend-seam.md:
+  BACKEND        From the environment or else from .env. Unset or rust,
+                 the web server's own database. elixir, core_elixir/ owns
+                 the data: it runs on the web server's port + 3000, after
+                 \`mix database.create\`, and the web server calls it with no
+                 database of its own. Needs Elixir and PostgreSQL.
+  BACKEND_DATABASE_URL  Its database, postgres://postgres@localhost/core_dev
+                 when unset.
+
 Examples:
   bin/dev                          # the web, on 4000 and 1420
   bin/dev desktop                  # the desktop app, its pages on 1420
   PORT=4003 bin/dev desktop ios    # both apps, their pages on 5003
+  BACKEND=elixir bin/dev           # the web over core_elixir, on 7000
 USAGE
 }
 
@@ -129,6 +139,13 @@ for target in "${targets[@]}"; do
   [ "$target" = web ] && starts_web=true
 done
 
+backend="$(read_setting BACKEND)"
+case "$backend" in
+  ''|rust) backend=rust ;;
+  elixir) ;;
+  *) fail "BACKEND must be rust or elixir, got '$backend'" ;;
+esac
+
 # The programs listening on a port, by name, or nothing when it is free.
 list_port_listeners() {
   lsof -nP -iTCP:"$1" -sTCP:LISTEN -Fc 2>/dev/null | sed -n 's/^c//p' | sort -u | tr '\n' ' '
@@ -143,6 +160,7 @@ list_taken_ports() {
     ports+=("$web_port")
     command -v garage > /dev/null &&
       ports+=("$storage_port" $((storage_port + 1)) $((storage_port + 2)) $((storage_port + 3)))
+    [ "$backend" = elixir ] && ports+=($((web_port + 3000)))
   fi
   for port in "${ports[@]}"; do
     listeners=$(list_port_listeners "$port")
@@ -188,11 +206,13 @@ Set PORT to free ones (the pages on PORT + 1000)"
 esac
 
 storage_port=$((web_port + 2000))
+backend_port=$((web_port + 3000))
 
 if [ "$only_print_ports" = true ]; then
   echo "Web server  http://localhost:$web_port"
   echo "Svelte dev  http://localhost:$vite_port"
   echo "Storage     http://127.0.0.1:$storage_port, files on $((storage_port + 2))"
+  [ "$backend" = elixir ] && echo "Backend     http://localhost:$backend_port, core_elixir"
   exit 0
 fi
 
@@ -304,6 +324,41 @@ if [ "$starts_web" = true ]; then
   fi
 fi
 
+# Up once it answers, any answer: a failure when it exits first or is not
+# up in two minutes, the first compile included.
+wait_for_backend() {
+  local pid=$1 tries=0
+  until curl -s -o /dev/null "http://localhost:$backend_port/backend/users/get_by_token"; do
+    kill -0 "$pid" 2>/dev/null || fail "core_elixir stopped before it was up; see its output above"
+    tries=$((tries + 1))
+    [ "$tries" -lt 600 ] || fail "core_elixir was not up after two minutes; see its output above"
+    sleep 0.2
+  done
+}
+
+# core_elixir, when it is the backend: the web server then calls it, with
+# the dev service token, and opens no database of its own.
+web_backend_env=(BACKEND=rust)
+web_env_unset=()
+if [ "$starts_web" = true ] && [ "$backend" = elixir ]; then
+  command -v mix > /dev/null || fail "BACKEND=elixir needs Elixir; \`brew install elixir\`"
+  backend_database_url="$(read_setting BACKEND_DATABASE_URL)"
+  backend_database_url="${backend_database_url:-postgres://postgres@localhost/core_dev}"
+  echo "bin/dev: the Elixir backend on http://localhost:$backend_port"
+  (
+    cd "$ROOT/core_elixir"
+    export DATABASE_URL="$backend_database_url" PORT="$backend_port"
+    [ -d deps ] || mix deps.get
+    mix database.create
+    exec mix phx.server
+  ) &
+  backend_pid=$!
+  pids+=("$backend_pid")
+  wait_for_backend "$backend_pid"
+  web_backend_env=(BACKEND=remote BACKEND_URL="http://localhost:$backend_port" BACKEND_SERVICE_TOKEN=dev-service-token)
+  web_env_unset=(-u DATABASE_URL)
+fi
+
 # The web server on the tailnet, see the help. In the foreground, so it
 # stops with the rest and leaves nothing behind.
 if [ "$starts_web" = true ] && [ "$(read_setting TAILSCALE_SERVE)" != false ]; then
@@ -323,7 +378,7 @@ for target in "${targets[@]}"; do
   case "$target" in
     web)
       echo "bin/dev: the web server on http://localhost:$web_port"
-      (cd "$ROOT" && exec env ${storage_env[@]+"${storage_env[@]}"} PORT="$web_port" PAGES_DEV_URL="http://localhost:$vite_port" TRIAL_USERS_MAX="${TRIAL_USERS_MAX:-100}" SERVER_SETTINGS="$(read_setting SERVER_SETTINGS)" cargo run -p app_web) &
+      (cd "$ROOT" && exec env ${web_env_unset[@]+"${web_env_unset[@]}"} ${storage_env[@]+"${storage_env[@]}"} "${web_backend_env[@]}" PORT="$web_port" PAGES_DEV_URL="http://localhost:$vite_port" TRIAL_USERS_MAX="${TRIAL_USERS_MAX:-100}" SERVER_SETTINGS="$(read_setting SERVER_SETTINGS)" cargo run -p app_web) &
       pids+=($!)
       ;;
     desktop)

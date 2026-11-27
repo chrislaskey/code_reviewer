@@ -10,8 +10,8 @@ removed `phoenix/` reference app. It has no pages and no assets. The
 Svelte pages, Tauri and Axum stay as they are, see
 [the backend seam](../docs/design/backend-seam.md).
 
-Axum doesn't call it yet. That is step 1 of the seam. Until then it is
-tested on its own, below.
+Axum calls it with `BACKEND=remote`, see step 1 of the seam.
+`BACKEND=elixir bin/dev` runs the web over it.
 
 ## Run it
 
@@ -21,7 +21,7 @@ the same database.
 ```sh
 cd core_elixir
 mix setup                 # deps, database, event store, migrations
-mix phx.server            # http://localhost:4100, service token dev-service-token
+mix phx.server            # http://localhost:4100, or PORT; service token dev-service-token
 mix test                  # TEST_DATABASE_URL, else postgres://postgres@localhost/core_test
 ```
 
@@ -71,8 +71,8 @@ and `PORT`.
 
 ## Not built yet
 
-- Axum calling it (step 1 of the seam). Then the Rust sync tests run
-  through Axum against this backend, as the conformance suite.
+- The Rust sync tests run through Axum against this backend, as the
+  conformance suite (step 2 of the seam).
 - Sign-in from a trial, resending a code, passwords, signing in a device,
   deletions, preferences, posts, community writes and commerce. They
   answer `501 not_implemented`.

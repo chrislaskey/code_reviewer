@@ -296,7 +296,7 @@ from its own database, see its README. They are:
 - files and their communities.
 
 Files go through Commanded. Users, accounts and memberships are plain
-Ecto writes. It has 14 tests, on PostgreSQL. Axum doesn't call it yet.
+Ecto writes. It has 15 tests, on PostgreSQL. Axum calls it with `BACKEND=remote`.
 
 ## 6. Decided (2026-11-27)
 
@@ -322,10 +322,10 @@ For `core_elixir/` the checks are `mix format --check-formatted`,
 
 ### Step 1: Axum calls a remote backend
 
-**Status, 2026-11-27.** Items 1 to 4 are built: the token check,
-sign-in, the current user, sync, communities, memberships and files are
-dispatched, and the bucket sweep runs in remote mode. Item 5, `bin/dev`,
-is next. How it is built:
+**Status, 2026-11-27.** Step 1 is built: the token check, sign-in, the
+current user, sync, communities, memberships and files are dispatched,
+the bucket sweep runs in remote mode, and `BACKEND=elixir bin/dev` runs
+the web over `core_elixir`. Step 2 is next. How it is built:
 
 - `BACKEND=remote`, `BACKEND_URL` and `BACKEND_SERVICE_TOKEN`, in
   `axum/src/config/backend.rs`. With a `DATABASE_URL` set it refuses to
@@ -370,6 +370,9 @@ is next. How it is built:
   record runs in, so Axum keeps when each last ran in memory, and a
   restart runs it again at once. The sweep is safe to run twice. The
   backend runs its own purge.
+- `BACKEND=elixir bin/dev` starts `core_elixir` on the web port + 3000,
+  after `mix database.create`, against `BACKEND_DATABASE_URL`, then the
+  web server in remote mode with the dev service token.
 
 1. **The backend setting.** The server's config chooses `rust` or
    `remote`, with the remote's URL and service token. `Deployment`

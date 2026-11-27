@@ -332,7 +332,8 @@ Where each deployment's file is:
   `BACKEND_SERVICE_TOKEN`, the web server opens no database: a remote
   backend such as `core_elixir/` owns it, see
   `docs/design/backend-seam.md`. Only what that backend serves is
-  answered yet.
+  answered yet. `BACKEND=elixir bin/dev` runs the web that way, over
+  `core_elixir/`.
 * The Tauri app: a folder per account under `accounts/`, holding its
   database, `app.db`, and the bytes of its files, `files/`, listed in
   `device.db`, in `DATA_DIR` when set, else the app data directory Tauri

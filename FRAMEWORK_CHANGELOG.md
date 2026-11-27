@@ -22,8 +22,9 @@ completes.
 
 Commits: `52bb028`, `25cf524`, which dispatches sign-in and the
 current user, `869193b`, which dispatches sync, `991d995`, which
-dispatches communities, memberships and files, and the commit after it,
-which runs the bucket sweep beside a remote backend. The first parts of step 1 of
+dispatches communities, memberships and files, `5be5419`, which runs
+the bucket sweep beside a remote backend, and the commit after it, which
+gives `bin/dev` `BACKEND=elixir`. The first parts of step 1 of
 `docs/design/backend-seam.md`.
 
 - **What changed**.
@@ -41,7 +42,9 @@ which runs the bucket sweep beside a remote backend. The first parts of step 1 o
     `app_`.
   - `RecurringJob` has `runs_beside_a_remote_backend`, false unless a
     job says so. Beside a remote backend only those run, the bucket
-    sweep of files among them, due by when the process last ran them. In remote mode, staff, plans, preferences
+    sweep of files among them, due by when the process last ran them.
+  - `BACKEND=elixir bin/dev` runs the web over `core_elixir/`, on the
+    web port + 3000, see `bin/dev --help`. In remote mode, staff, plans, preferences
     and trials answer nothing, since the sample doesn't serve them.
     Every other entry fails in remote mode, until its area is
     dispatched.
