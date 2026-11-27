@@ -44,6 +44,7 @@ framework = [
     "core/src/helpers/themes.rs",
     "core/src/helpers/translations.rs",
     "core/src/services/app_store.rs",
+    "core/src/services/backend.rs",
     "core/src/services/mailer.rs",
     "core/src/services/mailer/**",
     "core/src/services/storage.rs",

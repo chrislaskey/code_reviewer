@@ -14,6 +14,8 @@ postgres = ["sqlx/postgres"]
 sync-http = ["dep:reqwest"]
 # The framework's own test table, sync::test_notes; for tests alone, never in a build that ships
 test-tables = []
+# A remote backend that owns the web server's database, such as core_elixir; never in the Tauri app
+remote-backend = ["dep:reqwest", "dep:secrecy"]
 # Sending email through Resend, for the server in production
 mail-resend = ["dep:reqwest", "dep:secrecy"]
 # Uploads straight to S3-style object storage, for the server; never in the Tauri app

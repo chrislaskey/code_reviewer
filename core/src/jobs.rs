@@ -681,6 +681,7 @@ mod tests {
                 Database::Postgres(pool) => {
                     sqlx::query(statement).execute(pool).await.expect("dropped");
                 }
+                Database::None => unreachable!("a test opens a database"),
             }
         }
     }

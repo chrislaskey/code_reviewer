@@ -4,7 +4,9 @@
 //! every other path. Every request is from a user, see `user_auth`.
 //! Listens on `HOST`, 127.0.0.1 when unset, and `PORT`, 4000 when unset,
 //! and opens the database `DATABASE_URL` names: a SQLite file, under `data/`
-//! beside this crate when unset, or a PostgreSQL database. The email it
+//! beside this crate when unset, or a PostgreSQL database. With
+//! `BACKEND=remote` it opens none, and a remote backend owns the data,
+//! see `config::backend`. The email it
 //! sends goes where `MAILER` says, see `config::mailer`, pictures go to the bucket
 //! `STORAGE_BUCKET` names and files' bytes to `STORAGE_PRIVATE_BUCKET`'s,
 //! see `config::storage`, and its accounts routes are rate limited, see
@@ -69,7 +71,7 @@ async fn main() -> Result<(), String> {
         )
         .init();
 
-    let deployment = config::database::open().await?;
+    let deployment = config::backend::open().await?;
     let mailer = config::mailer::open()?;
     let deployment = match config::storage::open_public()? {
         Some(public) => deployment.with_avatar_bucket(public),
@@ -90,6 +92,9 @@ async fn main() -> Result<(), String> {
     };
     let arguments: Vec<String> = env::args().skip(1).collect();
     if !arguments.is_empty() {
+        if deployment.has_remote_backend() {
+            return Err("with BACKEND=remote, run commands on the backend".to_string());
+        }
         return command_line::run(&deployment, stripe.as_ref(), &arguments).await;
     }
 
@@ -101,9 +106,12 @@ async fn main() -> Result<(), String> {
             forgetting.forget_old();
         }
     });
-    jobs::spawn(deployment.clone());
     let server_state = std::sync::Arc::default();
-    server_tasks::spawn(deployment.clone(), std::sync::Arc::clone(&server_state));
+    // A remote backend runs its own jobs
+    if !deployment.has_remote_backend() {
+        jobs::spawn(deployment.clone());
+        server_tasks::spawn(deployment.clone(), std::sync::Arc::clone(&server_state));
+    }
     let server_settings = config::server_settings()?;
     let state = AppState {
         deployment,

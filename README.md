@@ -328,7 +328,11 @@ Where each deployment's file is:
   `postgres://user@host/database`, which must exist (`createdb`). So
   `DATABASE_URL=postgres://postgres@localhost/starter_pack bin/dev` runs
   the web on PostgreSQL while the apps keep their SQLite files, the
-  mix the sync will face.
+  mix the sync will face. With `BACKEND=remote`, `BACKEND_URL` and
+  `BACKEND_SERVICE_TOKEN`, the web server opens no database: a remote
+  backend such as `core_elixir/` owns it, see
+  `docs/design/backend-seam.md`. Only what that backend serves is
+  answered yet.
 * The Tauri app: a folder per account under `accounts/`, holding its
   database, `app.db`, and the bytes of its files, `files/`, listed in
   `device.db`, in `DATA_DIR` when set, else the app data directory Tauri

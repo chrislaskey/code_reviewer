@@ -24,6 +24,15 @@ pub enum Database {
     Sqlite(SqlitePool),
     #[cfg(feature = "postgres")]
     Postgres(sqlx::PgPool),
+    /// None: a web server whose remote backend owns the database, see
+    /// `services::backend`. Every transaction is refused, so what the
+    /// backend does not answer fails rather than reads another database.
+    None,
+}
+
+/// Why a transaction on `Database::None` is refused.
+fn no_database() -> sqlx::Error {
+    sqlx::Error::Configuration("this server's database belongs to its remote backend".into())
 }
 
 /// One transaction: what every core function runs in, so a row and the
@@ -65,6 +74,7 @@ impl Database {
             }
             #[cfg(feature = "postgres")]
             Database::Postgres(pool) => Transaction::Postgres(pool.begin().await?),
+            Database::None => return Err(no_database()),
         })
     }
 
@@ -77,6 +87,7 @@ impl Database {
                 pool.begin_with("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
                     .await?,
             ),
+            Database::None => return Err(no_database()),
         })
     }
 
@@ -87,6 +98,7 @@ impl Database {
             Database::Sqlite(pool) => pool.close().await,
             #[cfg(feature = "postgres")]
             Database::Postgres(pool) => pool.close().await,
+            Database::None => {}
         }
     }
 

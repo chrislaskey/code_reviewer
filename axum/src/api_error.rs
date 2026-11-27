@@ -33,6 +33,7 @@ use app_core::data::accounts_users::AccountUserError;
 use app_core::helpers::field_errors::FieldErrors;
 use app_core::ops::staff::StaffError;
 use app_core::services::app_store::AppStoreError;
+use app_core::services::backend::BackendError;
 use app_core::services::stripe::StripeError;
 use app_core::sync::SyncError;
 use app_core::sync::bytes::BytesError;
@@ -62,6 +63,28 @@ impl ApiError {
         ApiError {
             code: Some("account_deleted"),
             ..ApiError::new(StatusCode::GONE, "This account was deleted")
+        }
+    }
+
+    /// The remote backend's error: its status and message when it
+    /// answered one, else 502, see `app_core::services::backend`.
+    pub fn from_backend(error: &BackendError) -> ApiError {
+        match error {
+            BackendError::Answered {
+                status,
+                message,
+                fields,
+                ..
+            } => ApiError {
+                status: StatusCode::from_u16(*status).unwrap_or(StatusCode::BAD_GATEWAY),
+                message: message.clone(),
+                field_errors: fields.clone(),
+                code: None,
+            },
+            BackendError::Unreachable(_) | BackendError::Malformed(_) => {
+                tracing::warn!("backend: {error}");
+                ApiError::new(StatusCode::BAD_GATEWAY, error.to_string())
+            }
         }
     }
 
@@ -223,6 +246,7 @@ impl From<UserError> for ApiError {
             }
             UserError::AccountUser(error) => return error.into(),
             UserError::Record(error) => return ApiError::from_record(&error),
+            UserError::Backend(error) => return ApiError::from_backend(&error),
             UserError::ServerOnly | UserError::DeviceSettings(_) | UserError::Database(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }

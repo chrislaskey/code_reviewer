@@ -85,6 +85,11 @@ pub enum UserError {
     DeviceSettings(#[from] DeviceSettingsError),
     #[error(transparent)]
     Record(#[from] crate::sync::events::RecordError),
+    /// The remote backend failed, or answered what this error has no
+    /// variant for.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -439,6 +444,10 @@ pub(crate) async fn delete_of_unconfirmed_accounts_before(
 /// server does not know, or one that has expired, stands for nobody,
 /// and one of a deleted account is `AccountDeleted`.
 pub async fn get_by_token(deployment: &Deployment, token: &str) -> Result<User, UserError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return get_by_token_from_backend(backend, token).await;
+    }
     let (api_made_after, session_made_after) = accounts_tokens::made_after_to_be_valid(now());
     let mut tx = deployment.begin().await?;
     let user = app_users::authentication::get_by_token_hash(
@@ -453,6 +462,29 @@ pub async fn get_by_token(deployment: &Deployment, token: &str) -> Result<User, 
         Some(user) if user.deleted_at.is_some() => Err(UserError::AccountDeleted),
         Some(user) => Ok(user),
         None => Err(UserError::UnknownToken),
+    }
+}
+
+/// `get_by_token`, answered by the remote backend.
+#[cfg(feature = "remote-backend")]
+async fn get_by_token_from_backend(
+    backend: &crate::services::backend::RemoteBackend,
+    token: &str,
+) -> Result<User, UserError> {
+    #[derive(Deserialize)]
+    struct Found {
+        user: User,
+    }
+    let found = backend
+        .call::<_, Found>("users/get_by_token", &json!({ "token": token }))
+        .await;
+    match found {
+        Ok(found) => Ok(found.user),
+        Err(error) => match error.code() {
+            Some("unknown_token") => Err(UserError::UnknownToken),
+            Some("account_deleted") => Err(UserError::AccountDeleted),
+            _ => Err(error.into()),
+        },
     }
 }
 

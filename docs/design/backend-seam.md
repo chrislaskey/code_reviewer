@@ -322,6 +322,29 @@ For `core_elixir/` the checks are `mix format --check-formatted`,
 
 ### Step 1: Axum calls a remote backend
 
+**Status, 2026-11-27.** Items 1 and 2 are built, and the dispatch of
+`users::get_by_token`. The rest of item 3 goes one area at a time:
+sign-in and the current user, then sync, then communities, memberships
+and files. How it is built:
+
+- `BACKEND=remote`, `BACKEND_URL` and `BACKEND_SERVICE_TOKEN`, in
+  `axum/src/config/backend.rs`. With a `DATABASE_URL` set it refuses to
+  start. It runs no jobs, no server tasks and no commands.
+- `Deployment::new_with_remote_backend` gives `Database::None`, which
+  refuses every transaction. So an entry not yet dispatched fails with
+  "this server's database belongs to its remote backend", and never
+  reads another database.
+- `core/src/services/backend.rs`, behind the `remote-backend` feature,
+  which only Axum turns on. `RemoteBackend::call` posts the request
+  and reads the answer, or the protocol's error as
+  `BackendError::Answered` with its code.
+- At each dispatched entry, one block at the top:
+  `if let Some(backend) = &deployment.remote_backend`. It maps the codes
+  the entry knows onto its own error, as `unknown_token` onto
+  `UserError::UnknownToken`. Any other is the error's `Backend`
+  variant, which Axum answers with the backend's status, or 502 when
+  the backend was not reached.
+
 1. **The backend setting.** The server's config chooses `rust` or
    `remote`, with the remote's URL and service token. `Deployment`
    carries it. Remote is only for `Role::Server`. In remote mode Axum

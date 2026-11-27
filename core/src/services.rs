@@ -4,6 +4,8 @@
 
 #[cfg(feature = "app-store")]
 pub mod app_store;
+#[cfg(feature = "remote-backend")]
+pub mod backend;
 pub mod mailer;
 #[cfg(feature = "object-storage")]
 pub mod storage;
