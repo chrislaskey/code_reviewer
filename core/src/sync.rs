@@ -601,7 +601,7 @@ pub async fn run<T: Transport>(
     let token = Some(token.as_str());
     let mut waiting = bytes::ask_about_waiting(deployment, transport, token).await?;
     report.files_left = waiting.len().saturating_sub(bytes::PER_SYNC);
-    let held_back = bytes::held_back(deployment, &waiting).await?;
+    let held_back = rows_held_back(deployment, &waiting).await?;
     if let Err(error) =
         push_pending(deployment, transport, token, &user, &held_back, &mut report).await
     {
@@ -612,7 +612,7 @@ pub async fn run<T: Transport>(
     prune(deployment, &user, &mut report).await?;
     report.uploaded = bytes::upload_waiting(deployment, transport, token, &mut waiting).await?;
     if report.uploaded > 0 {
-        let held_back = bytes::held_back(deployment, &waiting).await?;
+        let held_back = rows_held_back(deployment, &waiting).await?;
         if let Err(error) =
             push_pending(deployment, transport, token, &user, &held_back, &mut report).await
         {
@@ -689,6 +689,20 @@ async fn push_pending<T: Transport>(
     }
 }
 
+/// The rows whose events are held back from the push: those waiting for
+/// their bytes to reach the server, and those waiting for the person,
+/// with the rows that wait with them.
+async fn rows_held_back(
+    deployment: &Deployment,
+    waiting: &[bytes::Waiting],
+) -> Result<BTreeSet<Uuid>, SyncError> {
+    let mut held_back = bytes::held_back(deployment, waiting).await?;
+    let mut tx = deployment.begin().await?;
+    conflicts::hold_back_refused(&mut tx, &mut held_back).await?;
+    tx.commit().await?;
+    Ok(held_back)
+}
+
 /// How many of the events, from the first, one push request holds:
 /// those whose JSON is within `PUSH_BATCH_BYTES`, and one at least.
 fn count_within_push_batch_bytes(batch: &[StoredEvent]) -> Result<usize, SyncError> {
@@ -723,6 +737,9 @@ async fn push_batch<T: Transport>(
     // The server's row of each answered row, by the row's place in the
     // write order, applied once every answer is in
     let mut answered: BTreeMap<(usize, Uuid), TableRow> = BTreeMap::new();
+    // The rows whose create was refused in this request: the later events
+    // of each, and the creates of rows pointing at it, wait with it
+    let mut refused: BTreeSet<Uuid> = BTreeSet::new();
     for answer in response.events {
         let Some(stored) = pending.iter().find(|stored| stored.event.id == answer.id) else {
             continue;
@@ -741,30 +758,31 @@ async fn push_batch<T: Transport>(
             AnswerStatus::Rejected => {
                 report.rejected += 1;
                 let reason = answer.reason.unwrap_or_else(|| "rejected".to_string());
+                // Kept pending, and held back from now on
+                if refused.contains(&event.row_id)
+                    || conflicts::creates_row_pointing_at(event, &refused)
+                {
+                    refused.insert(event.row_id);
+                    continue;
+                }
                 match (event.kind, server.is_some()) {
                     // The server's row wins
                     (_, true) => app_events::delete(&mut tx, event.id).await?,
-                    // A row's bytes may be their only copy, so it is never
-                    // dropped: it waits while the server only lacks the
-                    // bytes, and is kept for the person otherwise
-                    (EventKind::Create, false) if bytes::of_table(&event.table).is_ok() => {
-                        let refused = if reason == bytes::NOT_UPLOADED {
+                    // Never dropped: the row stays, a file's bytes may be
+                    // their only copy, and the person tries again or lets
+                    // it go. A file waits while the server only lacks its
+                    // bytes
+                    (EventKind::Create, false) => {
+                        let is_refused = if reason == bytes::NOT_UPLOADED {
                             app_events::count_attempt(&mut tx, event.id, &reason).await?
                         } else {
                             app_events::refuse(&mut tx, event.id, &reason).await?;
                             true
                         };
-                        if refused {
+                        if is_refused {
+                            refused.insert(event.row_id);
                             report.conflicts += 1;
                         }
-                        continue;
-                    }
-                    // The server will never have this row: drop it
-                    (EventKind::Create, false) => {
-                        app_events::delete(&mut tx, event.id).await?;
-                        app_events::delete_pending_of_row(&mut tx, &event.table, event.row_id)
-                            .await?;
-                        delete_row(&mut tx, &event.table, event.row_id).await?;
                         continue;
                     }
                     // The row is gone from the server, purged or never
@@ -2238,8 +2256,26 @@ pub(crate) mod tests {
         .await;
     }
 
+    /// Queues the note's create again with a field the server refuses.
+    async fn break_queued_create(device: &Deployment, user: &User) {
+        let mut tx = device.begin().await.expect("a transaction");
+        let stored = app_events::pending(&mut tx)
+            .await
+            .expect("the events")
+            .remove(0);
+        app_events::delete(&mut tx, stored.event.id)
+            .await
+            .expect("deleted");
+        let mut broken = stored.event.clone();
+        broken.changes = fields(json!({ "body": "x", "version": 5 }));
+        crate::sync::events::queue(&mut tx, user.id, &broken)
+            .await
+            .expect("queued");
+        tx.commit().await.expect("committed");
+    }
+
     #[tokio::test]
-    async fn sync_a_rejected_create_drops_the_devices_row() {
+    async fn sync_a_rejected_create_is_kept_for_the_person_with_its_later_edits() {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
@@ -2247,33 +2283,76 @@ pub(crate) mod tests {
             let note = test_notes::create(&a, &alice, "fine", None)
                 .await
                 .expect("a note");
-            {
-                // Rewrite the queued create to one the server refuses
-                let mut tx = a.begin().await.expect("a transaction");
-                let stored = app_events::pending(&mut tx)
-                    .await
-                    .expect("the events")
-                    .remove(0);
-                app_events::delete(&mut tx, stored.event.id)
-                    .await
-                    .expect("deleted");
-                let mut broken = stored.event.clone();
-                broken.changes = fields(json!({ "body": "x", "version": 5 }));
-                crate::sync::events::queue(&mut tx, alice.id, &broken)
-                    .await
-                    .expect("queued");
-                tx.commit().await.expect("committed");
-            }
+            break_queued_create(&a, &alice).await;
 
             let report = sync(&a, &server).await;
             assert_eq!(report.rejected, 1);
+            assert_eq!(report.conflicts, 1);
             assert_eq!(report.pending, 0);
-            assert!(bodies(&a, &alice).await.is_empty());
+            assert_eq!(bodies(&a, &alice).await, vec!["fine"], "the row stays");
             assert!(bodies(&server, &alice).await.is_empty());
-            let error = test_notes::get(&a, &alice, note.id)
+            let refused = conflicts::list(&a).await.expect("the conflicts");
+            assert_eq!(refused.len(), 1);
+            assert_eq!(refused[0].row_id, note.id);
+            assert_eq!(refused[0].resolve, conflicts::Resolve::TryAgain);
+            assert!(refused[0].reason.is_some(), "with why");
+
+            test_notes::update(&a, &alice, note.id, "edited")
                 .await
-                .expect_err("dropped");
-            assert!(matches!(error, NoteError::NotFound { .. }));
+                .expect("edited while refused");
+            let report = sync(&a, &server).await;
+            assert_eq!(report.rejected, 0, "the edit waits with its create");
+            assert_eq!(report.pending, 1);
+            assert!(bodies(&server, &alice).await.is_empty());
+
+            conflicts::delete(&a, refused[0].id).await.expect("let go");
+            assert!(bodies(&a, &alice).await.is_empty());
+            assert!(conflicts::list(&a).await.expect("the conflicts").is_empty());
+            assert_eq!(sync(&a, &server).await.pending, 0, "the edit went with it");
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn sync_a_rejected_create_tried_again_is_sent_again() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let (alice, token) = user_with_token(&server, "alice@example.com").await;
+            let a = device_of(&alice, &token).await;
+            test_notes::create(&a, &alice, "fine", None)
+                .await
+                .expect("a note");
+            break_queued_create(&a, &alice).await;
+            sync(&a, &server).await;
+            assert_eq!(sync(&a, &server).await.rejected, 0, "not sent on its own");
+
+            let refused = conflicts::list(&a).await.expect("the conflicts");
+            conflicts::try_again(&a, refused[0].id)
+                .await
+                .expect("tried again");
+            let report = sync(&a, &server).await;
+            assert_eq!(report.rejected, 1, "sent again");
+            assert_eq!(report.conflicts, 1, "and refused again");
+            assert_eq!(bodies(&a, &alice).await, vec!["fine"]);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn sync_a_rejected_create_keeps_its_row_through_a_resync() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let (alice, token) = user_with_token(&server, "alice@example.com").await;
+            let a = device_of(&alice, &token).await;
+            test_notes::create(&a, &alice, "fine", None)
+                .await
+                .expect("a note");
+            break_queued_create(&a, &alice).await;
+            sync(&a, &server).await;
+
+            reset(&a, &alice).await.expect("a resync");
+            assert_eq!(bodies(&a, &alice).await, vec!["fine"]);
+            assert_eq!(conflicts::list(&a).await.expect("the conflicts").len(), 1);
         })
         .await;
     }

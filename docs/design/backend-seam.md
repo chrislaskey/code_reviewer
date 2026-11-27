@@ -370,9 +370,9 @@ protocol or the sample. Add the Elixir checks to `bin/lint`.
   - the purge holding the feed lock, §3.5;
   - removal entries in the change log, §2 A;
   - a lock-free alternative to the feed lock, §2 B.
-- **Required by the outcome rule above.** A refused create of a table without bytes, such as a post, vanishes
-  from the device without a word, see
-  `docs/suggestions/refused-creates.md`.
+- **Done, 2026-11-27.** A refused create of a table without bytes, such
+  as a post, used to vanish from the device without a word. It is now
+  kept for the person, see `docs/suggestions/refused-creates.md`.
 - A token cache in remote mode, see
   `docs/suggestions/backend-token-cache.md`.
 - Hex: `mix deps.get` fails with this machine's Hex key, whose OAuth

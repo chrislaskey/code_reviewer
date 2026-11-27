@@ -18,6 +18,33 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-27: a refused create is kept for the person, in every table
+
+Commits: this one.
+
+- **What changed**.
+  - A create the server refuses, with no row of its own to send, is kept
+    on the device as a conflict with the reason, for every synced table.
+    Before, only a table with bytes kept it. Any other table deleted the
+    row and its events without a word.
+  - The row stays. Its later events, and the creates of rows pointing at
+    it by a foreign key of `SyncedTable::foreign_keys`, wait with it,
+    held back from each push.
+  - A resync keeps it. The conflicts page offers Try again and Let go;
+    letting it go removes the row and the rows waiting with it.
+  - `app_sync_state::maintenance::delete_not_pending` is now
+    `delete_not_pending_or_refused`.
+- **What an app does**.
+  - **Required**, for an app's own synced table that points at another
+    synced row: list that column in `foreign_keys`, so its creates wait
+    with a refused parent. Most already do, for resync and purge.
+  - **Required**, for an app's own table that overrides
+    `delete_for_resync`: keep the rows whose create was refused, an
+    `app_events` row with `status = 'conflict' AND type = 'create'`, as
+    `app_files`'s does. A table on the default needs nothing.
+  - **Optional**. Mark a refused row in the app's own pages, as the files
+    pages do. The conflicts page already lists it.
+
 ## 2026-11-27: a sample Elixir backend replaces phoenix/
 
 Commits: `b11afb9` removed `phoenix/`, `969ef0d` added `core_elixir/`,

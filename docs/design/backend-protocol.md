@@ -202,9 +202,9 @@ never removes the other two.
   unavailable, is a transport error, not `rejected`. The device then
   keeps the event pending and retries it.
 
-Today the device keeps a refused create for the person only for tables
-with bytes, such as files. Other tables drop it, see
-`docs/suggestions/refused-creates.md`, which closes that gap.
+The Rust device keeps every refused create for the person, with its
+row, and holds back the events that wait with it, see "Events" in
+`docs/design/offline-sync.md`.
 
 **`sync/pull`** (sample).
 

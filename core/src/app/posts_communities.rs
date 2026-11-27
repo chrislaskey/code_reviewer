@@ -730,7 +730,7 @@ mod tests {
     use crate::database::{Database, with_each_database};
     use crate::services::web_server::InProcess;
     use crate::sync::tests::{device_of, user_with_token};
-    use crate::sync::{PullRequest, Report, pull, run};
+    use crate::sync::{PullRequest, Report, conflicts, pull, run};
 
     async fn sync(device: &Deployment, server: &Deployment) -> Report {
         run(device, &InProcess { server }).await.expect("a sync")
@@ -1017,7 +1017,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn posts_communities_adding_to_a_community_left_meanwhile_is_refused_and_dropped() {
+    async fn posts_communities_adding_to_a_community_left_meanwhile_is_refused_and_kept() {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let (bob, bob_token) = user_with_token(&server, "bob@example.com").await;
@@ -1038,8 +1038,8 @@ mod tests {
             assert_eq!(report.pushed, 1, "the post");
             assert_eq!(report.rejected, 1, "its community row");
             assert_eq!(report.pending, 0);
+            assert_eq!(report.conflicts, 1, "kept for the person");
             assert_eq!(bodies(&b, &bob).await, vec!["late"]);
-            assert!(community_names(&b, &bob, post.id).await.is_empty());
             assert!(community_names(&server, &bob, post.id).await.is_empty());
             assert!(
                 memberships::list_mine(&b, &bob)
@@ -1047,6 +1047,63 @@ mod tests {
                     .expect("memberships")
                     .is_empty()
             );
+
+            let refused = conflicts::list(&b).await.expect("the conflicts");
+            assert_eq!(refused.len(), 1);
+            assert_eq!(refused[0].reason.as_deref(), Some("not_a_member"));
+            conflicts::delete(&b, refused[0].id).await.expect("let go");
+            assert!(community_names(&b, &bob, post.id).await.is_empty());
+            assert_eq!(bodies(&b, &bob).await, vec!["late"], "the post stays");
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn posts_communities_a_refused_post_keeps_its_community_rows_waiting_with_it() {
+        with_each_database(|database| async move {
+            let server = server(database);
+            let (bob, bob_token) = user_with_token(&server, "bob@example.com").await;
+            let gardening = communities::create(&server, &bob, "Gardening")
+                .await
+                .expect("a community");
+            let b = device_of(&bob, &bob_token).await;
+            sync(&b, &server).await;
+            let post = posts::create(&b, &bob, "late", &[gardening.id])
+                .await
+                .expect("a post, offline");
+            {
+                // Rewrite the post's queued create to one the server refuses
+                let mut tx = b.begin().await.expect("a transaction");
+                let stored = app_events::pending(&mut tx)
+                    .await
+                    .expect("the events")
+                    .into_iter()
+                    .find(|stored| stored.event.row_id == post.id)
+                    .expect("the post's create");
+                app_events::delete(&mut tx, stored.event.id)
+                    .await
+                    .expect("deleted");
+                let mut broken = stored.event.clone();
+                broken.changes.insert("version".to_string(), json!(5));
+                events::queue(&mut tx, bob.id, &broken)
+                    .await
+                    .expect("queued");
+                tx.commit().await.expect("committed");
+            }
+
+            let report = sync(&b, &server).await;
+            assert_eq!(report.conflicts, 1, "the post, refused");
+            assert_eq!(report.pending, 1, "its community row, waiting with it");
+            assert_eq!(community_names(&b, &bob, post.id).await, vec!["Gardening"]);
+            assert!(bodies(&server, &bob).await.is_empty());
+            let report = sync(&b, &server).await;
+            assert_eq!(report.rejected, 0, "nothing sent on its own");
+
+            let refused = conflicts::list(&b).await.expect("the conflicts");
+            assert_eq!(refused.len(), 1);
+            conflicts::delete(&b, refused[0].id).await.expect("let go");
+            assert!(bodies(&b, &bob).await.is_empty());
+            assert_eq!(sync(&b, &server).await.pending, 0, "its row went with it");
         })
         .await;
     }

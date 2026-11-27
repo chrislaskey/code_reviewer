@@ -220,9 +220,21 @@ it is the log: every event answered is recorded with its answer, in the
 same transaction as the row, so a retried event gets the same answer and
 nothing applies twice. On a device it is the queue: an event is `pending`
 until the server answers it, deleted when applied, and kept as a
-`conflict` until the person resolves it. A rejected event the server sent
-no row for stays pending with the reason in `last_error`, unless the
-reason is that the row is unknown to the server, see "Purge and resync".
+`conflict` until the person resolves it. A rejected create the server
+sent no row for is refused: kept as a conflict with the reason, its row
+kept on the device, and never sent again on its own. A rejected update
+the server sent no row for stays pending with the reason in
+`last_error`, unless the reason is that the row is unknown to the
+server, see "Purge and resync".
+
+**A refused create is never dropped.** The person decides, on the
+conflicts page: Try again or Let it go, see "What the person must still
+be able to see" in `docs/design/backend-protocol.md`. Until then, the
+row's later events, and the creates of rows pointing at it by a foreign
+key of `SyncedTable::foreign_keys` (a post's rows in communities, a
+file's), wait with it: held back from each push, as a file's events are
+while its bytes wait. A resync keeps the row. Letting it go removes the
+row, its events and the rows waiting with it.
 
 **A pending event is not tried for ever.** Each time the server
 rejects it and it stays pending counts in `attempts`, and at 30,
@@ -378,10 +390,12 @@ As the user signed in, with the device's token:
    applied before the next is sent, so a push cut short has kept what
    was answered. Apply the answers:
    `applied` deletes the event; `conflict` keeps it with the conflicts;
-   a rejected `create` deletes the event and the row it made, and the
-   server's row, if any, takes its place, except a file's, which is
-   never dropped; another `rejected` with a server
-   row deletes the event, the server wins; a `rejected` without one for a
+   a `rejected` with a server row deletes the event, the server wins; a
+   rejected `create` without one is refused and kept for the person,
+   with its row, and the later events in the request of that row and of
+   rows pointing at it stay pending, waiting with it; a file's create
+   the server only lacks the bytes of counts a try instead; a rejected
+   update without one for a
    row the server does not know deletes the device's copy and keeps the
    change as a conflict with nothing on the other side; any other
    `rejected` without one keeps the event pending with the reason. Then,
@@ -485,9 +499,11 @@ person's value and the value now on the device, which is the server's as
 of the last sync. **Reapply** queues a new update from the row's current
 version with the person's values and syncs; it applies unless someone
 changed the field yet again. **Let it go** deletes the event. A conflict
-on a post that is gone can only be let go. A file the server refused is
-there too, by its name with the reason: **Try again** queues its create
-as it was, **Let it go** removes the file from the device.
+on a post that is gone can only be let go. A create the server refused
+is there too, by what it is about with the reason, a post, a file or a
+post's row in a community: **Try again** queues its create as it was,
+**Let it go** removes the row from the device, with the rows waiting
+with it, and a file's bytes.
 
 ## Purge and resync
 

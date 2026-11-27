@@ -1,8 +1,10 @@
 # Keep a refused create for the person
 
-**Suggestion, 2026-11-27. Required by the outcome rule of
-`docs/design/backend-protocol.md`: a refusal is shown, never dropped.** Found reviewing how a device handles refused
-events, see `push_batch` in `core/src/sync.rs`.
+**Built, 2026-11-27.** Required by the outcome rule of
+`docs/design/backend-protocol.md`: a refusal is shown, never dropped.
+Found reviewing how a device handles refused events, see `push_batch` in
+`core/src/sync.rs`. The design is now "Events" in
+`docs/design/offline-sync.md`; this page keeps the reasoning.
 
 ## The gap
 
@@ -30,3 +32,24 @@ Things to decide:
   refused, as a file's does? Or should it show only on the conflicts page?
 - **Are there reasons to drop silently?** For example `exists`, when the
   server already has the row under the same id.
+
+## As built
+
+- **The row stays in its list**, as a file's does. The person sees the
+  conflict on the conflicts page, with the reason, and chooses Try again
+  or Let go. A post's list doesn't mark it as refused; that would be a
+  page change of the app's.
+- **No reason drops silently.** When the server has the row, it sends
+  it, and the server's row wins; that was already so.
+- **What waits with it.** The row's later edits, and the creates of rows
+  pointing at it by a foreign key (a post's rows in communities), are
+  held back from each push, as a file's are. In the request that
+  refused it, their answers are ignored and they stay pending.
+- **A resync keeps it.** `delete_not_pending_or_refused` keeps a row
+  whose create was refused.
+- **A post's row in a community left meanwhile** is refused with
+  `not_a_member`, and kept. Until the person lets it go, the device still
+  shows the post in that community.
+
+Open: should a refused row show a mark in its list, as a refused file
+does? That is a page change, posts' own.

@@ -3,9 +3,13 @@
 //! `docs/design/offline-sync.md`. Two kinds end up here. A change to a
 //! field someone else changed first, which the person reapplies or lets
 //! go. And a change the server refused, or said no to
-//! `app_events::MAX_ATTEMPTS` times: for a file added on this device, whose
-//! bytes are still here, the person tries again or lets it go, see
-//! `docs/design/offline-files-decisions.md`.
+//! `app_events::MAX_ATTEMPTS` times. A refused create keeps its row on the
+//! device, a post or a file and its bytes, and the person tries again or
+//! lets it go, see `docs/design/offline-files-decisions.md`. Never is a
+//! refused create dropped without the person, see "What the person must
+//! still be able to see" in `docs/design/backend-protocol.md`.
+
+use std::collections::BTreeSet;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -146,21 +150,103 @@ pub async fn try_again(deployment: &Deployment, id: Uuid) -> Result<(), Conflict
 }
 
 /// Deletes the conflict, which the page calls letting it go; nothing is
-/// sent. A file the server refused goes from the device with it, its
-/// row, its other events and its bytes, since nothing of it ever reached
-/// the server.
+/// sent. A refused create goes from the device with its row, its other
+/// events and the rows waiting with it, since nothing of them ever
+/// reached the server; a file's bytes go too.
 pub async fn delete(deployment: &Deployment, id: Uuid) -> Result<(), ConflictError> {
     let mut tx = deployment.begin().await?;
     let stored = get(&mut tx, id).await?;
-    let refused_with_bytes =
-        stored.event.kind == EventKind::Create && bytes::of_table(&stored.event.table).is_ok();
-    if refused_with_bytes {
+    if stored.event.kind != EventKind::Create {
+        app_events::delete(&mut tx, id).await?;
+        tx.commit().await?;
+        return Ok(());
+    }
+    if bytes::of_table(&stored.event.table).is_ok() {
         tx.commit().await?;
         return Ok(bytes::forget(deployment, &stored.event.table, stored.event.row_id).await?);
     }
-    app_events::delete(&mut tx, id).await?;
+    let rows = rows_waiting_with(&mut tx, &stored.event).await?;
+    // The rows pointing at others go first
+    for (table, row_id) in rows.iter().rev() {
+        app_events::delete_of_row(&mut tx, table, *row_id).await?;
+        if let Some(synced) = tables::get(table) {
+            synced.delete_row(&mut tx, *row_id).await?;
+        }
+    }
     tx.commit().await?;
     Ok(())
+}
+
+/// Adds the rows whose events wait for the person: those whose create
+/// the server refused, and those whose creates point at a row held back,
+/// which the server would answer by a row it never had.
+pub(crate) async fn hold_back_refused(
+    tx: &mut Transaction,
+    held_back: &mut BTreeSet<Uuid>,
+) -> Result<(), sqlx::Error> {
+    let conflicts = app_events::conflicts(&mut *tx).await?;
+    let refused = conflicts
+        .iter()
+        .filter(|stored| stored.event.kind == EventKind::Create)
+        .map(|stored| stored.event.row_id);
+    held_back.extend(refused);
+    let pending = app_events::pending(&mut *tx).await?;
+    loop {
+        let pointing: Vec<Uuid> = pending
+            .iter()
+            .filter(|stored| !held_back.contains(&stored.event.row_id))
+            .filter(|stored| creates_row_pointing_at(&stored.event, held_back))
+            .map(|stored| stored.event.row_id)
+            .collect();
+        if pointing.is_empty() {
+            return Ok(());
+        }
+        held_back.extend(pointing);
+    }
+}
+
+/// Whether the event creates a row whose foreign keys point at one of
+/// the rows, a post's row in a community at its post, say.
+pub(crate) fn creates_row_pointing_at(event: &Event, rows: &BTreeSet<Uuid>) -> bool {
+    let Some(synced) = tables::get(&event.table) else {
+        return false;
+    };
+    event.kind == EventKind::Create
+        && synced.foreign_keys().iter().any(|(column, _)| {
+            event
+                .changes
+                .get(*column)
+                .and_then(Value::as_str)
+                .and_then(|id| Uuid::parse_str(id).ok())
+                .is_some_and(|id| rows.contains(&id))
+        })
+}
+
+/// The refused create's row and the rows whose creates wait with it, in
+/// the order they point: each after the row it points at.
+async fn rows_waiting_with(
+    tx: &mut Transaction,
+    refused: &Event,
+) -> Result<Vec<(String, Uuid)>, sqlx::Error> {
+    let mut events = app_events::pending(&mut *tx).await?;
+    events.extend(app_events::conflicts(&mut *tx).await?);
+    let mut rows = vec![(refused.table.clone(), refused.row_id)];
+    let mut ids = BTreeSet::from([refused.row_id]);
+    loop {
+        let pointing: Vec<&Event> = events
+            .iter()
+            .map(|stored| &stored.event)
+            .filter(|event| !ids.contains(&event.row_id))
+            .filter(|event| creates_row_pointing_at(event, &ids))
+            .collect();
+        if pointing.is_empty() {
+            return Ok(rows);
+        }
+        for event in pointing {
+            ids.insert(event.row_id);
+            rows.push((event.table.clone(), event.row_id));
+        }
+    }
 }
 
 async fn get(tx: &mut Transaction, id: Uuid) -> Result<StoredEvent, ConflictError> {

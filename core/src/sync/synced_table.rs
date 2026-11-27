@@ -191,13 +191,14 @@ pub trait SyncedTable: Send + Sync {
     }
 
     /// Drops the device's rows for a resync from nothing, but those an
-    /// event still pending is about, which the next push answers.
+    /// event still pending is about, which the next push answers, and
+    /// those whose create was refused, kept for the person.
     async fn delete_for_resync(
         &self,
         tx: &mut Transaction,
         _user: &User,
     ) -> Result<(), TableError> {
-        Ok(app_sync_state::maintenance::delete_not_pending(tx, self.table()).await?)
+        Ok(app_sync_state::maintenance::delete_not_pending_or_refused(tx, self.table()).await?)
     }
 
     /// What the rows carry beside their fields, a file's bytes say, see

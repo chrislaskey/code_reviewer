@@ -63,8 +63,9 @@ pub async fn save_continuation(
 }
 
 /// Drops a synced table's rows for a resync from nothing, but those an
-/// event still pending is about, which the next push answers.
-pub async fn delete_not_pending(
+/// event still pending is about, which the next push answers, and those
+/// whose create the server refused, kept for the person.
+pub async fn delete_not_pending_or_refused(
     connection: &mut PgConnection,
     table: &str,
 ) -> Result<(), sqlx::Error> {
@@ -72,7 +73,8 @@ pub async fn delete_not_pending(
     let without_dependents = crate::sync::tables::without_dependents(table)?;
     sqlx::query(AssertSqlSafe(format!(
         "DELETE FROM {table} WHERE id NOT IN
-           (SELECT row_id FROM app_events WHERE status = 'pending' AND table_name = $1){without_dependents}"
+           (SELECT row_id FROM app_events WHERE table_name = $1
+            AND (status = 'pending' OR (status = 'conflict' AND type = 'create'))){without_dependents}"
     )))
     .bind(table)
     .execute(connection)

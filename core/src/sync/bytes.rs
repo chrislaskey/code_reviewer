@@ -495,10 +495,10 @@ pub async fn ask_about_waiting<T: Transport>(
     Ok(waiting)
 }
 
-/// The rows whose events are held back from the push: those waiting
-/// whose bytes the server does not have, and those it refused, whose
-/// later events, a rename say, it would answer by a row it never had,
-/// and the rows of other tables that wait with them.
+/// The rows whose events are held back from the push while their bytes
+/// wait: those whose bytes the server does not have, and the rows of
+/// other tables that wait with them. A refused row's are held back too,
+/// see `conflicts::hold_back_refused`.
 pub async fn held_back(
     deployment: &Deployment,
     waiting: &[Waiting],
@@ -509,14 +509,6 @@ pub async fn held_back(
         .map(|row| row.id)
         .collect();
     let mut tx = deployment.begin().await?;
-    let refused = app_events::conflicts(&mut tx)
-        .await?
-        .into_iter()
-        .filter(|stored| {
-            stored.event.kind == EventKind::Create && of_table(&stored.event.table).is_ok()
-        })
-        .map(|stored| stored.event.row_id);
-    held_back.extend(refused);
     let mut with_them = Vec::new();
     for (_, bytes) in tables() {
         with_them.extend(bytes.rows_waiting_with(&mut tx, &held_back).await?);

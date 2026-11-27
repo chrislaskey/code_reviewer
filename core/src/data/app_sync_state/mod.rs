@@ -73,9 +73,12 @@ pub mod maintenance {
     use super::*;
 
     /// Drops a synced table's rows for a resync, but those a pending
-    /// event is about.
-    pub async fn delete_not_pending(tx: &mut Transaction, table: &str) -> Result<(), sqlx::Error> {
-        query!(tx, delete_not_pending(table))
+    /// event is about and those whose create was refused.
+    pub async fn delete_not_pending_or_refused(
+        tx: &mut Transaction,
+        table: &str,
+    ) -> Result<(), sqlx::Error> {
+        query!(tx, delete_not_pending_or_refused(table))
     }
 
     /// Drops the cursor and the backfills to do, for a resync.
