@@ -323,8 +323,8 @@ For `core_elixir/` the checks are `mix format --check-formatted`,
 ### Step 1: Axum calls a remote backend
 
 **Status, 2026-11-27.** Items 1 and 2 are built. Of item 3, the token
-check, sign-in and the current user are dispatched. Sync is next, then
-communities, memberships and files. How it is built:
+check, sign-in, the current user and sync are dispatched. Communities,
+memberships and files are next. How it is built:
 
 - `BACKEND=remote`, `BACKEND_URL` and `BACKEND_SERVICE_TOKEN`, in
   `axum/src/config/backend.rs`. With a `DATABASE_URL` set it refuses to
@@ -350,6 +350,11 @@ communities, memberships and files. How it is built:
   mode they answer nothing: not staff, no plan, no failed payment, the
   default preferences, and no trial. Writes to those areas still fail.
   An app whose backend serves one dispatches it instead.
+- Push, pull and backfill call the backend, in
+  `core/src/sync/from_backend.rs`. Before a push, Rust checks the
+  bucket for each create of a row with bytes, as the Rust server does,
+  and sends the ones found as `uploaded`. The protocol version check and
+  the settings version stay in Axum, before the backend is called.
 
 1. **The backend setting.** The server's config chooses `rust` or
    `remote`, with the remote's URL and service token. `Deployment`

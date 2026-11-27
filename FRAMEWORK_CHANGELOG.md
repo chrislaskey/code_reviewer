@@ -20,8 +20,8 @@ completes.
 
 ## 2026-11-27: the web server can call a remote backend
 
-Commits: `52bb028`, and the commit after it, which dispatches sign-in
-and the current user. The first parts of step 1 of
+Commits: `52bb028`, `25cf524`, which dispatches sign-in and the
+current user, and the commit after it, which dispatches sync. The first parts of step 1 of
 `docs/design/backend-seam.md`.
 
 - **What changed**.
@@ -32,8 +32,8 @@ and the current user. The first parts of step 1 of
   - Core's `remote-backend` feature has the client,
     `services::backend::RemoteBackend`. `Deployment` has
     `remote_backend`, and `Database` has `None`.
-  - The token check, sign-in's three steps, sign-out and the current
-    user's account call it. In remote mode, staff, plans, preferences
+  - The token check, sign-in's three steps, sign-out, the current
+    user's account, and sync's push, pull and backfill call it. In remote mode, staff, plans, preferences
     and trials answer nothing, since the sample doesn't serve them.
     Every other entry fails in remote mode, until its area is
     dispatched.
@@ -41,8 +41,8 @@ and the current user. The first parts of step 1 of
   - **Required**, for an app whose code matches on `Database`: add an
     arm for `Database::None`.
   - **Required**, for an app's code that matches on `UserError`,
-    `AccountError` or `AccountUserError`: handle their `Backend`
-    variant.
+    `AccountError`, `AccountUserError` or `SyncError`: handle their
+    `Backend` variant.
   - **Optional**. Nothing else changes for an app on the Rust backend.
 
 ## 2026-11-27: every rejection is shown to the person, and a refused create is kept

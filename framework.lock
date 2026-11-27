@@ -1,6 +1,6 @@
 # The SHA-256 of each framework file as the template ships it, see
 # framework.toml. Written by `cargo run -p framework_check -- lock`.
-675120be491579b6e3a0a22b7e6ee658b7d8fdb864db0b0746db29729f5c8ff2  FRAMEWORK_CHANGELOG.md
+a7a018a569ae35acfc2f4998f4079e26cfce73f7cb1d1085a1b54e511aff0ef0  FRAMEWORK_CHANGELOG.md
 dbded3dccbf128f2dafd95a761318f0338856fa9dae66173642d45db3fd63a23  axum/src/accounts.rs
 dfdf353a942c730f3c0cea40c9e89a737bcf5fbf06960b91baab16578564a327  axum/src/accounts/app_store_notifications.rs
 4440725170bdb3eeda5a1257a241671c748cb8069a42809f37f289bacef91187  axum/src/accounts/checkouts.rs
@@ -218,11 +218,12 @@ d49274ada95fac3b9bf7378644937c946b3e6ac90e38af18735f9c122c1c900f  core/src/servi
 e5a409e3ab8e141f1b47f7a63e2b117b93ae417a3a27a4527713a80407f1af83  core/src/services/storage.rs
 5a0c4767bf1326f96ba1ab748da1ce3c74b7823f70c1f51b9f6fee9a274683b2  core/src/services/stripe.rs
 1f82412583c3c13a44a3df57dfcb1dc7af211918c947b8487e518ca348f8a0cd  core/src/services/web_server.rs
-59d578bcbf0d24c030625a807ebe96a89922249d76855f62a376e049c9c82f2b  core/src/sync.rs
+be98f605a7e71db960a3b600adc4314ead8b2a866a8348206d91755c16084ba2  core/src/sync.rs
 94b2e0222c4bd55fa99b2d860839030437eb570fa0990e53d0c6e77bc44b14a0  core/src/sync/bytes.rs
 951f03b1aa5dc132beb21e88e4ebc4f1aee847bc71e4373eabb7a26f699de1ae  core/src/sync/bytes/uploads.rs
 58825cd210ec4a7482f9b016cef8d6f70c1b14322b58d65180f9bbc75110b9aa  core/src/sync/conflicts.rs
 4e4d0e8fff93ddd988dc5cf21c02219bd698d789571b6fa8644a656c9bf5dade  core/src/sync/events.rs
+c2f8255294f0fcd08a3d274a831e70046662fb004978f3678d37f7862b3eb04a  core/src/sync/from_backend.rs
 10a05c74b82a244a76cc81098ccdc08396233d0ca1d23b993cad433564e2c491  core/src/sync/pending_changes.rs
 516860446f31446bbf2b454f5842a7e5f5f86162280bb968705ad692414f3407  core/src/sync/purge.rs
 b81731d0cb533614417f02f85abb44a1fd3810868c071f94ad9b11f08ba3cc2c  core/src/sync/synced_table.rs

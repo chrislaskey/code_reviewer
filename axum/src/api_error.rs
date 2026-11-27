@@ -443,6 +443,7 @@ impl From<SyncError> for ApiError {
             SyncError::User(error) => error.into(),
             SyncError::Unauthorized => ApiError::new(StatusCode::UNAUTHORIZED, error.to_string()),
             SyncError::AccountDeleted => ApiError::account_deleted(),
+            SyncError::Backend(error) => ApiError::from_backend(&error),
             SyncError::NotAMember { .. } => ApiError::new(StatusCode::FORBIDDEN, error.to_string()),
             SyncError::ProtocolVersion(_) => {
                 ApiError::new(StatusCode::UPGRADE_REQUIRED, error.to_string())

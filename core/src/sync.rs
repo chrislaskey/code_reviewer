@@ -20,6 +20,8 @@
 pub mod bytes;
 pub mod conflicts;
 pub mod events;
+#[cfg(feature = "remote-backend")]
+mod from_backend;
 pub mod pending_changes;
 pub mod purge;
 pub mod synced_table;
@@ -229,6 +231,11 @@ pub enum SyncError {
     /// A request supplied contradictory or out-of-order pagination bounds.
     #[error("invalid sync continuation")]
     InvalidContinuation,
+    /// The remote backend failed, or answered what this error has no
+    /// variant for.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("the server answered with something unexpected: {0}")]
     Malformed(String),
     /// A table with no part in this server's sync, which a remote
@@ -244,6 +251,10 @@ pub async fn push(
     user: &User,
     request: PushRequest,
 ) -> Result<PushResponse, SyncError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::push(deployment, backend, user, request).await;
+    }
     let mut answers = Vec::with_capacity(request.events.len());
     for event in &request.events {
         let answer = match tables::get(&event.table) {
@@ -284,6 +295,10 @@ pub async fn pull(
     user: &User,
     request: PullRequest,
 ) -> Result<Page, SyncError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::pull(backend, user, request).await;
+    }
     let mut tx = deployment.database.begin_snapshot().await?;
     let feed = app_sync_versions::get(&mut tx).await?;
     let continuation = if let Some(after) = request.after {
@@ -341,6 +356,10 @@ pub async fn backfill(
     user: &User,
     request: BackfillRequest,
 ) -> Result<Page, SyncError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::backfill(backend, user, request).await;
+    }
     let mut tx = deployment.database.begin_snapshot().await?;
     if memberships::get_live_in(&mut tx, user.id, request.community_id)
         .await?
