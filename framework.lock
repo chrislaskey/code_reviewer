@@ -1,6 +1,6 @@
 # The SHA-256 of each framework file as the template ships it, see
 # framework.toml. Written by `cargo run -p framework_check -- lock`.
-e648c2ac1386b9625eff121f29a3e3bc2eec3009f0775a29b8240f2c053f7fda  FRAMEWORK_CHANGELOG.md
+e2cc73d1a6845bb0206d3bdddab6759bfd8ea20396e7f26c33ab90a0977e4a84  FRAMEWORK_CHANGELOG.md
 dbded3dccbf128f2dafd95a761318f0338856fa9dae66173642d45db3fd63a23  axum/src/accounts.rs
 dfdf353a942c730f3c0cea40c9e89a737bcf5fbf06960b91baab16578564a327  axum/src/accounts/app_store_notifications.rs
 4440725170bdb3eeda5a1257a241671c748cb8069a42809f37f289bacef91187  axum/src/accounts/checkouts.rs
@@ -33,8 +33,8 @@ d13b0ec9fdcad8447a0d38601c46f788ac9ae511b49e243e72f883f309763101  axum/src/confi
 ce6453dabc5e8b6658958a21ac89b08686ed95d4aca5659b564285e843bda8d4  axum/src/config/mailer.rs
 b573d3685dd05d48d191ca969a0faaf32586abd8c92a2b4164e839c407304044  axum/src/config/storage.rs
 2ffe4e3f64063b42ccc1b19c859ef843969a90ad5e67b00472c4f366e41cb217  axum/src/config/stripe.rs
-6ff96627bf88f195f6ec23c15b23705b7a16f8d888a5c3fc9d729abd86e180b0  axum/src/jobs.rs
-d86e78265b1df5898d3ec97e520a49010d047d3b20a4370c2918af8f1f981c89  axum/src/main.rs
+2e899cead81f1f0a65c461a4d987e7eb9032a68789c7422c70f3bffd76e36083  axum/src/jobs.rs
+5307cf53696079540287e654073ca40ed3049315b20e508e878cf87b4b786e21  axum/src/main.rs
 204ec478f695afc0a92bdb912a627a4f047a8724645484140a2d3d1584d69630  axum/src/ops.rs
 7e5f4ec061d44e085e1d3bb54b8640de9ad07ce88803baa3941ca1237b25c481  axum/src/ops/current_staff.rs
 c2b47ab90975abfe1fc6735b90028f60605485b7ee8e30b6e7c66c1152f160a4  axum/src/public_pages.rs
@@ -204,7 +204,7 @@ d5b17695f28e217091f4342f58dfc7d0f8e3a508d0072339648dbe3f9b347d5f  core/src/helpe
 18281d1391d4bf5579f73d2a2633bfdd05d3d4e2c9b4d30be16db38f0e01dc33  core/src/helpers/sha256.rs
 07ab200d00be974871445b0de21c66a5e87302b9da4dbb2d372a0f76afca9ef4  core/src/helpers/themes.rs
 9882f97c23edf9138717f151f275a344e3241af39057e235d5c347b366cc466c  core/src/helpers/translations.rs
-a582f52bd8a8f05164f4b24743efa8a27ab0c329608c4ec5021eb9f8b341c178  core/src/jobs.rs
+3c38dc1774de6dd8e48aaa5410994d1fe6209d9cbcc7a19e899e760013f8b7db  core/src/jobs.rs
 ec6c897f324fdd56d0470f589b4353996a7cd45f71e94f627d5ba0dea33d96bc  core/src/lib.rs
 feef2c0e24147002cf86c6de72f823af905886b458b0ba552818044c3b3eab23  core/src/ops.rs
 feb40ca000f6519448fe76cec0774554f45c5b7b2f6348dfc46745eea22d3905  core/src/ops/staff.rs
@@ -219,7 +219,7 @@ e5a409e3ab8e141f1b47f7a63e2b117b93ae417a3a27a4527713a80407f1af83  core/src/servi
 5a0c4767bf1326f96ba1ab748da1ce3c74b7823f70c1f51b9f6fee9a274683b2  core/src/services/stripe.rs
 1f82412583c3c13a44a3df57dfcb1dc7af211918c947b8487e518ca348f8a0cd  core/src/services/web_server.rs
 be98f605a7e71db960a3b600adc4314ead8b2a866a8348206d91755c16084ba2  core/src/sync.rs
-53cfe6014eca221d50aec328a12ed43159663d39aa467d7dc8b8cb5a58508107  core/src/sync/bytes.rs
+8c506e4b7bdeaf078b76746dff7dd41c618b7e1290897b9a0a3f61e4d036b87e  core/src/sync/bytes.rs
 951f03b1aa5dc132beb21e88e4ebc4f1aee847bc71e4373eabb7a26f699de1ae  core/src/sync/bytes/uploads.rs
 58825cd210ec4a7482f9b016cef8d6f70c1b14322b58d65180f9bbc75110b9aa  core/src/sync/conflicts.rs
 4e4d0e8fff93ddd988dc5cf21c02219bd698d789571b6fa8644a656c9bf5dade  core/src/sync/events.rs

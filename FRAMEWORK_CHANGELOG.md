@@ -21,8 +21,9 @@ completes.
 ## 2026-11-27: the web server can call a remote backend
 
 Commits: `52bb028`, `25cf524`, which dispatches sign-in and the
-current user, `869193b`, which dispatches sync, and the commit after it,
-which dispatches communities, memberships and files. The first parts of step 1 of
+current user, `869193b`, which dispatches sync, `991d995`, which
+dispatches communities, memberships and files, and the commit after it,
+which runs the bucket sweep beside a remote backend. The first parts of step 1 of
 `docs/design/backend-seam.md`.
 
 - **What changed**.
@@ -37,7 +38,10 @@ which dispatches communities, memberships and files. The first parts of step 1 o
     user's account, sync's push, pull and backfill, the communities
     list, joining and leaving, and files call it. Reading a row's
     bytes asks `<resource>/readable`, named from the table without
-    `app_`. In remote mode, staff, plans, preferences
+    `app_`.
+  - `RecurringJob` has `runs_beside_a_remote_backend`, false unless a
+    job says so. Beside a remote backend only those run, the bucket
+    sweep of files among them, due by when the process last ran them. In remote mode, staff, plans, preferences
     and trials answer nothing, since the sample doesn't serve them.
     Every other entry fails in remote mode, until its area is
     dispatched.
@@ -48,6 +52,9 @@ which dispatches communities, memberships and files. The first parts of step 1 o
     `AccountError`, `AccountUserError`, `SyncError`, `BytesError`,
     `CommunityError`, `MembershipError` or `FileError`: handle their
     `Backend` variant.
+  - **Optional**, for an app's own job on what Rust keeps, such as a
+    bucket, when the app will use a remote backend: answer true from
+    `runs_beside_a_remote_backend`.
   - **Optional**. Nothing else changes for an app on the Rust backend.
 
 ## 2026-11-27: every rejection is shown to the person, and a refused create is kept

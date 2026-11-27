@@ -322,10 +322,10 @@ For `core_elixir/` the checks are `mix format --check-formatted`,
 
 ### Step 1: Axum calls a remote backend
 
-**Status, 2026-11-27.** Items 1, 2 and 3 are built: the token check,
+**Status, 2026-11-27.** Items 1 to 4 are built: the token check,
 sign-in, the current user, sync, communities, memberships and files are
-dispatched. Item 4, the jobs in remote mode, is next, then item 5. How
-it is built:
+dispatched, and the bucket sweep runs in remote mode. Item 5, `bin/dev`,
+is next. How it is built:
 
 - `BACKEND=remote`, `BACKEND_URL` and `BACKEND_SERVICE_TOKEN`, in
   `axum/src/config/backend.rs`. With a `DATABASE_URL` set it refuses to
@@ -363,6 +363,13 @@ it is built:
   device, asks `<resource>/readable` (`files/readable` for `app_files`)
   in `sync::bytes`, then signs the URL or serves the row's content.
   Signing an upload needs nothing from the backend.
+- A job runs beside a remote backend only when it says so,
+  `RecurringJob::runs_beside_a_remote_backend`: only
+  `files_delete_unreferenced`, the bucket sweep. It keeps the keys
+  `<resource>/storage_keys_list` answers. There is no `app_jobs` to
+  record runs in, so Axum keeps when each last ran in memory, and a
+  restart runs it again at once. The sweep is safe to run twice. The
+  backend runs its own purge.
 
 1. **The backend setting.** The server's config chooses `rust` or
    `remote`, with the remote's URL and service token. `Deployment`

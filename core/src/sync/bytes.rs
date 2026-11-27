@@ -687,15 +687,8 @@ pub async fn delete_unreferenced(
     let storage = bucket(deployment)?;
     let cutoff = now - chrono::Duration::days(UNREFERENCED_DAYS);
     let mut report = DeleteUnreferencedReport::default();
-    for (_, bytes) in tables() {
-        let mut tx = deployment.begin().await?;
-        let referenced: BTreeSet<String> = bytes
-            .list_rows(&mut tx)
-            .await?
-            .into_iter()
-            .map(|row| storage_key(bytes, row.created_by_id, row.id))
-            .collect();
-        tx.commit().await?;
+    for (table, bytes) in tables() {
+        let referenced = referenced_keys(deployment, table.table(), bytes).await?;
         for stored in storage.list(bytes.key_prefix()).await? {
             if referenced.contains(&stored.key) || stored.last_modified > cutoff {
                 report.kept += 1;
@@ -706,6 +699,37 @@ pub async fn delete_unreferenced(
         }
     }
     Ok(report)
+}
+
+/// The bucket keys of the table's rows, deleted or not, which the sweep
+/// keeps: from the remote backend's `<resource>/storage_keys_list`, when
+/// it owns the rows.
+#[cfg(feature = "object-storage")]
+async fn referenced_keys(
+    deployment: &Deployment,
+    #[cfg_attr(not(feature = "remote-backend"), expect(unused_variables))] table: &str,
+    bytes: &dyn SyncedBytes,
+) -> Result<BTreeSet<String>, BytesError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        #[derive(Deserialize)]
+        struct Keys {
+            keys: BTreeSet<String>,
+        }
+        let resource = table.strip_prefix("app_").unwrap_or(table);
+        let operation = format!("{resource}/storage_keys_list");
+        let keys: Keys = backend.call(&operation, &serde_json::json!({})).await?;
+        return Ok(keys.keys);
+    }
+    let mut tx = deployment.begin().await?;
+    let referenced = bytes
+        .list_rows(&mut tx)
+        .await?
+        .into_iter()
+        .map(|row| storage_key(bytes, row.created_by_id, row.id))
+        .collect();
+    tx.commit().await?;
+    Ok(referenced)
 }
 
 /// Removes from the account's folder the bytes no live row points at:

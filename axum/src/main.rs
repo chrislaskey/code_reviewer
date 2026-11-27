@@ -106,10 +106,10 @@ async fn main() -> Result<(), String> {
             forgetting.forget_old();
         }
     });
+    jobs::spawn(deployment.clone());
     let server_state = std::sync::Arc::default();
-    // A remote backend runs its own jobs
+    // The app's tasks work on its database, which a remote backend owns
     if !deployment.has_remote_backend() {
-        jobs::spawn(deployment.clone());
         server_tasks::spawn(deployment.clone(), std::sync::Arc::clone(&server_state));
     }
     let server_settings = config::server_settings()?;
