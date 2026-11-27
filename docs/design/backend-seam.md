@@ -1,6 +1,8 @@
-# Backend seam: analysis
+# Backend seam
 
-**Status: analysis, 2026-11-27.** Nothing is built yet. This follows
+**Status, 2026-11-27.** Step 0 is built, and so is the sample backend,
+`core_elixir/`. Step 1, Axum calling a remote backend, is next. See
+"Next steps" at the end. This follows
 [the global sync version review](../suggestions/global-sync-version-review.md).
 
 ## Decisions this starts from
@@ -17,6 +19,14 @@
   switches.
 - The template ships **the protocol plus a sample**. The sample's synced
   resource is **files**, with their communities.
+- The sample is **the Elixir app `core`** (`Core.*`, `CoreWeb.*`), in
+  `core_elixir/`. It uses **Phoenix**, JSON only, on Bandit, with
+  PostgreSQL, Ecto, Oban, and Commanded for files.
+- **One database, with separate schemas**, for the event store and the
+  tables, for now.
+- **The schema is the Rust core's PostgreSQL migrations.** The Elixir app
+  runs them itself. Only Oban's tables and Commanded's projection
+  checkpoints are migrations of its own.
 
 ## 1. Where the seam goes
 
@@ -272,9 +282,16 @@ purge holding the feed lock (§3.5).
 ## Status of the sample (2026-11-27)
 
 `core_elixir/` answers the operations the protocol marks **sample**,
-from its own PostgreSQL database, see its README. Files go through
-Commanded. Users, accounts and memberships are plain Ecto writes. It
-has 13 tests. Axum doesn't call it yet: that is step 1.
+from its own database, see its README. They are:
+
+- auth;
+- sign-in in Rust's three steps: code, code check, confirm;
+- sync push, pull and backfill;
+- communities and memberships;
+- files and their communities.
+
+Files go through Commanded. Users, accounts and memberships are plain
+Ecto writes. It has 14 tests, on PostgreSQL. Axum doesn't call it yet.
 
 ## 6. Decided (2026-11-27)
 
@@ -291,3 +308,67 @@ has 13 tests. Axum doesn't call it yet: that is step 1.
   keeps the routes, cookies, CSRF checks and the page server.
 - **The protocol** lives in `docs/design/backend-protocol.md`, with each
   operation's request, answer and errors. The conformance tests name it.
+
+## 7. Next steps
+
+In order. Each step is checked by the section 2 checks of `AGENTS.md`.
+For `core_elixir/` the checks are `mix format --check-formatted`,
+`mix compile --warnings-as-errors` and `mix test`.
+
+### Step 1: Axum calls a remote backend
+
+1. **The backend setting.** The server's config chooses `rust` or
+   `remote`, with the remote's URL and service token. `Deployment`
+   carries it. Remote is only for `Role::Server`. In remote mode Axum
+   opens no database, and refuses to start with a `DATABASE_URL`.
+2. **The client.** `core/src/services/backend.rs`: HTTP and JSON to
+   `/backend/<resource>/<action>`, with the service token. The protocol's
+   error codes map onto core's error enums.
+3. **The dispatch.** Each public entry on the sample's surface checks
+   the input's shape, then calls the Rust code or the client:
+   - `users::get_by_token`;
+   - `accounts::sign_in`, `sign_in_with_code`, `sign_in_confirm`,
+     `sign_out`;
+   - `sync::push`, `pull`, `backfill`;
+   - `communities::list`, `memberships::create`, `memberships::delete`;
+   - every `files::*`, `files_communities::*` and
+     `files::uploads::create` function Axum calls.
+
+   Rust keeps the bucket. Before a push it checks each file create's
+   bytes and sends their ids as `uploaded`. It signs downloads from
+   `files/readable`. It sends the mail the backend answers. Every other
+   entry answers "not available on this server" in remote mode.
+4. **Jobs in remote mode.** Only the bucket sweep runs, with
+   `files/storage_keys_list`. The backend runs its own purge.
+5. **A dev setup.** `bin/dev` can start `core_elixir` beside Axum in
+   remote mode, against one PostgreSQL.
+
+### Step 2: conformance
+
+Run core's sync tests through the `Http` transport, against Axum in
+remote mode with `core_elixir` behind it. These are the tests of files,
+memberships, paging, resync and conflicts. A failure is a gap in the
+protocol or the sample. Add the Elixir checks to `bin/lint`.
+
+### Step 3: fill in the sample
+
+- Record the accepted terms at sign-in, as `finish_proven_in` does.
+- `accounts/sign_in_confirm_for_device`, for the desktop and phone
+  apps.
+- Resending a code, and sign-in from a trial.
+- A new feed id for a restored backup.
+
+### Open questions and smaller fixes
+
+- From [the review](../suggestions/global-sync-version-review.md):
+  - the membership backfill trigger, §3.5;
+  - the purge holding the feed lock, §3.5;
+  - removal entries in the change log, §2 A;
+  - a lock-free alternative to the feed lock, §2 B.
+- A refused create of a table without bytes, such as a post, vanishes
+  from the device without a word, see
+  `docs/suggestions/refused-creates.md`.
+- A token cache in remote mode, see
+  `docs/suggestions/backend-token-cache.md`.
+- Hex: `mix deps.get` fails with this machine's Hex key, whose OAuth
+  refresh fails. A clean `HEX_HOME` works around it.

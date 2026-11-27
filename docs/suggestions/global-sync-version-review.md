@@ -327,18 +327,19 @@ Elixir backend will inherit them:
 
 ## 6. Recommended next steps, in order
 
-1. Narrow the feed lock to publishing paths, and lock rows before the
-   counter (§3.1). Run the PostgreSQL suite and a many-writer test.
-2. Page incremental pulls by visible rows, with a separate cap on
-   examined entries (§3.2).
-3. Persist bootstrap and backfill continuations (§3.3).
-4. Move stamping into the data layer, and add the feed invariant test
-   (§3.4).
-5. Decide the role of `app_sync_changes` (§2 A). If it stays, add
-   removal entries and the "hard deletes only when no replica" rule.
-6. Fix the membership backfill trigger, and rename `last_synced_at`
-   (§3.5). Both are cheap now and expensive after apps adopt them.
-7. Then start the Commanded analysis. Its main input from this review:
-   the projector writes rows, stamps and change entries in one
-   PostgreSQL transaction under the feed lock (or its watermark
-   replacement). Rust keeps every read and visibility rule.
+Updated 2026-11-27. The next steps are now in
+[the backend seam](../design/backend-seam.md#7-next-steps).
+
+1. **Done.** Narrow the feed lock. A sign-in code request, and a retried
+   event, no longer take it. The suite ran on PostgreSQL. Narrowing it
+   further, with row locks, is still open.
+2. **Done.** Page incremental pulls by visible rows.
+3. **Done.** Persist bootstrap and backfill continuations.
+4. **Done.** Move stamping into the data layer, and add the feed
+   invariant test.
+5. **Open.** Decide the role of `app_sync_changes` (§2 A).
+6. **Open.** Fix the membership backfill trigger. Rename `last_synced_at`
+   (§3.5).
+7. **Started.** The Commanded backend, in `core_elixir/`. Its projector
+   writes the rows, their versions and the answers in one transaction,
+   under the feed lock.

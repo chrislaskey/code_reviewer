@@ -3,6 +3,7 @@
 **Status: draft, 2026-11-27.** These are the operations a remote backend
 answers for Axum, see [the backend seam](backend-seam.md). The sample
 backend, `core_elixir/`, implements the operations marked **sample**.
+Axum doesn't call them yet: that is step 1 of the seam.
 The rest are named here, so the protocol is complete. The sample answers
 them `501 not_implemented`.
 
