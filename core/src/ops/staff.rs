@@ -28,6 +28,10 @@ pub async fn get(deployment: &Deployment, user: &User) -> Result<Staff, StaffErr
     if deployment.role != Role::Server {
         return Err(StaffError::ServerOnly);
     }
+    // A remote backend keeps no staff yet: ops is not in the sample
+    if deployment.has_remote_backend() {
+        return Err(StaffError::NotStaff);
+    }
     let mut tx = deployment.begin().await?;
     let staff = ops_staff::get(&mut tx, user.id).await?;
     tx.commit().await?;

@@ -2,6 +2,10 @@ defmodule CoreWeb.AccountsController do
   use CoreWeb, :controller
   alias Core.Accounts
 
+  def users_get(conn, params) do
+    with {:ok, account} <- Accounts.users_get(params["user_id"]), do: json(conn, account)
+  end
+
   def sign_in(conn, params) do
     with {:ok, sent} <- Accounts.sign_in(params["email"], params["sign_up_enabled"] == true, params["locale"] || "en"),
          do: json(conn, sent)

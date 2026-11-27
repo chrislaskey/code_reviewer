@@ -2,6 +2,7 @@ defmodule Core.Data.AccountsUsers do
   @moduledoc "Account records: the `accounts_users` schema and its reads and writes. Never synced."
   use Ecto.Schema
   import Ecto.Query
+  alias Core.Helpers.Time
   alias Core.Repo
 
   @primary_key {:id, Ecto.UUID, autogenerate: false}
@@ -9,6 +10,8 @@ defmodule Core.Data.AccountsUsers do
     field :email, :string
     field :confirmed_at, :utc_datetime_usec
     field :trial_expires_at, :utc_datetime_usec
+    field :terms_version, :string
+    field :terms_accepted_at, :utc_datetime_usec
     field :inserted_at, :utc_datetime_usec
     field :updated_at, :utc_datetime_usec
     field :deleted_at, :utc_datetime_usec
@@ -21,6 +24,21 @@ defmodule Core.Data.AccountsUsers do
   end
 
   def checked_email(_), do: nil
+
+  @doc "The account as Rust's `AccountUser` is written."
+  def to_wire(account) do
+    %{
+      "id" => account.id,
+      "email" => account.email,
+      "confirmed_at" => Time.to_wire(account.confirmed_at),
+      "trial_expires_at" => Time.to_wire(account.trial_expires_at),
+      "terms_version" => account.terms_version,
+      "terms_accepted_at" => Time.to_wire(account.terms_accepted_at),
+      "inserted_at" => Time.to_wire(account.inserted_at),
+      "updated_at" => Time.to_wire(account.updated_at),
+      "deleted_at" => Time.to_wire(account.deleted_at)
+    }
+  end
 
   @doc "Gets a row by id, deleted or not."
   def get(id), do: Repo.get(__MODULE__, id)

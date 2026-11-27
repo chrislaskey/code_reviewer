@@ -36,6 +36,9 @@ defmodule CoreWeb.BackendApiTest do
     conn = call("/backend/users/get_by_token", %{"token" => token})
     assert %{"user" => %{"id" => ^alice}, "kind" => "account"} = json_response(conn, 200)
 
+    conn = call("/backend/accounts/users/get", %{"user_id" => alice})
+    assert %{"id" => ^alice, "email" => "alice@example.com", "trial_expires_at" => nil} = json_response(conn, 200)
+
     conn = call("/backend/sync/pull", %{"actor_id" => alice, "cursor" => nil, "limit" => 200})
     assert %{"rows" => [_, _, _], "cursor" => %{"global_sync_version" => _}} = json_response(conn, 200)
   end

@@ -22,6 +22,7 @@ defmodule CoreWeb.Router do
 
     post "/users/get_by_token", UsersController, :get_by_token
 
+    post "/accounts/users/get", AccountsController, :users_get
     post "/accounts/sign_in", AccountsController, :sign_in
     post "/accounts/sign_in_with_code", AccountsController, :sign_in_with_code
     post "/accounts/sign_in_confirm", AccountsController, :sign_in_confirm

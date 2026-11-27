@@ -58,6 +58,11 @@ pub enum PreferenceError {
 /// The user's preferences. A row whose value no longer applies, a
 /// language since dropped say, reads as its default.
 pub async fn get(deployment: &Deployment, user: &User) -> Result<Preferences, PreferenceError> {
+    // A remote backend keeps no preferences yet: they are not in the
+    // sample, so the user has the defaults
+    if deployment.has_remote_backend() {
+        return Ok(Preferences::default());
+    }
     let mut tx = deployment.begin().await?;
     let preferences = get_in(&mut tx, user.id).await?;
     tx.commit().await?;
@@ -95,12 +100,16 @@ pub(crate) async fn mail_locale_in(
             .and_then(|row| row.value.as_str().map(str::to_string)),
         None => None,
     };
-    let locale = chosen.as_deref().unwrap_or(requested);
-    Ok(crate::app::locales::SUPPORTED
+    Ok(supported_locale(chosen.as_deref().unwrap_or(requested)))
+}
+
+/// The locale, if the app has it, else the default.
+pub(crate) fn supported_locale(locale: &str) -> &'static str {
+    crate::app::locales::SUPPORTED
         .iter()
         .copied()
         .find(|supported| *supported == locale)
-        .unwrap_or(locales::DEFAULT))
+        .unwrap_or(locales::DEFAULT)
 }
 
 /// Sets one of the user's preferences, with the time from this

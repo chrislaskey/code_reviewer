@@ -96,6 +96,18 @@ every signed-in request.
 Errors: `unknown_token`, `account_deleted`. The backend keeps only
 SHA-256 hashes of tokens, as hex. It matches them exactly.
 
+**`accounts/users/get`** (sample). The account of a user, for the
+current user's page: its email and whether it is a trial.
+
+```json
+{"user_id": "…"}
+→ AccountUser
+```
+
+`AccountUser` is the Rust struct: `id`, `email`, `confirmed_at`,
+`trial_expires_at`, `terms_version`, `terms_accepted_at`, `inserted_at`,
+`updated_at`, `deleted_at`. An unknown id is `not_found`.
+
 **`accounts/sign_in`** (sample). Starts a sign-in for an address.
 
 ```json

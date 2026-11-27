@@ -130,6 +130,10 @@ pub async fn count(deployment: &Deployment) -> Result<i64, TrialUserError> {
 
 /// Whether the user is a trial user. On a device, never.
 pub async fn is_trial(deployment: &Deployment, user: &User) -> Result<bool, sqlx::Error> {
+    // A remote backend has no trials yet: they are not in the sample
+    if deployment.has_remote_backend() {
+        return Ok(false);
+    }
     let mut tx = deployment.begin().await?;
     let account = accounts_users::lifecycle::get(&mut tx, user.id).await?;
     tx.commit().await?;

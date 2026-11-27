@@ -157,6 +157,11 @@ pub enum AccountError {
     Sync(#[from] SyncError),
     #[error(transparent)]
     DeviceSettings(#[from] DeviceSettingsError),
+    /// The remote backend failed, or answered what this error has no
+    /// variant for.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -191,6 +196,10 @@ pub async fn sign_in(
         return Err(AccountError::ServerOnly);
     }
     let email = accounts_users::checked_email(email)?;
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::sign_in(backend, mailer, &email, sign_up_enabled, requested).await;
+    }
     let mut tx = deployment.begin().await?;
     let (mail, pending) = match accounts_users::get_by_email(&mut tx, &email).await? {
         // A trial user's address is made up: nothing to send, nobody to tell
@@ -351,6 +360,10 @@ pub async fn sign_in_with_code(
     if deployment.role != Role::Server {
         return Err(AccountError::ServerOnly);
     }
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::sign_in_with_code(backend, pending, code).await;
+    }
     let mut tx = deployment.begin().await?;
     let matched = match_code_in(&mut tx, pending, code).await;
     tx.commit().await?;
@@ -364,6 +377,10 @@ pub async fn sign_in_confirm(
     deployment: &Deployment,
     pending: &str,
 ) -> Result<Session, AccountError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::sign_in_confirm(backend, pending).await;
+    }
     confirm(deployment, pending, Finish::Session).await
 }
 
@@ -439,6 +456,10 @@ pub async fn sign_in_with_device_code(
 pub async fn sign_out(deployment: &Deployment, token: &str) -> Result<(), AccountError> {
     if deployment.role != Role::Server {
         return Err(AccountError::ServerOnly);
+    }
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::sign_out(backend, token).await;
     }
     let mut tx = deployment.begin().await?;
     accounts_tokens::delete(&mut tx, token).await?;
@@ -706,6 +727,107 @@ async fn count_attempt_in(tx: &mut Transaction, id: Uuid) -> Result<(), AccountE
         accounts_tokens::delete_by_id(tx, id).await?;
     }
     Ok(())
+}
+
+/// The sign-in's steps answered by the remote backend, see
+/// `docs/design/backend-protocol.md`. Rust sends the mail the backend
+/// answers, as the Rust server does after its transaction.
+#[cfg(feature = "remote-backend")]
+mod from_backend {
+    use serde_json::json;
+
+    use super::*;
+    use crate::services::backend::{BackendError, RemoteBackend};
+    use crate::services::mailer::Mail;
+
+    /// The mail a sign-in answers for Rust to send.
+    #[derive(Deserialize)]
+    struct MailToSend {
+        kind: String,
+        to: String,
+        locale: String,
+        code: Option<String>,
+    }
+
+    #[derive(Deserialize)]
+    struct Sent {
+        pending: String,
+        mail: Option<MailToSend>,
+    }
+
+    pub(super) async fn sign_in(
+        backend: &RemoteBackend,
+        mailer: &Mailer,
+        email: &str,
+        sign_up_enabled: bool,
+        requested: &str,
+    ) -> Result<CodeSent, AccountError> {
+        let request = json!({
+            "email": email,
+            "sign_up_enabled": sign_up_enabled,
+            "locale": requested,
+        });
+        let sent: Sent = backend
+            .call("accounts/sign_in", &request)
+            .await
+            .map_err(account_error)?;
+        if let Some(mail) = sent.mail {
+            mailer.send(mail_of(mail)?).await?;
+        }
+        Ok(CodeSent {
+            pending: sent.pending,
+        })
+    }
+
+    pub(super) async fn sign_in_with_code(
+        backend: &RemoteBackend,
+        pending: &str,
+        code: &str,
+    ) -> Result<CodeMatched, AccountError> {
+        let request = json!({ "pending": pending, "code": code });
+        backend
+            .call("accounts/sign_in_with_code", &request)
+            .await
+            .map_err(account_error)
+    }
+
+    pub(super) async fn sign_in_confirm(
+        backend: &RemoteBackend,
+        pending: &str,
+    ) -> Result<Session, AccountError> {
+        backend
+            .call("accounts/sign_in_confirm", &json!({ "pending": pending }))
+            .await
+            .map_err(account_error)
+    }
+
+    pub(super) async fn sign_out(backend: &RemoteBackend, token: &str) -> Result<(), AccountError> {
+        let _: serde_json::Value = backend
+            .call("accounts/sign_out", &json!({ "token": token }))
+            .await
+            .map_err(account_error)?;
+        Ok(())
+    }
+
+    /// The mail in the language the backend chose, if core has it.
+    fn mail_of(mail: MailToSend) -> Result<Mail, AccountError> {
+        let locale = preferences::supported_locale(&mail.locale);
+        match (mail.kind.as_str(), mail.code) {
+            ("sign_in_code", Some(code)) => Ok(mails::sign_in_code(locale, &mail.to, &code)),
+            ("no_account", _) => Ok(mails::no_account(locale, &mail.to)),
+            (kind, _) => Err(BackendError::Malformed(format!("a mail of kind {kind}")).into()),
+        }
+    }
+
+    /// The account's error for each code the protocol gives a sign-in.
+    fn account_error(error: BackendError) -> AccountError {
+        match error.code() {
+            Some("wrong_code") => AccountError::CodeDoesNotMatch,
+            Some("sign_in_expired") => AccountError::SignInExpired,
+            Some("account_deleted") => AccountError::User(UserError::AccountDeleted),
+            _ => error.into(),
+        }
+    }
 }
 
 /// Where every proven user ends: the browser's token, or the device

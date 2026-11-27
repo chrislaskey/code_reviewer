@@ -11,6 +11,14 @@ defmodule Core.Accounts do
 
   @max_attempts 5
 
+  @doc "The account of the user, as `accounts::users::get` answers it."
+  def users_get(user_id) do
+    case Ids.cast(user_id) && AccountsUsers.get(user_id) do
+      %AccountsUsers{} = account -> {:ok, AccountsUsers.to_wire(account)}
+      _ -> {:error, :not_found}
+    end
+  end
+
   @doc "Starts a sign-in for an address, signing it up when it is new and sign-up is enabled."
   def sign_in(email, sign_up_enabled, locale) do
     case AccountsUsers.checked_email(email) do

@@ -322,10 +322,9 @@ For `core_elixir/` the checks are `mix format --check-formatted`,
 
 ### Step 1: Axum calls a remote backend
 
-**Status, 2026-11-27.** Items 1 and 2 are built, and the dispatch of
-`users::get_by_token`. The rest of item 3 goes one area at a time:
-sign-in and the current user, then sync, then communities, memberships
-and files. How it is built:
+**Status, 2026-11-27.** Items 1 and 2 are built. Of item 3, the token
+check, sign-in and the current user are dispatched. Sync is next, then
+communities, memberships and files. How it is built:
 
 - `BACKEND=remote`, `BACKEND_URL` and `BACKEND_SERVICE_TOKEN`, in
   `axum/src/config/backend.rs`. With a `DATABASE_URL` set it refuses to
@@ -344,6 +343,13 @@ and files. How it is built:
   `UserError::UnknownToken`. Any other is the error's `Backend`
   variant, which Axum answers with the backend's status, or 502 when
   the backend was not reached.
+- Sign-in's three steps and sign-out call the backend. Rust sends the
+  mail it answers, in a language core has.
+- The current user's page reads the account by `accounts/users/get`.
+  Its other reads are of areas the sample doesn't serve, so in remote
+  mode they answer nothing: not staff, no plan, no failed payment, the
+  default preferences, and no trial. Writes to those areas still fail.
+  An app whose backend serves one dispatches it instead.
 
 1. **The backend setting.** The server's config chooses `rust` or
    `remote`, with the remote's URL and service token. `Deployment`

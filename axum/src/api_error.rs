@@ -277,6 +277,7 @@ impl From<AccountUserError> for ApiError {
             AccountUserError::InvalidEmail | AccountUserError::EmailTaken => {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
+            AccountUserError::Backend(error) => return ApiError::from_backend(&error),
             AccountUserError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         ApiError::new(status, error.to_string())
@@ -348,6 +349,7 @@ impl From<AccountError> for ApiError {
             AccountError::AccountUser(error) => return error.into(),
             AccountError::Community(error) => return error.into(),
             AccountError::Sync(error) => return error.into(),
+            AccountError::Backend(error) => return ApiError::from_backend(&error),
             AccountError::SignInExpired
             | AccountError::CodeDoesNotMatch
             | AccountError::EmailOrPasswordDoesNotMatch
