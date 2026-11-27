@@ -17,12 +17,12 @@ use crate::data::accounts_preferences::{
     self, AcceptedPreference, LOCALE, Preference, PreferenceInvalid, TABLE, THEME,
 };
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
-use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::locales;
 use crate::sync::TableRow;
+use crate::sync::VersionRange;
 use crate::sync::events::{self, Answer};
 use crate::sync::synced_table::{LocalCreate, SyncedTable, TableError};
 
@@ -157,6 +157,7 @@ pub(crate) async fn apply_in(
     user: &User,
     event: &Event,
 ) -> Result<Answer, PreferenceError> {
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -207,6 +208,9 @@ pub(crate) async fn apply_in(
             row
         }
     };
+    if row.value == value {
+        return finish(tx, role, user, event, &row).await;
+    }
     let now = now();
     let mut updated = Preference {
         value,
@@ -217,10 +221,11 @@ pub(crate) async fn apply_in(
         updated.version += 1;
         updated.last_synced_at = Some(now);
     }
-    let updated = match AcceptedPreference::new(updated) {
+    let mut updated = match AcceptedPreference::new(updated) {
         Ok(updated) => updated,
         Err(invalid) => return rejected(event, format!("invalid: {invalid}"), Some(&row)),
     };
+    updated.record_sync_change(tx, role).await?;
     accounts_preferences::update(tx, &updated).await?;
     finish(tx, role, user, event, updated.row()).await
 }
@@ -247,13 +252,15 @@ async fn create(
         updated_at: now,
         version,
         last_synced_at,
+        global_sync_version: None,
         deleted_at: None,
         deleted_by_id: None,
     };
-    let preference = match AcceptedPreference::new(preference) {
+    let mut preference = match AcceptedPreference::new(preference) {
         Ok(preference) => preference,
         Err(invalid) => return rejected(event, format!("invalid: {invalid}"), None),
     };
+    preference.record_sync_change(tx, role).await?;
     accounts_preferences::create(tx, &preference).await?;
     finish(tx, role, user, event, preference.row()).await
 }
@@ -353,11 +360,11 @@ impl SyncedTable for Synced {
         &self,
         tx: &mut Transaction,
         user: &User,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<TableRow>, TableError> {
         let rows =
-            accounts_preferences::replication::list_synced_after(tx, user.id, after, limit).await?;
+            accounts_preferences::replication::list_synced_after(tx, user.id, range, limit).await?;
         Ok(rows.iter().map(table_row).collect::<Result<_, _>>()?)
     }
 

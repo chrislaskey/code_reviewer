@@ -13,6 +13,7 @@ pub struct Purge {
     pub id: Uuid,
     pub horizon: DateTime<Utc>,
     pub inserted_at: DateTime<Utc>,
+    pub minimum_global_sync_version: i64,
 }
 
 #[cfg(feature = "postgres")]
@@ -48,7 +49,8 @@ pub(crate) mod maintenance {
         tx: &mut Transaction,
         table: &str,
         horizon: DateTime<Utc>,
+        floor: i64,
     ) -> Result<u64, sqlx::Error> {
-        query!(tx, delete_deleted_before(table, horizon))
+        query!(tx, delete_deleted_before(table, horizon, floor))
     }
 }

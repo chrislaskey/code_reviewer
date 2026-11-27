@@ -640,7 +640,7 @@ async fn sync_push_applies_an_event_and_pull_returns_the_row() {
     assert_eq!(body["rows"][3]["row"]["body"], json!("pushed"));
     assert_eq!(body["next"], Value::Null);
     assert_eq!(body["resync"], json!(false));
-    assert!(body["cursor"]["last_synced_at"].is_string());
+    assert!(body["cursor"]["global_sync_version"].is_string());
 }
 
 #[tokio::test]

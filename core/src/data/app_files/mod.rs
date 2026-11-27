@@ -8,11 +8,11 @@ use garde::Validate;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::data::app_sync_state::Cursor;
 use crate::database::Transaction;
 use crate::helpers::content_type::{content_type_or_unknown, is_content_type};
 use crate::helpers::field_errors::FieldErrors;
 use crate::helpers::sha256::{self, is_sha256};
+use crate::sync::VersionRange;
 
 pub const TABLE: &str = "app_files";
 /// The largest file, 25 MB.
@@ -59,6 +59,9 @@ pub struct File {
     #[garde(skip)]
     pub last_synced_at: Option<DateTime<Utc>>,
     #[garde(skip)]
+    #[serde(with = "crate::sync::version::optional")]
+    pub global_sync_version: Option<i64>,
+    #[garde(skip)]
     pub deleted_at: Option<DateTime<Utc>>,
     #[garde(skip)]
     pub deleted_by_id: Option<Uuid>,
@@ -68,6 +71,20 @@ pub struct File {
 pub struct AcceptedFile(File);
 
 impl AcceptedFile {
+    /// Records a validated server change in the same transaction as its row.
+    pub(crate) async fn record_sync_change(
+        &mut self,
+        tx: &mut Transaction,
+        role: crate::deployment::Role,
+    ) -> Result<(), sqlx::Error> {
+        if let Some(version) =
+            crate::data::app_sync_changes::record(tx, role, TABLE, self.0.id).await?
+        {
+            self.0.global_sync_version = Some(version);
+        }
+        Ok(())
+    }
+
     /// Checks the file, with its name trimmed, a missing content type
     /// filled in, and the size and SHA-256 of content the row keeps.
     pub fn new(file: File) -> Result<AcceptedFile, FieldErrors> {
@@ -211,10 +228,10 @@ pub mod replication {
     pub async fn list_synced_after(
         tx: &mut Transaction,
         user_id: Uuid,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<File>, sqlx::Error> {
-        query!(tx, list_synced_after(user_id, after, limit))
+        query!(tx, list_synced_after(user_id, range, limit))
     }
 
     /// Persists a row accepted by the resource workflow.

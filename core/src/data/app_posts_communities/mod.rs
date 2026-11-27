@@ -7,8 +7,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::data::app_sync_state::Cursor;
 use crate::database::Transaction;
+use crate::sync::VersionRange;
 
 pub const TABLE: &str = "app_posts_communities";
 
@@ -25,6 +25,8 @@ pub struct PostCommunity {
     pub updated_at: DateTime<Utc>,
     pub version: i64,
     pub last_synced_at: Option<DateTime<Utc>>,
+    #[serde(with = "crate::sync::version::optional")]
+    pub global_sync_version: Option<i64>,
     pub deleted_at: Option<DateTime<Utc>>,
     pub deleted_by_id: Option<Uuid>,
 }
@@ -102,10 +104,10 @@ pub mod replication {
     pub async fn list_synced_after(
         tx: &mut Transaction,
         user_id: Uuid,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<PostCommunity>, sqlx::Error> {
-        query!(tx, list_synced_after(user_id, after, limit))
+        query!(tx, list_synced_after(user_id, range, limit))
     }
 
     /// Persists a row accepted by the resource workflow.
@@ -120,10 +122,10 @@ pub mod replication {
     pub async fn list_live_of_community_after(
         tx: &mut Transaction,
         community_id: Uuid,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<PostCommunity>, sqlx::Error> {
-        query!(tx, list_live_of_community_after(community_id, after, limit))
+        query!(tx, list_live_of_community_after(community_id, range, limit))
     }
 }
 

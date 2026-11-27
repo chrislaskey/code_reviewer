@@ -6,7 +6,7 @@ use sqlx::{FromRow, PgConnection};
 use uuid::Uuid;
 
 use super::PostCommunity;
-use crate::data::app_sync_state::Cursor;
+use crate::sync::VersionRange;
 
 #[derive(FromRow)]
 struct PostCommunityRow {
@@ -18,6 +18,7 @@ struct PostCommunityRow {
     updated_at: DateTime<Utc>,
     version: i64,
     last_synced_at: Option<DateTime<Utc>>,
+    global_sync_version: Option<i64>,
     deleted_at: Option<DateTime<Utc>>,
     deleted_by_id: Option<Uuid>,
 }
@@ -33,6 +34,7 @@ impl From<PostCommunityRow> for PostCommunity {
             updated_at: row.updated_at,
             version: row.version,
             last_synced_at: row.last_synced_at,
+            global_sync_version: row.global_sync_version,
             deleted_at: row.deleted_at,
             deleted_by_id: row.deleted_by_id,
         }
@@ -42,7 +44,7 @@ impl From<PostCommunityRow> for PostCommunity {
 macro_rules! select {
     ($($rest:expr),+ $(,)?) => {
         concat!(
-            "SELECT id, post_id, community_id, users_communities_id, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id FROM app_posts_communities ",
+            "SELECT id, post_id, community_id, users_communities_id, inserted_at, updated_at, version, last_synced_at, global_sync_version, deleted_at, deleted_by_id FROM app_posts_communities ",
             $($rest),+
         )
     };
@@ -135,17 +137,17 @@ pub async fn list_of_membership_deleted_at(
 pub async fn list_synced_after(
     connection: &mut PgConnection,
     user_id: Uuid,
-    after: &Cursor,
+    range: &VersionRange,
     limit: usize,
 ) -> Result<Vec<PostCommunity>, sqlx::Error> {
     let rows: Vec<PostCommunityRow> = sqlx::query_as(select!(
-        "WHERE last_synced_at IS NOT NULL AND (last_synced_at, id) > ($2, $3) AND ",
+        "WHERE global_sync_version > $2 AND global_sync_version <= $3 AND ",
         visible_to!(),
-        " ORDER BY last_synced_at, id LIMIT $4"
+        " ORDER BY global_sync_version LIMIT $4"
     ))
     .bind(user_id)
-    .bind(after.last_synced_at)
-    .bind(after.id)
+    .bind(range.after)
+    .bind(range.through)
     .bind(i64::try_from(limit).unwrap_or(i64::MAX))
     .fetch_all(connection)
     .await?;
@@ -157,17 +159,17 @@ pub async fn list_synced_after(
 pub async fn list_live_of_community_after(
     connection: &mut PgConnection,
     community_id: Uuid,
-    after: &Cursor,
+    range: &VersionRange,
     limit: usize,
 ) -> Result<Vec<PostCommunity>, sqlx::Error> {
     let rows: Vec<PostCommunityRow> = sqlx::query_as(select!(
-        "WHERE community_id = $1 AND deleted_at IS NULL AND last_synced_at IS NOT NULL
-           AND (last_synced_at, id) > ($2, $3)
-         ORDER BY last_synced_at, id LIMIT $4"
+        "WHERE community_id = $1 AND deleted_at IS NULL
+           AND global_sync_version > $2 AND global_sync_version <= $3
+         ORDER BY global_sync_version LIMIT $4"
     ))
     .bind(community_id)
-    .bind(after.last_synced_at)
-    .bind(after.id)
+    .bind(range.after)
+    .bind(range.through)
     .bind(i64::try_from(limit).unwrap_or(i64::MAX))
     .fetch_all(connection)
     .await?;
@@ -176,8 +178,8 @@ pub async fn list_live_of_community_after(
 
 pub async fn insert(connection: &mut PgConnection, row: &PostCommunity) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_posts_communities (id, post_id, community_id, users_communities_id, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+        "INSERT INTO app_posts_communities (id, post_id, community_id, users_communities_id, inserted_at, updated_at, version, last_synced_at, global_sync_version, deleted_at, deleted_by_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
     )
     .bind(row.id)
     .bind(row.post_id)
@@ -187,6 +189,7 @@ pub async fn insert(connection: &mut PgConnection, row: &PostCommunity) -> Resul
     .bind(row.updated_at)
     .bind(row.version)
     .bind(row.last_synced_at)
+    .bind(row.global_sync_version)
     .bind(row.deleted_at)
     .bind(row.deleted_by_id)
     .execute(connection)
@@ -200,7 +203,7 @@ pub async fn update(
     row: &PostCommunity,
 ) -> Result<bool, sqlx::Error> {
     let result = sqlx::query(
-        "UPDATE app_posts_communities SET users_communities_id = $2, updated_at = $3, version = $4, last_synced_at = $5, deleted_at = $6, deleted_by_id = $7
+        "UPDATE app_posts_communities SET users_communities_id = $2, updated_at = $3, version = $4, last_synced_at = $5, global_sync_version = $6, deleted_at = $7, deleted_by_id = $8
          WHERE id = $1",
     )
     .bind(row.id)
@@ -208,6 +211,7 @@ pub async fn update(
     .bind(row.updated_at)
     .bind(row.version)
     .bind(row.last_synced_at)
+    .bind(row.global_sync_version)
     .bind(row.deleted_at)
     .bind(row.deleted_by_id)
     .execute(connection)
@@ -218,12 +222,12 @@ pub async fn update(
 /// Writes the server's row over the device's, or inserts it.
 pub async fn upsert(connection: &mut PgConnection, row: &PostCommunity) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_posts_communities (id, post_id, community_id, users_communities_id, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        "INSERT INTO app_posts_communities (id, post_id, community_id, users_communities_id, inserted_at, updated_at, version, last_synced_at, global_sync_version, deleted_at, deleted_by_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT (id) DO UPDATE SET
            post_id = excluded.post_id, community_id = excluded.community_id, users_communities_id = excluded.users_communities_id,
            inserted_at = excluded.inserted_at, updated_at = excluded.updated_at, version = excluded.version,
-           last_synced_at = excluded.last_synced_at, deleted_at = excluded.deleted_at, deleted_by_id = excluded.deleted_by_id",
+           last_synced_at = excluded.last_synced_at, global_sync_version = excluded.global_sync_version, deleted_at = excluded.deleted_at, deleted_by_id = excluded.deleted_by_id",
     )
     .bind(row.id)
     .bind(row.post_id)
@@ -233,6 +237,7 @@ pub async fn upsert(connection: &mut PgConnection, row: &PostCommunity) -> Resul
     .bind(row.updated_at)
     .bind(row.version)
     .bind(row.last_synced_at)
+    .bind(row.global_sync_version)
     .bind(row.deleted_at)
     .bind(row.deleted_by_id)
     .execute(connection)

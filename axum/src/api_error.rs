@@ -421,9 +421,10 @@ impl From<SyncError> for ApiError {
             SyncError::ProtocolVersion(_) => {
                 ApiError::new(StatusCode::UPGRADE_REQUIRED, error.to_string())
             }
-            SyncError::Transport(_) | SyncError::Refused(_) | SyncError::Malformed(_) => {
-                ApiError::new(StatusCode::BAD_REQUEST, error.to_string())
-            }
+            SyncError::InvalidContinuation
+            | SyncError::Transport(_)
+            | SyncError::Refused(_)
+            | SyncError::Malformed(_) => ApiError::new(StatusCode::BAD_REQUEST, error.to_string()),
             SyncError::Database(_)
             | SyncError::Table(_)
             | SyncError::DeviceSettings(_)

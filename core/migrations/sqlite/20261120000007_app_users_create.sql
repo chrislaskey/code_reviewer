@@ -17,8 +17,9 @@ CREATE TABLE app_users (
   updated_at TEXT NOT NULL,
   version INTEGER NOT NULL DEFAULT 0,
   last_synced_at TEXT,
+  global_sync_version INTEGER CHECK (global_sync_version > 0),
   deleted_at TEXT,
   deleted_by_id TEXT
 );
 
-CREATE INDEX app_users_last_synced_at ON app_users (last_synced_at, id);
+CREATE INDEX app_users_global_sync_version ON app_users (global_sync_version);

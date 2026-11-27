@@ -17,8 +17,9 @@ CREATE TABLE app_users (
   updated_at timestamptz NOT NULL,
   version bigint NOT NULL DEFAULT 0,
   last_synced_at timestamptz,
+  global_sync_version BIGINT CHECK (global_sync_version > 0),
   deleted_at timestamptz,
   deleted_by_id uuid
 );
 
-CREATE INDEX app_users_last_synced_at ON app_users (last_synced_at, id);
+CREATE INDEX app_users_global_sync_version ON app_users (global_sync_version);

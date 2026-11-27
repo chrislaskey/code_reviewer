@@ -23,12 +23,12 @@ use crate::app::{communities, users};
 use crate::data::app_communities::Community;
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
 use crate::data::app_sync_backfills;
-use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;
 use crate::sync::TableRow;
+use crate::sync::VersionRange;
 use crate::sync::events::{self, Answer, AnswerStatus};
 use crate::sync::synced_table::{LocalCreate, SyncedTable, TableError};
 use crate::sync::tables;
@@ -208,10 +208,10 @@ pub(crate) async fn delete_row(tx: &mut Transaction, id: Uuid) -> Result<(), Mem
 pub(crate) async fn list_synced_after(
     tx: &mut Transaction,
     user: &User,
-    after: &Cursor,
+    range: &VersionRange,
     limit: usize,
 ) -> Result<Vec<Membership>, MembershipError> {
-    Ok(app_users_communities::replication::list_synced_after(tx, user.id, after, limit).await?)
+    Ok(app_users_communities::replication::list_synced_after(tx, user.id, range, limit).await?)
 }
 
 struct Applied {
@@ -241,6 +241,7 @@ async fn apply_in(
     user: &User,
     event: &Event,
 ) -> Result<Applied, MembershipError> {
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -297,7 +298,7 @@ async fn apply_in(
                         Role::Server => (1, Some(now)),
                         Role::Device => (0, None),
                     };
-                    let membership = Membership {
+                    let mut membership = Membership {
                         id: event.row_id,
                         user_id: user.id,
                         community_id,
@@ -306,9 +307,16 @@ async fn apply_in(
                         updated_at: now,
                         version,
                         last_synced_at,
+                        global_sync_version: None,
                         deleted_at: None,
                         deleted_by_id: None,
                     };
+                    if let Some(version) =
+                        crate::data::app_sync_changes::record(tx, role, TABLE, membership.id)
+                            .await?
+                    {
+                        membership.global_sync_version = Some(version);
+                    }
                     app_users_communities::create(&mut *tx, &membership).await?;
                     membership
                 }
@@ -445,6 +453,11 @@ async fn write_changed(
         membership.version += 1;
         membership.last_synced_at = Some(now);
     }
+    if let Some(version) =
+        crate::data::app_sync_changes::record(tx, role, TABLE, membership.id).await?
+    {
+        membership.global_sync_version = Some(version);
+    }
     app_users_communities::update(&mut *tx, membership).await?;
     Ok(())
 }
@@ -473,6 +486,13 @@ pub struct Synced;
 
 #[async_trait]
 impl SyncedTable for Synced {
+    fn foreign_keys(&self) -> &'static [(&'static str, &'static str)] {
+        &[
+            ("user_id", "app_users"),
+            ("community_id", "app_communities"),
+        ]
+    }
+
     fn table(&self) -> &'static str {
         TABLE
     }
@@ -495,10 +515,10 @@ impl SyncedTable for Synced {
         &self,
         tx: &mut Transaction,
         user: &User,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<TableRow>, TableError> {
-        let memberships = list_synced_after(tx, user, after, limit).await?;
+        let memberships = list_synced_after(tx, user, range, limit).await?;
         Ok(memberships
             .iter()
             .map(table_row)
@@ -532,9 +552,11 @@ impl SyncedTable for Synced {
         let incoming: Membership = serde_json::from_value(row.row.clone())?;
         let joined = incoming.user_id == user.id
             && incoming.deleted_at.is_none()
-            && get_in(tx, incoming.id)
-                .await?
-                .is_none_or(|had| had.deleted_at.is_some() || had.last_synced_at.is_none());
+            && get_in(tx, incoming.id).await?.is_none_or(|had| {
+                had.deleted_at.is_some()
+                    || had.global_sync_version.is_none()
+                    || incoming.version > had.version
+            });
         let written = apply_server_row(tx, &row.row).await?;
         if written && joined {
             app_sync_backfills::create(&mut *tx, incoming.community_id).await?;

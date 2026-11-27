@@ -104,6 +104,7 @@ pub async fn create(
         return Err(DeletionError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
+    crate::data::app_sync_versions::lock(&mut tx).await?;
     let account = live_account_in(&mut tx, user.id).await?;
     // Their language, read before their preferences go with the account
     let locale = preferences::mail_locale_in(&mut tx, Some(user.id), requested).await?;
@@ -140,6 +141,7 @@ pub async fn create_from_command_line(
         email: email.to_string(),
     };
     let mut tx = deployment.begin().await?;
+    crate::data::app_sync_versions::lock(&mut tx).await?;
     let account = accounts_users::get_by_email(&mut tx, email)
         .await?
         .ok_or_else(no_account)?;

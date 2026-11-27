@@ -2,7 +2,6 @@
 //! the first pull. The server never writes it; this is the counterpart
 //! of `sqlite::sync_state`.
 
-use chrono::{DateTime, Utc};
 use sqlx::{AssertSqlSafe, PgConnection};
 use uuid::Uuid;
 
@@ -10,11 +9,14 @@ use super::Cursor;
 use crate::database::identifier;
 
 pub async fn cursor(connection: &mut PgConnection) -> Result<Option<Cursor>, sqlx::Error> {
-    let row: Option<(DateTime<Utc>, Uuid)> =
-        sqlx::query_as("SELECT cursor_last_synced_at, cursor_id FROM app_sync_state WHERE id = 1")
+    let row: Option<(Uuid, i64)> =
+        sqlx::query_as("SELECT feed_id, global_sync_version FROM app_sync_state WHERE id = 1")
             .fetch_optional(connection)
             .await?;
-    Ok(row.map(|(last_synced_at, id)| Cursor { last_synced_at, id }))
+    Ok(row.map(|(feed_id, global_sync_version)| Cursor {
+        feed_id,
+        global_sync_version,
+    }))
 }
 
 pub async fn save_cursor(
@@ -22,12 +24,12 @@ pub async fn save_cursor(
     cursor: &Cursor,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_sync_state (id, cursor_last_synced_at, cursor_id) VALUES (1, $1, $2)
+        "INSERT INTO app_sync_state (id, feed_id, global_sync_version) VALUES (1, $1, $2)
          ON CONFLICT (id) DO UPDATE SET
-           cursor_last_synced_at = excluded.cursor_last_synced_at, cursor_id = excluded.cursor_id",
+           feed_id = excluded.feed_id, global_sync_version = excluded.global_sync_version",
     )
-    .bind(cursor.last_synced_at)
-    .bind(cursor.id)
+    .bind(cursor.feed_id)
+    .bind(cursor.global_sync_version)
     .execute(connection)
     .await?;
     Ok(())
@@ -40,9 +42,10 @@ pub async fn delete_not_pending(
     table: &str,
 ) -> Result<(), sqlx::Error> {
     let table = identifier(table)?;
+    let without_dependents = crate::sync::tables::without_dependents(table)?;
     sqlx::query(AssertSqlSafe(format!(
         "DELETE FROM {table} WHERE id NOT IN
-           (SELECT row_id FROM app_events WHERE status = 'pending' AND table_name = $1)"
+           (SELECT row_id FROM app_events WHERE status = 'pending' AND table_name = $1){without_dependents}"
     )))
     .bind(table)
     .execute(connection)

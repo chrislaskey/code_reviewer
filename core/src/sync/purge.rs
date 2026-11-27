@@ -1,20 +1,12 @@
-//! The purge: hard-deletes what was soft-deleted more than the retention
-//! window ago, on the server, see "Purge and resync" in
-//! `docs/design/offline-sync.md`. A row goes once both its delete and
-//! its last write are older than the horizon, so every device that
-//! pulled within the window has seen it go; children first, so a
-//! deleted post's community rows, deleted at the same moment, go with
-//! it; the events of rows that are gone go too, and so do the tokens
-//! that have expired, see `tokens`, the users who signed up more than a
-//! day ago and never entered their code, see `accounts`, whom no device
-//! ever pulled, and the accounts of the users removed. Each run records
-//! its horizon, and a device whose cursor is older than the latest one
-//! may have missed a deletion, so the pull tells it to start over.
+//! Scheduled server cleanup of expired sync entries and soft-deleted
+//! rows. The purge commits the discarded version floor with its deletions.
+//! A device below the floor starts with a fresh set of visible rows.
+//! Synced children go first and any remaining child keeps its parent.
 //!
 //! It runs daily, before the sweeps, see `jobs`.
 
-use crate::data::app_events;
 use crate::data::app_purges::{self, Purge};
+use crate::data::{app_events, app_sync_changes, app_sync_versions};
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Duration, Utc};
@@ -64,11 +56,14 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
     }
     let horizon = now - Duration::days(RETENTION_DAYS);
     let mut tx = deployment.begin().await?;
+    app_sync_versions::lock(&mut tx).await?;
+    let floor = app_sync_changes::purge(&mut tx, horizon).await?;
     let mut removed = BTreeMap::new();
     // Children first, so a purged parent's rows have already gone
     for synced in tables::list().iter().rev() {
         let table = synced.table();
-        let count = app_purges::maintenance::delete_deleted_before(&mut tx, table, horizon).await?;
+        let count =
+            app_purges::maintenance::delete_deleted_before(&mut tx, table, horizon, floor).await?;
         removed.insert(table.to_string(), count);
     }
     let mut events = 0;
@@ -91,6 +86,7 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
         id: Uuid::now_v7(),
         horizon,
         inserted_at: now,
+        minimum_global_sync_version: floor,
     };
     app_purges::create(&mut tx, &purge).await?;
     tx.commit().await?;

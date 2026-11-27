@@ -28,6 +28,8 @@ pub struct Post {
     pub version: i64,
     /// When the server last wrote it; none on a device's post not yet pushed.
     pub last_synced_at: Option<DateTime<Utc>>,
+    #[serde(with = "crate::sync::version::optional")]
+    pub global_sync_version: Option<i64>,
     pub deleted_at: Option<DateTime<Utc>>,
     pub deleted_by_id: Option<Uuid>,
 }
@@ -45,6 +47,20 @@ pub enum PostInvalid {
 pub struct AcceptedPost(Post);
 
 impl AcceptedPost {
+    /// Records a validated server change in the same transaction as its row.
+    pub(crate) async fn record_sync_change(
+        &mut self,
+        tx: &mut Transaction,
+        role: crate::deployment::Role,
+    ) -> Result<(), sqlx::Error> {
+        if let Some(version) =
+            crate::data::app_sync_changes::record(tx, role, TABLE, self.0.id).await?
+        {
+            self.0.global_sync_version = Some(version);
+        }
+        Ok(())
+    }
+
     /// Checks the post, with its body as it is kept.
     pub fn new(post: Post) -> Result<AcceptedPost, PostInvalid> {
         let body = checked_body(&post.body)?;
@@ -126,7 +142,7 @@ pub(crate) async fn update(tx: &mut Transaction, post: &AcceptedPost) -> Result<
 /// Protocol reads include tombstones; authoritative writes retain server versions.
 pub mod replication {
     use super::*;
-    use crate::data::app_sync_state::Cursor;
+    use crate::sync::VersionRange;
 
     /// Gets a row regardless of visibility or deletion for event processing.
     pub async fn get(tx: &mut Transaction, id: Uuid) -> Result<Option<Post>, sqlx::Error> {
@@ -137,10 +153,10 @@ pub mod replication {
     pub async fn list(
         tx: &mut Transaction,
         user_id: Uuid,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<Post>, sqlx::Error> {
-        query!(tx, list_synced_after(user_id, after, limit))
+        query!(tx, list_synced_after(user_id, range, limit))
     }
 
     /// Persists the server's row as it is, the server being the system of

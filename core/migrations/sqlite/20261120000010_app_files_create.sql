@@ -16,11 +16,12 @@ CREATE TABLE app_files (
   updated_at TEXT NOT NULL,
   version INTEGER NOT NULL DEFAULT 0,
   last_synced_at TEXT,
+  global_sync_version INTEGER CHECK (global_sync_version > 0),
   deleted_at TEXT,
   deleted_by_id TEXT
 );
 
-CREATE INDEX app_files_last_synced_at ON app_files (last_synced_at, id);
+CREATE INDEX app_files_global_sync_version ON app_files (global_sync_version);
 CREATE INDEX app_files_sha256 ON app_files (sha256);
 
 -- Taking a file out soft-deletes its row; putting it back revives the
@@ -34,10 +35,11 @@ CREATE TABLE app_files_communities (
   updated_at TEXT NOT NULL,
   version INTEGER NOT NULL DEFAULT 0,
   last_synced_at TEXT,
+  global_sync_version INTEGER CHECK (global_sync_version > 0),
   deleted_at TEXT,
   deleted_by_id TEXT
 );
 
 CREATE UNIQUE INDEX app_files_communities_file_community ON app_files_communities (file_id, community_id);
 CREATE INDEX app_files_communities_community_id ON app_files_communities (community_id);
-CREATE INDEX app_files_communities_last_synced_at ON app_files_communities (last_synced_at, id);
+CREATE INDEX app_files_communities_global_sync_version ON app_files_communities (global_sync_version);

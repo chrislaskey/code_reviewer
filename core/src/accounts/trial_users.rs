@@ -100,6 +100,7 @@ pub async fn create(deployment: &Deployment, max: i64) -> Result<Session, TrialU
         return Err(TrialUserError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
+    crate::data::app_sync_versions::lock(&mut tx).await?;
     if trial_users::count(&mut tx).await? >= max {
         return Err(TrialUserError::Full);
     }
@@ -160,6 +161,7 @@ pub async fn delete_expired(
     }
     let ended_before = now - Duration::hours(KEPT_AFTER_HOURS);
     let mut tx = deployment.begin().await?;
+    crate::data::app_sync_versions::lock(&mut tx).await?;
     let users = trial_users::maintenance::delete_expired_before(&mut tx, ended_before).await?;
     tx.commit().await?;
     Ok(TrialUsersDeleted { users })

@@ -7,13 +7,14 @@ CREATE TABLE app_posts (
   updated_at timestamptz NOT NULL,
   version bigint NOT NULL DEFAULT 0,
   last_synced_at timestamptz,
+  global_sync_version BIGINT CHECK (global_sync_version > 0),
   deleted_at timestamptz,
   deleted_by_id uuid
 );
 
 CREATE INDEX app_posts_user_id ON app_posts (user_id);
 CREATE INDEX app_posts_inserted_at ON app_posts (inserted_at);
-CREATE INDEX app_posts_last_synced_at ON app_posts (last_synced_at, id);
+CREATE INDEX app_posts_global_sync_version ON app_posts (global_sync_version);
 
 -- A post in a community, see src/app/posts_communities.rs, inserted
 -- under the user's membership, which leaving follows. Removing
@@ -28,6 +29,7 @@ CREATE TABLE app_posts_communities (
   updated_at timestamptz NOT NULL,
   version bigint NOT NULL DEFAULT 0,
   last_synced_at timestamptz,
+  global_sync_version BIGINT CHECK (global_sync_version > 0),
   deleted_at timestamptz,
   deleted_by_id uuid
 );
@@ -35,4 +37,4 @@ CREATE TABLE app_posts_communities (
 CREATE UNIQUE INDEX app_posts_communities_post_community ON app_posts_communities (post_id, community_id);
 CREATE INDEX app_posts_communities_community_id ON app_posts_communities (community_id);
 CREATE INDEX app_posts_communities_users_communities_id ON app_posts_communities (users_communities_id);
-CREATE INDEX app_posts_communities_last_synced_at ON app_posts_communities (last_synced_at, id);
+CREATE INDEX app_posts_communities_global_sync_version ON app_posts_communities (global_sync_version);

@@ -103,7 +103,7 @@ impl StoredEvent {
 }
 
 /// Merges an event's `changes` into a row's `current` values at
-/// `version`, field by field. At the server's version every change
+/// `version`, field by field. At the server's version each changed value
 /// applies. Behind it, a field the row already holds the device's value
 /// for is skipped; a field still at the device's `base` value applies,
 /// since nobody else changed it; any other field was changed by someone
@@ -116,7 +116,12 @@ pub fn merge(
     changes: &Fields,
 ) -> (Fields, Conflicts) {
     if base_version == version {
-        return (changes.clone(), Conflicts::new());
+        let applied = changes
+            .iter()
+            .filter(|(field, value)| current.get(*field) != Some(*value))
+            .map(|(field, value)| (field.clone(), value.clone()))
+            .collect();
+        return (applied, Conflicts::new());
     }
     let mut applied = Fields::new();
     let mut conflicts = Conflicts::new();

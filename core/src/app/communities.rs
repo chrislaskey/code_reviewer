@@ -19,7 +19,6 @@ use uuid::Uuid;
 
 use crate::app::memberships::{self, MembershipError};
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
-use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::data::app_users_communities::Membership;
 use crate::database::Transaction;
@@ -27,6 +26,7 @@ use crate::deployment::{Deployment, Role, now};
 use crate::helpers::field_errors::FieldErrors;
 use crate::helpers::json;
 use crate::sync::TableRow;
+use crate::sync::VersionRange;
 use crate::sync::events::{self, Answer, AnswerStatus};
 use crate::sync::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
 use crate::sync::tables;
@@ -242,10 +242,10 @@ pub(crate) async fn delete_row(tx: &mut Transaction, id: Uuid) -> Result<(), Com
 pub(crate) async fn list_synced_after(
     tx: &mut Transaction,
     user: &User,
-    after: &Cursor,
+    range: &VersionRange,
     limit: usize,
 ) -> Result<Vec<Community>, CommunityError> {
-    Ok(app_communities::replication::list_synced_after(tx, user.id, after, limit).await?)
+    Ok(app_communities::replication::list_synced_after(tx, user.id, range, limit).await?)
 }
 
 pub(crate) async fn list_by_ids(
@@ -312,6 +312,7 @@ pub(crate) async fn apply_in(
     user: &User,
     event: &Event,
 ) -> Result<Applied, CommunityError> {
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -349,16 +350,18 @@ pub(crate) async fn apply_in(
                 updated_at: now,
                 version,
                 last_synced_at,
+                global_sync_version: None,
                 deleted_at: None,
                 deleted_by_id: None,
             };
             let accepted = blank
                 .with_fields(&event.changes)
                 .and_then(|community| Ok(AcceptedCommunity::new(community)?));
-            let community = match accepted {
+            let mut community = match accepted {
                 Ok(community) => community,
                 Err(error) => return rejected(event, format!("invalid: {error}"), None),
             };
+            community.record_sync_change(tx, role).await?;
             app_communities::create(&mut *tx, &community).await?;
             finish(
                 tx,
@@ -404,12 +407,13 @@ pub(crate) async fn apply_in(
                 updated.version += 1;
                 updated.last_synced_at = Some(now);
             }
-            let updated = match AcceptedCommunity::new(updated) {
+            let mut updated = match AcceptedCommunity::new(updated) {
                 Ok(updated) => updated,
                 Err(error) => {
                     return rejected(event, format!("invalid: {error}"), Some(community));
                 }
             };
+            updated.record_sync_change(tx, role).await?;
             app_communities::update(&mut *tx, &updated).await?;
             let updated = updated.into_row();
             if changes.contains_key("deleted_at") && updated.deleted_at.is_some() {
@@ -505,10 +509,10 @@ impl SyncedTable for Synced {
         &self,
         tx: &mut Transaction,
         user: &User,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<TableRow>, TableError> {
-        let communities = list_synced_after(tx, user, after, limit).await?;
+        let communities = list_synced_after(tx, user, range, limit).await?;
         Ok(communities
             .iter()
             .map(table_row)

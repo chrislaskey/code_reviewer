@@ -68,6 +68,18 @@ impl Database {
         })
     }
 
+    /// Opens a read transaction with a single snapshot, including on PostgreSQL.
+    pub(crate) async fn begin_snapshot(&self) -> Result<Transaction, sqlx::Error> {
+        Ok(match self {
+            Database::Sqlite(pool) => Transaction::Sqlite(pool.begin().await?),
+            #[cfg(feature = "postgres")]
+            Database::Postgres(pool) => Transaction::Postgres(
+                pool.begin_with("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
+                    .await?,
+            ),
+        })
+    }
+
     /// Closes the connections, waiting for the ones in use to finish, so
     /// a SQLite file can be deleted or opened again.
     pub async fn close(&self) {
@@ -185,6 +197,16 @@ where
     test(sqlite).await;
 
     #[cfg(feature = "postgres")]
+    with_test_postgres(test).await;
+}
+
+/// Runs against a fresh PostgreSQL schema when a test database is configured.
+#[cfg(all(test, feature = "postgres"))]
+pub(crate) async fn with_test_postgres<Test, Run>(test: Test)
+where
+    Test: FnOnce(Database) -> Run,
+    Run: Future<Output = ()>,
+{
     if let Ok(url) = std::env::var("TEST_POSTGRES_URL") {
         let schema = format!("test_{}", uuid::Uuid::now_v7().simple());
         let options = sqlx::postgres::PgConnectOptions::from_str(&url)

@@ -1,28 +1,17 @@
 //! The device's place in the server's rows: the `Cursor` it pulled to,
 //! one row of `app_sync_state` per user, and the reads and writes of it.
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::database::Transaction;
 
-/// A place in the pull order: the server's write time and the id of a
-/// row, the last one pulled.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+/// The part of a server feed already applied to the device.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Cursor {
-    pub last_synced_at: DateTime<Utc>,
-    pub id: Uuid,
-}
-
-impl Cursor {
-    /// Before every row.
-    pub fn start() -> Cursor {
-        Cursor {
-            last_synced_at: DateTime::<Utc>::UNIX_EPOCH,
-            id: Uuid::nil(),
-        }
-    }
+    pub feed_id: Uuid,
+    #[serde(with = "crate::sync::version")]
+    pub global_sync_version: i64,
 }
 
 #[cfg(feature = "postgres")]
@@ -63,4 +52,52 @@ pub mod maintenance {
     pub async fn delete_cursor_and_backfills(tx: &mut Transaction) -> Result<(), sqlx::Error> {
         query!(tx, delete_cursor_and_backfills())
     }
+
+    /// Clears old feed stamps from rows retained during a full resync.
+    pub(crate) async fn clear_versions(
+        tx: &mut Transaction,
+        table: &str,
+    ) -> Result<(), sqlx::Error> {
+        let table = crate::database::identifier(table)?;
+        let statement = format!(
+            "UPDATE {table} SET global_sync_version = NULL WHERE global_sync_version IS NOT NULL"
+        );
+        match tx {
+            Transaction::Sqlite(connection) => sqlx::query(sqlx::AssertSqlSafe(statement))
+                .execute(&mut **connection)
+                .await
+                .map(|_| ()),
+            #[cfg(feature = "postgres")]
+            Transaction::Postgres(connection) => sqlx::query(sqlx::AssertSqlSafe(statement))
+                .execute(&mut **connection)
+                .await
+                .map(|_| ()),
+        }
+    }
+}
+
+/// Reads a device row's last version before applying a server snapshot.
+pub(crate) async fn row_version(
+    tx: &mut Transaction,
+    table: &str,
+    id: Uuid,
+) -> Result<Option<i64>, sqlx::Error> {
+    let table = crate::database::identifier(table)?;
+    let statement = format!("SELECT global_sync_version FROM {table} WHERE id = $1");
+    let version: Option<Option<i64>> = match tx {
+        Transaction::Sqlite(connection) => {
+            sqlx::query_scalar(sqlx::AssertSqlSafe(statement))
+                .bind(id.hyphenated())
+                .fetch_optional(&mut **connection)
+                .await?
+        }
+        #[cfg(feature = "postgres")]
+        Transaction::Postgres(connection) => {
+            sqlx::query_scalar(sqlx::AssertSqlSafe(statement))
+                .bind(id)
+                .fetch_optional(&mut **connection)
+                .await?
+        }
+    };
+    Ok(version.flatten())
 }

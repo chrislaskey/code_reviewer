@@ -22,13 +22,13 @@ use crate::app::{communities, posts};
 use crate::data::app_events::{self, Conflicts, Event, EventKind};
 use crate::data::app_posts;
 use crate::data::app_posts::Post;
-use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::data::app_users_communities::Membership;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;
 use crate::sync::TableRow;
+use crate::sync::VersionRange;
 use crate::sync::events::{self, Answer, AnswerStatus};
 use crate::sync::synced_table::{LocalCreate, SyncedTable, TableError};
 
@@ -312,24 +312,24 @@ pub(crate) async fn get_in(
 pub(crate) async fn list_synced_after(
     tx: &mut Transaction,
     user: &User,
-    after: &Cursor,
+    range: &VersionRange,
     limit: usize,
 ) -> Result<Vec<PostCommunity>, PostCommunityError> {
-    Ok(app_posts_communities::replication::list_synced_after(tx, user.id, after, limit).await?)
+    Ok(app_posts_communities::replication::list_synced_after(tx, user.id, range, limit).await?)
 }
 
 /// A page of the community's live rows after the cursor: a backfill.
 pub(crate) async fn list_live_of_community_after(
     tx: &mut Transaction,
     community_id: Uuid,
-    after: &Cursor,
+    range: &VersionRange,
     limit: usize,
 ) -> Result<Vec<PostCommunity>, PostCommunityError> {
     Ok(
         app_posts_communities::replication::list_live_of_community_after(
             tx,
             community_id,
-            after,
+            range,
             limit,
         )
         .await?,
@@ -378,6 +378,7 @@ async fn apply_in(
     user: &User,
     event: &Event,
 ) -> Result<Applied, PostCommunityError> {
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -438,7 +439,7 @@ async fn apply_in(
                         Role::Server => (1, Some(now)),
                         Role::Device => (0, None),
                     };
-                    let row = PostCommunity {
+                    let mut row = PostCommunity {
                         id: event.row_id,
                         post_id: post.id,
                         community_id,
@@ -447,9 +448,15 @@ async fn apply_in(
                         updated_at: now,
                         version,
                         last_synced_at,
+                        global_sync_version: None,
                         deleted_at: None,
                         deleted_by_id: None,
                     };
+                    if let Some(version) =
+                        crate::data::app_sync_changes::record(tx, role, TABLE, row.id).await?
+                    {
+                        row.global_sync_version = Some(version);
+                    }
                     app_posts_communities::create(&mut *tx, &row).await?;
                     row
                 }
@@ -535,6 +542,9 @@ async fn write_changed(
         row.version += 1;
         row.last_synced_at = Some(now);
     }
+    if let Some(version) = crate::data::app_sync_changes::record(tx, role, TABLE, row.id).await? {
+        row.global_sync_version = Some(version);
+    }
     app_posts_communities::update(&mut *tx, row).await?;
     Ok(())
 }
@@ -563,6 +573,14 @@ pub struct Synced;
 
 #[async_trait]
 impl SyncedTable for Synced {
+    fn foreign_keys(&self) -> &'static [(&'static str, &'static str)] {
+        &[
+            ("post_id", "app_posts"),
+            ("community_id", "app_communities"),
+            ("users_communities_id", "app_users_communities"),
+        ]
+    }
+
     fn table(&self) -> &'static str {
         TABLE
     }
@@ -585,10 +603,10 @@ impl SyncedTable for Synced {
         &self,
         tx: &mut Transaction,
         user: &User,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<TableRow>, TableError> {
-        let rows = list_synced_after(tx, user, after, limit).await?;
+        let rows = list_synced_after(tx, user, range, limit).await?;
         Ok(rows.iter().map(table_row).collect::<Result<_, _>>()?)
     }
 
@@ -660,10 +678,10 @@ impl SyncedTable for Synced {
         &self,
         tx: &mut Transaction,
         community_id: Uuid,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<TableRow>, TableError> {
-        let rows = list_live_of_community_after(tx, community_id, after, limit).await?;
+        let rows = list_live_of_community_after(tx, community_id, range, limit).await?;
         Ok(rows.iter().map(table_row).collect::<Result<_, _>>()?)
     }
 

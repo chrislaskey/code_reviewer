@@ -409,6 +409,11 @@ the only way a value reaches a phone build, else `http://localhost:4000`.
 `--config` override for the web server it starts. The web has nothing to sync and shows no sync
 status.
 
+Pull follows the server's committed `global_sync_version`. The device
+saves its feed ID and the last applied version in the active account's
+database. A cursor below the retained history triggers a fresh bootstrap
+that keeps pending work. See [offline sync](docs/design/offline-sync.md).
+
 The device holds exactly what its user sees. The pull brings each row
 after the rows it points at, so the foreign keys hold; joining a
 community records it in `app_sync_backfills` and the sync asks the server

@@ -56,7 +56,18 @@ pub(crate) mod maintenance {
         user_id: Uuid,
         now: DateTime<Utc>,
     ) -> Result<(), sqlx::Error> {
-        query!(tx, touch_communities_of(user_id, now))
+        use crate::data::{app_communities, app_sync_changes, app_sync_versions};
+        use crate::deployment::Role;
+
+        app_sync_versions::lock(tx).await?;
+        for id in query!(tx, community_ids(user_id))? {
+            if let Some(version) =
+                app_sync_changes::record(tx, Role::Server, app_communities::TABLE, id).await?
+            {
+                query!(tx, touch_community(id, now, version))?;
+            }
+        }
+        Ok(())
     }
 
     /// Removes one trial and its related rows through the existing bulk cleanup.

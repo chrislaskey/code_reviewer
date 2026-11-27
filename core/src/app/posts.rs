@@ -23,12 +23,12 @@ use crate::app::users;
 use crate::data::app_communities::Community;
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
 use crate::data::app_posts::{self, AcceptedPost, Post, PostInvalid, TABLE};
-use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;
 use crate::sync::TableRow;
+use crate::sync::VersionRange;
 use crate::sync::events::{self, Answer, AnswerStatus};
 use crate::sync::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
 
@@ -290,6 +290,7 @@ pub(crate) async fn apply_in(
     user: &User,
     event: &Event,
 ) -> Result<Applied, PostError> {
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -328,16 +329,18 @@ pub(crate) async fn apply_in(
                 updated_at: now,
                 version,
                 last_synced_at,
+                global_sync_version: None,
                 deleted_at: None,
                 deleted_by_id: None,
             };
             let accepted = blank
                 .with_fields(&event.changes)
                 .and_then(|post| Ok(AcceptedPost::new(post)?));
-            let post = match accepted {
+            let mut post = match accepted {
                 Ok(post) => post,
                 Err(error) => return rejected(event, format!("invalid: {error}"), None),
             };
+            post.record_sync_change(tx, role).await?;
             app_posts::create(tx, &post).await?;
             finish(tx, role, user, event, Conflicts::new(), post.into_row()).await?
         }
@@ -370,10 +373,11 @@ pub(crate) async fn apply_in(
                     updated.version += 1;
                     updated.last_synced_at = Some(now);
                 }
-                let updated = match AcceptedPost::new(updated) {
+                let mut updated = match AcceptedPost::new(updated) {
                     Ok(updated) => updated,
                     Err(error) => return rejected(event, format!("invalid: {error}"), Some(post)),
                 };
+                updated.record_sync_change(tx, role).await?;
                 app_posts::update(tx, &updated).await?;
                 let updated = updated.into_row();
                 if changes.contains_key("deleted_at") && updated.deleted_at.is_some() {
@@ -442,6 +446,10 @@ pub struct Synced;
 
 #[async_trait]
 impl SyncedTable for Synced {
+    fn foreign_keys(&self) -> &'static [(&'static str, &'static str)] {
+        &[("user_id", "app_users")]
+    }
+
     fn table(&self) -> &'static str {
         TABLE
     }
@@ -464,10 +472,10 @@ impl SyncedTable for Synced {
         &self,
         tx: &mut Transaction,
         user: &User,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<TableRow>, TableError> {
-        let posts = app_posts::replication::list(tx, user.id, after, limit).await?;
+        let posts = app_posts::replication::list(tx, user.id, range, limit).await?;
         Ok(posts.iter().map(table_row).collect::<Result<_, _>>()?)
     }
 

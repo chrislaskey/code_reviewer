@@ -23,13 +23,13 @@ use uuid::Uuid;
 
 use crate::data::app_communities::Community;
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
-use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::data::app_users_communities::{self, Membership};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;
 use crate::sync::TableRow;
+use crate::sync::VersionRange;
 use crate::sync::events::{self, Answer, AnswerStatus};
 use crate::sync::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
 
@@ -57,10 +57,11 @@ CREATE TABLE IF NOT EXISTS app_test_notes (
   updated_at TEXT NOT NULL,
   version INTEGER NOT NULL DEFAULT 0,
   last_synced_at TEXT,
+  global_sync_version INTEGER CHECK (global_sync_version > 0),
   deleted_at TEXT,
   deleted_by_id TEXT
 );
-CREATE INDEX IF NOT EXISTS app_test_notes_last_synced_at ON app_test_notes (last_synced_at, id);
+CREATE INDEX IF NOT EXISTS app_test_notes_global_sync_version ON app_test_notes (global_sync_version);
 ";
 
 /// The table, on PostgreSQL.
@@ -74,10 +75,11 @@ CREATE TABLE IF NOT EXISTS app_test_notes (
   updated_at timestamptz NOT NULL,
   version bigint NOT NULL DEFAULT 0,
   last_synced_at timestamptz,
+  global_sync_version BIGINT CHECK (global_sync_version > 0),
   deleted_at timestamptz,
   deleted_by_id uuid
 );
-CREATE INDEX IF NOT EXISTS app_test_notes_last_synced_at ON app_test_notes (last_synced_at, id);
+CREATE INDEX IF NOT EXISTS app_test_notes_global_sync_version ON app_test_notes (global_sync_version);
 ";
 
 /// A note, with the sync columns every synced row carries.
@@ -91,6 +93,8 @@ pub struct Note {
     pub updated_at: DateTime<Utc>,
     pub version: i64,
     pub last_synced_at: Option<DateTime<Utc>>,
+    #[serde(with = "crate::sync::version::optional")]
+    pub global_sync_version: Option<i64>,
     pub deleted_at: Option<DateTime<Utc>>,
     pub deleted_by_id: Option<Uuid>,
 }
@@ -329,6 +333,7 @@ async fn apply_in(
     user: &User,
     event: &Event,
 ) -> Result<Applied, NoteError> {
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -368,6 +373,7 @@ async fn apply_in(
                 updated_at: now,
                 version,
                 last_synced_at,
+                global_sync_version: None,
                 deleted_at: None,
                 deleted_by_id: None,
             };
@@ -381,6 +387,11 @@ async fn apply_in(
             };
             if !in_its_community(tx, user, &note).await? {
                 return rejected(event, "not_a_member", None);
+            }
+            if let Some(version) =
+                crate::data::app_sync_changes::record(tx, role, TABLE, note.id).await?
+            {
+                note.global_sync_version = Some(version);
             }
             query!(tx, insert(&note))?;
             finish(tx, role, user, event, Conflicts::new(), note).await
@@ -421,6 +432,11 @@ async fn apply_in(
             if role == Role::Server {
                 updated.version += 1;
                 updated.last_synced_at = Some(now);
+            }
+            if let Some(version) =
+                crate::data::app_sync_changes::record(tx, role, TABLE, updated.id).await?
+            {
+                updated.global_sync_version = Some(version);
             }
             query!(tx, update(&updated))?;
             finish(tx, role, user, event, conflicts, updated).await
@@ -475,6 +491,9 @@ async fn write_copied(
         note.version += 1;
         note.last_synced_at = Some(note.updated_at);
     }
+    if let Some(version) = crate::data::app_sync_changes::record(tx, role, TABLE, note.id).await? {
+        note.global_sync_version = Some(version);
+    }
     Ok(query!(tx, update(&note))?)
 }
 
@@ -500,6 +519,13 @@ pub struct Synced;
 
 #[async_trait]
 impl SyncedTable for Synced {
+    fn foreign_keys(&self) -> &'static [(&'static str, &'static str)] {
+        &[
+            ("user_id", "app_users"),
+            ("community_id", "app_communities"),
+        ]
+    }
+
     fn table(&self) -> &'static str {
         TABLE
     }
@@ -522,10 +548,10 @@ impl SyncedTable for Synced {
         &self,
         tx: &mut Transaction,
         user: &User,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<TableRow>, TableError> {
-        let notes = query!(tx, list_synced_after(user.id, after, limit))?;
+        let notes = query!(tx, list_synced_after(user.id, range, limit))?;
         Ok(notes.iter().map(table_row).collect::<Result<_, _>>()?)
     }
 
@@ -610,10 +636,10 @@ impl SyncedTable for Synced {
         &self,
         tx: &mut Transaction,
         community_id: Uuid,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<TableRow>, TableError> {
-        let notes = query!(tx, list_live_in_community_after(community_id, after, limit))?;
+        let notes = query!(tx, list_live_in_community_after(community_id, range, limit))?;
         Ok(notes.iter().map(table_row).collect::<Result<_, _>>()?)
     }
 

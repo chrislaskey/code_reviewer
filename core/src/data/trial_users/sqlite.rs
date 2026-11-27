@@ -4,7 +4,7 @@
 
 use chrono::{DateTime, Utc};
 use sqlx::SqliteConnection;
-use uuid::Uuid;
+use uuid::{Uuid, fmt::Hyphenated};
 
 /// The trial users there are, expired or not.
 pub async fn count(connection: &mut SqliteConnection) -> Result<i64, sqlx::Error> {
@@ -74,20 +74,36 @@ pub async fn community_is_hidden_from(
     Ok(hidden)
 }
 
-/// Writes the user's communities as changed now, so the next pull of
-/// everyone who could not see them while the user was a trial brings
-/// them.
-pub async fn touch_communities_of(
+/// Finds the communities exposed when an isolated trial joins the regular app.
+pub async fn community_ids(
     connection: &mut SqliteConnection,
     user_id: Uuid,
-    now: DateTime<Utc>,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "UPDATE app_communities SET version = version + 1, last_synced_at = $2
-         WHERE id IN (SELECT community_id FROM app_users_communities WHERE user_id = $1)",
+) -> Result<Vec<Uuid>, sqlx::Error> {
+    sqlx::query_scalar::<_, Hyphenated>(
+        "SELECT id FROM app_communities
+         WHERE id IN (SELECT community_id FROM app_users_communities WHERE user_id = $1)
+         ORDER BY id",
     )
     .bind(user_id.hyphenated())
+    .fetch_all(connection)
+    .await
+    .map(|ids| ids.into_iter().map(Hyphenated::into_uuid).collect())
+}
+
+/// Changes one community so other users can discover it on their next pull.
+pub async fn touch_community(
+    connection: &mut SqliteConnection,
+    community_id: Uuid,
+    now: DateTime<Utc>,
+    version: i64,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE app_communities SET version = version + 1, last_synced_at = $2,
+           global_sync_version = $3 WHERE id = $1",
+    )
+    .bind(community_id.hyphenated())
     .bind(now)
+    .bind(version)
     .execute(connection)
     .await?;
     Ok(())

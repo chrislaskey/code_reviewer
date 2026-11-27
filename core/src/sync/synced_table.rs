@@ -9,14 +9,14 @@ use uuid::Uuid;
 
 use crate::data::app_communities::Community;
 use crate::data::app_events::{Event, Fields};
-use crate::data::app_sync_state::{self, Cursor};
+use crate::data::app_sync_state;
 use crate::data::app_users::User;
 use crate::data::app_users_communities::Membership;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role};
-use crate::sync::TableRow;
 use crate::sync::bytes::SyncedBytes;
 use crate::sync::events::Answer;
+use crate::sync::{TableRow, VersionRange};
 
 /// The error of a table's own module, as the machinery passes it on.
 pub type TableError = Box<dyn std::error::Error + Send + Sync>;
@@ -51,6 +51,12 @@ pub trait SyncedTable: Send + Sync {
     /// move gives to the account; none when the row has no maker.
     fn owner_column(&self) -> Option<&'static str>;
 
+    /// Foreign keys from this table to other synced rows, as (column, table).
+    /// Resync and purge keep parents until their dependent rows can go.
+    fn foreign_keys(&self) -> &'static [(&'static str, &'static str)] {
+        &[]
+    }
+
     /// Applies an event of the user's in the caller's transaction and
     /// answers it, recording it on the server or queueing it on a device.
     async fn apply_in(
@@ -81,7 +87,7 @@ pub trait SyncedTable: Send + Sync {
         &self,
         tx: &mut Transaction,
         user: &User,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<TableRow>, TableError>;
 
@@ -134,7 +140,7 @@ pub trait SyncedTable: Send + Sync {
         &self,
         _tx: &mut Transaction,
         _community_id: Uuid,
-        _after: &Cursor,
+        _range: &VersionRange,
         _limit: usize,
     ) -> Result<Vec<TableRow>, TableError> {
         Ok(Vec::new())

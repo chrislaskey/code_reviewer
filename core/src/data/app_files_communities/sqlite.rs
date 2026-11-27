@@ -3,12 +3,12 @@
 
 use chrono::{DateTime, Utc};
 use sqlx::types::Json;
-use sqlx::{FromRow, SqliteConnection};
+use sqlx::{AssertSqlSafe, FromRow, SqliteConnection};
 use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
 use super::FileCommunity;
-use crate::data::app_sync_state::Cursor;
+use crate::sync::VersionRange;
 
 #[derive(FromRow)]
 struct FileCommunityRow {
@@ -20,6 +20,7 @@ struct FileCommunityRow {
     updated_at: DateTime<Utc>,
     version: i64,
     last_synced_at: Option<DateTime<Utc>>,
+    global_sync_version: Option<i64>,
     deleted_at: Option<DateTime<Utc>>,
     deleted_by_id: Option<Hyphenated>,
 }
@@ -35,6 +36,7 @@ impl From<FileCommunityRow> for FileCommunity {
             updated_at: row.updated_at,
             version: row.version,
             last_synced_at: row.last_synced_at,
+            global_sync_version: row.global_sync_version,
             deleted_at: row.deleted_at,
             deleted_by_id: row.deleted_by_id.map(Hyphenated::into_uuid),
         }
@@ -44,7 +46,7 @@ impl From<FileCommunityRow> for FileCommunity {
 macro_rules! select {
     ($($rest:expr),+ $(,)?) => {
         concat!(
-            "SELECT id, file_id, community_id, created_by_id, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id FROM app_files_communities ",
+            "SELECT id, file_id, community_id, created_by_id, inserted_at, updated_at, version, last_synced_at, global_sync_version, deleted_at, deleted_by_id FROM app_files_communities ",
             $($rest),+
         )
     };
@@ -141,17 +143,17 @@ pub async fn list_live_of_community(
 pub async fn list_synced_after(
     connection: &mut SqliteConnection,
     user_id: Uuid,
-    after: &Cursor,
+    range: &VersionRange,
     limit: usize,
 ) -> Result<Vec<FileCommunity>, sqlx::Error> {
     let rows: Vec<FileCommunityRow> = sqlx::query_as(select!(
-        "WHERE last_synced_at IS NOT NULL AND (last_synced_at, id) > ($2, $3) AND ",
+        "WHERE global_sync_version > $2 AND global_sync_version <= $3 AND ",
         visible_to!(),
-        " ORDER BY last_synced_at, id LIMIT $4"
+        " ORDER BY global_sync_version LIMIT $4"
     ))
     .bind(user_id.hyphenated())
-    .bind(after.last_synced_at)
-    .bind(after.id.hyphenated())
+    .bind(range.after)
+    .bind(range.through)
     .bind(i64::try_from(limit).unwrap_or(i64::MAX))
     .fetch_all(connection)
     .await?;
@@ -163,17 +165,17 @@ pub async fn list_synced_after(
 pub async fn list_live_of_community_after(
     connection: &mut SqliteConnection,
     community_id: Uuid,
-    after: &Cursor,
+    range: &VersionRange,
     limit: usize,
 ) -> Result<Vec<FileCommunity>, sqlx::Error> {
     let rows: Vec<FileCommunityRow> = sqlx::query_as(select!(
-        "WHERE community_id = $1 AND deleted_at IS NULL AND last_synced_at IS NOT NULL
-           AND (last_synced_at, id) > ($2, $3)
-         ORDER BY last_synced_at, id LIMIT $4"
+        "WHERE community_id = $1 AND deleted_at IS NULL
+           AND global_sync_version > $2 AND global_sync_version <= $3
+         ORDER BY global_sync_version LIMIT $4"
     ))
     .bind(community_id.hyphenated())
-    .bind(after.last_synced_at)
-    .bind(after.id.hyphenated())
+    .bind(range.after)
+    .bind(range.through)
     .bind(i64::try_from(limit).unwrap_or(i64::MAX))
     .fetch_all(connection)
     .await?;
@@ -185,8 +187,8 @@ pub async fn insert(
     row: &FileCommunity,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_files_communities (id, file_id, community_id, created_by_id, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+        "INSERT INTO app_files_communities (id, file_id, community_id, created_by_id, inserted_at, updated_at, version, last_synced_at, global_sync_version, deleted_at, deleted_by_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
     )
     .bind(row.id.hyphenated())
     .bind(row.file_id.hyphenated())
@@ -196,6 +198,7 @@ pub async fn insert(
     .bind(row.updated_at)
     .bind(row.version)
     .bind(row.last_synced_at)
+    .bind(row.global_sync_version)
     .bind(row.deleted_at)
     .bind(row.deleted_by_id.map(Uuid::hyphenated))
     .execute(connection)
@@ -209,13 +212,14 @@ pub async fn update(
     row: &FileCommunity,
 ) -> Result<bool, sqlx::Error> {
     let result = sqlx::query(
-        "UPDATE app_files_communities SET updated_at = $2, version = $3, last_synced_at = $4, deleted_at = $5, deleted_by_id = $6
+        "UPDATE app_files_communities SET updated_at = $2, version = $3, last_synced_at = $4, global_sync_version = $5, deleted_at = $6, deleted_by_id = $7
          WHERE id = $1",
     )
     .bind(row.id.hyphenated())
     .bind(row.updated_at)
     .bind(row.version)
     .bind(row.last_synced_at)
+    .bind(row.global_sync_version)
     .bind(row.deleted_at)
     .bind(row.deleted_by_id.map(Uuid::hyphenated))
     .execute(connection)
@@ -229,12 +233,12 @@ pub async fn upsert(
     row: &FileCommunity,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_files_communities (id, file_id, community_id, created_by_id, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        "INSERT INTO app_files_communities (id, file_id, community_id, created_by_id, inserted_at, updated_at, version, last_synced_at, global_sync_version, deleted_at, deleted_by_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT (id) DO UPDATE SET
            file_id = excluded.file_id, community_id = excluded.community_id, created_by_id = excluded.created_by_id,
            inserted_at = excluded.inserted_at, updated_at = excluded.updated_at, version = excluded.version,
-           last_synced_at = excluded.last_synced_at, deleted_at = excluded.deleted_at, deleted_by_id = excluded.deleted_by_id",
+           last_synced_at = excluded.last_synced_at, global_sync_version = excluded.global_sync_version, deleted_at = excluded.deleted_at, deleted_by_id = excluded.deleted_by_id",
     )
     .bind(row.id.hyphenated())
     .bind(row.file_id.hyphenated())
@@ -244,6 +248,7 @@ pub async fn upsert(
     .bind(row.updated_at)
     .bind(row.version)
     .bind(row.last_synced_at)
+    .bind(row.global_sync_version)
     .bind(row.deleted_at)
     .bind(row.deleted_by_id.map(Uuid::hyphenated))
     .execute(connection)
@@ -265,12 +270,13 @@ pub async fn delete_row(connection: &mut SqliteConnection, id: Uuid) -> Result<(
 /// pending is about, and those of a file whose create is pending or was
 /// refused, which came with that create.
 pub async fn delete_for_resync(connection: &mut SqliteConnection) -> Result<(), sqlx::Error> {
-    sqlx::query(
+    let without_dependents = crate::sync::tables::without_dependents("app_files_communities")?;
+    sqlx::query(AssertSqlSafe(format!(
         "DELETE FROM app_files_communities WHERE id NOT IN
            (SELECT row_id FROM app_events WHERE status = 'pending' AND table_name = 'app_files_communities')
            AND file_id NOT IN (SELECT row_id FROM app_events WHERE table_name = 'app_files'
-            AND type = 'create' AND status IN ('pending', 'conflict'))",
-    )
+            AND type = 'create' AND status IN ('pending', 'conflict')){without_dependents}"
+    )))
     .execute(connection)
     .await?;
     Ok(())

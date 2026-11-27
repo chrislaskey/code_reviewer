@@ -54,7 +54,6 @@ use crate::data::app_communities::Community;
 use crate::data::app_events::{
     self, Conflicts, Event, EventKind, EventStatus, Fields, StoredEvent,
 };
-use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
@@ -64,6 +63,7 @@ use crate::helpers::sha256::is_sha256;
 use crate::helpers::{json, sha256};
 use crate::services::web_server::Transport;
 use crate::sync::TableRow;
+use crate::sync::VersionRange;
 use crate::sync::bytes::{self, BytesError, BytesRow, Readable, RowContent, SyncedBytes};
 use crate::sync::events::{self, Answer, AnswerStatus};
 use crate::sync::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
@@ -573,10 +573,10 @@ pub(crate) async fn delete_row(tx: &mut Transaction, id: Uuid) -> Result<(), Fil
 pub(crate) async fn list_synced_after(
     tx: &mut Transaction,
     user: &User,
-    after: &Cursor,
+    range: &VersionRange,
     limit: usize,
 ) -> Result<Vec<File>, FileError> {
-    Ok(app_files::replication::list_synced_after(tx, user.id, after, limit).await?)
+    Ok(app_files::replication::list_synced_after(tx, user.id, range, limit).await?)
 }
 
 /// The row by its id, deleted or not, whoever sees it.
@@ -649,7 +649,8 @@ pub(crate) async fn delete_with_last_community(
         file.version += 1;
         file.last_synced_at = Some(file.updated_at);
     }
-    let file = AcceptedFile::new(file)?;
+    let mut file = AcceptedFile::new(file)?;
+    file.record_sync_change(tx, role).await?;
     app_files::update(&mut *tx, &file).await?;
     Ok(())
 }
@@ -808,6 +809,7 @@ pub(crate) async fn apply_in(
     event: &Event,
     uploaded: bool,
 ) -> Result<Applied, FileError> {
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -852,13 +854,14 @@ pub(crate) async fn apply_in(
                 updated_at: now,
                 version,
                 last_synced_at,
+                global_sync_version: None,
                 deleted_at: None,
                 deleted_by_id: None,
             };
             let accepted = blank
                 .with_fields(&event.changes)
                 .and_then(|file| Ok(AcceptedFile::new(file)?));
-            let file = match accepted {
+            let mut file = match accepted {
                 Ok(file) => file,
                 Err(error) => return rejected(event, format!("invalid: {error}"), None),
             };
@@ -877,9 +880,10 @@ pub(crate) async fn apply_in(
             if !uploaded {
                 return rejected(event, bytes::NOT_UPLOADED, None);
             }
+            file.record_sync_change(tx, role).await?;
             app_files::create(&mut *tx, &file).await?;
             let file = file.into_row();
-            files_communities::create_with_file(tx, user, &file, &communities).await?;
+            files_communities::create_with_file(tx, role, user, &file, &communities).await?;
             finish(tx, role, user, event, Conflicts::new(), file).await
         }
         EventKind::Update => {
@@ -905,10 +909,11 @@ pub(crate) async fn apply_in(
                     updated.version += 1;
                     updated.last_synced_at = Some(now);
                 }
-                let updated = match AcceptedFile::new(updated) {
+                let mut updated = match AcceptedFile::new(updated) {
                     Ok(updated) => updated,
                     Err(error) => return rejected(event, format!("invalid: {error}"), Some(file)),
                 };
+                updated.record_sync_change(tx, role).await?;
                 app_files::update(&mut *tx, &updated).await?;
                 updated.into_row()
             };
@@ -1067,10 +1072,10 @@ impl SyncedTable for Synced {
         &self,
         tx: &mut Transaction,
         user: &User,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<TableRow>, TableError> {
-        let files = list_synced_after(tx, user, after, limit).await?;
+        let files = list_synced_after(tx, user, range, limit).await?;
         Ok(files.iter().map(table_row).collect::<Result<_, _>>()?)
     }
 

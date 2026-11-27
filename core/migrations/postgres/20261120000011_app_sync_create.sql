@@ -29,8 +29,8 @@ CREATE INDEX app_events_status ON app_events (status, made_at, id);
 -- last row pulled. The server has the table too and leaves it empty.
 CREATE TABLE app_sync_state (
   id integer PRIMARY KEY,
-  cursor_last_synced_at timestamptz NOT NULL,
-  cursor_id uuid NOT NULL
+  feed_id uuid NOT NULL,
+  global_sync_version BIGINT NOT NULL CHECK (global_sync_version >= 0)
 );
 
 -- The communities a device still has to ask the server for everything
@@ -47,5 +47,26 @@ CREATE TABLE app_sync_backfills (
 CREATE TABLE app_purges (
   id uuid PRIMARY KEY,
   horizon timestamptz NOT NULL,
+  minimum_global_sync_version BIGINT NOT NULL,
   inserted_at timestamptz NOT NULL
 );
+
+-- One server feed. Its version and the change it names commit together.
+CREATE TABLE app_sync_versions (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  feed_id uuid NOT NULL,
+  global_sync_version BIGINT NOT NULL DEFAULT 0 CHECK (global_sync_version >= 0),
+  minimum_global_sync_version BIGINT NOT NULL DEFAULT 0
+    CHECK (minimum_global_sync_version BETWEEN 0 AND global_sync_version)
+);
+
+INSERT INTO app_sync_versions (id, feed_id) VALUES (1, gen_random_uuid());
+
+CREATE TABLE app_sync_changes (
+  global_sync_version BIGINT PRIMARY KEY NOT NULL CHECK (global_sync_version > 0),
+  table_name TEXT NOT NULL,
+  row_id uuid NOT NULL,
+  written_at timestamptz NOT NULL
+);
+
+CREATE INDEX app_sync_changes_written_at ON app_sync_changes (written_at, global_sync_version);

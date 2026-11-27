@@ -7,8 +7,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::data::app_sync_state::Cursor;
 use crate::database::Transaction;
+use crate::sync::VersionRange;
 use uuid::Uuid;
 
 pub const TABLE: &str = "app_users";
@@ -26,6 +26,8 @@ pub struct User {
     pub updated_at: DateTime<Utc>,
     pub version: i64,
     pub last_synced_at: Option<DateTime<Utc>>,
+    #[serde(with = "crate::sync::version::optional")]
+    pub global_sync_version: Option<i64>,
     pub deleted_at: Option<DateTime<Utc>>,
     pub deleted_by_id: Option<Uuid>,
     /// The public URL of their picture in object storage, see `avatars`.
@@ -44,6 +46,20 @@ pub enum UserInvalid {
 pub struct AcceptedUser(User);
 
 impl AcceptedUser {
+    /// Records a validated server change in the same transaction as its row.
+    pub(crate) async fn record_sync_change(
+        &mut self,
+        tx: &mut Transaction,
+        role: crate::deployment::Role,
+    ) -> Result<(), sqlx::Error> {
+        if let Some(version) =
+            crate::data::app_sync_changes::record(tx, role, TABLE, self.0.id).await?
+        {
+            self.0.global_sync_version = Some(version);
+        }
+        Ok(())
+    }
+
     /// Checks the user, with their name as it is kept.
     pub fn new(user: User) -> Result<AcceptedUser, UserInvalid> {
         let name = checked_name(&user.name)?;
@@ -131,10 +147,10 @@ pub mod replication {
     pub async fn list_synced_after(
         tx: &mut Transaction,
         user_id: Uuid,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<User>, sqlx::Error> {
-        query!(tx, list_synced_after(user_id, after, limit))
+        query!(tx, list_synced_after(user_id, range, limit))
     }
 
     /// Persists a row accepted by the resource workflow.

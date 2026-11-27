@@ -18,6 +18,29 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-27: global sync versions replace timestamp cursors
+
+- **What changed**. Rust servers on SQLite and PostgreSQL assign a durable
+  `global_sync_version` to each device-visible change. The server and
+  native apps use sync protocol 2. The baseline schemas changed.
+- **What an app does**.
+  - **Required**. Update app-owned synced row schemas and database
+    adapters for `global_sync_version`. Record each accepted server
+    change in its write transaction, update the `SyncedTable` page
+    methods to take a version range, and declare its synced foreign
+    keys for resync and purge. Remove a divergence when adopting the
+    framework's version of the same change.
+  - **Required**. Stop the development server and desktop app. Run
+    `bin/reset` for the development checkout and database, then
+    restart. This deletes local account databases, pending changes
+    and device files, and recreates the configured development
+    PostgreSQL database when reachable. Use `bin/reset --dry-run` to
+    inspect its targets. Clear data on test phones, simulators and
+    other machines separately, then install builds matching the server.
+  - **Verify**. Sign in on two clean devices. Make an offline edit and
+    see it on the other device after reconnecting. Check that an online
+    edit, deletion and change in community access also reach the devices.
+
 ## 2026-11-26: restore the iPhone app layout after login
 
 - **What changed**: after a successful return from the iPhone's sign-in

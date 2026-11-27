@@ -19,11 +19,11 @@ use uuid::Uuid;
 use crate::data::accounts_tokens;
 use crate::data::accounts_users::{self, AccountUserError};
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
-use crate::data::app_sync_state::Cursor;
 use crate::data::device_settings::{self, DeviceSettingsError, SIGNED_IN};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::sync::TableRow;
+use crate::sync::VersionRange;
 use crate::sync::events::{self, Answer, AnswerStatus};
 use crate::sync::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
 
@@ -111,6 +111,7 @@ pub async fn create(deployment: &Deployment, email: &str, name: &str) -> Result<
         return Err(UserError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
+    crate::data::app_sync_versions::lock(&mut tx).await?;
     let id = Uuid::now_v7();
     accounts_users::create(&mut tx, id, email, true).await?;
     let user = create_in(&mut tx, id, name).await?;
@@ -133,11 +134,13 @@ pub(crate) async fn create_in(
         updated_at: now,
         version: 1,
         last_synced_at: Some(now),
+        global_sync_version: None,
         deleted_at: None,
         deleted_by_id: None,
         avatar_url: None,
     };
-    let user = AcceptedUser::new(user)?;
+    let mut user = AcceptedUser::new(user)?;
+    user.record_sync_change(tx, Role::Server).await?;
     app_users::create(&mut *tx, &user).await?;
     let user = user.into_row();
     Ok(user)
@@ -209,6 +212,7 @@ pub(crate) async fn apply_in(
     user: &User,
     event: &Event,
 ) -> Result<Applied, UserError> {
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     if role == Role::Server
         && let Some(recorded) = app_events::get(tx, event.id).await?
     {
@@ -258,7 +262,8 @@ pub(crate) async fn apply_in(
         updated.version += 1;
         updated.last_synced_at = Some(now);
     }
-    let updated = AcceptedUser::new(updated)?;
+    let mut updated = AcceptedUser::new(updated)?;
+    updated.record_sync_change(tx, role).await?;
     app_users::update(&mut *tx, &updated).await?;
     let updated = updated.into_row();
     finish(tx, role, user, event, conflicts, updated).await
@@ -303,16 +308,22 @@ pub(crate) async fn update_name_in(
     id: Uuid,
     name: &str,
 ) -> Result<User, UserError> {
+    crate::data::app_sync_versions::lock(tx).await?;
     let user = get_live(tx, id).await?;
+    if user.name == name {
+        return Ok(user);
+    }
     let now = now();
     let updated = User {
         name: name.to_string(),
         updated_at: now,
         version: user.version + 1,
         last_synced_at: Some(now),
+        global_sync_version: None,
         ..user
     };
-    let updated = AcceptedUser::new(updated)?;
+    let mut updated = AcceptedUser::new(updated)?;
+    updated.record_sync_change(tx, Role::Server).await?;
     app_users::update(&mut *tx, &updated).await?;
     let updated = updated.into_row();
     Ok(updated)
@@ -327,7 +338,11 @@ pub(crate) async fn update_avatar_url_in(
     id: Uuid,
     avatar_url: &str,
 ) -> Result<User, UserError> {
+    crate::data::app_sync_versions::lock(tx).await?;
     let user = get_live(tx, id).await?;
+    if user.avatar_url.as_deref() == Some(avatar_url) {
+        return Ok(user);
+    }
     let now = now();
     let event = Event::update(
         TABLE,
@@ -342,9 +357,11 @@ pub(crate) async fn update_avatar_url_in(
         updated_at: now,
         version: user.version + 1,
         last_synced_at: Some(now),
+        global_sync_version: None,
         ..user
     };
-    let updated = AcceptedUser::new(updated)?;
+    let mut updated = AcceptedUser::new(updated)?;
+    updated.record_sync_change(tx, Role::Server).await?;
     app_users::update(&mut *tx, &updated).await?;
     let updated = updated.into_row();
     let answer = Answer::applied(
@@ -364,6 +381,7 @@ pub const DELETED_NAME: &str = "Deleted user";
 /// soft-deleted, named `DELETED_NAME` and without a picture, so every
 /// device that pulled it sees them go, see `accounts::deletions`.
 pub(crate) async fn delete_in(tx: &mut Transaction, id: Uuid) -> Result<User, UserError> {
+    crate::data::app_sync_versions::lock(tx).await?;
     let user = get_live(tx, id).await?;
     let now = now();
     let event = Event::update(
@@ -388,11 +406,13 @@ pub(crate) async fn delete_in(tx: &mut Transaction, id: Uuid) -> Result<User, Us
         updated_at: now,
         version: user.version + 1,
         last_synced_at: Some(now),
+        global_sync_version: None,
         deleted_at: Some(now),
         deleted_by_id: Some(id),
         ..user
     };
-    let deleted = AcceptedUser::new(deleted)?;
+    let mut deleted = AcceptedUser::new(deleted)?;
+    deleted.record_sync_change(tx, Role::Server).await?;
     app_users::delete(&mut *tx, &deleted).await?;
     let deleted = deleted.into_row();
     let answer = Answer::applied(
@@ -565,10 +585,10 @@ impl SyncedTable for Synced {
         &self,
         tx: &mut Transaction,
         user: &User,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<TableRow>, TableError> {
-        let users = app_users::replication::list_synced_after(tx, user.id, after, limit).await?;
+        let users = app_users::replication::list_synced_after(tx, user.id, range, limit).await?;
         Ok(users.iter().map(table_row).collect::<Result<_, _>>()?)
     }
 
@@ -680,6 +700,7 @@ pub(crate) mod tests {
             updated_at: now,
             version: 1,
             last_synced_at: Some(now),
+            global_sync_version: None,
             deleted_at: None,
             deleted_by_id: None,
             avatar_url: None,
