@@ -1,6 +1,7 @@
 # Keep a refused create for the person
 
-**Suggestion, 2026-11-27.** Found reviewing how a device handles refused
+**Suggestion, 2026-11-27. Required by the outcome rule of
+`docs/design/backend-protocol.md`: a refusal is shown, never dropped.** Found reviewing how a device handles refused
 events, see `push_batch` in `core/src/sync.rs`.
 
 ## The gap

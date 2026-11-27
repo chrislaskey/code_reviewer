@@ -179,6 +179,33 @@ The bodies are core's `PushRequest`, `PullRequest`, `BackfillRequest`,
 - The sample serves `app_files` and `app_files_communities` here.
   Joining and leaving go through `memberships/*`.
 
+#### What the person must still be able to see
+
+However well a backend resolves edits on its own, every answer to a
+pushed event falls into one of three outcomes. The device must be able
+to tell them apart:
+
+| Outcome | Answer | On the device |
+| --- | --- | --- |
+| **Resolved.** Applied as sent, or merged by the backend's rules, a Commanded process included | `applied`, with the resulting row | The change is done. The row shows the result |
+| **Needs the person.** The backend can't choose between the values | `conflict`, with `yours` and `server` per field | Kept as a conflict, with Reapply or Let go |
+| **Refused, final.** The backend won't apply it, and retrying won't help | `rejected`, with a stable `reason`, and the server's row when the device should take it | Kept and marked refused, with the reason. Nothing retries it on its own. The person can choose Try again or Let go |
+
+Better automatic resolution only moves events into the first outcome. It
+never removes the other two.
+
+- A backend that can resolve a case must still answer `conflict` when
+  its rules don't settle it.
+- It must answer `rejected` with a reason when a decision is final.
+- It must never turn a refusal into a silent drop.
+- A temporary failure, such as a timeout or the backend being
+  unavailable, is a transport error, not `rejected`. The device then
+  keeps the event pending and retries it.
+
+Today the device keeps a refused create for the person only for tables
+with bytes, such as files. Other tables drop it, see
+`docs/suggestions/refused-creates.md`, which closes that gap.
+
 **`sync/pull`** (sample).
 
 ```json

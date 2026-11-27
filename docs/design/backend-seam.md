@@ -24,6 +24,11 @@
   PostgreSQL, Ecto, Oban, and Commanded for files.
 - **One database, with separate schemas**, for the event store and the
   tables, for now.
+- **The person keeps the last word.** Even as backends resolve more
+  conflicts on their own, an answer is always one of three outcomes:
+  resolved, needs the person, or refused for good with a reason. The
+  device shows the last two, and lets the person act on them. See
+  "What the person must still be able to see" in the protocol.
 - **The schema is the Rust core's PostgreSQL migrations.** The Elixir app
   runs them itself. Only Oban's tables and Commanded's projection
   checkpoints are migrations of its own.
@@ -365,7 +370,7 @@ protocol or the sample. Add the Elixir checks to `bin/lint`.
   - the purge holding the feed lock, §3.5;
   - removal entries in the change log, §2 A;
   - a lock-free alternative to the feed lock, §2 B.
-- A refused create of a table without bytes, such as a post, vanishes
+- **Required by the outcome rule above.** A refused create of a table without bytes, such as a post, vanishes
   from the device without a word, see
   `docs/suggestions/refused-creates.md`.
 - A token cache in remote mode, see
