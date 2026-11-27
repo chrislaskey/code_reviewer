@@ -63,6 +63,11 @@ pub enum CommunityError {
     /// A synced table's own module failed.
     #[error(transparent)]
     Table(#[from] TableError),
+    /// The remote backend failed, or answered what this error has no
+    /// variant for.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -86,6 +91,11 @@ pub async fn list(
     deployment: &Deployment,
     user: &User,
 ) -> Result<Vec<CommunityAndMembership>, CommunityError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = json!({ "actor_id": user.id });
+        return Ok(backend.call("communities/list", &request).await?);
+    }
     let mut tx = deployment.begin().await?;
     let communities = app_communities::list(&mut tx, user.id).await?;
     let memberships =

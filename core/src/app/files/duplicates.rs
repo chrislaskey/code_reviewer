@@ -37,6 +37,10 @@ pub async fn list(
     if sha256s.is_empty() {
         return Ok(Vec::new());
     }
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return files::from_backend::duplicates_list(backend, user, sha256s).await;
+    }
     let mut tx = deployment.begin().await?;
     let files = app_files::list(
         &mut tx,

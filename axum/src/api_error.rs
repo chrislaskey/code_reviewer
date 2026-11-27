@@ -188,6 +188,7 @@ impl From<CommunityError> for ApiError {
             }
             CommunityError::Membership(error) => return ApiError::from_membership(error),
             CommunityError::Record(error) => return ApiError::from_record(error),
+            CommunityError::Backend(error) => return ApiError::from_backend(error),
             CommunityError::Table(_) | CommunityError::Database(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
@@ -206,6 +207,7 @@ impl ApiError {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
             MembershipError::Record(error) => return ApiError::from_record(error),
+            MembershipError::Backend(error) => return ApiError::from_backend(error),
             MembershipError::Table(_) | MembershipError::Database(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
@@ -315,6 +317,7 @@ impl From<FileError> for ApiError {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
             FileError::Bytes(error) => return error.into(),
+            FileError::Backend(error) => return ApiError::from_backend(&error),
             FileError::DeviceOnly | FileError::Table(_) | FileError::Database(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
@@ -334,6 +337,7 @@ impl From<BytesError> for ApiError {
             BytesError::NoFileStore => StatusCode::SERVICE_UNAVAILABLE,
             BytesError::Storage(_) => StatusCode::BAD_GATEWAY,
             BytesError::User(error) => return error.into(),
+            BytesError::Backend(error) => return ApiError::from_backend(&error),
             BytesError::Io(_) | BytesError::Table(_) | BytesError::Database(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }

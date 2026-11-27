@@ -269,9 +269,9 @@ defmodule Core.App.Files do
   @doc "The storage keys of every file row, deleted or not, for Rust's bucket sweep."
   def storage_keys_list, do: AppFiles.list_storage_keys()
 
-  @doc "The live files the actor sees with any of the checksums."
+  @doc "The live files the actor sees with any of the checksums, each as `files/get` answers it."
   def duplicates_list(actor_id, sha256s),
-    do: Enum.map(AppFiles.list_with_sha256s(actor_id, sha256s), &AppFiles.to_wire/1)
+    do: with_states(actor_id, AppFiles.list_with_sha256s(actor_id, sha256s))
 
   defp answer_to_result(%{"status" => status, "server" => %{"row" => row}}) when status in ["applied", "conflict"],
     do: {:ok, row}

@@ -28,6 +28,8 @@
 //! of each sync.
 
 pub mod duplicates;
+#[cfg(feature = "remote-backend")]
+mod from_backend;
 #[cfg(feature = "object-storage")]
 pub mod uploads;
 
@@ -226,6 +228,11 @@ pub enum FileError {
     Table(#[from] TableError),
     #[error(transparent)]
     Record(#[from] crate::sync::events::RecordError),
+    /// The remote backend failed, or answered what this error has no
+    /// variant for.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(crate::services::backend::BackendError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -282,6 +289,10 @@ pub async fn list(
             format!("at most {MAX_LIST_LIMIT} files at once"),
         )));
     }
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::list(backend, user, filter).await;
+    }
     let mut tx = deployment.begin().await?;
     let (total, files) = app_files::search(
         &mut tx,
@@ -304,6 +315,10 @@ pub async fn get(
     user: &User,
     id: Uuid,
 ) -> Result<FileWithState, FileError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::get(backend, user, id).await;
+    }
     let mut tx = deployment.begin().await?;
     let file = get_visible(&mut tx, user, id).await?;
     let mut listed = with_states(&mut tx, deployment.role, user, vec![file]).await?;
@@ -342,6 +357,10 @@ pub async fn create(
         changes.insert("content".to_string(), json!(content));
     }
     let event = Event::create(TABLE, new.id, changes, now());
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::create(deployment, backend, user, &new, &event).await;
+    }
     apply(deployment, user, &event).await?.file()
 }
 
@@ -398,6 +417,10 @@ pub async fn update(
 ) -> Result<File, FileError> {
     let name = checked_name(name)?;
     checked_community_ids(community_ids)?;
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::update(backend, user, id, &name, community_ids).await;
+    }
     let mut tx = deployment.begin().await?;
     let mut file = get_visible(&mut tx, user, id).await?;
     if file.name != name {
@@ -425,6 +448,10 @@ pub async fn update(
 /// refused, goes at once and whole, its rows, its events and its bytes,
 /// and nothing is pushed.
 pub async fn delete(deployment: &Deployment, user: &User, id: Uuid) -> Result<(), FileError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::delete(backend, user, id).await;
+    }
     let mut tx = deployment.begin().await?;
     get_visible(&mut tx, user, id).await?;
     if deployment.role == Role::Device && create_of(&mut tx, id).await?.is_some() {
@@ -486,6 +513,11 @@ pub async fn content_disposition(
 ) -> Result<Option<String>, FileError> {
     if !as_attachment {
         return Ok(None);
+    }
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let readable = bytes::readable_from_backend(backend, user, TABLE, id).await?;
+        return Ok(Some(attachment_named(&readable.name)));
     }
     let mut tx = deployment.begin().await?;
     let file = get_visible(&mut tx, user, id).await?;

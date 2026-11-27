@@ -51,6 +51,11 @@ pub enum MembershipError {
     /// A synced table's own module failed.
     #[error(transparent)]
     Table(#[from] TableError),
+    /// The remote backend failed, or answered what this error has no
+    /// variant for.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -80,6 +85,17 @@ pub async fn create(
     user: &User,
     community_id: Uuid,
 ) -> Result<Membership, MembershipError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = serde_json::json!({ "actor_id": user.id, "community_id": community_id });
+        return match backend.call("memberships/create", &request).await {
+            Ok(membership) => Ok(membership),
+            Err(error) if error.code() == Some("not_found") => {
+                Err(MembershipError::UnknownCommunity { id: community_id })
+            }
+            Err(error) => Err(error.into()),
+        };
+    }
     let mut tx = deployment.begin().await?;
     let membership = create_in(&mut tx, deployment.role, user, community_id).await?;
     tx.commit().await?;
@@ -92,6 +108,20 @@ pub async fn delete(
     user: &User,
     community_id: Uuid,
 ) -> Result<(), MembershipError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = serde_json::json!({ "actor_id": user.id, "community_id": community_id });
+        return match backend
+            .call::<_, serde_json::Value>("memberships/delete", &request)
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(error) if error.code() == Some("not_found") => {
+                Err(MembershipError::NotFound { community_id })
+            }
+            Err(error) => Err(error.into()),
+        };
+    }
     let mut tx = deployment.begin().await?;
     delete_in(&mut tx, deployment.role, user, community_id).await?;
     tx.commit().await?;

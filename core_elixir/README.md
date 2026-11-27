@@ -58,6 +58,12 @@ and `PORT`.
 - **A refusal is not recorded**, as in the Rust server. A retried
   event that was refused is decided again, so the answer can change if
   something changed in between, such as the actor joining the community.
+- **A projector that fails stops the backend.** Commanded stops a
+  handler on an error, and the application with it. The event is in the
+  store, so the projector meets it again at the next start, until the
+  code is fixed. That is honest, never a silent skip, but one bad event
+  takes the backend down. A time on a whole second did that, until
+  `Time.from_wire` gave every time microsecond precision.
 - **A membership check can be stale by a moment.** A file decision
   reads memberships when the command is dispatched. A leave committed
   just before can be missed. The next pull prunes the link, which is

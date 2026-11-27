@@ -51,6 +51,17 @@ defmodule Core.SyncTest do
     assert length(ids_of(rows, "app_files_communities")) == 1
   end
 
+  test "sync_a_create_made_on_a_whole_second_is_applied" do
+    %{"user" => %{"id" => alice}} = signed_up("alice@example.com")
+    file_id = Ids.new()
+    # Rust writes a time on a whole second with no fraction
+    event = %{file_create(file_id, personal_community(alice), "notes.txt") | "made_at" => "2026-11-27T10:00:00Z"}
+
+    {:ok, %{"events" => [answer]}} = Sync.push(alice, [event], [])
+    assert %{"status" => "applied", "server" => %{"row" => row}} = answer
+    assert row["inserted_at"] == "2026-11-27T10:00:00.000000Z"
+  end
+
   test "sync_a_file_create_without_its_bytes_or_community_is_rejected" do
     %{"user" => %{"id" => alice}} = signed_up("alice@example.com")
     %{"user" => %{"id" => bob}} = signed_up("bob@example.com")

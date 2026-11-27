@@ -247,6 +247,11 @@ pub enum BytesError {
     Table(#[from] TableError),
     #[error(transparent)]
     User(#[from] UserError),
+    /// The remote backend failed, or answered what this error has no
+    /// variant for.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -299,6 +304,17 @@ pub async fn download_url(
 ) -> Result<String, BytesError> {
     let bytes = of_table(table)?;
     let storage = bucket(deployment)?;
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let readable = readable_from_backend(backend, user, table, id).await?;
+        return Ok(storage
+            .download_url(
+                &readable.storage_key,
+                DOWNLOAD_URL_LIFETIME,
+                content_disposition,
+            )
+            .await?);
+    }
     let mut tx = deployment.begin().await?;
     let readable = bytes
         .readable(&mut tx, user, id)
@@ -324,6 +340,14 @@ pub async fn row_content(
     id: Uuid,
 ) -> Result<Option<RowContent>, BytesError> {
     let bytes = of_table(table)?;
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let readable = readable_from_backend(backend, user, table, id).await?;
+        return Ok(readable.content.map(|content| RowContent {
+            content_type: readable.content_type,
+            content,
+        }));
+    }
     let mut tx = deployment.begin().await?;
     bytes
         .readable(&mut tx, user, id)
@@ -332,6 +356,40 @@ pub async fn row_content(
     let content = bytes.content(&mut tx, user, id).await?;
     tx.commit().await?;
     Ok(content)
+}
+
+/// What Rust needs of a row the user sees to read its bytes, from the
+/// remote backend: its name, its content type, its key in the bucket,
+/// and the content the row keeps itself, if any, see
+/// `docs/design/backend-protocol.md`.
+#[cfg(feature = "remote-backend")]
+#[derive(Debug, Deserialize)]
+pub struct ReadableFromBackend {
+    pub name: String,
+    pub content_type: String,
+    pub storage_key: String,
+    pub content: Option<String>,
+}
+
+/// `<resource>/readable` of the table's resource, its name without
+/// `app_`: `files/readable` for `app_files`.
+#[cfg(feature = "remote-backend")]
+pub async fn readable_from_backend(
+    backend: &crate::services::backend::RemoteBackend,
+    user: &User,
+    table: &str,
+    id: Uuid,
+) -> Result<ReadableFromBackend, BytesError> {
+    let resource = table.strip_prefix("app_").unwrap_or(table);
+    let request = serde_json::json!({ "actor_id": user.id, "id": id });
+    match backend
+        .call(&format!("{resource}/readable"), &request)
+        .await
+    {
+        Ok(readable) => Ok(readable),
+        Err(error) if error.code() == Some("not_found") => Err(BytesError::NotFound { id }),
+        Err(error) => Err(error.into()),
+    }
 }
 
 /// The bytes of a row the user sees, read from the bucket: what the

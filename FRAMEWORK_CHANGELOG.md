@@ -21,7 +21,8 @@ completes.
 ## 2026-11-27: the web server can call a remote backend
 
 Commits: `52bb028`, `25cf524`, which dispatches sign-in and the
-current user, and the commit after it, which dispatches sync. The first parts of step 1 of
+current user, `869193b`, which dispatches sync, and the commit after it,
+which dispatches communities, memberships and files. The first parts of step 1 of
 `docs/design/backend-seam.md`.
 
 - **What changed**.
@@ -33,7 +34,10 @@ current user, and the commit after it, which dispatches sync. The first parts of
     `services::backend::RemoteBackend`. `Deployment` has
     `remote_backend`, and `Database` has `None`.
   - The token check, sign-in's three steps, sign-out, the current
-    user's account, and sync's push, pull and backfill call it. In remote mode, staff, plans, preferences
+    user's account, sync's push, pull and backfill, the communities
+    list, joining and leaving, and files call it. Reading a row's
+    bytes asks `<resource>/readable`, named from the table without
+    `app_`. In remote mode, staff, plans, preferences
     and trials answer nothing, since the sample doesn't serve them.
     Every other entry fails in remote mode, until its area is
     dispatched.
@@ -41,7 +45,8 @@ current user, and the commit after it, which dispatches sync. The first parts of
   - **Required**, for an app whose code matches on `Database`: add an
     arm for `Database::None`.
   - **Required**, for an app's code that matches on `UserError`,
-    `AccountError`, `AccountUserError` or `SyncError`: handle their
+    `AccountError`, `AccountUserError`, `SyncError`, `BytesError`,
+    `CommunityError`, `MembershipError` or `FileError`: handle their
     `Backend` variant.
   - **Optional**. Nothing else changes for an app on the Rust backend.
 

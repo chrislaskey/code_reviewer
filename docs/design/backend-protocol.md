@@ -313,7 +313,8 @@ key is `files/<created_by_id>/<id>`.
 **`files/storage_keys_list`** (sample). `{} → {"keys": […]}`. The keys
 of every file row, deleted or not, for Rust's bucket sweep.
 
-**`files/duplicates_list`** (sample). `{"actor_id", "sha256s": […]} → [File]`.
+**`files/duplicates_list`** (sample). `{"actor_id", "sha256s": […]} →
+[FileWithState]`: each as `files/get` answers it.
 
 **`files_communities/create`** and **`files_communities/delete`**
 (sample). `{"actor_id", "file_id", "community_id"} → FileCommunity`.
