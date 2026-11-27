@@ -21,14 +21,17 @@ completes.
 ## 2026-11-27: a sample Elixir backend replaces phoenix/
 
 Commits: `b11afb9` removed `phoenix/`, `969ef0d` added `core_elixir/`,
-and the commit after it moved its HTTP layer to Phoenix.
+`9a92088` moved its HTTP layer to Phoenix, and the commit after it
+named it `core` and gave it the Rust PostgreSQL migrations.
 
 - **What changed**. `phoenix/`, the earlier reference app, is gone.
-  `core_elixir/` is a sample remote backend: Elixir with Phoenix,
+  `core_elixir/`, the Elixir app `core`, is a sample remote backend:
+  Elixir with Phoenix,
   PostgreSQL, Ecto, Oban and Commanded, answering the operations of
   `docs/design/backend-protocol.md`. Files are its synced resource.
-  Axum doesn't call it yet, see `docs/design/backend-seam.md`. It is an
-  example, so `framework.toml` never checks it.
+  Its schema is the Rust core's PostgreSQL migrations, which it runs
+  itself. Axum doesn't call it yet, see `docs/design/backend-seam.md`.
+  It is an example, so `framework.toml` never checks it.
 - **What an app does**.
   - **Optional**. An app on the Rust backend deletes `core_elixir/`. An
     app that will use an Elixir backend keeps it, and builds from it.

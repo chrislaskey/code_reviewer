@@ -1,5 +1,8 @@
 # core_elixir: the sample remote backend
 
+The Elixir app `core`, with modules `Core.*` and `CoreWeb.*`: the
+Elixir counterpart of the Rust `core/`.
+
 **Status: first slice, 2026-11-27.** An Elixir backend that owns its
 PostgreSQL database alone and answers Axum over the
 [backend protocol](../docs/design/backend-protocol.md). It replaces the
@@ -19,7 +22,7 @@ the same database.
 cd core_elixir
 mix setup                 # deps, database, event store, migrations
 mix phx.server            # http://localhost:4100, service token dev-service-token
-mix test                  # TEST_DATABASE_URL, else postgres://postgres@localhost/core_elixir_test
+mix test                  # TEST_DATABASE_URL, else postgres://postgres@localhost/core_test
 ```
 
 In production, set `DATABASE_URL`, `BACKEND_SERVICE_TOKEN`, `SECRET_KEY_BASE`
@@ -29,14 +32,15 @@ and `PORT`.
 
 | Part | Where | What it does |
 | --- | --- | --- |
-| HTTP | `lib/core_elixir_web/` | Phoenix, JSON only, on Bandit, its default server. `POST /backend/<resource>/<action>`, behind the service token (`plugs/service_token.ex`). One controller per resource; `FallbackController` turns `{:error, …}` into the protocol's error codes. |
-| Data contexts | `lib/core_elixir/data/` | One module per table, named after it, as `core/src/data/` is. Only they issue SQL. The synced tables match the Rust PostgreSQL schema column for column. |
+| HTTP | `lib/core_web/` | Phoenix, JSON only, on Bandit, its default server. `POST /backend/<resource>/<action>`, behind the service token (`plugs/service_token.ex`). One controller per resource; `FallbackController` turns `{:error, …}` into the protocol's error codes. |
+| Schema | `lib/core/migrations/` | The Rust core's PostgreSQL migrations, `core/migrations/postgres/*.sql`, run as Ecto migrations with their own versions (`migrations/rust.ex`), so the schema is the Rust server's, table for table. They are read at compile time and kept in the build, so a release needs no copy. Only what Rust doesn't have is the backend's own: Oban's tables and Commanded's projection checkpoints. `mix core.migrate` runs them all; in a release, `Core.Migrations.migrate/0`. |
+| Data contexts | `lib/core/data/` | One module per table, named after it, as `core/src/data/` is. Only they issue SQL. |
 | Publishing | `data/synced_row.ex`, `data/app_sync_changes.ex`, `data/app_sync_versions.ex` | Every write to a synced row takes the next `global_sync_version` from the locked feed row, and records the change, in the row's own transaction. |
-| Files, with Commanded | `lib/core_elixir/app/files/` | One aggregate per file, holding its links to communities. Commands: create, update, add to a community, remove from one. The aggregate deletes the file when its last link goes. |
-| The projector | `app/files/projector.ex` | Writes `app_files` and `app_files_communities` from the facts, with their versions and the answer to the request, in one transaction, with its checkpoint. It uses strong consistency, so a push answers from the rows it just wrote. |
-| Other resources | `lib/core_elixir/accounts.ex`, `app/users.ex`, `app/communities.ex`, `app/memberships.ex` | Plain Ecto writes, with the same publishing rule. Only files go through Commanded, as the sample. |
-| Sync | `lib/core_elixir/sync.ex`, `sync/` | Push, pull and backfill, as `core/src/sync.rs` answers them: one snapshot per page, pages by visible rows, parents first, cursors as decimal strings. |
-| Jobs | `lib/core_elixir/jobs/purge.ex` | The daily purge on Oban: the change log, the floor, and file tombstones. |
+| Files, with Commanded | `lib/core/app/files/` | One aggregate per file, holding its links to communities. Commands: create, update, add to a community, remove from one. The aggregate deletes the file when its last link goes. |
+| The projector | `app/files/projector.ex` | Writes `app_files` and `app_files_communities` from the facts, with their versions, in one transaction, with its checkpoint. It records the pushed event and its answer in `app_events` in the same transaction. The event arrives as the command's dispatch metadata, so the domain events carry no sync details. It uses strong consistency, so a push answers from the rows it just wrote. |
+| Other resources | `lib/core/accounts.ex`, `app/users.ex`, `app/communities.ex`, `app/memberships.ex` | Plain Ecto writes, with the same publishing rule. Only files go through Commanded, as the sample. |
+| Sync | `lib/core/sync.ex`, `sync/` | Push, pull and backfill, as `core/src/sync.rs` answers them: one snapshot per page, pages by visible rows, parents first, cursors as decimal strings. |
+| Jobs | `lib/core/jobs/purge.ex` | The daily purge on Oban: the change log, the floor, and file tombstones. |
 
 ## Decisions to review
 
@@ -67,3 +71,6 @@ and `PORT`.
   deletions, preferences, posts, community writes and commerce. They
   answer `501 not_implemented`.
 - The protocol's rule that a restored backup gets a new feed id.
+- Recording the accepted terms at sign-in, as Rust's `finish_proven_in` does.
+- Splitting a Rust migration that someday holds a function or a `DO`
+  block: `Core.Migrations.Statements` splits at every `;`.

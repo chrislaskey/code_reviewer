@@ -1,4 +1,4 @@
-defmodule CoreElixir.BackendCase do
+defmodule Core.BackendCase do
   @moduledoc """
   A test against the whole backend, from an empty database: each test
   stops the app, empties the event store and the tables, makes a new
@@ -9,13 +9,13 @@ defmodule CoreElixir.BackendCase do
 
   using do
     quote do
-      import CoreElixir.BackendCase
+      import Core.BackendCase
     end
   end
 
   setup do
-    Application.stop(:core_elixir)
-    config = CoreElixir.EventStore.config()
+    Application.stop(:core)
+    config = Core.EventStore.config()
     {:ok, conn} = Postgrex.start_link(Keyword.drop(config, [:schema]))
     EventStore.Storage.Initializer.reset!(conn, config)
 
@@ -32,28 +32,28 @@ defmodule CoreElixir.BackendCase do
     )
 
     GenServer.stop(conn)
-    {:ok, _} = Application.ensure_all_started(:core_elixir)
+    {:ok, _} = Application.ensure_all_started(:core)
     :ok
   end
 
   @doc "A signed-up, confirmed user with a token: `%{user, email, token}`."
   def signed_up(email) do
-    {:ok, %{"pending" => pending, "mail" => %{"code" => code}}} = CoreElixir.Accounts.sign_in(email, true, "en")
-    {:ok, %{"pending" => confirm}} = CoreElixir.Accounts.sign_in_with_code(pending, code)
-    {:ok, session} = CoreElixir.Accounts.sign_in_confirm(confirm)
+    {:ok, %{"pending" => pending, "mail" => %{"code" => code}}} = Core.Accounts.sign_in(email, true, "en")
+    {:ok, %{"pending" => confirm}} = Core.Accounts.sign_in_with_code(pending, code)
+    {:ok, session} = Core.Accounts.sign_in_confirm(confirm)
     session
   end
 
   @doc "The user's personal community's id."
   def personal_community(user_id) do
-    [id] = for %{"community" => %{"id" => id}, "membership" => %{}} <- CoreElixir.App.Communities.list(user_id), do: id
+    [id] = for %{"community" => %{"id" => id}, "membership" => %{}} <- Core.App.Communities.list(user_id), do: id
     id
   end
 
   @doc "A pushed file create, with its bytes kept on the row."
   def file_create(file_id, community_id, name) do
     %{
-      "id" => CoreElixir.Helpers.Ids.new(),
+      "id" => Core.Helpers.Ids.new(),
       "table" => "app_files",
       "row_id" => file_id,
       "type" => "create",
@@ -65,9 +65,9 @@ defmodule CoreElixir.BackendCase do
         "size" => 5,
         "sha256" => String.duplicate("a", 64),
         "content" => "hello",
-        "communities" => [%{"id" => CoreElixir.Helpers.Ids.new(), "community_id" => community_id}]
+        "communities" => [%{"id" => Core.Helpers.Ids.new(), "community_id" => community_id}]
       },
-      "made_at" => CoreElixir.Helpers.Time.to_wire(CoreElixir.Helpers.Time.now())
+      "made_at" => Core.Helpers.Time.to_wire(Core.Helpers.Time.now())
     }
   end
 
@@ -77,7 +77,7 @@ defmodule CoreElixir.BackendCase do
   end
 
   defp pull_pages(user_id, request, rows) do
-    {:ok, page} = CoreElixir.Sync.pull(user_id, request)
+    {:ok, page} = Core.Sync.pull(user_id, request)
     rows = rows ++ page["rows"]
 
     case page["next"] do

@@ -1,9 +1,9 @@
-defmodule CoreElixir.MixProject do
+defmodule Core.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :core_elixir,
+      app: :core,
       version: "0.1.0",
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -16,7 +16,7 @@ defmodule CoreElixir.MixProject do
   def application do
     [
       extra_applications: [:logger, :crypto],
-      mod: {CoreElixir.Application, []}
+      mod: {Core.Application, []}
     ]
   end
 
@@ -41,15 +41,9 @@ defmodule CoreElixir.MixProject do
   defp aliases do
     [
       setup: ["deps.get", "database.create"],
-      "database.create": ["ecto.create", "event_store.create", "event_store.init", "ecto.migrate"],
+      "database.create": ["ecto.create", "event_store.create", "event_store.init", "core.migrate"],
       "database.reset": ["ecto.drop", "database.create"],
-      test: [
-        "ecto.create --quiet",
-        "event_store.create --quiet",
-        "event_store.init --quiet",
-        "ecto.migrate --quiet",
-        "test"
-      ]
+      test: ["ecto.create --quiet", "event_store.create --quiet", "event_store.init --quiet", "core.migrate", "test"]
     ]
   end
 end
