@@ -33,7 +33,7 @@ defmodule CoreElixir.MixProject do
       {:eventstore, "~> 1.4"},
       {:jason, "~> 1.4"},
       {:oban, "~> 2.24"},
-      {:plug, "~> 1.20"},
+      {:phoenix, "~> 1.8"},
       {:postgrex, "~> 0.23.0"}
     ]
   end

@@ -18,17 +18,18 @@ the same database.
 ```sh
 cd core_elixir
 mix setup                 # deps, database, event store, migrations
-mix run --no-halt         # http://localhost:4100, service token dev-service-token
+mix phx.server            # http://localhost:4100, service token dev-service-token
 mix test                  # TEST_DATABASE_URL, else postgres://postgres@localhost/core_elixir_test
 ```
 
-In production, set `DATABASE_URL`, `BACKEND_SERVICE_TOKEN` and `PORT`.
+In production, set `DATABASE_URL`, `BACKEND_SERVICE_TOKEN`, `SECRET_KEY_BASE`
+and `PORT`.
 
 ## How it is built
 
 | Part | Where | What it does |
 | --- | --- | --- |
-| HTTP | `lib/core_elixir/web/router.ex` | `POST /backend/<resource>/<action>`, behind the service token. Plug with Bandit, not Phoenix: a private JSON API with one router needs no more. |
+| HTTP | `lib/core_elixir_web/` | Phoenix, JSON only, on Bandit, its default server. `POST /backend/<resource>/<action>`, behind the service token (`plugs/service_token.ex`). One controller per resource; `FallbackController` turns `{:error, …}` into the protocol's error codes. |
 | Data contexts | `lib/core_elixir/data/` | One module per table, named after it, as `core/src/data/` is. Only they issue SQL. The synced tables match the Rust PostgreSQL schema column for column. |
 | Publishing | `data/synced_row.ex`, `data/app_sync_changes.ex`, `data/app_sync_versions.ex` | Every write to a synced row takes the next `global_sync_version` from the locked feed row, and records the change, in the row's own transaction. |
 | Files, with Commanded | `lib/core_elixir/app/files/` | One aggregate per file, holding its links to communities. Commands: create, update, add to a community, remove from one. The aggregate deletes the file when its last link goes. |
@@ -50,10 +51,9 @@ In production, set `DATABASE_URL`, `BACKEND_SERVICE_TOKEN` and `PORT`.
 - **The answer is recorded by the projector**, with the rows. A retry
   that reaches the aggregate after its fact was appended changes
   nothing. It finds the recorded answer once the projector has run.
-- **A refusal is not recorded.** A retried event that was refused is
-  decided again. That answer could differ if things changed in between.
-  The contract asks for durable refusals for strict workflows. Files
-  don't need them.
+- **A refusal is not recorded**, as in the Rust server. A retried
+  event that was refused is decided again, so the answer can change if
+  something changed in between, such as the actor joining the community.
 - **A membership check can be stale by a moment.** A file decision
   reads memberships when the command is dispatched. A leave committed
   just before can be missed. The next pull prunes the link, which is
@@ -63,7 +63,7 @@ In production, set `DATABASE_URL`, `BACKEND_SERVICE_TOKEN` and `PORT`.
 
 - Axum calling it (step 1 of the seam). Then the Rust sync tests run
   through Axum against this backend, as the conformance suite.
-- Sign-in from a trial, resending a code, passwords, device codes,
+- Sign-in from a trial, resending a code, passwords, signing in a device,
   deletions, preferences, posts, community writes and commerce. They
   answer `501 not_implemented`.
 - The protocol's rule that a restored backup gets a new feed id.

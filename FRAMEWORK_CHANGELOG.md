@@ -20,12 +20,12 @@ completes.
 
 ## 2026-11-27: a sample Elixir backend replaces phoenix/
 
-Commits: `b11afb9` removed `phoenix/`, and the commit that adds
-`core_elixir/`.
+Commits: `b11afb9` removed `phoenix/`, `969ef0d` added `core_elixir/`,
+and the commit after it moved its HTTP layer to Phoenix.
 
 - **What changed**. `phoenix/`, the earlier reference app, is gone.
-  `core_elixir/` is a sample remote backend: Elixir with PostgreSQL,
-  Ecto, Oban and Commanded, answering the operations of
+  `core_elixir/` is a sample remote backend: Elixir with Phoenix,
+  PostgreSQL, Ecto, Oban and Commanded, answering the operations of
   `docs/design/backend-protocol.md`. Files are its synced resource.
   Axum doesn't call it yet, see `docs/design/backend-seam.md`. It is an
   example, so `framework.toml` never checks it.

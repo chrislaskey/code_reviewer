@@ -106,23 +106,42 @@ SHA-256 hashes of tokens, as hex. It matches them exactly.
 - An unknown address with `sign_up_enabled` gets an account, a user and
   a code. That's a sign-up. The user's first community and membership
   come at `sign_in_confirm`.
+- `pending` identifies the sign-in for `sign_in_with_code`.
 - An unknown address without sign-up gets the `no_account` mail.
-- `pending` identifies the sign-in for `sign_in_confirm`. Rust sends the
-  mail after the answer. The backend never sends mail itself.
+- Rust sends the mail after the answer. The backend never sends mail
+  itself.
 
-**`accounts/sign_in_confirm`** (sample). Finishes a sign-in with the code.
+**`accounts/sign_in_with_code`** (sample). Takes the code that was
+mailed, as `accounts::sign_in_with_code` does.
 
 ```json
 {"pending": "…", "code": "123456"}
+→ {"pending": "…", "new_account": true}
+```
+
+- The code is good for ten minutes and five wrong attempts. A wrong
+  code is `wrong_code`, with `fields.code`.
+- The answer's `pending` is for the last step. `new_account` says
+  whether finishing makes the account, so the page says "Create
+  account" rather than "Log in".
+- Nobody is signed in yet.
+
+**`accounts/sign_in_confirm`** (sample). Finishes the sign-in, as
+`accounts::sign_in_confirm` does.
+
+```json
+{"pending": "…"}
 → {"user": User, "email": "…", "token": "…"}
 ```
 
-- The code is good for ten minutes and five wrong attempts. Errors:
-  `sign_in_expired`, and `wrong_code` with `fields.code`.
 - A first sign-in confirms the account. It creates the user's personal
   community, `"Personal"`, and their membership of it. Both are
   published.
-- `token` is new, and is returned this once.
+- `token` is new, and is returned this once. An expired or used
+  `pending` is `sign_in_expired`.
+- Specified, not in the sample: `accounts/sign_in_confirm_for_device`.
+  It takes the device's challenge, and answers a device code instead of
+  a token.
 
 **`accounts/sign_out`** (sample). `{"token": "…"} → {}`. Forgets the token.
 

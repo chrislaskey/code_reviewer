@@ -24,6 +24,12 @@ config :core_elixir, Oban,
   queues: [maintenance: 1],
   plugins: [{Oban.Plugins.Cron, crontab: [{"15 3 * * *", CoreElixir.Jobs.Purge}]}]
 
+config :core_elixir, CoreElixirWeb.Endpoint,
+  adapter: Bandit.PhoenixAdapter,
+  render_errors: [formats: [json: CoreElixirWeb.ErrorJSON], layout: false]
+
+config :phoenix, :json_library, Jason
+
 config :logger, level: :info
 
 import_config "#{config_env()}.exs"

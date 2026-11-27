@@ -56,22 +56,41 @@ defmodule CoreElixir.Accounts do
   end
 
   @doc """
-  Finishes a sign-in with its code: a new token for the user. A first
-  sign-in confirms the account and makes the user's personal community.
+  Takes the code mailed for a pending sign-in, as `accounts::sign_in_with_code`
+  does: the pending token of the last step, and whether that step makes
+  the account. A wrong code counts; after five the pending sign-in is gone.
   """
-  def sign_in_confirm(pending, code) do
-    case AccountsTokens.get_valid(pending, AccountsTokens.context_sign_in_code()) do
+  def sign_in_with_code(pending, code) do
+    case AccountsTokens.get_valid(pending || "", AccountsTokens.context_sign_in_code()) do
       nil ->
-        {:error, :sign_in_expired}
+        {:error, :wrong_code}
 
       row ->
         if CoreElixir.Helpers.Sha256.hex(String.trim(code || "")) == row.code_hash do
-          Repo.transaction(fn -> confirmed(row) end)
+          Repo.transaction(fn ->
+            AccountsTokens.delete(row)
+            AccountsTokens.delete_of_user(row.user_id, AccountsTokens.context_sign_in_confirm())
+            confirm_pending = Random.hex(32)
+            AccountsTokens.create(row.user_id, AccountsTokens.context_sign_in_confirm(), confirm_pending)
+            %{"pending" => confirm_pending, "new_account" => is_nil(AccountsUsers.get(row.user_id).confirmed_at)}
+          end)
         else
           attempts = AccountsTokens.update_attempts(row)
           if attempts >= @max_attempts, do: AccountsTokens.delete(row)
           {:error, :wrong_code}
         end
+    end
+  end
+
+  @doc """
+  Finishes a sign-in whose code matched, as `accounts::sign_in_confirm`
+  does: a new token for the user. A first sign-in confirms the account
+  and makes the user's personal community.
+  """
+  def sign_in_confirm(pending) do
+    case AccountsTokens.get_valid(pending || "", AccountsTokens.context_sign_in_confirm()) do
+      nil -> {:error, :sign_in_expired}
+      row -> Repo.transaction(fn -> confirmed(row) end)
     end
   end
 

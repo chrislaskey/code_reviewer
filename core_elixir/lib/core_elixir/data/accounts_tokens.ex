@@ -11,6 +11,7 @@ defmodule CoreElixir.Data.AccountsTokens do
 
   @context_api "api"
   @context_sign_in_code "sign_in_code"
+  @context_sign_in_confirm "sign_in_confirm"
   @sign_in_code_validity_minutes 10
 
   @primary_key {:id, Ecto.UUID, autogenerate: false}
@@ -25,6 +26,7 @@ defmodule CoreElixir.Data.AccountsTokens do
 
   def context_api, do: @context_api
   def context_sign_in_code, do: @context_sign_in_code
+  def context_sign_in_confirm, do: @context_sign_in_confirm
 
   @doc "Inserts a token of the context for the user, by the token's hash, with the code's hash for a sign-in."
   def create(user_id, context, token, code \\ nil) do
@@ -38,13 +40,13 @@ defmodule CoreElixir.Data.AccountsTokens do
     })
   end
 
-  @doc "Gets the token of the context, by the token itself, or nil. A sign-in code expires after ten minutes."
+  @doc "Gets the token of the context, by the token itself, or nil. A sign-in's steps expire after ten minutes."
   def get_valid(token, context) do
     row = Repo.one(from t in __MODULE__, where: t.token_hash == ^Sha256.hex(token) and t.context == ^context)
 
     cond do
       is_nil(row) -> nil
-      context == @context_sign_in_code and expired?(row) -> nil
+      context in [@context_sign_in_code, @context_sign_in_confirm] and expired?(row) -> nil
       true -> row
     end
   end

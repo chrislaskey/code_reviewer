@@ -39,7 +39,8 @@ defmodule CoreElixir.BackendCase do
   @doc "A signed-up, confirmed user with a token: `%{user, email, token}`."
   def signed_up(email) do
     {:ok, %{"pending" => pending, "mail" => %{"code" => code}}} = CoreElixir.Accounts.sign_in(email, true, "en")
-    {:ok, session} = CoreElixir.Accounts.sign_in_confirm(pending, code)
+    {:ok, %{"pending" => confirm}} = CoreElixir.Accounts.sign_in_with_code(pending, code)
+    {:ok, session} = CoreElixir.Accounts.sign_in_confirm(confirm)
     session
   end
 
