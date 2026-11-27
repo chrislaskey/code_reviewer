@@ -269,6 +269,13 @@ Moved to step 1, the seam itself:
 Still open from the review: the membership backfill trigger, and the
 purge holding the feed lock (§3.5).
 
+## Status of the sample (2026-11-27)
+
+`core_elixir/` answers the operations the protocol marks **sample**,
+from its own PostgreSQL database, see its README. Files go through
+Commanded. Users, accounts and memberships are plain Ecto writes. It
+has 13 tests. Axum doesn't call it yet: that is step 1.
+
 ## 6. Decided (2026-11-27)
 
 - **Mail.** The backend returns the mail to send: its kind, address,

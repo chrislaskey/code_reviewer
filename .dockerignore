@@ -6,6 +6,7 @@
 target
 axum/data
 svelte/node_modules
+core_elixir
 svelte/dist
 svelte/dist-ops
 tauri/gen

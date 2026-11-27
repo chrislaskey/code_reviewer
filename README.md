@@ -16,6 +16,7 @@ core/      app_core, the application: one module per resource, with
 axum/      app_web, the web server: app_core over HTTP under /api, and svelte/dist
 tauri/     app_tauri, the desktop and mobile app: app_core behind Tauri commands
 svelte/    the pages, one Svelte app the web server serves and the Tauri app bundles
+core_elixir/ the sample remote backend, Elixir with Commanded, see docs/design/backend-seam.md
 bin/dev    starts a deployment in dev mode
 bin/lint   runs the checks a change passes before it is committed
 bin/reset  deletes the local SQLite files and drops the dev PostgreSQL database

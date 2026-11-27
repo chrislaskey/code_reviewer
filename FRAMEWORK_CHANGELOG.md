@@ -18,6 +18,23 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-27: a sample Elixir backend replaces phoenix/
+
+Commits: `b11afb9` removed `phoenix/`, and the commit that adds
+`core_elixir/`.
+
+- **What changed**. `phoenix/`, the earlier reference app, is gone.
+  `core_elixir/` is a sample remote backend: Elixir with PostgreSQL,
+  Ecto, Oban and Commanded, answering the operations of
+  `docs/design/backend-protocol.md`. Files are its synced resource.
+  Axum doesn't call it yet, see `docs/design/backend-seam.md`. It is an
+  example, so `framework.toml` never checks it.
+- **What an app does**.
+  - **Optional**. An app on the Rust backend deletes `core_elixir/`. An
+    app that will use an Elixir backend keeps it, and builds from it.
+  - **Optional**. Delete a `phoenix/` the merge left, if the app changed
+    files inside it.
+
 ## 2026-11-27: global sync versions replace timestamp cursors
 
 Commits: `5861a22`, `53a21ec`, and the commit after it that splits

@@ -209,6 +209,10 @@ examples = [
     "core/migrations/*/*_app_files_create.sql",
     "core/migrations/*/*_app_files_content_add.sql",
 
+    # The sample remote backend, see docs/design/backend-seam.md: an app on
+    # the Rust backend deletes it, an app on Elixir builds from it
+    "core_elixir/**",
+
     "axum/src/app/posts.rs",
     "axum/src/app/files.rs",
     "axum/src/app/files/**",
