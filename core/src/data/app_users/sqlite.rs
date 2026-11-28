@@ -17,7 +17,6 @@ struct UserRow {
     inserted_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
     version: i64,
-    last_synced_at: Option<DateTime<Utc>>,
     global_sync_version: Option<i64>,
     deleted_at: Option<DateTime<Utc>>,
     deleted_by_id: Option<Hyphenated>,
@@ -32,7 +31,6 @@ impl From<UserRow> for User {
             inserted_at: row.inserted_at,
             updated_at: row.updated_at,
             version: row.version,
-            last_synced_at: row.last_synced_at,
             global_sync_version: row.global_sync_version,
             deleted_at: row.deleted_at,
             deleted_by_id: row.deleted_by_id.map(Hyphenated::into_uuid),
@@ -44,7 +42,7 @@ impl From<UserRow> for User {
 macro_rules! select {
     ($($rest:expr),+ $(,)?) => {
         concat!(
-            "SELECT id, name, inserted_at, updated_at, version, last_synced_at, global_sync_version, deleted_at, deleted_by_id, avatar_url FROM app_users ",
+            "SELECT id, name, inserted_at, updated_at, version, global_sync_version, deleted_at, deleted_by_id, avatar_url FROM app_users ",
             $($rest),+
         )
     };
@@ -85,7 +83,7 @@ pub async fn get_by_token_hash(
     session_made_after: DateTime<Utc>,
 ) -> Result<Option<User>, sqlx::Error> {
     let row: Option<UserRow> = sqlx::query_as(
-        "SELECT u.id, u.name, u.inserted_at, u.updated_at, u.version, u.last_synced_at, u.global_sync_version, u.deleted_at, u.deleted_by_id, u.avatar_url
+        "SELECT u.id, u.name, u.inserted_at, u.updated_at, u.version, u.global_sync_version, u.deleted_at, u.deleted_by_id, u.avatar_url
          FROM app_users u JOIN accounts_tokens t ON t.user_id = u.id
          WHERE t.token_hash = $1
            AND ((t.context = 'api' AND t.inserted_at > $2) OR (t.context = 'session' AND t.inserted_at > $3))",
@@ -101,7 +99,7 @@ pub async fn get_by_token_hash(
 /// Writes the fields a user's event may change, with the sync columns.
 pub async fn update(connection: &mut SqliteConnection, user: &User) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "UPDATE app_users SET name = $2, avatar_url = $3, updated_at = $4, version = $5, last_synced_at = $6, global_sync_version = $7
+        "UPDATE app_users SET name = $2, avatar_url = $3, updated_at = $4, version = $5, global_sync_version = $6
          WHERE id = $1",
     )
     .bind(user.id.hyphenated())
@@ -109,7 +107,6 @@ pub async fn update(connection: &mut SqliteConnection, user: &User) -> Result<()
     .bind(&user.avatar_url)
     .bind(user.updated_at)
     .bind(user.version)
-    .bind(user.last_synced_at)
     .bind(user.global_sync_version)
     .execute(connection)
     .await?;
@@ -122,8 +119,8 @@ pub async fn update_deleted(
     user: &User,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "UPDATE app_users SET name = $2, avatar_url = $3, updated_at = $4, version = $5, last_synced_at = $6, global_sync_version = $7,
-           deleted_at = $8, deleted_by_id = $9
+        "UPDATE app_users SET name = $2, avatar_url = $3, updated_at = $4, version = $5, global_sync_version = $6,
+           deleted_at = $7, deleted_by_id = $8
          WHERE id = $1",
     )
     .bind(user.id.hyphenated())
@@ -131,7 +128,6 @@ pub async fn update_deleted(
     .bind(&user.avatar_url)
     .bind(user.updated_at)
     .bind(user.version)
-    .bind(user.last_synced_at)
     .bind(user.global_sync_version)
     .bind(user.deleted_at)
     .bind(user.deleted_by_id.map(|id| id.hyphenated()))
@@ -219,15 +215,14 @@ pub async fn list_synced_after(
 
 pub async fn insert(connection: &mut SqliteConnection, user: &User) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_users (id, name, inserted_at, updated_at, version, last_synced_at, global_sync_version, deleted_at, deleted_by_id, avatar_url)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+        "INSERT INTO app_users (id, name, inserted_at, updated_at, version, global_sync_version, deleted_at, deleted_by_id, avatar_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
     )
     .bind(user.id.hyphenated())
     .bind(&user.name)
     .bind(user.inserted_at)
     .bind(user.updated_at)
     .bind(user.version)
-    .bind(user.last_synced_at)
     .bind(user.global_sync_version)
     .bind(user.deleted_at)
     .bind(user.deleted_by_id.map(Uuid::hyphenated))
@@ -240,11 +235,11 @@ pub async fn insert(connection: &mut SqliteConnection, user: &User) -> Result<()
 /// Writes the server's row over the device's, or inserts it.
 pub async fn upsert(connection: &mut SqliteConnection, user: &User) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_users (id, name, inserted_at, updated_at, version, last_synced_at, global_sync_version, deleted_at, deleted_by_id, avatar_url)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        "INSERT INTO app_users (id, name, inserted_at, updated_at, version, global_sync_version, deleted_at, deleted_by_id, avatar_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          ON CONFLICT (id) DO UPDATE SET
            name = excluded.name, inserted_at = excluded.inserted_at, updated_at = excluded.updated_at,
-           version = excluded.version, last_synced_at = excluded.last_synced_at, global_sync_version = excluded.global_sync_version,
+           version = excluded.version, global_sync_version = excluded.global_sync_version,
            deleted_at = excluded.deleted_at, deleted_by_id = excluded.deleted_by_id,
            avatar_url = excluded.avatar_url",
     )
@@ -253,7 +248,6 @@ pub async fn upsert(connection: &mut SqliteConnection, user: &User) -> Result<()
     .bind(user.inserted_at)
     .bind(user.updated_at)
     .bind(user.version)
-    .bind(user.last_synced_at)
     .bind(user.global_sync_version)
     .bind(user.deleted_at)
     .bind(user.deleted_by_id.map(Uuid::hyphenated))

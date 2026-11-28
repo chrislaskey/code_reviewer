@@ -6,7 +6,6 @@ CREATE TABLE app_posts (
   inserted_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
   version bigint NOT NULL DEFAULT 0,
-  last_synced_at timestamptz,
   global_sync_version BIGINT CHECK (global_sync_version > 0),
   deleted_at timestamptz,
   deleted_by_id uuid
@@ -28,7 +27,6 @@ CREATE TABLE app_posts_communities (
   inserted_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
   version bigint NOT NULL DEFAULT 0,
-  last_synced_at timestamptz,
   global_sync_version BIGINT CHECK (global_sync_version > 0),
   deleted_at timestamptz,
   deleted_by_id uuid

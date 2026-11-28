@@ -683,7 +683,6 @@ pub(crate) async fn delete_with_last_community(
     file.updated_at = now();
     if role == Role::Server {
         file.version += 1;
-        file.last_synced_at = Some(file.updated_at);
     }
     let file = AcceptedFile::new(file)?;
     app_files::update(&mut *tx, role, file).await?;
@@ -875,9 +874,9 @@ pub(crate) async fn apply_in(
                 let existing = app_files::get(tx, user.id, event.row_id).await?;
                 return rejected(event, "exists", existing);
             }
-            let (version, last_synced_at) = match role {
-                Role::Server => (1, Some(now)),
-                Role::Device => (0, None),
+            let version = match role {
+                Role::Server => 1,
+                Role::Device => 0,
             };
             let blank = File {
                 id: event.row_id,
@@ -890,7 +889,6 @@ pub(crate) async fn apply_in(
                 inserted_at: event.row_inserted_at(now),
                 updated_at: now,
                 version,
-                last_synced_at,
                 global_sync_version: None,
                 deleted_at: None,
                 deleted_by_id: None,
@@ -942,7 +940,6 @@ pub(crate) async fn apply_in(
                 updated.updated_at = now;
                 if role == Role::Server {
                     updated.version += 1;
-                    updated.last_synced_at = Some(now);
                 }
                 let updated = match AcceptedFile::new(updated) {
                     Ok(updated) => updated,

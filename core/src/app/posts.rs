@@ -321,9 +321,9 @@ pub(crate) async fn apply_in(
             if let Some(existing) = get_in(tx, event.row_id).await? {
                 return rejected(event, "exists", Some(existing));
             }
-            let (version, last_synced_at) = match role {
-                Role::Server => (1, Some(now)),
-                Role::Device => (0, None),
+            let version = match role {
+                Role::Server => 1,
+                Role::Device => 0,
             };
             let blank = Post {
                 id: event.row_id,
@@ -332,7 +332,6 @@ pub(crate) async fn apply_in(
                 inserted_at: event.row_inserted_at(now),
                 updated_at: now,
                 version,
-                last_synced_at,
                 global_sync_version: None,
                 deleted_at: None,
                 deleted_by_id: None,
@@ -374,7 +373,6 @@ pub(crate) async fn apply_in(
                 }
                 if role == Role::Server {
                     updated.version += 1;
-                    updated.last_synced_at = Some(now);
                 }
                 let updated = match AcceptedPost::new(updated) {
                     Ok(updated) => updated,
@@ -800,7 +798,7 @@ mod tests {
                 .await
                 .expect("a post");
             assert_eq!(post.version, 1);
-            assert_eq!(post.last_synced_at, Some(post.updated_at));
+            assert!(post.global_sync_version.is_some(), "published");
             assert_eq!(
                 events_with_status(&deployment, EventStatus::Applied).await,
                 1
@@ -824,7 +822,7 @@ mod tests {
             .await
             .expect("a post");
         assert_eq!(post.version, 0);
-        assert_eq!(post.last_synced_at, None);
+        assert_eq!(post.global_sync_version, None);
         assert_eq!(post.user_id, alice.id);
         assert_eq!(
             events_with_status(&deployment, EventStatus::Pending).await,

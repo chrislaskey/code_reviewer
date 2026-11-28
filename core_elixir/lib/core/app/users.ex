@@ -30,8 +30,7 @@ defmodule Core.App.Users do
       name: name,
       inserted_at: now,
       updated_at: now,
-      version: 1,
-      last_synced_at: now
+      version: 1
     })
   end
 end

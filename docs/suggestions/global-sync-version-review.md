@@ -232,7 +232,8 @@ it. If one forgets the early lock, PostgreSQL can deadlock under load.
   but costly. Only a revival (deleted → live) or a first confirmation
   should backfill. If the clause exists to catch a missed leave/rejoin,
   compare `deleted_at` transitions or `inserted_at` instead.
-- **Two server stamps per row.** `last_synced_at` stays, for tombstone
+- **Two server stamps per row.** (Removed, 2026-11-27: the column is
+  gone, see `offline-sync.md`.) `last_synced_at` stays, for tombstone
   aging, next to `global_sync_version`. Consider renaming it
   `server_written_at` while a reset is free. Its old name says it is the
   sync cursor, which is no longer true.
@@ -341,8 +342,8 @@ Updated 2026-11-27. The next steps are now in
    removal entries (§2 A). The rule instead: a hard delete of a synced
    row only when no device can hold it, in `offline-sync.md`.
 6. **Decided, 2026-11-27.** The membership backfill trigger stays, since
-   memberships will grow. Renaming `last_synced_at` is still open
-   (§3.5). The purge now holds the feed lock only to move the floor.
+   memberships will grow. `last_synced_at` is removed, not renamed
+   (§3.5): only the purge read it, and the floor says the same. The purge now holds the feed lock only to move the floor.
 7. **Started.** The Commanded backend, in `core_elixir/`. Its projector
    writes the rows, their versions and the answers in one transaction,
    under the feed lock.

@@ -27,7 +27,6 @@ pub struct Membership {
     pub inserted_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub version: i64,
-    pub last_synced_at: Option<DateTime<Utc>>,
     #[serde(with = "crate::sync::version::optional")]
     pub global_sync_version: Option<i64>,
     pub deleted_at: Option<DateTime<Utc>>,

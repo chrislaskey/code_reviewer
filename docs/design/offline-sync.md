@@ -118,9 +118,14 @@ There is no default user on any deployment.
 | --- | --- | --- |
 | `version` | the server only | 1 for a new row, incremented by the server on every write; 0 on a device's row not yet pushed |
 | `global_sync_version` | the server only | the durable version of the row's last replicated change, null before a device create is accepted |
-| `last_synced_at` | the server only | the time the server last wrote the row, used to age tombstones |
 | `deleted_at` | whoever deleted | the soft delete, the time on that device's clock |
 | `deleted_by_id` | the deployment applying the delete | the user who deleted, never sent by a device |
+
+There is no column for the time the server last wrote a row. The
+change log keeps it, `app_sync_changes.written_at` by the row's
+`global_sync_version`, for the retention window; the purge needs no
+more, since a tombstone at or below the floor was last written before
+the horizon.
 
 `updated_at` is the time of the last edit on the clock of whoever made
 it, shown to people and deciding nothing. The server writes its own time

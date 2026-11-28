@@ -16,7 +16,6 @@ struct CommunityRow {
     inserted_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
     version: i64,
-    last_synced_at: Option<DateTime<Utc>>,
     global_sync_version: Option<i64>,
     deleted_at: Option<DateTime<Utc>>,
     deleted_by_id: Option<Hyphenated>,
@@ -30,7 +29,6 @@ impl From<CommunityRow> for Community {
             inserted_at: row.inserted_at,
             updated_at: row.updated_at,
             version: row.version,
-            last_synced_at: row.last_synced_at,
             global_sync_version: row.global_sync_version,
             deleted_at: row.deleted_at,
             deleted_by_id: row.deleted_by_id.map(Hyphenated::into_uuid),
@@ -41,7 +39,7 @@ impl From<CommunityRow> for Community {
 macro_rules! select {
     ($($rest:expr),+ $(,)?) => {
         concat!(
-            "SELECT id, name, inserted_at, updated_at, version, last_synced_at, global_sync_version, deleted_at, deleted_by_id FROM app_communities ",
+            "SELECT id, name, inserted_at, updated_at, version, global_sync_version, deleted_at, deleted_by_id FROM app_communities ",
             $($rest),+
         )
     };
@@ -134,15 +132,14 @@ pub async fn insert(
     community: &Community,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_communities (id, name, inserted_at, updated_at, version, last_synced_at, global_sync_version, deleted_at, deleted_by_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        "INSERT INTO app_communities (id, name, inserted_at, updated_at, version, global_sync_version, deleted_at, deleted_by_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(community.id.hyphenated())
     .bind(&community.name)
     .bind(community.inserted_at)
     .bind(community.updated_at)
     .bind(community.version)
-    .bind(community.last_synced_at)
     .bind(community.global_sync_version)
     .bind(community.deleted_at)
     .bind(community.deleted_by_id.map(Uuid::hyphenated))
@@ -156,14 +153,13 @@ pub async fn update(
     community: &Community,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "UPDATE app_communities SET name = $2, updated_at = $3, version = $4, last_synced_at = $5, global_sync_version = $6, deleted_at = $7, deleted_by_id = $8
+        "UPDATE app_communities SET name = $2, updated_at = $3, version = $4, global_sync_version = $5, deleted_at = $6, deleted_by_id = $7
          WHERE id = $1",
     )
     .bind(community.id.hyphenated())
     .bind(&community.name)
     .bind(community.updated_at)
     .bind(community.version)
-    .bind(community.last_synced_at)
     .bind(community.global_sync_version)
     .bind(community.deleted_at)
     .bind(community.deleted_by_id.map(Uuid::hyphenated))
@@ -178,11 +174,11 @@ pub async fn upsert(
     community: &Community,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_communities (id, name, inserted_at, updated_at, version, last_synced_at, global_sync_version, deleted_at, deleted_by_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        "INSERT INTO app_communities (id, name, inserted_at, updated_at, version, global_sync_version, deleted_at, deleted_by_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          ON CONFLICT (id) DO UPDATE SET
            name = excluded.name, inserted_at = excluded.inserted_at, updated_at = excluded.updated_at,
-           version = excluded.version, last_synced_at = excluded.last_synced_at, global_sync_version = excluded.global_sync_version,
+           version = excluded.version, global_sync_version = excluded.global_sync_version,
            deleted_at = excluded.deleted_at, deleted_by_id = excluded.deleted_by_id",
     )
     .bind(community.id.hyphenated())
@@ -190,7 +186,6 @@ pub async fn upsert(
     .bind(community.inserted_at)
     .bind(community.updated_at)
     .bind(community.version)
-    .bind(community.last_synced_at)
     .bind(community.global_sync_version)
     .bind(community.deleted_at)
     .bind(community.deleted_by_id.map(Uuid::hyphenated))

@@ -140,7 +140,6 @@ pub(crate) async fn create_in(
         inserted_at: now,
         updated_at: now,
         version: 1,
-        last_synced_at: Some(now),
         global_sync_version: None,
         deleted_at: None,
         deleted_by_id: None,
@@ -267,7 +266,6 @@ pub(crate) async fn apply_in(
     };
     if role == Role::Server {
         updated.version += 1;
-        updated.last_synced_at = Some(now);
     }
     let updated = AcceptedUser::new(updated)?;
     let updated = app_users::update(&mut *tx, role, updated).await?;
@@ -323,7 +321,6 @@ pub(crate) async fn update_name_in(
         name: name.to_string(),
         updated_at: now,
         version: user.version + 1,
-        last_synced_at: Some(now),
         global_sync_version: None,
         ..user
     };
@@ -359,7 +356,6 @@ pub(crate) async fn update_avatar_url_in(
         avatar_url: Some(avatar_url.to_string()),
         updated_at: now,
         version: user.version + 1,
-        last_synced_at: Some(now),
         global_sync_version: None,
         ..user
     };
@@ -406,7 +402,6 @@ pub(crate) async fn delete_in(tx: &mut Transaction, id: Uuid) -> Result<User, Us
         avatar_url: None,
         updated_at: now,
         version: user.version + 1,
-        last_synced_at: Some(now),
         global_sync_version: None,
         deleted_at: Some(now),
         deleted_by_id: Some(id),
@@ -732,7 +727,6 @@ pub(crate) mod tests {
             inserted_at: now,
             updated_at: now,
             version: 1,
-            last_synced_at: Some(now),
             global_sync_version: None,
             deleted_at: None,
             deleted_by_id: None,
@@ -808,7 +802,7 @@ pub(crate) mod tests {
                 .expect("a user");
             assert_eq!(user.name, "Alice", "trimmed");
             assert_eq!(user.version, 1);
-            assert_eq!(user.last_synced_at, Some(user.updated_at));
+            assert!(user.global_sync_version.is_some(), "published");
             assert_eq!(get(&deployment, user.id).await.expect("the user"), user);
 
             let account = crate::accounts::users::get(&deployment, user.id)

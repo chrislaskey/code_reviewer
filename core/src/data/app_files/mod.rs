@@ -57,9 +57,6 @@ pub struct File {
     /// The server's version, 0 on a device's file not yet pushed.
     #[garde(skip)]
     pub version: i64,
-    /// When the server last wrote it; none on a device's file not yet pushed.
-    #[garde(skip)]
-    pub last_synced_at: Option<DateTime<Utc>>,
     #[garde(skip)]
     #[serde(with = "crate::sync::version::optional")]
     pub global_sync_version: Option<i64>,

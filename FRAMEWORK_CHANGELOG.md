@@ -18,6 +18,25 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-27: last_synced_at is removed from every synced table
+
+Commits: this one.
+
+- **What changed**. Synced rows have no `last_synced_at`. It was the
+  server's time of a row's last write, left from the old timestamp
+  cursor, and only the purge still read it, which the floor already
+  covers. The change log keeps a write's time, by its
+  `global_sync_version`, for the retention window. The baseline
+  migrations, the structs, the SQL and the wire shape of a row all
+  lose it, in Rust and in `core_elixir/`.
+- **What an app does**.
+  - **Required**, for each of the app's own synced tables: remove
+    `last_synced_at` from its create migration, its struct and row
+    struct, its SQL and binds, and its write paths, where a server
+    write set it and `(version, last_synced_at)` became `version`.
+  - **Required**: `bin/reset` the server's database and the devices',
+    since the baseline migrations changed.
+
 ## 2026-11-27: is_trial asks the remote backend
 
 Commits: this one.

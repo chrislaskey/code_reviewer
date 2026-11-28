@@ -215,7 +215,7 @@ pub(crate) async fn show_communities_in(
     tx: &mut Transaction,
     user_id: Uuid,
 ) -> Result<(), sqlx::Error> {
-    trial_users::maintenance::touch_communities_of(tx, user_id, now()).await
+    trial_users::maintenance::touch_communities_of(tx, user_id).await
 }
 
 #[cfg(test)]

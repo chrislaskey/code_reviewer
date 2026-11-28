@@ -115,9 +115,9 @@ pub fn list() -> &'static [&'static dyn SyncedTable] {
   replacing `purge::TABLES`.
 - **A table left out of the list** is the one mistake the compiler
   cannot catch. A test catches it instead: every `app_` table with a
-  `last_synced_at` column must be registered.
+  `global_sync_version` column must be registered.
 - **Rows travel as `TableRow`** (table and JSON), ordered by their place
-  in the pull, `(last_synced_at, id)`. A pull sends each row after the
+  in the pull, their `global_sync_version`. A pull sends each row after the
   rows it points at, asking each table for its `parents`.
 - **Errors.** A table's own error reaches sync as one variant,
   `SyncError::Table`, a boxed source, so sync names no resource's error

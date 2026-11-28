@@ -21,8 +21,7 @@ defmodule Core.App.Memberships do
                 community_id: community_id,
                 inserted_at: now,
                 updated_at: now,
-                version: 1,
-                last_synced_at: now
+                version: 1
               })
 
             %AppUsersCommunities{deleted_at: nil} = live ->

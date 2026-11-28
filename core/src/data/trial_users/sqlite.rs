@@ -94,15 +94,12 @@ pub async fn community_ids(
 pub async fn touch_community(
     connection: &mut SqliteConnection,
     community_id: Uuid,
-    now: DateTime<Utc>,
     version: i64,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "UPDATE app_communities SET version = version + 1, last_synced_at = $2,
-           global_sync_version = $3 WHERE id = $1",
+        "UPDATE app_communities SET version = version + 1, global_sync_version = $2 WHERE id = $1",
     )
     .bind(community_id.hyphenated())
-    .bind(now)
     .bind(version)
     .execute(connection)
     .await?;

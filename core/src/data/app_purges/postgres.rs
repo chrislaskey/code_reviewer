@@ -17,7 +17,7 @@ pub async fn delete_deleted_before(
     let table = identifier(table)?;
     let without_dependents = crate::sync::tables::without_dependents(table)?;
     let result = sqlx::query(AssertSqlSafe(format!(
-        "DELETE FROM {table} WHERE deleted_at IS NOT NULL AND deleted_at < $1 AND last_synced_at < $1 AND global_sync_version <= $2{without_dependents}"
+        "DELETE FROM {table} WHERE deleted_at IS NOT NULL AND deleted_at < $1 AND global_sync_version <= $2{without_dependents}"
     )))
     .bind(horizon)
     .bind(floor)

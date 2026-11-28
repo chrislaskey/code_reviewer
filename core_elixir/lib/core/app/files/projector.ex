@@ -37,8 +37,7 @@ defmodule Core.App.Files.Projector do
           content: event.content,
           inserted_at: time!(event.inserted_at),
           updated_at: at,
-          version: 1,
-          last_synced_at: at
+          version: 1
         })
 
       for link <- event.links do
@@ -49,8 +48,7 @@ defmodule Core.App.Files.Projector do
           created_by_id: event.actor_id,
           inserted_at: at,
           updated_at: at,
-          version: 1,
-          last_synced_at: at
+          version: 1
         })
       end
 
@@ -68,8 +66,7 @@ defmodule Core.App.Files.Projector do
         file
         | name: Map.get(changes, "name", file.name),
           version: event.version,
-          updated_at: at,
-          last_synced_at: at
+          updated_at: at
       })
 
       answered(event, metadata, AppFiles.table(), file.id, event.version, event.conflicts)
@@ -87,7 +84,6 @@ defmodule Core.App.Files.Projector do
           inserted_at: time!(event.inserted_at),
           updated_at: at,
           version: event.link_version,
-          last_synced_at: at,
           deleted_at: nil,
           deleted_by_id: nil
       }
@@ -106,7 +102,6 @@ defmodule Core.App.Files.Projector do
         row
         | version: event.link_version,
           updated_at: at,
-          last_synced_at: at,
           deleted_at: time!(event.deleted_at),
           deleted_by_id: event.actor_id
       })
@@ -124,7 +119,6 @@ defmodule Core.App.Files.Projector do
         file
         | version: event.version,
           updated_at: at,
-          last_synced_at: at,
           deleted_at: time!(event.deleted_at),
           deleted_by_id: event.actor_id
       })

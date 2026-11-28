@@ -1165,7 +1165,6 @@ pub(crate) mod tests {
                 inserted_at: now,
                 updated_at: now,
                 version: 1,
-                last_synced_at: Some(now),
                 global_sync_version: Some(1),
                 deleted_at: None,
                 deleted_by_id: None,
@@ -1178,7 +1177,6 @@ pub(crate) mod tests {
                 inserted_at: now,
                 updated_at: now,
                 version: 1,
-                last_synced_at: Some(now),
                 global_sync_version: Some(2),
                 deleted_at: None,
                 deleted_by_id: None,
@@ -1280,7 +1278,7 @@ pub(crate) mod tests {
                 .await
                 .expect("the note on a");
             assert_eq!(on_a.version, 1);
-            assert!(on_a.last_synced_at.is_some());
+            assert!(on_a.global_sync_version.is_some());
             assert_eq!(bodies(&server, &alice).await, vec!["from a"]);
 
             let report = sync(&b, &server).await;

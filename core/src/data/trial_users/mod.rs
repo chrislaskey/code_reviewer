@@ -54,7 +54,6 @@ pub(crate) mod maintenance {
     pub(crate) async fn touch_communities_of(
         tx: &mut Transaction,
         user_id: Uuid,
-        now: DateTime<Utc>,
     ) -> Result<(), sqlx::Error> {
         use crate::data::{app_communities, app_sync_changes, app_sync_versions};
         use crate::deployment::Role;
@@ -64,7 +63,7 @@ pub(crate) mod maintenance {
             if let Some(version) =
                 app_sync_changes::record(tx, Role::Server, app_communities::TABLE, id).await?
             {
-                query!(tx, touch_community(id, now, version))?;
+                query!(tx, touch_community(id, version))?;
             }
         }
         Ok(())

@@ -28,8 +28,6 @@ pub struct Post {
     pub updated_at: DateTime<Utc>,
     /// The server's version, 0 on a device's post not yet pushed.
     pub version: i64,
-    /// When the server last wrote it; none on a device's post not yet pushed.
-    pub last_synced_at: Option<DateTime<Utc>>,
     #[serde(with = "crate::sync::version::optional")]
     pub global_sync_version: Option<i64>,
     pub deleted_at: Option<DateTime<Utc>>,

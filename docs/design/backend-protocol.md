@@ -51,10 +51,9 @@ them as they arrive, so the backend must write exactly these fields.
   row a device made that the server has not yet accepted. So is the
   cursor's version. The backend never sends it as a JSON number.
 - **Every synced row** has `id`, `inserted_at`, `updated_at`, `version`,
-  `last_synced_at`, `global_sync_version`, `deleted_at` and
-  `deleted_by_id`. `version` is 1 for a new row, and goes up by one on
-  every server write that changes the row. `last_synced_at` is the
-  server's time of that write.
+  `global_sync_version`, `deleted_at` and `deleted_by_id`. `version` is
+  1 for a new row, and goes up by one on every server write that changes
+  the row. The time of that write is in the change log, not on the row.
 - A row on the wire is a `TableRow`: `{"table": "app_files", "row": {…}}`.
 
 | Table | Fields beside the sync columns |

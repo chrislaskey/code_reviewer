@@ -43,7 +43,7 @@ defmodule Core.Jobs.Purge do
     for table <- ~w(app_files_communities app_files), into: %{} do
       %{num_rows: count} =
         Repo.query!(
-          "DELETE FROM #{table} t WHERE t.deleted_at IS NOT NULL AND t.deleted_at < $1 AND t.last_synced_at < $1 AND t.global_sync_version <= $2" <>
+          "DELETE FROM #{table} t WHERE t.deleted_at IS NOT NULL AND t.deleted_at < $1 AND t.global_sync_version <= $2" <>
             if(table == "app_files",
               do: " AND NOT EXISTS (SELECT 1 FROM app_files_communities c WHERE c.file_id = t.id)",
               else: ""

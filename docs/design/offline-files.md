@@ -187,7 +187,7 @@ Open:
 | `name` | the name the person sees, editable |
 | `content_type` | from the file picked, fixed |
 | `size` | in bytes, fixed |
-| `version`, `last_synced_at`, `deleted_at`, `deleted_by_id`, `inserted_at`, `updated_at` | as on every synced table |
+| `version`, `global_sync_version`, `deleted_at`, `deleted_by_id`, `inserted_at`, `updated_at` | as on every synced table |
 
 - **The bytes never change.** Create fixes them; update changes `name`
   only; delete is the soft delete. Replacing the content is adding a

@@ -255,7 +255,6 @@ pub(crate) async fn create_with_file(
             inserted_at: file.inserted_at,
             updated_at: file.updated_at,
             version: file.version,
-            last_synced_at: file.last_synced_at,
             global_sync_version: None,
             deleted_at: None,
             deleted_by_id: None,
@@ -468,9 +467,9 @@ async fn apply_in(
                         return rejected(event, "exists", None);
                     }
                     let now = now();
-                    let (version, last_synced_at) = match role {
-                        Role::Server => (1, Some(now)),
-                        Role::Device => (0, None),
+                    let version = match role {
+                        Role::Server => 1,
+                        Role::Device => 0,
                     };
                     let row = FileCommunity {
                         id: event.row_id,
@@ -480,7 +479,6 @@ async fn apply_in(
                         inserted_at: event.row_inserted_at(now),
                         updated_at: now,
                         version,
-                        last_synced_at,
                         global_sync_version: None,
                         deleted_at: None,
                         deleted_by_id: None,
@@ -587,7 +585,6 @@ async fn write_changed(
     row.updated_at = now;
     if role == Role::Server {
         row.version += 1;
-        row.last_synced_at = Some(now);
     }
     *row = app_files_communities::update(&mut *tx, role, row.clone()).await?;
     Ok(())

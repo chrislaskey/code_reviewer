@@ -58,7 +58,6 @@ CREATE TABLE IF NOT EXISTS app_test_notes (
   inserted_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   version INTEGER NOT NULL DEFAULT 0,
-  last_synced_at TEXT,
   global_sync_version INTEGER CHECK (global_sync_version > 0),
   deleted_at TEXT,
   deleted_by_id TEXT
@@ -76,7 +75,6 @@ CREATE TABLE IF NOT EXISTS app_test_notes (
   inserted_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
   version bigint NOT NULL DEFAULT 0,
-  last_synced_at timestamptz,
   global_sync_version BIGINT CHECK (global_sync_version > 0),
   deleted_at timestamptz,
   deleted_by_id uuid
@@ -94,7 +92,6 @@ pub struct Note {
     pub inserted_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub version: i64,
-    pub last_synced_at: Option<DateTime<Utc>>,
     #[serde(with = "crate::sync::version::optional")]
     pub global_sync_version: Option<i64>,
     pub deleted_at: Option<DateTime<Utc>>,
@@ -364,9 +361,9 @@ async fn apply_in(
             if let Some(existing) = get_in(tx, event.row_id).await? {
                 return rejected(event, "exists", Some(existing));
             }
-            let (version, last_synced_at) = match role {
-                Role::Server => (1, Some(now)),
-                Role::Device => (0, None),
+            let version = match role {
+                Role::Server => 1,
+                Role::Device => 0,
             };
             let blank = Note {
                 id: event.row_id,
@@ -376,7 +373,6 @@ async fn apply_in(
                 inserted_at: event.row_inserted_at(now),
                 updated_at: now,
                 version,
-                last_synced_at,
                 global_sync_version: None,
                 deleted_at: None,
                 deleted_by_id: None,
@@ -438,7 +434,6 @@ async fn apply_in(
             }
             if role == Role::Server {
                 updated.version += 1;
-                updated.last_synced_at = Some(now);
             }
             updated.global_sync_version = crate::data::app_sync_changes::stamp(
                 tx,
@@ -499,7 +494,6 @@ async fn write_copied(
     note.updated_at = now();
     if role == Role::Server {
         note.version += 1;
-        note.last_synced_at = Some(note.updated_at);
     }
     note.global_sync_version =
         crate::data::app_sync_changes::stamp(tx, role, TABLE, note.id, note.global_sync_version)

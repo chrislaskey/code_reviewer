@@ -6,7 +6,6 @@ CREATE TABLE app_posts (
   inserted_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   version INTEGER NOT NULL DEFAULT 0,
-  last_synced_at TEXT,
   global_sync_version INTEGER CHECK (global_sync_version > 0),
   deleted_at TEXT,
   deleted_by_id TEXT
@@ -28,7 +27,6 @@ CREATE TABLE app_posts_communities (
   inserted_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   version INTEGER NOT NULL DEFAULT 0,
-  last_synced_at TEXT,
   global_sync_version INTEGER CHECK (global_sync_version > 0),
   deleted_at TEXT,
   deleted_by_id TEXT

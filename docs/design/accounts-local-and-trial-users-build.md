@@ -116,7 +116,7 @@ a remembered browser.
 
 - [x] Every write works as for a full user, soft deletes included, but
       queues no event. The rows look like rows made offline and not
-      yet pushed: `version` 0, `last_synced_at` null. One place in
+      yet pushed: `version` 0, `global_sync_version` null. One place in
       core decides this; no resource module asks the user's kind.
 - [x] A sync for a local user makes no request and reports nothing.
 - [x] The nav shows no pending count, no "Working offline" and no

@@ -230,7 +230,6 @@ pub(crate) async fn apply_in(
     };
     if role == Role::Server {
         updated.version += 1;
-        updated.last_synced_at = Some(now);
     }
     let updated = match AcceptedPreference::new(updated) {
         Ok(updated) => updated,
@@ -249,9 +248,9 @@ async fn create(
     value: Value,
 ) -> Result<Answer, PreferenceError> {
     let now = now();
-    let (version, last_synced_at) = match role {
-        Role::Server => (1, Some(now)),
-        Role::Device => (0, None),
+    let version = match role {
+        Role::Server => 1,
+        Role::Device => 0,
     };
     let preference = Preference {
         id: event.row_id,
@@ -261,7 +260,6 @@ async fn create(
         inserted_at: event.row_inserted_at(now),
         updated_at: now,
         version,
-        last_synced_at,
         global_sync_version: None,
         deleted_at: None,
         deleted_by_id: None,
@@ -483,7 +481,7 @@ mod tests {
             let rows = rows_of(&server, alice.id).await;
             assert_eq!(rows.len(), 1, "one row, written over");
             assert_eq!(rows[0].version, 2);
-            assert!(rows[0].last_synced_at.is_some());
+            assert!(rows[0].global_sync_version.is_some());
         })
         .await;
     }

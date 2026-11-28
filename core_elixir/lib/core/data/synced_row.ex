@@ -13,7 +13,6 @@ defmodule Core.Data.SyncedRow do
       field :inserted_at, :utc_datetime_usec
       field :updated_at, :utc_datetime_usec
       field :version, :integer, default: 0
-      field :last_synced_at, :utc_datetime_usec
       field :global_sync_version, :integer
       field :deleted_at, :utc_datetime_usec
       field :deleted_by_id, Ecto.UUID
@@ -27,7 +26,6 @@ defmodule Core.Data.SyncedRow do
       "inserted_at" => Time.to_wire(row.inserted_at),
       "updated_at" => Time.to_wire(row.updated_at),
       "version" => row.version,
-      "last_synced_at" => Time.to_wire(row.last_synced_at),
       "global_sync_version" => row.global_sync_version && Integer.to_string(row.global_sync_version),
       "deleted_at" => Time.to_wire(row.deleted_at),
       "deleted_by_id" => row.deleted_by_id
@@ -46,6 +44,6 @@ defmodule Core.Data.SyncedRow do
 
   @doc "A row changed by the server now: one version on, written now."
   def changed(row, now) do
-    %{row | version: row.version + 1, updated_at: now, last_synced_at: now}
+    %{row | version: row.version + 1, updated_at: now}
   end
 end
