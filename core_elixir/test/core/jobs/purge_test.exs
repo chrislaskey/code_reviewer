@@ -22,4 +22,33 @@ defmodule Core.Jobs.PurgeTest do
     {_rows, fresh} = pull_all(alice, nil)
     assert {:ok, %{"resync" => false}} = Sync.pull(alice, %{"cursor" => fresh})
   end
+
+  test "purge_removes_tombstones_while_a_writer_holds_the_feed_lock" do
+    %{"user" => %{"id" => alice}} = signed_up("alice@example.com")
+    file_id = Ids.new()
+    {:ok, _} = Sync.push(alice, [file_create(file_id, personal_community(alice), "a.txt")], [])
+    :ok = Files.delete(alice, file_id)
+    horizon = DateTime.add(Time.now(), 1, :day)
+    %{head: floor} = Core.Data.AppSyncVersions.get()
+
+    parent = self()
+
+    writer =
+      Task.async(fn ->
+        Core.Repo.transaction(fn ->
+          Core.Data.AppSyncVersions.lock()
+          send(parent, :locked)
+
+          receive do
+            :done -> :ok
+          end
+        end)
+      end)
+
+    assert_receive :locked
+    deleting = Task.async(fn -> Purge.delete_tombstones(horizon, floor) end)
+    assert %{"app_files_communities" => 1, "app_files" => 1} = Task.await(deleting, 5_000)
+    send(writer.pid, :done)
+    Task.await(writer)
+  end
 end

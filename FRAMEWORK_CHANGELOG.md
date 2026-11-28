@@ -18,6 +18,20 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-27: the purge no longer holds the feed lock while it deletes
+
+Commits: this one.
+
+- **What changed**. `sync::purge::run` holds the feed lock only to
+  remove the old change log, move the floor and record the run. The
+  tombstones go after, a table at a time, without it, so writers don't
+  wait on them. `docs/design/offline-sync.md` gains the rule for hard
+  deletes: a synced row is deleted outright only when no device can
+  hold it.
+- **What an app does**.
+  - **Required**, for an app's own hard delete of a synced row: check it
+    against the rule, or soft-delete the row instead.
+
 ## 2026-11-27: app_web sync feed renew, after a restore
 
 Commits: this one.

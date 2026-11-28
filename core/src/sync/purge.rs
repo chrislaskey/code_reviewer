@@ -1,7 +1,8 @@
 //! Scheduled server cleanup of expired sync entries and soft-deleted
-//! rows. The purge commits the discarded version floor with its deletions.
-//! A device below the floor starts with a fresh set of visible rows.
-//! Synced children go first and any remaining child keeps its parent.
+//! rows. The purge first commits the discarded version floor, then
+//! removes the tombstones at or below it. A device below the floor starts
+//! with a fresh set of visible rows. Synced children go first and any
+//! remaining child keeps its parent.
 //!
 //! It runs daily, before the sweeps, see `jobs`.
 
@@ -48,8 +49,13 @@ pub enum PurgeError {
     Database(#[from] sqlx::Error),
 }
 
-/// Purges every table as of `now` and records the horizon, in one
-/// transaction.
+/// Purges every table as of `now` and records the horizon. Only the
+/// first step holds the feed lock, and briefly: it removes the change log
+/// before the horizon, moves the floor, and records the run. The
+/// tombstones at or below that floor then go, a table at a time, without
+/// the lock, so no writer waits on them: a device that could still need
+/// one has a cursor below the floor, and resyncs. A run cut short leaves
+/// tombstones the next one removes.
 pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeReport, PurgeError> {
     if deployment.role != Role::Server {
         return Err(PurgeError::ServerOnly);
@@ -58,14 +64,18 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
     let mut tx = deployment.begin().await?;
     app_sync_versions::lock(&mut tx).await?;
     let floor = app_sync_changes::maintenance::delete_written_before(&mut tx, horizon).await?;
-    let mut removed = BTreeMap::new();
-    // Children first, so a purged parent's rows have already gone
-    for synced in tables::list().iter().rev() {
-        let table = synced.table();
-        let count =
-            app_purges::maintenance::delete_deleted_before(&mut tx, table, horizon, floor).await?;
-        removed.insert(table.to_string(), count);
-    }
+    let purge = Purge {
+        id: Uuid::now_v7(),
+        horizon,
+        inserted_at: now,
+        minimum_global_sync_version: floor,
+    };
+    app_purges::create(&mut tx, &purge).await?;
+    tx.commit().await?;
+
+    let mut removed = delete_tombstones(deployment, horizon, floor).await?;
+
+    let mut tx = deployment.begin().await?;
     let mut events = 0;
     for synced in tables::list() {
         events += app_events::maintenance::delete_of_missing_rows(&mut tx, synced.table()).await?;
@@ -82,15 +92,29 @@ pub async fn run(deployment: &Deployment, now: DateTime<Utc>) -> Result<PurgeRep
     removed.insert(accounts_users::TABLE.to_string(), accounts);
     let preferences = preferences::delete_without_account_in(&mut tx).await?;
     removed.insert(accounts_preferences::TABLE.to_string(), preferences);
-    let purge = Purge {
-        id: Uuid::now_v7(),
-        horizon,
-        inserted_at: now,
-        minimum_global_sync_version: floor,
-    };
-    app_purges::create(&mut tx, &purge).await?;
     tx.commit().await?;
     Ok(PurgeReport { horizon, removed })
+}
+
+/// Removes each table's tombstones deleted before the horizon, at or
+/// below the floor, a table at a time and children first, so a purged
+/// parent's rows have already gone. Without the feed lock: nothing here
+/// gives out a version.
+async fn delete_tombstones(
+    deployment: &Deployment,
+    horizon: DateTime<Utc>,
+    floor: i64,
+) -> Result<BTreeMap<String, u64>, PurgeError> {
+    let mut removed = BTreeMap::new();
+    for synced in tables::list().iter().rev() {
+        let table = synced.table();
+        let mut tx = deployment.begin().await?;
+        let count =
+            app_purges::maintenance::delete_deleted_before(&mut tx, table, horizon, floor).await?;
+        tx.commit().await?;
+        removed.insert(table.to_string(), count);
+    }
+    Ok(removed)
 }
 
 /// The latest run's horizon: the oldest deletion a device may still
@@ -111,6 +135,52 @@ mod tests {
     use crate::database::{Database, with_each_database};
     use crate::deployment::now;
     use crate::sync::test_notes;
+
+    /// On PostgreSQL, where writers run side by side: the tombstones go
+    /// while another transaction holds the feed lock, as a writer would.
+    /// SQLite has one writer, so there is nothing to show there.
+    #[cfg(feature = "postgres")]
+    #[tokio::test]
+    async fn purge_removes_tombstones_while_a_writer_holds_the_feed_lock() {
+        with_each_database(|database| async move {
+            if !matches!(database, Database::Postgres(_)) {
+                return;
+            }
+            let deployment = Deployment::new(database, Role::Server);
+            let alice = users::create(&deployment, "alice@example.com", "Alice")
+                .await
+                .expect("a user");
+            let gone = test_notes::create(&deployment, &alice, "gone", None)
+                .await
+                .expect("a note");
+            test_notes::delete(&deployment, &alice, gone.id)
+                .await
+                .expect("deleted");
+            let later = now() + Duration::days(RETENTION_DAYS + 1);
+            let horizon = later - Duration::days(RETENTION_DAYS);
+            let mut tx = deployment.begin().await.expect("a transaction");
+            let floor = app_sync_versions::get(&mut tx)
+                .await
+                .expect("the feed")
+                .head;
+            tx.commit().await.expect("committed");
+
+            let mut writer = deployment.begin().await.expect("a writer");
+            app_sync_versions::lock(&mut writer)
+                .await
+                .expect("the feed lock");
+            let removed = tokio::time::timeout(
+                std::time::Duration::from_secs(10),
+                delete_tombstones(&deployment, horizon, floor),
+            )
+            .await
+            .expect("not waiting on the feed lock")
+            .expect("removed");
+            writer.commit().await.expect("committed");
+            assert_eq!(removed[test_notes::TABLE], 1);
+        })
+        .await;
+    }
 
     #[tokio::test]
     async fn purge_removes_what_was_deleted_before_the_horizon_with_its_rows_and_events() {

@@ -5,6 +5,11 @@ defmodule Core.Jobs.Purge do
   and hard-deletes the file tombstones every device that pulled within
   the window has seen. Rows go children first, and only once their last
   change is at or below the floor.
+
+  Only moving the floor holds the feed lock, briefly. The tombstones go
+  after, a table at a time, without it, so no writer waits on them: a
+  device that could still need one has a cursor below the floor, and
+  resyncs. A run cut short leaves tombstones the next one removes.
   """
   use Oban.Worker, queue: :maintenance, max_attempts: 3
 
@@ -24,26 +29,29 @@ defmodule Core.Jobs.Purge do
   def run(now) do
     horizon = DateTime.add(now, -@retention_days, :day)
 
-    Repo.transaction(fn ->
-      AppSyncVersions.lock()
-      floor = AppSyncChanges.delete_written_before(horizon)
+    {:ok, floor} =
+      Repo.transaction(fn ->
+        AppSyncVersions.lock()
+        AppSyncChanges.delete_written_before(horizon)
+      end)
 
-      removed =
-        for table <- ~w(app_files_communities app_files), into: %{} do
-          %{num_rows: count} =
-            Repo.query!(
-              "DELETE FROM #{table} t WHERE t.deleted_at IS NOT NULL AND t.deleted_at < $1 AND t.last_synced_at < $1 AND t.global_sync_version <= $2" <>
-                if(table == "app_files",
-                  do: " AND NOT EXISTS (SELECT 1 FROM app_files_communities c WHERE c.file_id = t.id)",
-                  else: ""
-                ),
-              [horizon, floor]
-            )
+    {:ok, %{floor: floor, removed: delete_tombstones(horizon, floor)}}
+  end
 
-          {table, count}
-        end
+  @doc "Deletes the tombstones before the horizon and at or below the floor, children first, a table at a time."
+  def delete_tombstones(horizon, floor) do
+    for table <- ~w(app_files_communities app_files), into: %{} do
+      %{num_rows: count} =
+        Repo.query!(
+          "DELETE FROM #{table} t WHERE t.deleted_at IS NOT NULL AND t.deleted_at < $1 AND t.last_synced_at < $1 AND t.global_sync_version <= $2" <>
+            if(table == "app_files",
+              do: " AND NOT EXISTS (SELECT 1 FROM app_files_communities c WHERE c.file_id = t.id)",
+              else: ""
+            ),
+          [horizon, floor]
+        )
 
-      %{floor: floor, removed: removed}
-    end)
+      {table, count}
+    end
   end
 end

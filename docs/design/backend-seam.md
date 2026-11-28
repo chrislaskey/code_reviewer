@@ -466,11 +466,18 @@ with them.
 
 ### Open questions and smaller fixes
 
-- From [the review](../suggestions/global-sync-version-review.md):
-  - the membership backfill trigger, §3.5;
-  - the purge holding the feed lock, §3.5;
-  - removal entries in the change log, §2 A;
-  - a lock-free alternative to the feed lock, §2 B.
+- From [the review](../suggestions/global-sync-version-review.md),
+  decided with the user on 2026-11-27:
+  - **The purge holding the feed lock, §3.5: done.** Only moving the
+    floor holds it, in Rust and in `core_elixir`. A test on each holds
+    the lock in another transaction while the tombstones go.
+  - **Removal entries in the change log, §2 A: not built.** The rule
+    instead, in "Purge and resync" of `offline-sync.md`: a hard delete
+    of a synced row is allowed only when no device can hold it.
+  - **The membership backfill trigger, §3.5: left as it is.**
+    Memberships will grow, so it isn't tuned now.
+  - **A lock-free alternative to the feed lock, §2 B: not built.**
+  - **The token cache: deferred**, see below.
 - **Done, 2026-11-27.** A refused create of a table without bytes, such
   as a post, used to vanish from the device without a word. It is now
   kept for the person, see `docs/suggestions/refused-creates.md`.

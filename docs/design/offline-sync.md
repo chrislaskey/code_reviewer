@@ -521,7 +521,25 @@ Scheduled purge removes a committed prefix of change entries older than
 the retention window. It records the last discarded global sync version as
 the minimum valid cursor and removes eligible tombstones with no surviving
 synced children. The purge's wall time still determines which entries and
-tombstones are old enough to remove.
+tombstones are old enough to remove. Only moving the floor holds the feed
+lock. The tombstones at or below it go after, a table at a time, without
+it, so no writer waits on them: a device that could still need one has a
+cursor below the floor, and resyncs.
+
+**A hard delete of a synced row is allowed only when no device can hold
+it.** A device learns of a delete from the row: its tombstone, pulled
+like any change. A row deleted outright leaves nothing to pull, so a
+device that holds it keeps it. The purge is safe, since it removes only
+tombstones at or below the floor, which every device has pulled or
+resyncs past. The other hard deletes are safe for now, each because no
+device holds the row: an account's preferences when the account is
+deleted, as its devices lose their token; a trial's rows, as trials are
+on the web alone; an unconfirmed sign-up's user, which was never
+pulled. A new hard delete of a synced row must say which of these holds,
+or soft-delete the row instead. When one can't, the general fix is a
+removal entry in the change log, "row X of table T is gone", which a
+pull would answer; it isn't built, see the review's §2 A in
+`docs/suggestions/global-sync-version-review.md`.
 
 A cursor below that minimum or from another feed gets an empty page marked
 `resync`. The device drops its cursor and backfills, removes replicated rows

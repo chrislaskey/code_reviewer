@@ -337,9 +337,12 @@ Updated 2026-11-27. The next steps are now in
 3. **Done.** Persist bootstrap and backfill continuations.
 4. **Done.** Move stamping into the data layer, and add the feed
    invariant test.
-5. **Open.** Decide the role of `app_sync_changes` (§2 A).
-6. **Open.** Fix the membership backfill trigger. Rename `last_synced_at`
-   (§3.5).
+5. **Decided, 2026-11-27.** `app_sync_changes` stays as it is, with no
+   removal entries (§2 A). The rule instead: a hard delete of a synced
+   row only when no device can hold it, in `offline-sync.md`.
+6. **Decided, 2026-11-27.** The membership backfill trigger stays, since
+   memberships will grow. Renaming `last_synced_at` is still open
+   (§3.5). The purge now holds the feed lock only to move the floor.
 7. **Started.** The Commanded backend, in `core_elixir/`. Its projector
    writes the rows, their versions and the answers in one transaction,
    under the feed lock.

@@ -1,6 +1,6 @@
 # The SHA-256 of each framework file as the template ships it, see
 # framework.toml. Written by `cargo run -p framework_check -- lock`.
-6da46fc5a5beac0fb8d68c59a7978ff24578b7ed24e33648686bcd6741ff7324  FRAMEWORK_CHANGELOG.md
+2dbfe875cc4f856aadf8810046ce239c000f270d4e18d0c028c31c00453052cc  FRAMEWORK_CHANGELOG.md
 dbded3dccbf128f2dafd95a761318f0338856fa9dae66173642d45db3fd63a23  axum/src/accounts.rs
 dfdf353a942c730f3c0cea40c9e89a737bcf5fbf06960b91baab16578564a327  axum/src/accounts/app_store_notifications.rs
 4440725170bdb3eeda5a1257a241671c748cb8069a42809f37f289bacef91187  axum/src/accounts/checkouts.rs
@@ -226,7 +226,7 @@ e5a409e3ab8e141f1b47f7a63e2b117b93ae417a3a27a4527713a80407f1af83  core/src/servi
 4e4d0e8fff93ddd988dc5cf21c02219bd698d789571b6fa8644a656c9bf5dade  core/src/sync/events.rs
 c2f8255294f0fcd08a3d274a831e70046662fb004978f3678d37f7862b3eb04a  core/src/sync/from_backend.rs
 10a05c74b82a244a76cc81098ccdc08396233d0ca1d23b993cad433564e2c491  core/src/sync/pending_changes.rs
-516860446f31446bbf2b454f5842a7e5f5f86162280bb968705ad692414f3407  core/src/sync/purge.rs
+6706875e6e359b6f0e41e376ef0726522040623aa6c13eafba6639ad6fca56da  core/src/sync/purge.rs
 b81731d0cb533614417f02f85abb44a1fd3810868c071f94ad9b11f08ba3cc2c  core/src/sync/synced_table.rs
 173bccad48b0db4e75788337345bb553249208f75ad620871f4fa4ddc7ef4895  core/src/sync/tables.rs
 61b398eed0748bfae20c0919d1b70b796d28d0ac04638379f75456895bf47b47  core/src/sync/test_notes.rs
