@@ -71,8 +71,10 @@ The tailnet:
   \`tailscale serve\` gives the web server the address
   https://<this computer>.<tailnet>.ts.net:<web port> on the tailnet, and
   prints it: a phone's server, SYNC_SERVER_URL in .env for \`bin/reinstall\`.
-  It stops with the rest. TAILSCALE_SERVE=false, from the environment or
-  else from .env, turns it off.
+  It stops with the rest, and when it fails the rest runs on. One left from
+  an earlier run is named, with the command to stop it, and the tailnet
+  skipped. TAILSCALE_SERVE=false, from the environment or else from .env,
+  turns it off.
 
 Other servers:
   MULTI_SERVER   none, listed_only or any: the app's multiServer setting
@@ -254,11 +256,14 @@ print(sorted(found)[-1][1] if found else "")' "$name")
 }
 
 pids=()
+# Stopped with the rest, but its stopping stops nothing else.
+tailscale_pid=""
 # Stops every target and the dev server when one of them is closed, or this
 # script is interrupted, and waits for them, so a run started right after
 # finds the ports free.
 stop_all() {
   trap - EXIT INT TERM
+  [ -n "$tailscale_pid" ] && pids+=("$tailscale_pid")
   for pid in ${pids[@]+"${pids[@]}"}; do
     pkill -P "$pid" 2>/dev/null || true
     kill "$pid" 2>/dev/null || true
@@ -370,16 +375,20 @@ fi
 
 # The web server on the tailnet, see the help. In the foreground, so it
 # stops with the rest and leaves nothing behind.
+tailscale_serve_args=(serve --https="$web_port" "http://127.0.0.1:$web_port")
 if [ "$starts_web" = true ] && [ "$(read_setting TAILSCALE_SERVE)" != false ]; then
   if ! command -v tailscale > /dev/null; then
     echo "bin/dev: warning: tailscale is not installed, so a phone can't reach the web server" >&2
   elif ! tailscale status > /dev/null 2>&1; then
     echo "bin/dev: warning: Tailscale is not up, so a phone can't reach the web server" >&2
+  elif leftover_pids=$(pgrep -i -f -- "tailscale ${tailscale_serve_args[*]}\$" | tr '\n' ' ') &&
+    [ -n "$leftover_pids" ]; then
+    echo "bin/dev: warning: a \`tailscale ${tailscale_serve_args[*]}\` from an earlier run holds port $web_port on the tailnet, so a phone can't reach this web server; stop it with \`kill ${leftover_pids% }\`" >&2
   else
     echo "bin/dev: building the pages for the tailnet"
     (cd "$ROOT/svelte" && pnpm build)
-    (exec tailscale serve --https="$web_port" "http://127.0.0.1:$web_port") &
-    pids+=($!)
+    (exec tailscale "${tailscale_serve_args[@]}") &
+    tailscale_pid=$!
   fi
 fi
 
@@ -419,5 +428,9 @@ while true; do
   for pid in "${pids[@]}"; do
     kill -0 "$pid" 2>/dev/null || exit 0
   done
+  if [ -n "$tailscale_pid" ] && ! kill -0 "$tailscale_pid" 2>/dev/null; then
+    echo "bin/dev: warning: \`tailscale serve\` stopped, so a phone can't reach the web server; the rest runs on" >&2
+    tailscale_pid=""
+  fi
   sleep 1
 done
