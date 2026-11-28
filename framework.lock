@@ -1,6 +1,6 @@
 # The SHA-256 of each framework file as the template ships it, see
 # framework.toml. Written by `cargo run -p framework_check -- lock`.
-8fb15fcc3e245aeeba1608ddf3d902e837a69e27a83aff5f8b27a7b225aa6a54  FRAMEWORK_CHANGELOG.md
+81deb7196bdbe867ea5150cf17c7e10743ed290dbc50c32e229636cb65d9d72c  FRAMEWORK_CHANGELOG.md
 8519249972fe5e4ca952db7e02f2f9874dc98b3168d8d2c5a9972e3fa57d1df6  axum/src/accounts.rs
 dfdf353a942c730f3c0cea40c9e89a737bcf5fbf06960b91baab16578564a327  axum/src/accounts/app_store_notifications.rs
 4440725170bdb3eeda5a1257a241671c748cb8069a42809f37f289bacef91187  axum/src/accounts/checkouts.rs
@@ -54,7 +54,7 @@ f6cf3c382132b618959001b21ae04ef536df92195a729517fb07084d498fcc1c  axum/src/sync/
 af13ac868193a9d2830a4333a44f39f06fe30553025af225912b5d8a77b4835d  axum/src/tests/ops.rs
 467306c4db963394ceb87ae3ee1f6023019a27dfad37b3d3d00c4409b3a9c24f  axum/src/tests/servers.rs
 0f6c3161e7135ff943a97cc645ba3b2ba70ed5b9967aeb54ab1b213ae0d4a66c  axum/src/user_auth.rs
-3b980c70583ce1e80a47559304b90ce2ba2db6042545350cb80ee95f195f32c7  bin/dev
+1ba58b77d68d09a1a5a6b6ce3a0ab28ee0a14f44408c923f2eb0feb426c13b7c  bin/dev
 0eb519e1cf6d709ba820cc0e1511295f3c5613bd671a6211ceaecf90fc0ecd44  bin/framework
 7b374fb80e32bbaf4da61f835907eed6a08b5dedee10e7113b8e111dfbb7277a  bin/lint
 17b1962517075e049dcd6f4d84886f012597268d203448891aff631215f88314  bin/reinstall

@@ -66,15 +66,16 @@ Server settings:
                    core/src/servers/settings.rs.
 
 The tailnet:
-  When the web target runs and Tailscale is installed and up, the pages are
-  built (\`pnpm build\`, for the web server to serve), then
-  \`tailscale serve\` gives the web server the address
-  https://<this computer>.<tailnet>.ts.net:<web port> on the tailnet, and
-  prints it: a phone's server, SYNC_SERVER_URL in .env for \`bin/reinstall\`.
-  It stops with the rest, and when it fails the rest runs on. One left from
-  an earlier run is named, with the command to stop it, and the tailnet
-  skipped. TAILSCALE_SERVE=false, from the environment or else from .env,
-  turns it off.
+  Off unless TAILSCALE_SERVE=true, from the environment or else from .env.
+  When it is on and the web target runs, the pages are built (\`pnpm build\`,
+  for the web server to serve), then \`tailscale serve\` gives the web server
+  the address https://<this computer>.<tailnet>.ts.net:<web port> on the
+  tailnet, and prints it: a phone's server, SYNC_SERVER_URL in .env for
+  \`bin/reinstall\`. It needs Tailscale installed and up, and warns when it
+  isn't. It stops with the rest, and when it fails the rest runs on. One left
+  from an earlier run is named, with the command to stop it, and the tailnet
+  skipped. When TAILSCALE_SERVE is unset and Tailscale is up, a line says
+  how to turn it on; TAILSCALE_SERVE=false leaves that line out.
 
 Other servers:
   MULTI_SERVER   none, listed_only or any: the app's multiServer setting
@@ -376,7 +377,16 @@ fi
 # The web server on the tailnet, see the help. In the foreground, so it
 # stops with the rest and leaves nothing behind.
 tailscale_serve_args=(serve --https="$web_port" "http://127.0.0.1:$web_port")
-if [ "$starts_web" = true ] && [ "$(read_setting TAILSCALE_SERVE)" != false ]; then
+tailscale_serve="$(read_setting TAILSCALE_SERVE)"
+case "$tailscale_serve" in
+  ''|true|false) ;;
+  *) fail "TAILSCALE_SERVE must be true, false or empty, got '$tailscale_serve'" ;;
+esac
+if [ "$starts_web" = true ] && [ -z "$tailscale_serve" ] &&
+  command -v tailscale > /dev/null && tailscale status > /dev/null 2>&1; then
+  echo "bin/dev: Tailscale is up; TAILSCALE_SERVE=true in .env puts the web server on the tailnet, for a phone"
+fi
+if [ "$starts_web" = true ] && [ "$tailscale_serve" = true ]; then
   if ! command -v tailscale > /dev/null; then
     echo "bin/dev: warning: tailscale is not installed, so a phone can't reach the web server" >&2
   elif ! tailscale status > /dev/null 2>&1; then
