@@ -3,12 +3,14 @@ defmodule CoreWeb.Router do
 
   alias CoreWeb.{
     AccountsController,
+    PreferencesController,
     CommunitiesController,
     FilesCommunitiesController,
     FilesController,
     MembershipsController,
     NotImplementedController,
     SyncController,
+    TrialUsersController,
     UsersController
   }
 
@@ -21,6 +23,7 @@ defmodule CoreWeb.Router do
     pipe_through :backend
 
     post "/users/get_by_token", UsersController, :get_by_token
+    post "/users/update", UsersController, :update
 
     post "/accounts/users/get", AccountsController, :users_get
     post "/accounts/sign_in", AccountsController, :sign_in
@@ -30,7 +33,13 @@ defmodule CoreWeb.Router do
     post "/accounts/sign_in_confirm", AccountsController, :sign_in_confirm
     post "/accounts/sign_in_confirm_for_device", AccountsController, :sign_in_confirm_for_device
     post "/accounts/sign_in_with_device_code", AccountsController, :sign_in_with_device_code
+    post "/accounts/sign_in_from_trial", AccountsController, :sign_in_from_trial
     post "/accounts/sign_out", AccountsController, :sign_out
+    post "/accounts/preferences/get", PreferencesController, :get
+    post "/accounts/preferences/update", PreferencesController, :update
+
+    post "/trial_users/count", TrialUsersController, :count
+    post "/trial_users/create", TrialUsersController, :create
 
     post "/sync/push", SyncController, :push
     post "/sync/pull", SyncController, :pull

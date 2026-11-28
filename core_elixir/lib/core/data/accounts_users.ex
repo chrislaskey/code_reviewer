@@ -50,6 +50,12 @@ defmodule Core.Data.AccountsUsers do
   @doc "Inserts a new row."
   def create(account), do: Repo.insert!(account)
 
+  @doc "Deletes an unconfirmed sign-up outright, its user's row first: someone else proved its address."
+  def delete_unconfirmed(account) do
+    Repo.delete_all(from u in Core.Data.AppUsers, where: u.id == ^account.id)
+    Repo.delete!(account)
+  end
+
   @doc "Writes the row over its stored one."
   def update(account), do: Repo.insert!(account, on_conflict: :replace_all, conflict_target: :id)
 end

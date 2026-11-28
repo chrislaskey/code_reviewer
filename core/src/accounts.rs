@@ -259,6 +259,10 @@ pub async fn sign_in_from_trial(
         return Err(AccountError::ServerOnly);
     }
     let email = accounts_users::checked_email(email)?;
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::sign_in_from_trial(backend, mailer, trial, &email, requested).await;
+    }
     let mut tx = deployment.begin().await?;
     let account = live_account_in(&mut tx, trial.id).await?;
     if account.trial_expires_at.is_none() {
@@ -796,6 +800,26 @@ mod from_backend {
         })
     }
 
+    pub(super) async fn sign_in_from_trial(
+        backend: &RemoteBackend,
+        mailer: &Mailer,
+        trial: &User,
+        email: &str,
+        requested: &str,
+    ) -> Result<CodeSent, AccountError> {
+        let request = json!({ "trial_id": trial.id, "email": email, "locale": requested });
+        let sent: Sent = backend
+            .call("accounts/sign_in_from_trial", &request)
+            .await
+            .map_err(account_error)?;
+        if let Some(mail) = sent.mail {
+            mailer.send(mail_of(mail)?).await?;
+        }
+        Ok(CodeSent {
+            pending: sent.pending,
+        })
+    }
+
     pub(super) async fn sign_in_with_code(
         backend: &RemoteBackend,
         pending: &str,
@@ -910,6 +934,7 @@ mod from_backend {
             Some("wrong_code") => AccountError::CodeDoesNotMatch,
             Some("sign_in_expired") => AccountError::SignInExpired,
             Some("unknown_device_code") => AccountError::UnknownDeviceCode,
+            Some("not_a_trial") => AccountError::NotATrial,
             Some("account_deleted") => AccountError::User(UserError::AccountDeleted),
             _ => error.into(),
         }

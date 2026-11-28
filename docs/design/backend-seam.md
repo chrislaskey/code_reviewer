@@ -349,8 +349,9 @@ next. How step 1 is built:
   mail it answers, in a language core has.
 - The current user's page reads the account by `accounts/users/get`.
   Its other reads are of areas the sample doesn't serve, so in remote
-  mode they answer nothing: not staff, no plan, no failed payment, and
-  the default preferences. Writes to those areas still fail. Whether a
+  mode they answer nothing: not staff, no plan, no failed payment.
+  Writes to those areas still fail. The preferences are the backend's,
+  by `accounts/preferences/get`, since step 4. Whether a
   user is a trial is the account's `trial_expires_at`, from the backend,
   so nothing changes in Rust when a backend has trials.
   An app whose backend serves one dispatches it instead.
@@ -437,7 +438,7 @@ How it runs, and why not as planned:
 ```sh
 cd core_elixir && mix phx.server     # PostgreSQL, see core_elixir/README.md
 CONFORMANCE_BACKEND_URL=http://localhost:4100 \
-  cargo test -p app_core --features object-storage,remote-backend conformance -- --ignored
+  cargo test -p app_core --features object-storage,remote-backend conformance -- --ignored --test-threads=1
 ```
 
 `bin/lint` runs `mix format --check-formatted` and
@@ -459,12 +460,26 @@ an app's own resources.
 - A restored backup gets a new feed id: `mix core.feed_id_renew`, or
   `Core.Migrations.feed_id_renew/0` in a release.
 
-Not built: trials. `trial_users::count` and `create` call the backend,
-`trial_users/count` and `trial_users/create`, and the sample answers
-`not_implemented`, so it fails, plainly, until a backend has them: the
-sign-in page shows no guest visit, and `/accounts/trial` shows the
-error. Nothing in Rust waits to be removed. Sign-in from a trial waits
-with them.
+**Trials, built 2026-11-27**, with three conformance tests:
+`trial_users/count` and `trial_users/create`, `accounts/sign_in_from_trial`,
+the write limit and the hourly expiry, an Oban job in the sample. The
+sample records the events of the writes it makes for a person, a
+community and a membership, as Rust does, so a trial's limit counts
+the same writes on both.
+
+### Step 4: account information
+
+In order, each with conformance tests:
+
+1. **Preferences, built 2026-11-27**, with three conformance tests:
+   `accounts/preferences/get` and `update`, and `accounts_preferences`
+   in the sample's push and pull. The mail's language is the account's.
+   The sample reads the languages and themes a person may choose from
+   the Rust core's source, `app/locales.rs` and `helpers/themes.rs`,
+   when it compiles, so the lists stay one.
+2. **Renaming, built 2026-11-27**, with three conformance tests:
+   `users/update`, and `app_users` in the sample's push.
+3. Next: passwords, then deletions.
 
 ### Open questions and smaller fixes
 
@@ -488,7 +503,5 @@ with them.
 - **Done, 2026-11-27.** The Rust server renews its feed id with
   `app_web sync feed renew`, after a restore, as `core_elixir` does with
   `mix core.feed_id_renew`, see `docs/suggestions/sync-feed-id-renew.md`.
-- Trials on a remote backend: `trial_users/*`, sign-in from a trial,
-  and their expiry job.
 - Hex: `mix deps.get` fails with this machine's Hex key, whose OAuth
   refresh fails. A clean `HEX_HOME` works around it.

@@ -11,6 +11,11 @@ defmodule CoreWeb.AccountsController do
          do: json(conn, sent)
   end
 
+  def sign_in_from_trial(conn, params) do
+    with {:ok, sent} <- Accounts.sign_in_from_trial(params["trial_id"], params["email"], params["locale"] || "en"),
+         do: json(conn, sent)
+  end
+
   def sign_in_with_code(conn, params) do
     with {:ok, matched} <- Accounts.sign_in_with_code(params["pending"], params["code"]), do: json(conn, matched)
   end

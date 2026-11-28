@@ -30,7 +30,7 @@ against it, with `mix phx.server` up:
 
 ```sh
 CONFORMANCE_BACKEND_URL=http://localhost:4100 \
-  cargo test -p app_core --features object-storage,remote-backend conformance -- --ignored
+  cargo test -p app_core --features object-storage,remote-backend conformance -- --ignored --test-threads=1
 ```
 
 In production, set `DATABASE_URL`, `BACKEND_SERVICE_TOKEN`, `SECRET_KEY_BASE`
@@ -52,9 +52,9 @@ device already saw.
 | Publishing | `data/synced_row.ex`, `data/app_sync_changes.ex`, `data/app_sync_versions.ex` | Every write to a synced row takes the next `global_sync_version` from the locked feed row, and records the change, in the row's own transaction. |
 | Files, with Commanded | `lib/core/app/files/` | One aggregate per file, holding its links to communities. Commands: create, update, add to a community, remove from one. The aggregate deletes the file when its last link goes. |
 | The projector | `app/files/projector.ex` | Writes `app_files` and `app_files_communities` from the facts, with their versions, in one transaction, with its checkpoint. It records the pushed event and its answer in `app_events` in the same transaction. The event arrives as the command's dispatch metadata, so the domain events carry no sync details. It uses strong consistency, so a push answers from the rows it just wrote. |
-| Other resources | `lib/core/accounts.ex`, `app/users.ex`, `app/communities.ex`, `app/memberships.ex` | Plain Ecto writes, with the same publishing rule. Only files go through Commanded, as the sample. |
+| Other resources | `lib/core/accounts.ex`, `accounts/trial_users.ex`, `accounts/preferences.ex`, `app/users.ex`, `app/communities.ex`, `app/memberships.ex` | Plain Ecto writes, with the same publishing rule. A write made for a person is recorded as their event in `app_events` (`sync/events.ex`), as Rust records it, which is what a trial's write limit counts. Only files go through Commanded, as the sample. |
 | Sync | `lib/core/sync.ex`, `sync/` | Push, pull and backfill, as `core/src/sync.rs` answers them: one snapshot per page, pages by visible rows, parents first, cursors as decimal strings. |
-| Jobs | `lib/core/jobs/purge.ex` | The daily purge on Oban: the change log, the floor, and file tombstones. |
+| Jobs | `lib/core/jobs/` | On Oban: the daily purge, of the change log, the floor and file tombstones, and the hourly removal of expired trials. |
 
 ## Decisions to review
 
@@ -87,9 +87,7 @@ device already saw.
 
 - More of the conformance suite, `core/src/app/files/conformance_tests.rs`,
   which this backend passes: a test for each area added below.
-- Trials and sign-in from a trial, passwords, deletions, preferences,
-  posts, community writes and commerce. They answer
-  `501 not_implemented`. So the web's guest visit fails plainly, as
-  `/accounts/trial` shows.
+- Passwords, deletions, pictures, posts, community writes and
+  commerce. They answer `501 not_implemented`.
 - Splitting a Rust migration that someday holds a function or a `DO`
   block: `Core.Migrations.Statements` splits at every `;`.

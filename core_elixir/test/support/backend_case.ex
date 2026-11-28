@@ -21,7 +21,7 @@ defmodule Core.BackendCase do
 
     Postgrex.query!(
       conn,
-      "TRUNCATE accounts_tokens, accounts_users, app_users, app_communities, app_users_communities, app_files, app_files_communities, app_events, app_sync_changes, projection_versions, oban_jobs CASCADE",
+      "TRUNCATE accounts_tokens, accounts_users, accounts_preferences, app_users, app_communities, app_users_communities, app_files, app_files_communities, app_events, app_sync_changes, projection_versions, oban_jobs CASCADE",
       []
     )
 

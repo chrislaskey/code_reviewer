@@ -23,6 +23,7 @@ defmodule Core.Data.AccountsTokens do
     field :token_hash, :string
     field :code_hash, :string
     field :attempts, :integer, default: 0
+    field :sent_to, :string
     field :inserted_at, :utc_datetime_usec
   end
 
@@ -31,14 +32,19 @@ defmodule Core.Data.AccountsTokens do
   def context_sign_in_confirm, do: @context_sign_in_confirm
   def context_device_code, do: @context_device_code
 
-  @doc "Inserts a token of the context for the user, by the token's hash, with the code's hash for a sign-in."
-  def create(user_id, context, token, code \\ nil) do
+  @doc """
+  Inserts a token of the context for the user, by the token's hash, with
+  the code's hash for a sign-in, and the address the code went to when
+  it is not yet the account's, as for a trial user signing up.
+  """
+  def create(user_id, context, token, code \\ nil, sent_to \\ nil) do
     Repo.insert!(%__MODULE__{
       id: Ids.new(),
       user_id: user_id,
       context: context,
       token_hash: Sha256.hex(token),
       code_hash: code && Sha256.hex(code),
+      sent_to: sent_to,
       inserted_at: Time.now()
     })
   end

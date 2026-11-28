@@ -200,9 +200,7 @@ impl From<CommunityError> for ApiError {
 impl ApiError {
     fn from_membership(error: &MembershipError) -> ApiError {
         let status = match error {
-            MembershipError::NotFound { .. } | MembershipError::UnknownCommunity { .. } => {
-                StatusCode::NOT_FOUND
-            }
+            MembershipError::NotFound { .. } => StatusCode::NOT_FOUND,
             MembershipError::Invalid(_) | MembershipError::Rejected(_) => {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
@@ -264,6 +262,7 @@ impl From<PreferenceError> for ApiError {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
             PreferenceError::Record(error) => return ApiError::from_record(&error),
+            PreferenceError::Backend(error) => return ApiError::from_backend(&error),
             PreferenceError::Json(_) | PreferenceError::Database(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }

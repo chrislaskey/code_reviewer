@@ -1,16 +1,19 @@
 //! The conformance suite of the backend protocol, see
-//! `docs/design/backend-seam.md`: what a device sees of sync, files and
-//! memberships, set up only by what the protocol serves. It is the
-//! files example's, so it goes with it; an app adds a test for each
-//! resource its backend serves. Each test runs
-//! on the Rust backend with the other tests, and against a remote
-//! backend when asked, its device syncing through the server's own
-//! functions as the web server calls them:
+//! `docs/design/backend-seam.md`: what a device sees of sync, files,
+//! memberships, trials and preferences, set up only by what the protocol
+//! serves. It is the files example's, so it goes with it; an app adds a
+//! test for each resource its backend serves. Each test runs on the Rust
+//! backend with the other tests, and against a remote backend when asked,
+//! its device syncing through the server's own functions as the web
+//! server calls them:
 //!
 //! ```sh
 //! CONFORMANCE_BACKEND_URL=http://localhost:4100 \
-//!   cargo test -p app_core --features object-storage,remote-backend conformance -- --ignored
+//!   cargo test -p app_core --features object-storage,remote-backend conformance -- --ignored --test-threads=1
 //! ```
+//!
+//! The tests run one at a time there: they share the backend's data, and
+//! a pull would see another test's writes.
 //!
 //! `CONFORMANCE_BACKEND_SERVICE_TOKEN` is the service token,
 //! `dev-service-token` when unset. The server keeps the bucket in memory,
@@ -19,11 +22,14 @@
 use std::collections::BTreeSet;
 use std::future::Future;
 
+use serde_json::json;
 use uuid::Uuid;
 
-use crate::accounts::{self, Session};
+use crate::accounts::{self, Session, preferences};
 use crate::app::files::{self, FileFilter};
 use crate::app::{communities, memberships, users};
+use crate::data::accounts_preferences;
+use crate::data::app_events::Event;
 use crate::data::app_sync_state::Cursor;
 use crate::database::with_each_database;
 use crate::deployment::Deployment;
@@ -419,4 +425,246 @@ async fn conformance_a_signed_up_user_is_not_a_trial(server: Deployment) {
         .await
         .expect("asked");
     assert!(!is_trial);
+}
+
+/// A trial user on a server whose cap leaves room.
+async fn trial(server: &Deployment) -> Session {
+    accounts::trial_users::create(server, 1_000_000)
+        .await
+        .expect("a trial")
+}
+
+conformance!(conformance_a_trial_has_its_own_community_nobody_else_joins);
+async fn conformance_a_trial_has_its_own_community_nobody_else_joins(server: Deployment) {
+    let guest = trial(&server).await;
+    let alice = signed_up(&server).await;
+    assert!(
+        accounts::trial_users::is_trial(&server, &guest.user)
+            .await
+            .expect("asked")
+    );
+    let names: Vec<String> = communities::list(&server, &guest.user)
+        .await
+        .expect("the communities")
+        .into_iter()
+        .map(|listed| listed.community.name)
+        .collect();
+    assert_eq!(names, [accounts::trial_users::COMMUNITY_NAME]);
+    let guest_community = personal_community(&server, &guest).await;
+    let joined = memberships::create(&server, &alice.user, guest_community).await;
+    assert!(
+        matches!(&joined, Err(memberships::MembershipError::Rejected(reason)) if reason == "unknown_community"),
+        "{joined:?}"
+    );
+}
+
+conformance!(conformance_a_trial_signs_up_and_keeps_its_user);
+async fn conformance_a_trial_signs_up_and_keeps_its_user(server: Deployment) {
+    let guest = trial(&server).await;
+    let email = format!("{}@example.com", Uuid::now_v7().simple());
+    let mailer = Mailer::memory();
+    let sent = accounts::sign_in_from_trial(&server, &mailer, &guest.user, &email, "en")
+        .await
+        .expect("a code");
+    let code = mails::code_in(&mailer.last_sent_to(&email).expect("mailed")).expect("a code");
+    let matched = accounts::sign_in_with_code(&server, &sent.pending, &code)
+        .await
+        .expect("the code");
+    assert!(matched.new_account);
+    let session = accounts::sign_in_confirm(&server, &matched.pending)
+        .await
+        .expect("signed up");
+    assert_eq!(session.user.id, guest.user.id);
+    assert_eq!(session.email, email);
+    assert!(
+        !accounts::trial_users::is_trial(&server, &session.user)
+            .await
+            .expect("asked")
+    );
+    assert!(users::get_by_token(&server, &guest.token).await.is_err());
+}
+
+conformance!(conformance_a_trials_writes_stop_at_the_limit);
+async fn conformance_a_trials_writes_stop_at_the_limit(server: Deployment) {
+    let guest = trial(&server).await;
+    let community = personal_community(&server, &guest).await;
+    let mut writes = 0;
+    let refused = loop {
+        let written = if writes % 2 == 0 {
+            memberships::delete(&server, &guest.user, community).await
+        } else {
+            memberships::create(&server, &guest.user, community)
+                .await
+                .map(|_| ())
+        };
+        match written {
+            Ok(()) => writes += 1,
+            Err(error) => break error,
+        }
+        assert!(writes < accounts::trial_users::MAX_WRITES, "never refused");
+    };
+    assert!(
+        matches!(
+            refused,
+            memberships::MembershipError::Record(crate::sync::events::RecordError::TrialWritesFull)
+        ),
+        "{refused:?}"
+    );
+    // Its community and membership were the first two
+    assert_eq!(writes + 2, accounts::trial_users::MAX_WRITES);
+}
+
+conformance!(conformance_a_preference_reaches_the_device_and_one_made_there_the_server);
+async fn conformance_a_preference_reaches_the_device_and_one_made_there_the_server(
+    server: Deployment,
+) {
+    let alice = signed_up(&server).await;
+    preferences::update(&server, &alice.user, "theme", json!("dark"))
+        .await
+        .expect("the theme");
+    let (a, _folder) = files::tests::device_with_folder(&alice.user, &alice.token).await;
+    sync(&a, &server).await;
+    let on_device = preferences::get(&a, &alice.user)
+        .await
+        .expect("the device's");
+    assert_eq!(on_device.theme.as_deref(), Some("dark"));
+
+    preferences::update(&a, &alice.user, "locale", json!("es"))
+        .await
+        .expect("the language, offline");
+    sync(&a, &server).await;
+    let on_server = preferences::get(&server, &alice.user)
+        .await
+        .expect("the server's");
+    assert_eq!(on_server.locale.as_deref(), Some("es"));
+    assert_eq!(on_server.theme.as_deref(), Some("dark"));
+}
+
+conformance!(conformance_a_value_a_key_does_not_take_is_refused);
+async fn conformance_a_value_a_key_does_not_take_is_refused(server: Deployment) {
+    let alice = signed_up(&server).await;
+    let (a, _folder) = files::tests::device_with_folder(&alice.user, &alice.token).await;
+    sync(&a, &server).await;
+    let event = Event::create(
+        accounts_preferences::TABLE,
+        Uuid::now_v7(),
+        crate::helpers::json::object_fields(
+            json!({ "user_id": alice.user.id, "key": "theme", "value": "plaid" }),
+        ),
+        crate::deployment::now(),
+    );
+    let answers = sync::push(
+        &server,
+        &alice.user,
+        sync::PushRequest {
+            events: vec![event],
+        },
+    )
+    .await
+    .expect("answered");
+    assert_eq!(
+        answers.events[0].status,
+        sync::events::AnswerStatus::Rejected
+    );
+    let on_server = preferences::get(&server, &alice.user)
+        .await
+        .expect("the server's");
+    assert_eq!(on_server.theme, None);
+}
+
+conformance!(conformance_a_code_is_mailed_in_the_language_chosen);
+async fn conformance_a_code_is_mailed_in_the_language_chosen(server: Deployment) {
+    let alice = signed_up(&server).await;
+    preferences::update(&server, &alice.user, "locale", json!("es"))
+        .await
+        .expect("the language");
+    let mailer = Mailer::memory();
+    accounts::sign_in(&server, &mailer, &alice.email, true, "en")
+        .await
+        .expect("a sign-in");
+    let mail = mailer.last_sent_to(&alice.email).expect("mailed");
+    let code = mails::code_in(&mail).expect("a code");
+    assert_eq!(
+        mail.subject,
+        mails::sign_in_code("es", &alice.email, &code).subject
+    );
+}
+
+conformance!(conformance_a_rename_reaches_the_device_and_one_made_there_the_server);
+async fn conformance_a_rename_reaches_the_device_and_one_made_there_the_server(server: Deployment) {
+    let alice = signed_up(&server).await;
+    let renamed = users::update(&server, &alice.user, "Alice on the web")
+        .await
+        .expect("renamed");
+    assert_eq!(renamed.version, alice.user.version + 1);
+    let (a, _folder) = files::tests::device_with_folder(&alice.user, &alice.token).await;
+    sync(&a, &server).await;
+    let on_device = users::get(&a, alice.user.id).await.expect("the device's");
+    assert_eq!(on_device.name, "Alice on the web");
+
+    users::update(&a, &on_device, "Alice offline")
+        .await
+        .expect("renamed offline");
+    sync(&a, &server).await;
+    let on_server = users::get_by_token(&server, &alice.token)
+        .await
+        .expect("the server's");
+    assert_eq!(on_server.name, "Alice offline");
+}
+
+conformance!(conformance_renaming_oneself_from_an_old_version_is_a_conflict_the_person_sees);
+async fn conformance_renaming_oneself_from_an_old_version_is_a_conflict_the_person_sees(
+    server: Deployment,
+) {
+    let alice = signed_up(&server).await;
+    let (a, _folder) = files::tests::device_with_folder(&alice.user, &alice.token).await;
+    sync(&a, &server).await;
+    let on_device = users::get(&a, alice.user.id).await.expect("the device's");
+    users::update(&server, &alice.user, "From the web")
+        .await
+        .expect("renamed on the web");
+    users::update(&a, &on_device, "From the device")
+        .await
+        .expect("renamed offline");
+    let report = sync(&a, &server).await;
+    assert_eq!(report.conflicts, 1, "{report:?}");
+    let on_server = users::get_by_token(&server, &alice.token)
+        .await
+        .expect("the server's");
+    assert_eq!(on_server.name, "From the web");
+    let seen = conflicts::list(&a).await.expect("the conflicts");
+    assert_eq!(seen.len(), 1);
+    assert_eq!(seen[0].resolve, conflicts::Resolve::Reapply);
+}
+
+conformance!(conformance_nobody_renames_someone_else);
+async fn conformance_nobody_renames_someone_else(server: Deployment) {
+    let alice = signed_up(&server).await;
+    let bob = signed_up(&server).await;
+    let event = Event::update(
+        crate::data::app_users::TABLE,
+        alice.user.id,
+        alice.user.version,
+        crate::helpers::json::object_fields(json!({ "name": alice.user.name })),
+        crate::helpers::json::object_fields(json!({ "name": "Not Alice" })),
+        crate::deployment::now(),
+    );
+    let answers = sync::push(
+        &server,
+        &bob.user,
+        sync::PushRequest {
+            events: vec![event],
+        },
+    )
+    .await
+    .expect("answered");
+    assert_eq!(
+        answers.events[0].status,
+        sync::events::AnswerStatus::Rejected
+    );
+    assert_eq!(answers.events[0].reason.as_deref(), Some("not_yours"));
+    let on_server = users::get_by_token(&server, &alice.token)
+        .await
+        .expect("the server's");
+    assert_eq!(on_server.name, alice.user.name);
 }

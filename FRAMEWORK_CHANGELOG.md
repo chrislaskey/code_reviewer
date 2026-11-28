@@ -18,6 +18,67 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-27: renaming on a remote backend
+
+Commits: this one. `docs/design/backend-seam.md`, step 4.
+
+- **What changed**.
+  - Beside a remote backend, `users::update` calls it, `users/update`,
+    where it failed until now: `PUT /api/users/current` renames.
+  - `core_elixir/` serves it, and takes `app_users` updates in its push.
+  - The conformance suite has three more tests, for renaming.
+- **What an app does**.
+  - **Required**, for an app with its own remote backend: serve
+    `users/update`, or renaming fails beside it.
+
+## 2026-11-27: preferences on a remote backend
+
+Commits: this one. `docs/design/backend-seam.md`, step 4.
+
+- **What changed**.
+  - Beside a remote backend, `accounts::preferences::get` and `update`
+    call it, `accounts/preferences/get` and `update`, where `get`
+    answered the defaults until now. `PreferenceError` has a `Backend`
+    variant, under the `remote-backend` feature.
+  - `core_elixir/` serves preferences, and syncs `accounts_preferences`
+    in its push and pull. A code's mail is in the account's language.
+    It reads the languages and themes from `core/src/app/locales.rs`
+    and `core/src/helpers/themes.rs` when it compiles.
+  - The conformance suite has three more tests, for preferences.
+- **What an app does**.
+  - **Required**, for an app that matches `PreferenceError`
+    exhaustively with the `remote-backend` feature on: handle `Backend`.
+  - **Required**, for an app with its own remote backend: serve
+    `accounts/preferences/get` and `update`, or the current user's page
+    fails beside it.
+
+## 2026-11-27: trials on a remote backend
+
+Commits: this one. `docs/design/backend-seam.md`, step 3.
+
+- **What changed**.
+  - `core_elixir/` has trials: `trial_users/count` and `create`,
+    `accounts/sign_in_from_trial`, the write limit, and an hourly Oban
+    job that removes expired trials. It records the events of the
+    community and membership writes it makes for a person, as Rust
+    does, so a trial's limit counts the same writes.
+  - `accounts::sign_in_from_trial` calls the remote backend beside
+    one. Its `not_a_trial` is `AccountError::NotATrial`.
+  - `memberships::create` and `delete` map the backend's
+    `trial_writes_full` to `RecordError::TrialWritesFull`, as Rust
+    refuses it.
+  - `MembershipError::UnknownCommunity` is removed. Only the remote
+    path answered it. A refused join is now `Rejected("unknown_community")`
+    on every backend, as the Rust server answers it.
+  - The conformance suite has three more tests, for trials. Against a
+    remote backend it runs with `--test-threads=1`, since its tests
+    share the backend's data.
+- **What an app does**.
+  - **Required**, for an app that matches `MembershipError::UnknownCommunity`:
+    match `MembershipError::Rejected` with `"unknown_community"` instead.
+  - **Optional**, for an app's own dispatch of a write to a remote
+    backend: map `trial_writes_full` to `RecordError::TrialWritesFull`.
+
 ## 2026-11-27: last_synced_at is removed from every synced table
 
 Commits: this one.

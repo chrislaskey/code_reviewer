@@ -96,6 +96,19 @@ every signed-in request.
 Errors: `unknown_token`, `account_deleted`. The backend keeps only
 SHA-256 hashes of tokens, as hex. It matches them exactly.
 
+**`users/update`** (sample). A person renames themselves, as
+`users::update` does.
+
+```json
+{"actor_id": "…", "name": "Alice"}
+→ User
+```
+
+- An event like any change a person makes, recorded in `app_events`.
+  The same name writes nothing.
+- The name is trimmed, 1 to 80 characters. Rust checks it first.
+- A deleted or unknown user is `not_found`.
+
 **`accounts/users/get`** (sample). The account of a user, for the
 current user's page: its email and whether it is a trial.
 
@@ -191,17 +204,76 @@ mail.
 
 **`accounts/sign_out`** (sample). `{"token": "…"} → {}`. Forgets the token.
 
-**`trial_users/count`**. `{} → {"count": 3}`: how many trial users
-there are, for the cap. **`trial_users/create`**.
-`{"max": 100} → {"user": User, "email": "…", "token": "…"}`: a trial
-user and their token, as `accounts::trial_users::create` makes them, or
-`full` when `max` are there already. Rust checks a cap of 0 itself.
-Specified, not in the sample, which answers both `not_implemented`: the
-pages then show no guest visits, and `/accounts/trial` shows the error.
+**`trial_users/count`** (sample). `{} → {"count": 3}`: how many trial
+users there are, for the cap.
 
-Specified, not in the sample: `accounts/sign_in_from_trial`, the
-password operations, `accounts/deletions/*`, `accounts/preferences/*`,
-and the commerce and ops operations of `backend-seam.md` §2.
+**`trial_users/create`** (sample). A trial user and their token, as
+`accounts::trial_users::create` makes them.
+
+```json
+{"max": 100}
+→ {"user": User, "email": "guest_…@example.com", "token": "…"}
+```
+
+- The account has a made-up email and `trial_expires_at`, a day on.
+  The user has a community of their own, `"Guest"`, and their
+  membership of it. Both are published, and recorded as the trial's
+  events.
+- `full` (503) when `max` trial users are there already. Rust checks a
+  cap of 0 itself.
+- Nobody else sees a trial's communities or joins them, and a trial
+  joins nobody else's: `memberships/create` answers `not_found`.
+- A trial makes 500 writes, its community and membership included.
+  The next write is `trial_writes_full` (403), and writes nothing.
+  The writes counted are the trial's rows of `app_events`.
+- The backend removes a trial outright, with everything of theirs, a
+  day after it ends. Trials are web-only, so no device holds their rows.
+
+**`accounts/sign_in_from_trial`** (sample). A trial user's browser
+signs up, as `accounts::sign_in_from_trial` does.
+
+```json
+{"trial_id": "…", "email": "…", "locale": "en"}
+→ {"pending": "…", "mail": Mail | null}
+```
+
+- An address with a confirmed account gets that account's code. The
+  trial is left as it is.
+- Any other address is the trial signing up. The code goes to that
+  address, and the pending sign-in keeps it. The trial's made-up name
+  gives way to one from the address. `sign_in_with_code` answers
+  `new_account: true`, and `sign_in_confirm` gives the account the
+  address, confirms it, and ends the trial. It shows the trial's
+  communities to everyone, and forgets the trial's tokens. An
+  unconfirmed sign-up with the same address is deleted. A confirmed
+  one makes the last step `wrong_code`.
+- The address of another trial gets a pending that matches nothing.
+- `not_a_trial` (422) when the user is not a trial.
+
+**`accounts/preferences/get`** (sample). `{"user_id"} → Preferences`:
+`{"locale": "es" | null, "theme": "dark" | null}`. A row whose value no
+longer applies, a language since dropped say, reads as null.
+
+**`accounts/preferences/update`** (sample). Sets one key, as
+`accounts::preferences::update` does.
+
+```json
+{"user_id": "…", "key": "locale", "value": "es"}
+→ Preferences
+```
+
+- An event like any change a person makes, recorded in `app_events`.
+  The row is published to the user's devices, and nobody else's.
+- `value` is null, to follow the device, or one the key takes: a
+  language of `app::locales::SUPPORTED`, or a theme of
+  `helpers::themes::SUPPORTED`. Rust checks it first. Any other is
+  `invalid`, with the reason as the message.
+- A code's mail is in the language the account chose, else the one
+  asked for.
+
+Specified, not in the sample: the password operations,
+`accounts/deletions/*`, and the commerce and ops operations of
+`backend-seam.md` §2.
 
 ### Sync
 
@@ -228,8 +300,18 @@ The bodies are core's `PushRequest`, `PullRequest`, `BackfillRequest`,
   conflict, `{"yours": …, "server": …}`. The fields that merge apply.
 - An event of a table the backend does not serve is rejected
   `unknown_table`.
-- The sample serves `app_files` and `app_files_communities` here.
-  Joining and leaving go through `memberships/*`.
+- The sample serves `app_users`, `app_files`, `app_files_communities`
+  and `accounts_preferences` here. Joining and leaving go through
+  `memberships/*`.
+- A user's own row takes an update of its `name`, merged as any
+  update is. A create is `server_only`, a change to someone else's
+  row `not_yours`.
+- A preference follows `accounts::preferences::apply_in`: the last
+  write wins, with no conflicts. A create of a key the user already
+  has writes over that row, and the answer carries it, so the device
+  drops its own.
+- A trial's write past its limit ends the push with
+  `trial_writes_full`. The events before it stay applied.
 
 #### What the person must still be able to see
 

@@ -4,8 +4,9 @@ defmodule Core.Accounts do
   its confirm do. The backend never sends mail: it answers what to send,
   and Rust sends it.
   """
+  alias Core.Accounts.Preferences
   alias Core.App.{Communities, Users}
-  alias Core.Data.{AccountsTokens, AccountsUsers, AppSyncVersions, AppUsers}
+  alias Core.Data.{AccountsTokens, AccountsUsers, AppSyncVersions, AppUsers, TrialUsers}
   alias Core.Helpers.{Ids, Random, Time}
   alias Core.Repo
 
@@ -42,7 +43,7 @@ defmodule Core.Accounts do
               account =
                 AccountsUsers.create(%AccountsUsers{id: Ids.new(), email: email, inserted_at: now, updated_at: now})
 
-              Users.create_in(account.id, email)
+              Users.create_in(account.id, Users.name_from_email_in(email, account.id))
               code_sent(account.id, email, locale)
 
             nil ->
@@ -55,11 +56,49 @@ defmodule Core.Accounts do
     end
   end
 
-  defp code_sent(user_id, email, locale) do
+  @doc """
+  `sign_in/3` from a trial user's browser, as `accounts::sign_in_from_trial`
+  does. An address with a confirmed account gets a code for that
+  account, and the trial is left as it is. Any other address is the
+  trial user signing up: the code goes to it, and `sign_in_confirm`
+  gives their account that address. Their made-up name gives way at once
+  to one from the address.
+  """
+  def sign_in_from_trial(trial_id, email, locale) do
+    with {:ok, trial} <- live_account(trial_id),
+         %DateTime{} <- trial.trial_expires_at || {:error, :not_a_trial},
+         email when is_binary(email) <-
+           AccountsUsers.checked_email(email) || {:error, {:invalid, %{"email" => ["is not an email address"]}}} do
+      Repo.transaction(fn ->
+        case AccountsUsers.get_by_email(email) do
+          %AccountsUsers{trial_expires_at: %DateTime{}} ->
+            %{"pending" => Random.hex(32), "mail" => nil}
+
+          %AccountsUsers{confirmed_at: %DateTime{}} = taken ->
+            code_sent(taken.id, email, locale)
+
+          _ ->
+            AppSyncVersions.lock()
+            Users.update_name_in(trial.id, Users.name_from_email_in(email, trial.id))
+            code_sent(trial.id, email, locale, email)
+        end
+      end)
+    end
+  end
+
+  defp live_account(id) do
+    case Ids.cast(id) && AccountsUsers.get(id) do
+      %AccountsUsers{deleted_at: nil} = account -> {:ok, account}
+      _ -> {:error, :wrong_code}
+    end
+  end
+
+  defp code_sent(user_id, email, locale, sent_to \\ nil) do
     AccountsTokens.delete_of_user(user_id, AccountsTokens.context_sign_in_code())
     pending = Random.hex(32)
     code = Random.digits(6)
-    AccountsTokens.create(user_id, AccountsTokens.context_sign_in_code(), pending, code)
+    AccountsTokens.create(user_id, AccountsTokens.context_sign_in_code(), pending, code, sent_to)
+    locale = Preferences.mail_locale(user_id, locale)
     %{"pending" => pending, "mail" => %{"kind" => "sign_in_code", "to" => email, "locale" => locale, "code" => code}}
   end
 
@@ -79,8 +118,17 @@ defmodule Core.Accounts do
             AccountsTokens.delete(row)
             AccountsTokens.delete_of_user(row.user_id, AccountsTokens.context_sign_in_confirm())
             confirm_pending = Random.hex(32)
-            AccountsTokens.create(row.user_id, AccountsTokens.context_sign_in_confirm(), confirm_pending)
-            %{"pending" => confirm_pending, "new_account" => is_nil(AccountsUsers.get(row.user_id).confirmed_at)}
+
+            AccountsTokens.create(
+              row.user_id,
+              AccountsTokens.context_sign_in_confirm(),
+              confirm_pending,
+              nil,
+              row.sent_to
+            )
+
+            new_account = not is_nil(row.sent_to) or is_nil(AccountsUsers.get(row.user_id).confirmed_at)
+            %{"pending" => confirm_pending, "new_account" => new_account}
           end)
         else
           attempts = AccountsTokens.update_attempts(row)
@@ -97,7 +145,7 @@ defmodule Core.Accounts do
   def resend_code_to(pending) do
     case AccountsTokens.get_valid(pending || "", AccountsTokens.context_sign_in_code()) do
       nil -> {:error, :wrong_code}
-      row -> {:ok, %{"email" => AccountsUsers.get(row.user_id).email}}
+      row -> {:ok, %{"email" => row.sent_to || AccountsUsers.get(row.user_id).email}}
     end
   end
 
@@ -109,7 +157,8 @@ defmodule Core.Accounts do
 
       row ->
         code = AccountsTokens.update_code(row, Random.digits(6))
-        email = AccountsUsers.get(row.user_id).email
+        email = row.sent_to || AccountsUsers.get(row.user_id).email
+        locale = Preferences.mail_locale(row.user_id, locale)
         {:ok, %{"mail" => %{"kind" => "sign_in_code", "to" => email, "locale" => locale, "code" => code}}}
     end
   end
@@ -186,15 +235,40 @@ defmodule Core.Accounts do
     now = Time.now()
 
     account =
-      if account.confirmed_at do
-        account
-      else
-        AppSyncVersions.lock()
-        Communities.create_personal_in(row.user_id)
-        %{account | confirmed_at: now}
+      cond do
+        row.sent_to ->
+          trial_signed_up(account, row.sent_to, now)
+
+        account.confirmed_at ->
+          account
+
+        true ->
+          AppSyncVersions.lock()
+          Communities.create_in(row.user_id, Communities.personal_name())
+          %{account | confirmed_at: now}
       end
 
     AccountsUsers.update(%{account | terms_version: terms_version, terms_accepted_at: now, updated_at: now})
+  end
+
+  # A trial user's account as the person's own, once the code sent to
+  # their address matched: the address, confirmed, the trial over, their
+  # communities shown to everyone, and the trial's tokens forgotten for
+  # the one this sign-in ends in. A sign-up that never proved the same
+  # address gives way; a confirmed account with it does not.
+  defp trial_signed_up(account, email, now) do
+    if is_nil(account.trial_expires_at), do: Repo.rollback(:wrong_code)
+
+    case AccountsUsers.get_by_email(email) do
+      nil -> :ok
+      %AccountsUsers{confirmed_at: nil} = other -> AccountsUsers.delete_unconfirmed(other)
+      _confirmed -> Repo.rollback(:wrong_code)
+    end
+
+    AppSyncVersions.lock()
+    TrialUsers.touch_communities_of(account.id)
+    AccountsTokens.delete_of_user(account.id, AccountsTokens.context_api())
+    %{account | email: email, confirmed_at: now, trial_expires_at: nil}
   end
 
   @doc "Forgets a token."

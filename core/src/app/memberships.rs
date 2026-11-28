@@ -40,8 +40,6 @@ const UPDATE_FIELDS: &[&str] = &["deleted_at"];
 pub enum MembershipError {
     #[error("not a member of community {community_id}")]
     NotFound { community_id: Uuid },
-    #[error("community {id} not found")]
-    UnknownCommunity { id: Uuid },
     #[error("{0}")]
     Invalid(String),
     #[error("the change was refused: {0}")]
@@ -91,7 +89,10 @@ pub async fn create(
         return match backend.call("memberships/create", &request).await {
             Ok(membership) => Ok(membership),
             Err(error) if error.code() == Some("not_found") => {
-                Err(MembershipError::UnknownCommunity { id: community_id })
+                Err(MembershipError::Rejected("unknown_community".to_string()))
+            }
+            Err(error) if error.code() == Some("trial_writes_full") => {
+                Err(crate::sync::events::RecordError::TrialWritesFull.into())
             }
             Err(error) => Err(error.into()),
         };
@@ -118,6 +119,9 @@ pub async fn delete(
             Ok(_) => Ok(()),
             Err(error) if error.code() == Some("not_found") => {
                 Err(MembershipError::NotFound { community_id })
+            }
+            Err(error) if error.code() == Some("trial_writes_full") => {
+                Err(crate::sync::events::RecordError::TrialWritesFull.into())
             }
             Err(error) => Err(error.into()),
         };

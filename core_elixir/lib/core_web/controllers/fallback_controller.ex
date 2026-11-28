@@ -8,6 +8,12 @@ defmodule CoreWeb.FallbackController do
   def call(conn, {:error, :not_a_member}), do: error(conn, 403, "not_a_member", "not a member of the community")
   def call(conn, {:error, :not_found}), do: error(conn, 404, "not_found", "not found")
   def call(conn, {:error, :exists}), do: error(conn, 409, "exists", "it exists already")
+  def call(conn, {:error, :full}), do: error(conn, 503, "full", "Trials are full right now; sign up instead")
+  def call(conn, {:error, :not_a_trial}), do: error(conn, 422, "not_a_trial", "Only a trial signs up this way")
+
+  def call(conn, {:error, :trial_writes_full}),
+    do: error(conn, 403, "trial_writes_full", "This trial has reached its limit. Sign up to keep going.")
+
   def call(conn, {:error, :sign_in_expired}), do: error(conn, 422, "sign_in_expired", "the sign-in expired")
 
   def call(conn, {:error, :unknown_device_code}),

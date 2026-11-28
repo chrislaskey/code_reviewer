@@ -4,8 +4,9 @@ defmodule Core.Sync do
   answers it, see `docs/design/backend-protocol.md`: push, pull and
   backfill. Cursor and row versions are decimal strings on the wire.
   """
-  alias Core.App.{Files, FilesCommunities}
-  alias Core.Data.{AppFiles, AppFilesCommunities, AppSyncVersions, AppUsersCommunities}
+  alias Core.Accounts.Preferences
+  alias Core.App.{Files, FilesCommunities, Users}
+  alias Core.Data.{AccountsPreferences, AppFiles, AppUsers, AppFilesCommunities, AppSyncVersions, AppUsersCommunities}
   alias Core.Repo
   alias Core.Sync.{Answers, Tables}
 
@@ -21,20 +22,38 @@ defmodule Core.Sync do
     uploaded = MapSet.new(uploaded || [])
 
     answers =
-      for event <- events do
-        cond do
-          event["table"] == AppFiles.table() ->
-            Files.apply_event(actor_id, event, MapSet.member?(uploaded, event["id"]))
-
-          event["table"] == AppFilesCommunities.table() ->
-            FilesCommunities.apply_event(actor_id, event)
-
-          true ->
-            Answers.rejected(event["id"], "unknown_table")
+      Enum.reduce_while(events, [], fn event, answers ->
+        case apply_event(actor_id, event, MapSet.member?(uploaded, event["id"])) do
+          {:error, reason} -> {:halt, {:error, reason}}
+          answer -> {:cont, [answer | answers]}
         end
-      end
+      end)
 
-    {:ok, %{"events" => answers}}
+    case answers do
+      {:error, reason} -> {:error, reason}
+      answers -> {:ok, %{"events" => Enum.reverse(answers)}}
+    end
+  end
+
+  # A trial's write past its limit ends the push, as in the Rust server:
+  # the events before it stay applied
+  defp apply_event(actor_id, event, uploaded) do
+    cond do
+      event["table"] == AppFiles.table() ->
+        Files.apply_event(actor_id, event, uploaded)
+
+      event["table"] == AppFilesCommunities.table() ->
+        FilesCommunities.apply_event(actor_id, event)
+
+      event["table"] == AccountsPreferences.table() ->
+        with {:ok, answer} <- Preferences.apply_event(actor_id, event), do: answer
+
+      event["table"] == AppUsers.table() ->
+        with {:ok, answer} <- Users.apply_event(actor_id, event), do: answer
+
+      true ->
+        Answers.rejected(event["id"], "unknown_table")
+    end
   end
 
   @doc "Pulls a page of one snapshot of the committed feed."

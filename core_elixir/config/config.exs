@@ -22,7 +22,7 @@ config :commanded_ecto_projections, repo: Core.Repo
 config :core, Oban,
   repo: Core.Repo,
   queues: [maintenance: 1],
-  plugins: [{Oban.Plugins.Cron, crontab: [{"15 3 * * *", Core.Jobs.Purge}]}]
+  plugins: [{Oban.Plugins.Cron, crontab: [{"15 3 * * *", Core.Jobs.Purge}, {"5 * * * *", Core.Jobs.TrialUsersDelete}]}]
 
 config :core, CoreWeb.Endpoint,
   adapter: Bandit.PhoenixAdapter,

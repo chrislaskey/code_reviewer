@@ -33,7 +33,7 @@ const UPDATE_FIELDS: &[&str] = &["value"];
 
 /// A person's preferences as the pages read them, each its default
 /// when they made no choice.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, serde::Deserialize)]
 pub struct Preferences {
     /// The language chosen, or none to follow the device's.
     pub locale: Option<String>,
@@ -49,6 +49,11 @@ pub enum PreferenceError {
     Rejected(String),
     #[error(transparent)]
     Record(#[from] crate::sync::events::RecordError),
+    /// The remote backend failed, or answered what this error has no
+    /// variant for.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("{0}")]
     Json(#[from] serde_json::Error),
     #[error("database error: {0}")]
@@ -58,10 +63,10 @@ pub enum PreferenceError {
 /// The user's preferences. A row whose value no longer applies, a
 /// language since dropped say, reads as its default.
 pub async fn get(deployment: &Deployment, user: &User) -> Result<Preferences, PreferenceError> {
-    // A remote backend keeps no preferences yet: they are not in the
-    // sample, so the user has the defaults
-    if deployment.has_remote_backend() {
-        return Ok(Preferences::default());
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = json!({ "user_id": user.id });
+        return Ok(backend.call("accounts/preferences/get", &request).await?);
     }
     let mut tx = deployment.begin().await?;
     let preferences = get_in(&mut tx, user.id).await?;
@@ -122,6 +127,20 @@ pub async fn update(
     value: Value,
 ) -> Result<Preferences, PreferenceError> {
     accounts_preferences::checked_value(key, &value)?;
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = json!({ "user_id": user.id, "key": key, "value": value });
+        return match backend.call("accounts/preferences/update", &request).await {
+            Ok(preferences) => Ok(preferences),
+            Err(error) if error.code() == Some("invalid") => {
+                Err(PreferenceError::Rejected(error.to_string()))
+            }
+            Err(error) if error.code() == Some("trial_writes_full") => {
+                Err(crate::sync::events::RecordError::TrialWritesFull.into())
+            }
+            Err(error) => Err(error.into()),
+        };
+    }
     let mut tx = deployment.begin().await?;
     let event = match accounts_preferences::get_by_user_and_key(&mut tx, user.id, key).await? {
         Some(row) if row.value == value => {

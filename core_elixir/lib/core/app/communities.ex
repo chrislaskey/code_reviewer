@@ -1,7 +1,9 @@
 defmodule Core.App.Communities do
   @moduledoc "Communities: the ones a user sees, and the personal one a sign-up starts with."
+  alias Core.App.Memberships
   alias Core.Data.{AppCommunities, AppUsersCommunities}
   alias Core.Helpers.{Ids, Time}
+  alias Core.Sync.{Answers, Events}
 
   @personal_name "Personal"
 
@@ -19,28 +21,23 @@ defmodule Core.App.Communities do
     end
   end
 
-  @doc "Creates the user's personal community and their membership of it, published, in the caller's transaction."
-  def create_personal_in(user_id) do
+  @doc """
+  Creates a community with the name and the user's membership of it,
+  each published and recorded as the user's event, as
+  `communities::create_in` does. In the caller's transaction.
+  """
+  def create_in(user_id, name) do
     now = Time.now()
 
     community =
-      AppCommunities.create(%AppCommunities{
-        id: Ids.new(),
-        name: @personal_name,
-        inserted_at: now,
-        updated_at: now,
-        version: 1
-      })
+      AppCommunities.create(%AppCommunities{id: Ids.new(), name: name, inserted_at: now, updated_at: now, version: 1})
 
-    AppUsersCommunities.create(%AppUsersCommunities{
-      id: Ids.new(),
-      user_id: user_id,
-      community_id: community.id,
-      inserted_at: now,
-      updated_at: now,
-      version: 1
-    })
-
+    event = Events.create(AppCommunities.table(), community.id, %{"name" => name})
+    Events.record(user_id, event, Answers.applied(event["id"], community.version, %{}, nil))
+    Memberships.create_in(user_id, community.id)
     community
   end
+
+  @doc "The name of the community a sign-up starts with."
+  def personal_name, do: @personal_name
 end

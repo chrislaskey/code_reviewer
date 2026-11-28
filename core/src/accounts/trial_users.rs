@@ -69,8 +69,8 @@ pub enum TrialUserError {
     AccountUser(#[from] AccountUserError),
     #[error(transparent)]
     Community(#[from] CommunityError),
-    /// The remote backend failed, or does not have trials yet: the
-    /// sample answers `not_implemented`.
+    /// The remote backend failed, or has no trials: a backend without
+    /// them answers `not_implemented`.
     #[cfg(feature = "remote-backend")]
     #[error(transparent)]
     Backend(#[from] crate::services::backend::BackendError),

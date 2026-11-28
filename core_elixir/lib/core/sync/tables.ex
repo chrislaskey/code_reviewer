@@ -5,10 +5,10 @@ defmodule Core.Sync.Tables do
   context answers `list_synced_after/4`, `to_wire/1` and `table/0`; its
   parents and backfill rows are here.
   """
-  alias Core.Data.{AppCommunities, AppFiles, AppFilesCommunities, AppUsers, AppUsersCommunities}
+  alias Core.Data.{AccountsPreferences, AppCommunities, AppFiles, AppFilesCommunities, AppUsers, AppUsersCommunities}
 
   @doc "Every table, parents first."
-  def list, do: [AppUsers, AppCommunities, AppUsersCommunities, AppFiles, AppFilesCommunities]
+  def list, do: [AppUsers, AccountsPreferences, AppCommunities, AppUsersCommunities, AppFiles, AppFilesCommunities]
 
   @doc "The rows a row points at, which a pull sends before it, as `{table module, row}`."
   def parents(AppUsersCommunities, membership) do

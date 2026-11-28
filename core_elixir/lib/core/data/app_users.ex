@@ -7,6 +7,7 @@ defmodule Core.Data.AppUsers do
   alias Core.Repo
 
   @table "app_users"
+  @max_name_length 80
   @primary_key {:id, Ecto.UUID, autogenerate: false}
   schema @table do
     field :name, :string
@@ -15,6 +16,7 @@ defmodule Core.Data.AppUsers do
   end
 
   def table, do: @table
+  def max_name_length, do: @max_name_length
 
   @doc "The row as the wire carries it."
   def to_wire(user),
@@ -27,8 +29,17 @@ defmodule Core.Data.AppUsers do
   def list_by_ids([]), do: []
   def list_by_ids(ids), do: Repo.all(from u in __MODULE__, where: u.id in ^ids)
 
-  @doc "Inserts a new row and publishes it."
+  @doc "Whether a live user other than `except_id` has the name, in any case."
+  def exists_by_name?(name, except_id) do
+    Repo.exists?(
+      from u in __MODULE__,
+        where: fragment("lower(?) = lower(?)", u.name, ^name) and u.id != ^except_id and is_nil(u.deleted_at)
+    )
+  end
+
+  @doc "Inserts a new row, or writes over its stored one, and publishes it."
   def create(user), do: SyncedRow.write(user, @table)
+  def update(user), do: SyncedRow.write(user, @table)
 
   @doc "The rows the user sees with a version in the range: themselves, and every live member of a community they are a live member of."
   def list_synced_after(user_id, after_version, through, limit) do

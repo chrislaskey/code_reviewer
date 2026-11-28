@@ -156,6 +156,23 @@ pub(crate) async fn create_in(
 /// `docs/design/offline-sync.md`.
 pub async fn update(deployment: &Deployment, user: &User, name: &str) -> Result<User, UserError> {
     let name = app_users::checked_name(name)?;
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = json!({ "actor_id": user.id, "name": name });
+        return match backend.call("users/update", &request).await {
+            Ok(user) => Ok(user),
+            Err(error) if error.code() == Some("not_found") => {
+                Err(UserError::NotFound { id: user.id })
+            }
+            Err(error) if error.code() == Some("invalid") => {
+                Err(UserError::Rejected(error.to_string()))
+            }
+            Err(error) if error.code() == Some("trial_writes_full") => {
+                Err(crate::sync::events::RecordError::TrialWritesFull.into())
+            }
+            Err(error) => Err(error.into()),
+        };
+    }
     let mut tx = deployment.begin().await?;
     let current = get_live(&mut tx, user.id).await?;
     if current.name == name {
