@@ -20,8 +20,8 @@ Usage: $0 [TARGET...] [--fix]
 Targets, any number of them, all when none:
   rust           cargo fmt --all -- --check
                  cargo clippy --workspace --all-targets -- -D warnings
-                 cargo audit
-  svelte         pnpm check (svelte-check), in svelte/
+                 cargo audit, cargo-audit installed first when missing
+  svelte        pnpm check (svelte-check), in svelte/
   translations   pnpm translations:check, in svelte/: translations/default.pot
                  has every message the pages write, and each <locale>.po
                  translates them all, none fuzzy. Needs GNU gettext for --fix.
@@ -77,6 +77,14 @@ svelte_dependencies_install() {
   fi
 }
 
+# Under asdf, each Rust version needs it installed.
+cargo_audit_install() {
+  if ! cargo audit --version > /dev/null 2>&1; then
+    echo "==> cargo install cargo-audit --locked"
+    cargo install cargo-audit --locked || fail "cargo install cargo-audit failed"
+  fi
+}
+
 # Runs the command in core_elixir/, its dependencies fetched first.
 in_core_elixir() {
   (cd "$ROOT/core_elixir" && { [ -d deps ] || mix deps.get; } && "$@")
@@ -90,11 +98,8 @@ for target in "${targets[@]}"; do
       [ "$fix" = true ] && cargo fmt --all
       check cargo fmt --all -- --check
       check cargo clippy --workspace --all-targets -- -D warnings
-      if command -v cargo-audit > /dev/null; then
-        check cargo audit
-      else
-        failed+=("cargo audit: not installed, \`cargo install cargo-audit\`")
-      fi
+      cargo_audit_install
+      check cargo audit
       ;;
     svelte)
       svelte_dependencies_install
