@@ -1,7 +1,7 @@
 # The SHA-256 of each framework file as the template ships it, see
 # framework.toml. Written by `cargo run -p framework_check -- lock`.
-2dbfe875cc4f856aadf8810046ce239c000f270d4e18d0c028c31c00453052cc  FRAMEWORK_CHANGELOG.md
-dbded3dccbf128f2dafd95a761318f0338856fa9dae66173642d45db3fd63a23  axum/src/accounts.rs
+871868ec5be694df1c69b18fc58d63487c5c66d98cefe635b4c7f311fa2c799a  FRAMEWORK_CHANGELOG.md
+8519249972fe5e4ca952db7e02f2f9874dc98b3168d8d2c5a9972e3fa57d1df6  axum/src/accounts.rs
 dfdf353a942c730f3c0cea40c9e89a737bcf5fbf06960b91baab16578564a327  axum/src/accounts/app_store_notifications.rs
 4440725170bdb3eeda5a1257a241671c748cb8069a42809f37f289bacef91187  axum/src/accounts/checkouts.rs
 33f10afd7cadbd711cd4caac60c72cc5da0a309cb37526bb3cc3cc780ac7de80  axum/src/accounts/deletions.rs
@@ -108,7 +108,7 @@ e18fd480e854d31c518571e2d1dfeb4f1c7a78d31b835eca3b688d211cc46766  core/src/accou
 d2871c31fdef82d5d01aba55e0331298c6ec9d77f5c6ef831f9ee2968ab8e62b  core/src/accounts/stripe_reconcile.rs
 76ddc65c8b47c06d69a7b99cdde22ed53804028fc9e1eb08778217859ecf294d  core/src/accounts/subscriptions.rs
 4d012e6d91059df3a935ca5a75ba82ab9421bdd3361416a03e30320b94ead1b4  core/src/accounts/subscriptions/portal.rs
-925b87850789630f135bbc25b871498f0f7dfe8af079c0ab55c36ddd715b730b  core/src/accounts/trial_users.rs
+700007d2845ef68a9548303860117e1f743ff745d29d59dd7758ba22f73947a9  core/src/accounts/trial_users.rs
 c719a113f623ec3cff1937c6338fd8f445e02503acc460f251f95511cdcf4f94  core/src/accounts/users.rs
 cee866dd75649095e0f975e12c5e23af7e11c65a7743749f3ea373045306368c  core/src/app/avatars.rs
 9c7e31329b32f86fc05b3031e88be6a53119b6aabc526851e691fa01d74f12ff  core/src/app/avatars/uploads.rs

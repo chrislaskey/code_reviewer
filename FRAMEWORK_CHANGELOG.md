@@ -18,6 +18,17 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-27: is_trial asks the remote backend
+
+Commits: this one.
+
+- **What changed**. `accounts::trial_users::is_trial` answers by the
+  account the remote backend keeps, beside one, where it answered "no"
+  until now. Its error is `UserError`, not `sqlx::Error`.
+- **What an app does**.
+  - **Required**, for an app's own call of `is_trial`: convert the
+    `UserError` it answers.
+
 ## 2026-11-27: the purge no longer holds the feed lock while it deletes
 
 Commits: this one.

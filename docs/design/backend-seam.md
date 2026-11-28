@@ -349,8 +349,10 @@ next. How step 1 is built:
   mail it answers, in a language core has.
 - The current user's page reads the account by `accounts/users/get`.
   Its other reads are of areas the sample doesn't serve, so in remote
-  mode they answer nothing: not staff, no plan, no failed payment, the
-  default preferences, and no trial. Writes to those areas still fail.
+  mode they answer nothing: not staff, no plan, no failed payment, and
+  the default preferences. Writes to those areas still fail. Whether a
+  user is a trial is the account's `trial_expires_at`, from the backend,
+  so nothing changes in Rust when a backend has trials.
   An app whose backend serves one dispatches it instead.
 - Push, pull and backfill call the backend, in
   `core/src/sync/from_backend.rs`. Before a push, Rust checks the

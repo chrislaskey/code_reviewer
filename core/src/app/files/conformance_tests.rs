@@ -411,3 +411,12 @@ async fn conformance_the_last_step_records_the_terms_accepted(server: Deployment
     );
     assert!(account.terms_accepted_at.is_some());
 }
+
+conformance!(conformance_a_signed_up_user_is_not_a_trial);
+async fn conformance_a_signed_up_user_is_not_a_trial(server: Deployment) {
+    let alice = signed_up(&server).await;
+    let is_trial = accounts::trial_users::is_trial(&server, &alice.user)
+        .await
+        .expect("asked");
+    assert!(!is_trial);
+}
