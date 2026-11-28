@@ -18,6 +18,25 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-28: bin/dev on the tailnet only when turned on
+
+Commits: this one. It changes 2026-11-24's bcd10f1.
+
+- **What changed**.
+  - `bin/dev` runs `tailscale serve` only with `TAILSCALE_SERVE=true`,
+    from the environment or else from `.env`. Before, it ran whenever
+    Tailscale was installed and up, unless `TAILSCALE_SERVE=false`.
+  - When it's unset and Tailscale is up, `bin/dev` prints a line saying
+    how to turn it on. `false` leaves that line out.
+- **What an app does**.
+  - **Required**, for an app whose phone reaches the dev web server over
+    the tailnet: `TAILSCALE_SERVE=true` in `.env.example`, for new
+    checkouts, and in each checkout's `.env`. Without it, a phone can't
+    reach the web server.
+  - **Optional**: remove `TAILSCALE_SERVE=false` from `.env` and
+    `.env.example`. It's now the same as unset, except that it leaves out
+    the hint.
+
 ## 2026-11-27: pictures on a remote backend
 
 Commits: this one. `docs/design/backend-seam.md`, step 4.

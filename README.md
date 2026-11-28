@@ -681,9 +681,9 @@ Tauri targets compile in turn, since Cargo locks the workspace's build
 directory. It takes its ports from `PORT` when set (the server on `PORT`,
 the pages on `PORT + 1000`), so worktrees don't collide. Without `PORT`,
 when another program holds 4000 or 1420, it warns and uses 4010 and 5010
-instead. With the web server, when Tailscale is installed and up, it
-builds the pages and runs `tailscale serve`, which prints the server's
-address on the tailnet, for a phone; `TAILSCALE_SERVE=false` turns it off.
+instead. With `TAILSCALE_SERVE=true` in `.env` and Tailscale installed and
+up, it also builds the pages and runs `tailscale serve`, which prints the
+web server's address on the tailnet, for a phone. It's off by default.
 `bin/dev --help` has the rest. By hand:
 
 ```sh
