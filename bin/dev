@@ -135,9 +135,19 @@ if [ ${#targets[@]} -eq 0 ]; then
 fi
 
 starts_web=false
+starts_tauri=false
 for target in "${targets[@]}"; do
-  [ "$target" = web ] && starts_web=true
+  case "$target" in
+    web) starts_web=true ;;
+    *) starts_tauri=true ;;
+  esac
 done
+
+# Before anything starts. Under asdf, each Rust version needs it installed.
+if [ "$starts_tauri" = true ] && [ "$only_print_ports" = false ] &&
+  ! cargo tauri --version > /dev/null 2>&1; then
+  fail "the Tauri CLI is not installed; \`cargo install tauri-cli --version '^2' --locked\`"
+fi
 
 backend="$(read_setting BACKEND)"
 case "$backend" in
