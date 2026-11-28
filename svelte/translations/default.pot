@@ -576,7 +576,7 @@ msgid ""
 msgstr ""
 
 #: src/communities/components/CommunitiesForm.svelte:25
-#: src/profile/ProfileEditPage.svelte:129
+#: src/profile/ProfileEditPage.svelte:121
 #: src/sessions/SessionsNewPage.svelte:57
 msgid "Name"
 msgstr ""
@@ -1622,15 +1622,15 @@ msgstr[0] ""
 msgstr[1] ""
 
 #: src/lib/layouts/AccountMenu.svelte:67
-#: src/profile/ProfileEditPage.svelte:120
+#: src/profile/ProfileEditPage.svelte:112
 msgid "Profile"
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:121
+#: src/profile/ProfileEditPage.svelte:113
 msgid "This account is only on this device."
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:122
+#: src/profile/ProfileEditPage.svelte:114
 msgid ""
 "Nothing is backed up: if the device is lost or reset, or the app is "
 "removed, what you made is gone. Sign up or log in to keep it safe and use "
@@ -1639,28 +1639,28 @@ msgstr ""
 
 #: src/accounts/AccountsIndexPage.svelte:53
 #: src/lib/AccountsNeeded.svelte:16
-#: src/profile/ProfileEditPage.svelte:124
+#: src/profile/ProfileEditPage.svelte:116
 msgid "Sign up or log in"
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:132
+#: src/profile/ProfileEditPage.svelte:124
 msgid "Save name"
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:133
+#: src/profile/ProfileEditPage.svelte:125
 msgid "Language"
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:137
+#: src/profile/ProfileEditPage.svelte:129
 #, javascript-format
 msgid "Follow the system (${ systemLanguage })"
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:143
+#: src/profile/ProfileEditPage.svelte:135
 msgid "Picture"
 msgstr ""
 
-#: src/profile/ProfileEditPage.svelte:150
+#: src/profile/ProfileEditPage.svelte:142
 msgid "Save picture"
 msgstr ""
 
