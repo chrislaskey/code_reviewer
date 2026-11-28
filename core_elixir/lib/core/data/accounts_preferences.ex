@@ -78,6 +78,9 @@ defmodule Core.Data.AccountsPreferences do
     preference
   end
 
+  @doc "Deletes every row of the user outright, with their account: no device of anyone else's has one."
+  def delete_of_user(user_id), do: Repo.delete_all(from p in __MODULE__, where: p.user_id == ^user_id)
+
   @doc "The user's own rows with a version in the range: nobody else sees them."
   def list_synced_after(user_id, after_version, through, limit) do
     Repo.all(

@@ -1,6 +1,6 @@
 # The SHA-256 of each framework file as the template ships it, see
 # framework.toml. Written by `cargo run -p framework_check -- lock`.
-a28bf3fd1f933a0e95015f90aa1a56c3fd0bf9bda1dc3d76acdbae8295894838  FRAMEWORK_CHANGELOG.md
+e224c807841116616c08af7a681f4108637ff77bec7d93f611fc4fb6d8b81eef  FRAMEWORK_CHANGELOG.md
 8519249972fe5e4ca952db7e02f2f9874dc98b3168d8d2c5a9972e3fa57d1df6  axum/src/accounts.rs
 dfdf353a942c730f3c0cea40c9e89a737bcf5fbf06960b91baab16578564a327  axum/src/accounts/app_store_notifications.rs
 4440725170bdb3eeda5a1257a241671c748cb8069a42809f37f289bacef91187  axum/src/accounts/checkouts.rs
@@ -94,8 +94,8 @@ fbe351c2c85363c746594460a9bab2db5f812210ef23014179f8604a26976263  core/src/accou
 11193b351e57aca38261e1ecaa30f8e8ce4b36d8e5650533a9af8488b71441bc  core/src/accounts/app_store_notifications.rs
 84ee0566cb311320cd4805537ebd1c090df1668065356a65bed16d13ba54c522  core/src/accounts/app_store_reconcile.rs
 a33516f63acb9093bcd6525a7e5c3749599bf39c662a571d581f13e0f5b04900  core/src/accounts/checkouts.rs
-7e37f858cd48af4e82272cdfeed15adcc95615dd041e2cd84da024e1045d416f  core/src/accounts/deletions.rs
-4ebb7b9d1c84cea86a799683fde1100f7d9601cd388355b0c6f564e7c0189be3  core/src/accounts/deletions/code.rs
+4b0fcb5711163b16bd269ec09ff72428932529665031be3a448495eccc06ae79  core/src/accounts/deletions.rs
+d0885d014e4b7f1904723d968e4302879569c1a583ad38a06ba21347d371cf21  core/src/accounts/deletions/code.rs
 aa882210b2a14696aec1da2c3fb02fcb79601d557a63d84a5fc03aaf903ae80c  core/src/accounts/online.rs
 b0b4be557f00bc1ecbf207279d444edd3e750ed4c19f462cc02c26593e0d635b  core/src/accounts/password.rs
 bc82b526804dc8a18650519813db1a529a09e3627c2bfbba9f97bd85cfa49389  core/src/accounts/plans.rs

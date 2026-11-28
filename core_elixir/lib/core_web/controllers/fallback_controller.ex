@@ -9,6 +9,10 @@ defmodule CoreWeb.FallbackController do
   def call(conn, {:error, :not_found}), do: error(conn, 404, "not_found", "not found")
   def call(conn, {:error, :exists}), do: error(conn, 409, "exists", "it exists already")
   def call(conn, {:error, :full}), do: error(conn, 503, "full", "Trials are full right now; sign up instead")
+
+  def call(conn, {:error, :trial_has_no_code}),
+    do: error(conn, 422, "trial_has_no_code", "A trial is deleted without a code")
+
   def call(conn, {:error, :not_a_trial}), do: error(conn, 422, "not_a_trial", "Only a trial signs up this way")
 
   def call(conn, {:error, :trial_writes_full}),

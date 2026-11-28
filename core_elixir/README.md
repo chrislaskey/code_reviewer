@@ -78,6 +78,12 @@ device already saw.
   code is fixed. That is honest, never a silent skip, but one bad event
   takes the backend down. A time on a whole second did that, until
   `Time.from_wire` gave every time microsecond precision.
+- **A deleted account's files go after its rows.** Deleting an account
+  soft-deletes its communities in one transaction, then takes the files
+  out of them through their aggregates, since a command is never
+  dispatched inside a transaction. Until then the links stand in a
+  deleted community nobody is in, so nobody sees them. Rust does both
+  at once.
 - **A membership check can be stale by a moment.** A file decision
   reads memberships when the command is dispatched. A leave committed
   just before can be missed. The next pull prunes the link, which is
@@ -87,7 +93,7 @@ device already saw.
 
 - More of the conformance suite, `core/src/app/files/conformance_tests.rs`,
   which this backend passes: a test for each area added below.
-- Deletions, pictures, posts, community writes and
+- Pictures, posts, community writes and
   commerce. They answer `501 not_implemented`.
 - Splitting a Rust migration that someday holds a function or a `DO`
   block: `Core.Migrations.Statements` splits at every `;`.

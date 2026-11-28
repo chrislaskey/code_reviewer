@@ -18,6 +18,26 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-27: deleting an account on a remote backend
+
+Commits: this one. `docs/design/backend-seam.md`, step 4.
+
+- **What changed**.
+  - Beside a remote backend, `accounts::deletions::code::create` and
+    `accounts::deletions::create` call it,
+    `accounts/deletions/code/create` and `accounts/deletions/create`.
+    Rust sends the mail it answers and deletes the pictures. No Stripe
+    plan is ended there. `DeletionError` has a `Backend` variant, under
+    the `remote-backend` feature.
+  - `core_elixir/` serves them, and the conformance suite has three
+    more tests.
+- **What an app does**.
+  - **Required**, for an app that matches `DeletionError` exhaustively
+    with the `remote-backend` feature on: handle `Backend`.
+  - **Required**, for an app with its own remote backend: serve the
+    two operations, deleting the app's own rows of the user by each
+    table's rule, or deleting an account fails beside it.
+
 ## 2026-11-27: passwords on a remote backend
 
 Commits: this one. `docs/design/backend-seam.md`, step 4.

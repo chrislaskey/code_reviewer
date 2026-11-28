@@ -44,6 +44,10 @@ defmodule Core.Data.AppUsersCommunities do
   def list_live_of_user(user_id),
     do: Repo.all(from m in __MODULE__, where: m.user_id == ^user_id and is_nil(m.deleted_at))
 
+  @doc "Lists the community's live memberships."
+  def list_live_of_community(community_id),
+    do: Repo.all(from m in __MODULE__, where: m.community_id == ^community_id and is_nil(m.deleted_at))
+
   @doc "Inserts a new row, or writes over its stored one, and publishes it."
   def create(membership), do: SyncedRow.write(membership, @table)
   def update(membership), do: SyncedRow.write(membership, @table)

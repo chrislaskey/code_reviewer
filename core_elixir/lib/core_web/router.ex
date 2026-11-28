@@ -5,6 +5,7 @@ defmodule CoreWeb.Router do
     AccountsController,
     PreferencesController,
     CommunitiesController,
+    DeletionsController,
     FilesCommunitiesController,
     FilesController,
     MembershipsController,
@@ -41,6 +42,8 @@ defmodule CoreWeb.Router do
     post "/accounts/password/get", PasswordController, :get
     post "/accounts/password/update", PasswordController, :update
     post "/accounts/password/get_hash", PasswordController, :get_hash
+    post "/accounts/deletions/code/create", DeletionsController, :code_create
+    post "/accounts/deletions/create", DeletionsController, :create
     post "/accounts/preferences/get", PreferencesController, :get
     post "/accounts/preferences/update", PreferencesController, :update
 

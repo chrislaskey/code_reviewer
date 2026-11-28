@@ -311,7 +311,34 @@ same for a device, with a code it collects as after
 `sign_in_confirm_for_device`. An account that is no longer confirmed
 and full is `sign_in_expired`.
 
-Specified, not in the sample: `accounts/deletions/*`, and the commerce and ops operations of
+**`accounts/deletions/code/create`** (sample).
+`{"user_id", "locale"} → {"mail": Mail}`: a code that confirms deleting
+the account, ten minutes, in place of any earlier one. Rust mails it,
+kind `delete_code`. A trial is `trial_has_no_code` (422).
+
+**`accounts/deletions/create`** (sample). Deletes the account, as
+`accounts::deletions::create` does.
+
+```json
+{"user_id": "…", "code": "123456" | null, "locale": "en"}
+→ {"mail": {"kind": "account_deleted", …} | null}
+```
+
+- A full user needs the code. A wrong one is `wrong_code`, and counts:
+  the fifth deletes the code.
+- A trial needs none, and goes outright, as its expiry would remove it.
+  The answer has no mail.
+- Everything of the user's is soft-deleted as an event in their name,
+  so every device that pulled a row sees it go: each community nobody
+  else is in, with its memberships and the files' links in it, a file
+  with no link left deleted; their membership of every other one; and
+  their user, named `"Deleted user"`, with no picture.
+- Their preferences go outright, and their staff row. The account gets
+  `deleted_at`, so its tokens are answered `account_deleted`.
+- The mail is in the language the account chose, read before the
+  preferences go. Rust sends it, and deletes the pictures.
+
+Specified, not in the sample: and the commerce and ops operations of
 `backend-seam.md` §2.
 
 ### Sync

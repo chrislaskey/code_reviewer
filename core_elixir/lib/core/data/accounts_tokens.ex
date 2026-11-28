@@ -13,6 +13,7 @@ defmodule Core.Data.AccountsTokens do
   @context_sign_in_code "sign_in_code"
   @context_sign_in_confirm "sign_in_confirm"
   @context_device_code "device_code"
+  @context_delete_code "delete_code"
   @sign_in_code_validity_minutes 10
   @device_code_validity_minutes 5
 
@@ -31,6 +32,7 @@ defmodule Core.Data.AccountsTokens do
   def context_sign_in_code, do: @context_sign_in_code
   def context_sign_in_confirm, do: @context_sign_in_confirm
   def context_device_code, do: @context_device_code
+  def context_delete_code, do: @context_delete_code
 
   @doc """
   Inserts a token of the context for the user, by the token's hash, with
@@ -51,7 +53,8 @@ defmodule Core.Data.AccountsTokens do
 
   @doc """
   Gets the token of the context, by the token itself, or nil. A sign-in's
-  steps expire after ten minutes, a device code after five.
+  steps and a delete code expire after ten minutes, a device code after
+  five.
   """
   def get_valid(token, context) do
     row = Repo.one(from t in __MODULE__, where: t.token_hash == ^Sha256.hex(token) and t.context == ^context)
@@ -94,8 +97,9 @@ defmodule Core.Data.AccountsTokens do
   @doc "Deletes a row."
   def delete(row), do: Repo.delete!(row)
 
-  defp expired?(%{context: context} = row) when context in [@context_sign_in_code, @context_sign_in_confirm],
-    do: DateTime.diff(Time.now(), row.inserted_at, :minute) >= @sign_in_code_validity_minutes
+  defp expired?(%{context: context} = row)
+       when context in [@context_sign_in_code, @context_sign_in_confirm, @context_delete_code],
+       do: DateTime.diff(Time.now(), row.inserted_at, :minute) >= @sign_in_code_validity_minutes
 
   defp expired?(%{context: @context_device_code} = row),
     do: DateTime.diff(Time.now(), row.inserted_at, :minute) >= @device_code_validity_minutes

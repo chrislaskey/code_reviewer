@@ -62,6 +62,10 @@ defmodule Core.Data.AppFilesCommunities do
     )
   end
 
+  @doc "The live rows of the community."
+  def list_live_of_community(community_id),
+    do: Repo.all(from r in __MODULE__, where: r.community_id == ^community_id and is_nil(r.deleted_at))
+
   @doc "The live rows of the community with a version in the range, for a backfill."
   def list_live_of_community_after(community_id, after_version, through, limit) do
     Repo.all(

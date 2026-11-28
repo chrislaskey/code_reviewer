@@ -59,25 +59,30 @@ defmodule Core.App.Memberships do
     Repo.transaction(fn ->
       AppSyncVersions.lock()
 
-      case AppUsersCommunities.get_live(actor_id, community_id) do
-        nil ->
-          Repo.rollback(:not_found)
-
-        membership ->
-          now = Time.now()
-
-          event =
-            Events.update(AppUsersCommunities.table(), membership.id, membership.version, %{"deleted_at" => nil}, %{
-              "deleted_at" => Time.to_wire(now)
-            })
-
-          left =
-            AppUsersCommunities.update(%{SyncedRow.changed(membership, now) | deleted_at: now, deleted_by_id: actor_id})
-
-          recorded(actor_id, event, left)
-          %{}
-      end
+      delete_in(actor_id, community_id)
+      %{}
     end)
+  end
+
+  @doc "Leaves the community in the caller's transaction, which it rolls back with `:not_found` for one the actor is not in."
+  def delete_in(actor_id, community_id) do
+    case AppUsersCommunities.get_live(actor_id, community_id) do
+      nil ->
+        Repo.rollback(:not_found)
+
+      membership ->
+        now = Time.now()
+
+        event =
+          Events.update(AppUsersCommunities.table(), membership.id, membership.version, %{"deleted_at" => nil}, %{
+            "deleted_at" => Time.to_wire(now)
+          })
+
+        left =
+          AppUsersCommunities.update(%{SyncedRow.changed(membership, now) | deleted_at: now, deleted_by_id: actor_id})
+
+        recorded(actor_id, event, left)
+    end
   end
 
   defp recorded(actor_id, event, membership) do

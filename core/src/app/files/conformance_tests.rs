@@ -1,11 +1,11 @@
 //! The conformance suite of the backend protocol, see
 //! `docs/design/backend-seam.md`: what a device sees of sync, files,
-//! memberships, trials, preferences and passwords, set up only by what
-//! the protocol serves. It is the files example's, so it goes with it;
-//! an app adds a test for each resource its backend serves. Each test runs on the Rust
-//! backend with the other tests, and against a remote backend when asked,
-//! its device syncing through the server's own functions as the web
-//! server calls them:
+//! memberships, trials, preferences, passwords and deletions, set up
+//! only by what the protocol serves. It is the files example's, so it
+//! goes with it; an app adds a test for each resource its backend
+//! serves. Each test runs on the Rust backend with the other tests, and
+//! against a remote backend when asked, its device syncing through the
+//! server's own functions as the web server calls them:
 //!
 //! ```sh
 //! CONFORMANCE_BACKEND_URL=http://localhost:4100 \
@@ -753,4 +753,101 @@ async fn conformance_a_password_sign_in_refuses_every_way_alike(server: Deployme
     accounts::sign_in_with_password(&server, &alice.email, "another horse battery")
         .await
         .expect("the new one");
+}
+
+/// Asks for the code that confirms deleting the account, and answers it.
+async fn delete_code(server: &Deployment, session: &Session) -> String {
+    let mailer = Mailer::memory();
+    accounts::deletions::code::create(server, &mailer, &session.user, "en")
+        .await
+        .expect("a code");
+    let mail = mailer.last_sent_to(&session.email).expect("mailed");
+    mails::code_in(&mail).expect("a code")
+}
+
+conformance!(conformance_a_deleted_account_takes_its_community_and_leaves_the_rest);
+async fn conformance_a_deleted_account_takes_its_community_and_leaves_the_rest(server: Deployment) {
+    let alice = signed_up(&server).await;
+    let bob = signed_up(&server).await;
+    let alices = personal_community(&server, &alice).await;
+    let bobs = personal_community(&server, &bob).await;
+    memberships::create(&server, &alice.user, bobs)
+        .await
+        .expect("alice joins bob's");
+    let code = delete_code(&server, &alice).await;
+    let mailer = Mailer::memory();
+    accounts::deletions::create(&server, &mailer, &alice.user, Some(&code), "en")
+        .await
+        .expect("deleted");
+    let mail = mailer.last_sent_to(&alice.email).expect("told");
+    assert_eq!(
+        mail.subject,
+        mails::account_deleted("en", &alice.email).subject
+    );
+
+    let refused = users::get_by_token(&server, &alice.token).await;
+    assert!(
+        matches!(refused, Err(users::UserError::AccountDeleted)),
+        "{refused:?}"
+    );
+    let seen: Vec<Uuid> = communities::list(&server, &bob.user)
+        .await
+        .expect("bob's communities")
+        .into_iter()
+        .map(|listed| listed.community.id)
+        .collect();
+    assert!(!seen.contains(&alices), "alice's community went");
+    assert!(seen.contains(&bobs));
+
+    let (b, _folder) = files::tests::device_with_folder(&bob.user, &bob.token).await;
+    sync(&b, &server).await;
+    let members = memberships::list_mine(&b, &bob.user)
+        .await
+        .expect("bob's memberships");
+    assert_eq!(members.len(), 1);
+}
+
+conformance!(conformance_a_delete_needs_the_code_mailed);
+async fn conformance_a_delete_needs_the_code_mailed(server: Deployment) {
+    let alice = signed_up(&server).await;
+    let mailer = Mailer::memory();
+    let refused =
+        accounts::deletions::create(&server, &mailer, &alice.user, Some("123456"), "en").await;
+    assert!(
+        matches!(
+            refused,
+            Err(accounts::deletions::DeletionError::CodeDoesNotMatch)
+        ),
+        "{refused:?}"
+    );
+    let code = delete_code(&server, &alice).await;
+    let wrong = if code == "000000" { "111111" } else { "000000" };
+    let refused =
+        accounts::deletions::create(&server, &mailer, &alice.user, Some(wrong), "en").await;
+    assert!(matches!(
+        refused,
+        Err(accounts::deletions::DeletionError::CodeDoesNotMatch)
+    ));
+    users::get_by_token(&server, &alice.token)
+        .await
+        .expect("still there");
+    accounts::deletions::create(&server, &mailer, &alice.user, Some(&code), "en")
+        .await
+        .expect("deleted with the code");
+}
+
+conformance!(conformance_a_trial_is_deleted_without_a_code);
+async fn conformance_a_trial_is_deleted_without_a_code(server: Deployment) {
+    let guest = trial(&server).await;
+    let mailer = Mailer::memory();
+    let refused = accounts::deletions::code::create(&server, &mailer, &guest.user, "en").await;
+    assert!(matches!(
+        refused,
+        Err(accounts::deletions::DeletionError::TrialHasNoCode)
+    ));
+    accounts::deletions::create(&server, &mailer, &guest.user, None, "en")
+        .await
+        .expect("deleted");
+    assert!(mailer.sent().is_empty(), "nothing mailed");
+    assert!(users::get_by_token(&server, &guest.token).await.is_err());
 }

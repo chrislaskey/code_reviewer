@@ -64,6 +64,25 @@ defmodule Core.Data.TrialUsers do
     :ok
   end
 
+  @doc "Deletes outright the trial user, as `delete_expired_before/1` would later: a trial deleting itself."
+  def delete_one(user_id) do
+    trial = "SELECT id FROM accounts_users WHERE id = $1 AND trial_expires_at IS NOT NULL"
+    id = Ecto.UUID.dump!(user_id)
+
+    for statement <- [
+          "DELETE FROM app_events WHERE user_id IN (#{trial})",
+          "DELETE FROM accounts_preferences WHERE user_id IN (#{trial})",
+          "DELETE FROM app_communities WHERE id IN
+             (SELECT community_id FROM app_users_communities WHERE user_id IN (#{trial}))",
+          "DELETE FROM app_users WHERE id IN (#{trial})"
+        ] do
+      Repo.query!(statement, [id])
+    end
+
+    Repo.query!("DELETE FROM accounts_users WHERE id = $1 AND trial_expires_at IS NOT NULL", [id])
+    :ok
+  end
+
   @doc """
   Deletes outright the trial users whose trial ended before the time,
   with everything of theirs: their events and preferences, the

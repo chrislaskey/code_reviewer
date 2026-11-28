@@ -25,8 +25,9 @@ defmodule Core.Data.AppCommunities do
   def list_by_ids([]), do: []
   def list_by_ids(ids), do: Repo.all(from c in __MODULE__, where: c.id in ^ids, order_by: [c.name, c.id])
 
-  @doc "Inserts a new row and publishes it."
+  @doc "Inserts a new row, or writes over its stored one, and publishes it."
   def create(community), do: SyncedRow.write(community, @table)
+  def update(community), do: SyncedRow.write(community, @table)
 
   @doc "Lists the live communities the user sees, by name."
   def list_live(user_id) do

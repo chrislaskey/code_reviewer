@@ -159,6 +159,32 @@ defmodule Core.App.FilesCommunities do
   def server_row(nil), do: nil
   def server_row(row), do: Answers.table_row(AppFilesCommunities.table(), AppFilesCommunities.to_wire(row))
 
+  @doc """
+  Takes every file out of a community deleted at `deleted_at`, as
+  `files_communities::delete_with_community` does, each file with no
+  community left deleted by its aggregate. A command is not dispatched
+  inside a database transaction, so this runs after the community's
+  delete commits, as the actor who deleted it.
+  """
+  def delete_with_community(actor_id, community_id, deleted_at) do
+    for row <- AppFilesCommunities.list_live_of_community(community_id) do
+      event = %{
+        "id" => Ids.new(),
+        "table" => AppFilesCommunities.table(),
+        "type" => "update",
+        "row_id" => row.id,
+        "base_version" => row.version,
+        "base" => %{"deleted_at" => nil},
+        "changes" => %{"deleted_at" => Time.to_wire(deleted_at)},
+        "made_at" => Time.to_wire(Time.now())
+      }
+
+      remove(event, actor_id, row.file_id, community_id, deleted_at)
+    end
+
+    :ok
+  end
+
   # Axum's routes
 
   @doc "Puts a file the actor sees in a community they are in."

@@ -484,7 +484,12 @@ In order, each with conformance tests:
    own database. The backend keeps the hash it is given, and answers
    it for a sign-in. So a backend needs no Argon2 and no password
    rules, and a refusal takes the same work every way.
-4. Next: deletions, with the picture.
+4. **Deletions, built 2026-11-27**, with three conformance tests:
+   `accounts/deletions/code/create` and `accounts/deletions/create`.
+   The backend deletes the rows and answers the mail. Rust sends it and
+   deletes the pictures from the bucket. Beside a remote backend no
+   Stripe plan is ended, since the backend keeps no plans yet.
+5. Next: the picture, `avatar_url`.
 
 ### Open questions and smaller fixes
 

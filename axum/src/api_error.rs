@@ -386,6 +386,7 @@ impl From<DeletionError> for ApiError {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
             DeletionError::Mail(_) => StatusCode::SERVICE_UNAVAILABLE,
+            DeletionError::Backend(error) => return ApiError::from_backend(&error),
             DeletionError::NoAccount { .. } => StatusCode::NOT_FOUND,
             DeletionError::ServerOnly
             | DeletionError::Refused(_)
