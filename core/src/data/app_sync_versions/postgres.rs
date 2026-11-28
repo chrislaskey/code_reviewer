@@ -33,6 +33,17 @@ pub async fn lock(connection: &mut PgConnection) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
+pub async fn update_feed_id(
+    connection: &mut PgConnection,
+    feed_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE app_sync_versions SET feed_id = $1 WHERE id = 1")
+        .bind(feed_id)
+        .execute(connection)
+        .await?;
+    Ok(())
+}
+
 pub async fn update_floor(connection: &mut PgConnection, floor: i64) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE app_sync_versions SET minimum_global_sync_version = $1 WHERE id = 1")
         .bind(floor)

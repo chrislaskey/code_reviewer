@@ -56,6 +56,11 @@ pub(crate) async fn lock_for_role(tx: &mut Transaction, role: Role) -> Result<()
     Ok(())
 }
 
+/// Gives the feed a new id: every cursor of the old one resyncs.
+pub(crate) async fn update_feed_id(tx: &mut Transaction, feed_id: Uuid) -> Result<(), sqlx::Error> {
+    query!(tx, update_feed_id(feed_id))
+}
+
 /// Sets the lowest cursor a pull still answers.
 pub(crate) async fn update_floor(tx: &mut Transaction, floor: i64) -> Result<(), sqlx::Error> {
     query!(tx, update_floor(floor))

@@ -25,7 +25,7 @@
 //! `ops staff create <email>` makes that account staff,
 //! `accounts users create <email>` makes an account with a password,
 //! `password <email>` gives it a new one and `delete <email>` deletes it,
-//! and
+//! `sync feed renew` gives the sync feed a new id after a restore, and
 //! `accounts products sync` copies Stripe's catalog, see `command_line`.
 //!
 //! The routes mirror core: a handler sits at the path of the core module

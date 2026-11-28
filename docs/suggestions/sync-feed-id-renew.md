@@ -1,7 +1,8 @@
 # A command to renew the Rust server's feed id
 
-**Suggestion, 2026-11-27.** Found filling in the Elixir sample, which
-has `mix core.feed_id_renew`.
+**Built, 2026-11-27**: `sync::feed_id_renew` and `app_web sync feed renew`,
+with the restore step in the README's Fly.io section. Found filling in
+the Elixir sample, which has `mix core.feed_id_renew`.
 
 ## The gap
 

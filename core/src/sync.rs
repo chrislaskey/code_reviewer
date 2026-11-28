@@ -50,7 +50,7 @@ use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::data::device_settings::{self, DeviceSettingsError, WORK_OFFLINE};
 use crate::database::Transaction;
-use crate::deployment::{Deployment, now};
+use crate::deployment::{Deployment, Role, now};
 use crate::services::web_server::Transport;
 use bytes::BytesError;
 use events::{Answer, AnswerStatus};
@@ -287,6 +287,23 @@ fn database_rolled_back(mut error: &(dyn std::error::Error + 'static)) -> bool {
         };
         error = source;
     }
+}
+
+/// Gives the server's feed a new id, after its database is restored from
+/// a backup: the restored head may be below what devices saw, and the
+/// versions given out again would name other changes. Every device's
+/// cursor is then of another feed, so its next pull resyncs. Answers the
+/// new id. A remote backend renews its own.
+pub async fn feed_id_renew(deployment: &Deployment) -> Result<Uuid, SyncError> {
+    if deployment.role != Role::Server {
+        return Err(SyncError::NotServed("a device has no feed".to_string()));
+    }
+    let feed_id = Uuid::now_v7();
+    let mut tx = deployment.begin().await?;
+    app_sync_versions::lock(&mut tx).await?;
+    app_sync_versions::update_feed_id(&mut tx, feed_id).await?;
+    tx.commit().await?;
+    Ok(feed_id)
 }
 
 /// Pulls a page of a consistent snapshot of the server's committed feed.
@@ -2394,6 +2411,35 @@ pub(crate) mod tests {
             assert_eq!(report.rejected, 1, "sent again");
             assert_eq!(report.conflicts, 1, "and refused again");
             assert_eq!(bodies(&a, &alice).await, vec!["fine"]);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn sync_a_renewed_feed_id_resyncs_every_device_and_keeps_its_rows() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let (alice, token) = user_with_token(&server, "alice@example.com").await;
+            test_notes::create(&server, &alice, "roses", None)
+                .await
+                .expect("a note");
+            let a = device_of(&alice, &token).await;
+            sync(&a, &server).await;
+            let before = sync(&a, &server).await;
+            assert!(!before.resynced);
+
+            let renewed = feed_id_renew(&server).await.expect("renewed");
+            let mut tx = server.begin().await.expect("a transaction");
+            assert_eq!(
+                app_sync_versions::get(&mut tx).await.expect("the feed").id,
+                renewed
+            );
+            tx.commit().await.expect("committed");
+            let after = sync(&a, &server).await;
+            assert!(after.resynced);
+            assert_eq!(bodies(&a, &alice).await, vec!["roses"]);
+            assert!(!sync(&a, &server).await.resynced, "once");
+            assert!(feed_id_renew(&a).await.is_err(), "a device has no feed");
         })
         .await;
     }

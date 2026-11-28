@@ -473,9 +473,8 @@ a database. Sign-in from a trial waits with them.
   kept for the person, see `docs/suggestions/refused-creates.md`.
 - A token cache in remote mode, see
   `docs/suggestions/backend-token-cache.md`.
-- **The Rust server has no feed id renewal either.** Its feed id is made
-  once, by the migration. A restored backup of its database keeps it,
-  so a device could miss changes. It needs a command, as
+- **Done, 2026-11-27.** The Rust server renews its feed id with
+  `app_web sync feed renew`, after a restore, as `core_elixir` does with
   `mix core.feed_id_renew`, see `docs/suggestions/sync-feed-id-renew.md`.
 - Trials on a remote backend: `trial_users/*`, sign-in from a trial,
   and their expiry job.

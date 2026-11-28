@@ -78,7 +78,7 @@ keeps, see [offline sync](offline-sync.md):
   row, as the Rust server has, does that. So does one ordered projector.
 - The feed has an id, a UUID made when its database is made. A restored
   backup gets a new one, so every device resyncs: in the sample,
-  `mix core.feed_id_renew`.
+  `mix core.feed_id_renew`; on the Rust server, `app_web sync feed renew`.
 - The floor is the lowest cursor a pull still answers. Purging the
   change log moves it.
 

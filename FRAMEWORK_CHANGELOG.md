@@ -18,6 +18,20 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-27: app_web sync feed renew, after a restore
+
+Commits: this one.
+
+- **What changed**. `app_web sync feed renew`, and
+  `app_core::sync::feed_id_renew`, give the server's sync feed a new id.
+  Run it after restoring the database from a backup, before people sync
+  again: every device resyncs at its next pull. Without it a device can
+  miss changes, since the restored database may give out again versions
+  it already saw.
+- **What an app does**.
+  - **Optional**. Add the command to the app's restore steps, as the
+    README's Fly.io section does.
+
 ## 2026-11-27: device sign-in, resent codes and terms through a remote backend
 
 Commits: this one. Step 3 of `docs/design/backend-seam.md`.

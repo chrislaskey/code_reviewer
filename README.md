@@ -744,7 +744,11 @@ fly deploy --ha=false
 ```
 
 It runs one machine with the SQLite database on the `data` volume;
-`--ha=false` keeps it at one. `fly ssh console -C "app_web ops staff
+`--ha=false` keeps it at one. After restoring the database from a
+backup, a volume snapshot say, run `fly ssh console -C "app_web sync feed
+renew"` before people sync again: the feed gets a new id and every
+device resyncs, since the restored database may give out again versions
+a device already saw. `fly ssh console -C "app_web ops staff
 create <email>"` makes an account staff. Settings that aren't secret are
 in `fly.toml`'s `[env]`; secrets are set with `fly secrets set --stage`,
 which waits for the next deploy. A secret goes in before the setting that

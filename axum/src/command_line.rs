@@ -5,6 +5,7 @@ pub mod accounts_products;
 pub mod accounts_users;
 pub mod jobs;
 pub mod ops_staff;
+pub mod sync_feed;
 
 use app_core::deployment::Deployment;
 use app_core::services::stripe::Stripe;
@@ -21,10 +22,12 @@ pub async fn run(
         ["ops", "staff", rest @ ..] => ops_staff::run(deployment, rest).await,
         ["accounts", "products", rest @ ..] => accounts_products::run(deployment, stripe, rest).await,
         ["accounts", "users", rest @ ..] => accounts_users::run(deployment, rest).await,
+        ["sync", "feed", rest @ ..] => sync_feed::run(deployment, rest).await,
         _ => Err(
             "commands: jobs run, jobs run <name>, ops staff create <email>, ops staff delete <email>, \
              accounts products sync, accounts users create <email>, \
-             accounts users password <email>, accounts users delete <email>"
+             accounts users password <email>, accounts users delete <email>, \
+             sync feed renew"
                 .to_string(),
         ),
     }

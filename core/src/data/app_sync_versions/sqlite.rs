@@ -34,6 +34,17 @@ pub async fn lock(_connection: &mut SqliteConnection) -> Result<(), sqlx::Error>
     Ok(())
 }
 
+pub async fn update_feed_id(
+    connection: &mut SqliteConnection,
+    feed_id: uuid::Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE app_sync_versions SET feed_id = $1 WHERE id = 1")
+        .bind(feed_id.hyphenated())
+        .execute(connection)
+        .await?;
+    Ok(())
+}
+
 pub async fn update_floor(
     connection: &mut SqliteConnection,
     floor: i64,
