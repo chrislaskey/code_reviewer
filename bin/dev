@@ -265,9 +265,8 @@ if [ ! -f "$ROOT/.env" ] && [ -f "$ROOT/.env.example" ]; then
   echo "bin/dev: created .env from .env.example"
 fi
 
-if [ ! -d "$ROOT/svelte/node_modules" ]; then
-  (cd "$ROOT/svelte" && pnpm install)
-fi
+# An existing node_modules can be missing packages after switching branches.
+(cd "$ROOT/svelte" && pnpm install --frozen-lockfile)
 
 # The Svelte dev server, listening on every address so a simulator or a
 # phone on the network reaches it too, sending /api to the web server.
