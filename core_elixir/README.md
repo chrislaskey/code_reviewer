@@ -89,7 +89,7 @@ device already saw.
   which this backend passes: a test for each area added below.
 - Trials and sign-in from a trial, passwords, deletions, preferences,
   posts, community writes and commerce. They answer
-  `501 not_implemented`. Beside this backend the web server offers no
-  trials.
+  `501 not_implemented`. So the web's guest visit fails plainly, as
+  `/accounts/trial` shows.
 - Splitting a Rust migration that someday holds a function or a `DO`
   block: `Core.Migrations.Statements` splits at every `;`.

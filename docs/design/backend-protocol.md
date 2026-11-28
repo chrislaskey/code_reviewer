@@ -34,7 +34,7 @@ them `501 not_implemented`.
 | 401 | `unauthorized` (a wrong service token), `unknown_token` |
 | 403 | `not_a_member` |
 | 404 | `not_found` |
-| 409 | `exists` |
+| 409 | `exists`, `full` |
 | 410 | `account_deleted` |
 | 422 | `sign_in_expired`, `wrong_code`, `unknown_device_code` |
 | 501 | `not_implemented` |
@@ -192,11 +192,17 @@ mail.
 
 **`accounts/sign_out`** (sample). `{"token": "…"} → {}`. Forgets the token.
 
+**`trial_users/count`**. `{} → {"count": 3}`: how many trial users
+there are, for the cap. **`trial_users/create`**.
+`{"max": 100} → {"user": User, "email": "…", "token": "…"}`: a trial
+user and their token, as `accounts::trial_users::create` makes them, or
+`full` when `max` are there already. Rust checks a cap of 0 itself.
+Specified, not in the sample, which answers both `not_implemented`: the
+pages then show no guest visits, and `/accounts/trial` shows the error.
+
 Specified, not in the sample: `accounts/sign_in_from_trial`, the
-password operations, `accounts/deletions/*`, `trial_users/*`,
-`accounts/preferences/*`, and the commerce and ops operations of
-`backend-seam.md` §2. Beside a remote backend the web server offers no
-trials, so a trial sign-in never comes.
+password operations, `accounts/deletions/*`, `accounts/preferences/*`,
+and the commerce and ops operations of `backend-seam.md` §2.
 
 ### Sync
 

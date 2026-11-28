@@ -76,19 +76,6 @@ pub fn trust_proxy_headers() -> bool {
 pub struct TrialUsersMax(pub i64);
 
 impl TrialUsersMax {
-    /// `TRIAL_USERS_MAX`, or 0 beside a remote backend: trials are not in
-    /// its sample yet, see `docs/design/backend-seam.md`.
-    pub fn open_for(
-        deployment: &app_core::deployment::Deployment,
-    ) -> Result<TrialUsersMax, String> {
-        let max = TrialUsersMax::open()?;
-        if deployment.has_remote_backend() && max.0 > 0 {
-            tracing::info!("trials: off, the remote backend has none");
-            return Ok(TrialUsersMax(0));
-        }
-        Ok(max)
-    }
-
     /// `TRIAL_USERS_MAX`; unset, 0.
     pub fn open() -> Result<TrialUsersMax, String> {
         match env::var("TRIAL_USERS_MAX") {

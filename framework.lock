@@ -1,6 +1,6 @@
 # The SHA-256 of each framework file as the template ships it, see
 # framework.toml. Written by `cargo run -p framework_check -- lock`.
-69ccc4a99a7fdeb3e2f801db9c9e864dfccb962aa1288e8f0457d116f60633f7  FRAMEWORK_CHANGELOG.md
+6da46fc5a5beac0fb8d68c59a7978ff24578b7ed24e33648686bcd6741ff7324  FRAMEWORK_CHANGELOG.md
 dbded3dccbf128f2dafd95a761318f0338856fa9dae66173642d45db3fd63a23  axum/src/accounts.rs
 dfdf353a942c730f3c0cea40c9e89a737bcf5fbf06960b91baab16578564a327  axum/src/accounts/app_store_notifications.rs
 4440725170bdb3eeda5a1257a241671c748cb8069a42809f37f289bacef91187  axum/src/accounts/checkouts.rs
@@ -27,7 +27,7 @@ f56546f2061b255d94fd3cdcb602696a7fe9946fc1c34cbc4cc024baf10b6a3a  axum/src/app/m
 22894beca7f1047f31d4bda372a1ab0454ea814a24fd7681e3cf762289db386a  axum/src/command_line/jobs.rs
 d2f4be0b1d15e519c85bc6c8ab28797cd0a4f25778dcadf2bda3b25f1b4385f5  axum/src/command_line/ops_staff.rs
 e2c8f5fe22a91a3363bbc47d447b849d1d6dcdb1d2ecb51cc5b3cb91fb6cdc23  axum/src/command_line/sync_feed.rs
-7386d2208fd93a2663d383b65aaf3ce2cdd8c27bc7fb64c4433a75d043b6f4e3  axum/src/config.rs
+17b0022dc29b56e2039a7ae08e81d22fa2371f89a1acee447811687a9552cabd  axum/src/config.rs
 bea4adced2c2048e0967e8590cc2e12946c4858249780b2ea0ed0654015fa56b  axum/src/config/app_store.rs
 5bd3a951ed8245f792f9cecd85ca2ff640eb192e14d3b7156fd41c3f285d4668  axum/src/config/backend.rs
 d13b0ec9fdcad8447a0d38601c46f788ac9ae511b49e243e72f883f309763101  axum/src/config/database.rs
@@ -35,7 +35,7 @@ ce6453dabc5e8b6658958a21ac89b08686ed95d4aca5659b564285e843bda8d4  axum/src/confi
 b573d3685dd05d48d191ca969a0faaf32586abd8c92a2b4164e839c407304044  axum/src/config/storage.rs
 2ffe4e3f64063b42ccc1b19c859ef843969a90ad5e67b00472c4f366e41cb217  axum/src/config/stripe.rs
 2e899cead81f1f0a65c461a4d987e7eb9032a68789c7422c70f3bffd76e36083  axum/src/jobs.rs
-3bc624efb85c0ddcd80294c8440724fe3f42bb98c6871578c9ad56cf47a47a79  axum/src/main.rs
+d8758932092bb41b7a91e101e5467ff0eddeb9f8d56f83f1c23838af02c4f279  axum/src/main.rs
 204ec478f695afc0a92bdb912a627a4f047a8724645484140a2d3d1584d69630  axum/src/ops.rs
 7e5f4ec061d44e085e1d3bb54b8640de9ad07ce88803baa3941ca1237b25c481  axum/src/ops/current_staff.rs
 c2b47ab90975abfe1fc6735b90028f60605485b7ee8e30b6e7c66c1152f160a4  axum/src/public_pages.rs
@@ -108,7 +108,7 @@ e18fd480e854d31c518571e2d1dfeb4f1c7a78d31b835eca3b688d211cc46766  core/src/accou
 d2871c31fdef82d5d01aba55e0331298c6ec9d77f5c6ef831f9ee2968ab8e62b  core/src/accounts/stripe_reconcile.rs
 76ddc65c8b47c06d69a7b99cdde22ed53804028fc9e1eb08778217859ecf294d  core/src/accounts/subscriptions.rs
 4d012e6d91059df3a935ca5a75ba82ab9421bdd3361416a03e30320b94ead1b4  core/src/accounts/subscriptions/portal.rs
-d283b7b28a2c49dbd95c38e5e216ac0f20f3b15402660a27d11dc86718402ce8  core/src/accounts/trial_users.rs
+925b87850789630f135bbc25b871498f0f7dfe8af079c0ab55c36ddd715b730b  core/src/accounts/trial_users.rs
 c719a113f623ec3cff1937c6338fd8f445e02503acc460f251f95511cdcf4f94  core/src/accounts/users.rs
 cee866dd75649095e0f975e12c5e23af7e11c65a7743749f3ea373045306368c  core/src/app/avatars.rs
 9c7e31329b32f86fc05b3031e88be6a53119b6aabc526851e691fa01d74f12ff  core/src/app/avatars/uploads.rs

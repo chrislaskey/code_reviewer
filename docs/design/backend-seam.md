@@ -457,9 +457,12 @@ an app's own resources.
 - A restored backup gets a new feed id: `mix core.feed_id_renew`, or
   `Core.Migrations.feed_id_renew/0` in a release.
 
-Not built: trials. Beside a remote backend the web server offers none:
-`TRIAL_USERS_MAX` is 0 there, and a trial is refused before it touches
-a database. Sign-in from a trial waits with them.
+Not built: trials. `trial_users::count` and `create` call the backend,
+`trial_users/count` and `trial_users/create`, and the sample answers
+`not_implemented`, so it fails, plainly, until a backend has them: the
+sign-in page shows no guest visit, and `/accounts/trial` shows the
+error. Nothing in Rust waits to be removed. Sign-in from a trial waits
+with them.
 
 ### Open questions and smaller fixes
 

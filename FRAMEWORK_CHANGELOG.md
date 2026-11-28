@@ -42,10 +42,11 @@ Commits: this one. Step 3 of `docs/design/backend-seam.md`.
     accepted: `accounts::sign_in_confirm_for_device`,
     `sign_in_with_device_code`, `resend_code_to` and `resend_code` call
     it, and `sign_in_confirm` sends `TERMS_VERSION`.
-  - Beside a remote backend the web server offers no trials:
-    `TrialUsersMax::open_for` is 0 there. `trial_users::create` with a
-    cap of 0 is refused before it opens a transaction, on every
-    backend, and `GET /api/accounts/trial` counts nothing at a cap of 0.
+  - `trial_users::count` and `create` call the remote backend, which
+    the sample answers `not_implemented`, so a guest visit fails plainly
+    there until a backend has trials. `trial_users::create` with a cap
+    of 0 is refused before it opens a transaction, on every backend, and
+    `GET /api/accounts/trial` counts nothing at a cap of 0.
   - The conformance suite has three more tests, ten in all.
   - `core_elixir/` has `mix core.feed_id_renew`, for after a restore.
 - **What an app does**. Nothing.

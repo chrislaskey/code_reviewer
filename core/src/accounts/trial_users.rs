@@ -69,6 +69,11 @@ pub enum TrialUserError {
     AccountUser(#[from] AccountUserError),
     #[error(transparent)]
     Community(#[from] CommunityError),
+    /// The remote backend failed, or does not have trials yet: the
+    /// sample answers `not_implemented`.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -81,6 +86,8 @@ impl From<TrialUserError> for AccountError {
             TrialUserError::User(error) => error.into(),
             TrialUserError::AccountUser(error) => error.into(),
             TrialUserError::Community(error) => error.into(),
+            #[cfg(feature = "remote-backend")]
+            TrialUserError::Backend(error) => error.into(),
             TrialUserError::Database(error) => error.into(),
         }
     }
@@ -101,6 +108,15 @@ pub async fn create(deployment: &Deployment, max: i64) -> Result<Session, TrialU
     }
     if max <= 0 {
         return Err(TrialUserError::Full);
+    }
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = serde_json::json!({ "max": max });
+        return match backend.call("trial_users/create", &request).await {
+            Ok(session) => Ok(session),
+            Err(error) if error.code() == Some("full") => Err(TrialUserError::Full),
+            Err(error) => Err(error.into()),
+        };
     }
     let mut tx = deployment.begin().await?;
     crate::data::app_sync_versions::lock(&mut tx).await?;
@@ -125,6 +141,17 @@ pub async fn create(deployment: &Deployment, max: i64) -> Result<Session, TrialU
 
 /// How many trial users there are, for the cap.
 pub async fn count(deployment: &Deployment) -> Result<i64, TrialUserError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        #[derive(serde::Deserialize)]
+        struct Count {
+            count: i64,
+        }
+        let answer: Count = backend
+            .call("trial_users/count", &serde_json::json!({}))
+            .await?;
+        return Ok(answer.count);
+    }
     let mut tx = deployment.begin().await?;
     let count = trial_users::count(&mut tx).await?;
     tx.commit().await?;
