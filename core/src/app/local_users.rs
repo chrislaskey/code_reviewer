@@ -151,7 +151,7 @@ pub async fn create(
         inserted_at: now,
         updated_at: now,
         version: 0,
-        last_synced_at: None,
+        global_sync_version: None,
         deleted_at: None,
         deleted_by_id: None,
         avatar_url: None,
@@ -721,7 +721,7 @@ mod tests {
                 inserted_at: at(0),
                 updated_at: at(0),
                 version: 1,
-                last_synced_at: None,
+                global_sync_version: None,
                 deleted_at: None,
                 deleted_by_id: None,
             };
@@ -733,7 +733,7 @@ mod tests {
                 inserted_at: at(seconds),
                 updated_at: at(seconds),
                 version: 1,
-                last_synced_at: None,
+                global_sync_version: None,
                 deleted_at: left.then(|| at(seconds + 1)),
                 deleted_by_id: None,
             });

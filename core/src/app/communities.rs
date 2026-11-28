@@ -19,7 +19,6 @@ use uuid::Uuid;
 
 use crate::app::memberships::{self, MembershipError};
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
-use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::data::app_users_communities::Membership;
 use crate::database::Transaction;
@@ -27,8 +26,11 @@ use crate::deployment::{Deployment, Role, now};
 use crate::helpers::field_errors::FieldErrors;
 use crate::helpers::json;
 use crate::sync::TableRow;
+use crate::sync::VersionRange;
 use crate::sync::events::{self, Answer, AnswerStatus};
-use crate::sync::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
+use crate::sync::synced_table::{
+    CurrentFields, LocalCreate, SyncedTable, SyncedTableServer, TableError,
+};
 use crate::sync::tables;
 
 const CREATE_FIELDS: &[&str] = &["name"];
@@ -61,6 +63,11 @@ pub enum CommunityError {
     /// A synced table's own module failed.
     #[error(transparent)]
     Table(#[from] TableError),
+    /// The remote backend failed, or answered what this error has no
+    /// variant for.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -84,6 +91,11 @@ pub async fn list(
     deployment: &Deployment,
     user: &User,
 ) -> Result<Vec<CommunityAndMembership>, CommunityError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = json!({ "actor_id": user.id });
+        return Ok(backend.call("communities/list", &request).await?);
+    }
     let mut tx = deployment.begin().await?;
     let communities = app_communities::list(&mut tx, user.id).await?;
     let memberships =
@@ -242,10 +254,10 @@ pub(crate) async fn delete_row(tx: &mut Transaction, id: Uuid) -> Result<(), Com
 pub(crate) async fn list_synced_after(
     tx: &mut Transaction,
     user: &User,
-    after: &Cursor,
+    range: &VersionRange,
     limit: usize,
 ) -> Result<Vec<Community>, CommunityError> {
-    Ok(app_communities::replication::list_synced_after(tx, user.id, after, limit).await?)
+    Ok(app_communities::replication::list_synced_after(tx, user.id, range, limit).await?)
 }
 
 pub(crate) async fn list_by_ids(
@@ -322,6 +334,9 @@ pub(crate) async fn apply_in(
             community,
         });
     }
+    // A retry is answered above without waiting for the feed. Two at once
+    // both reach here, and the second fails on the event's id.
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
 
     let allowed = match event.kind {
         EventKind::Create => CREATE_FIELDS,
@@ -338,9 +353,9 @@ pub(crate) async fn apply_in(
             if let Some(existing) = get_in(tx, event.row_id).await? {
                 return rejected(event, "exists", Some(existing));
             }
-            let (version, last_synced_at) = match role {
-                Role::Server => (1, Some(now)),
-                Role::Device => (0, None),
+            let version = match role {
+                Role::Server => 1,
+                Role::Device => 0,
             };
             let blank = Community {
                 id: event.row_id,
@@ -348,7 +363,7 @@ pub(crate) async fn apply_in(
                 inserted_at: event.row_inserted_at(now),
                 updated_at: now,
                 version,
-                last_synced_at,
+                global_sync_version: None,
                 deleted_at: None,
                 deleted_by_id: None,
             };
@@ -359,16 +374,8 @@ pub(crate) async fn apply_in(
                 Ok(community) => community,
                 Err(error) => return rejected(event, format!("invalid: {error}"), None),
             };
-            app_communities::create(&mut *tx, &community).await?;
-            finish(
-                tx,
-                role,
-                user,
-                event,
-                Conflicts::new(),
-                community.into_row(),
-            )
-            .await
+            let community = app_communities::create(&mut *tx, role, community).await?;
+            finish(tx, role, user, event, Conflicts::new(), community).await
         }
         EventKind::Update => {
             let Some(community) = get_in(tx, event.row_id).await? else {
@@ -402,7 +409,6 @@ pub(crate) async fn apply_in(
             }
             if role == Role::Server {
                 updated.version += 1;
-                updated.last_synced_at = Some(now);
             }
             let updated = match AcceptedCommunity::new(updated) {
                 Ok(updated) => updated,
@@ -410,8 +416,7 @@ pub(crate) async fn apply_in(
                     return rejected(event, format!("invalid: {error}"), Some(community));
                 }
             };
-            app_communities::update(&mut *tx, &updated).await?;
-            let updated = updated.into_row();
+            let updated = app_communities::update(&mut *tx, role, updated).await?;
             if changes.contains_key("deleted_at") && updated.deleted_at.is_some() {
                 memberships::delete_with_community(tx, role, &updated).await?;
                 for table in tables::list().iter().rev() {
@@ -487,6 +492,10 @@ impl SyncedTable for Synced {
         TABLE
     }
 
+    fn server(&self) -> Option<&dyn SyncedTableServer> {
+        Some(self)
+    }
+
     fn owner_column(&self) -> Option<&'static str> {
         None
     }
@@ -499,28 +508,6 @@ impl SyncedTable for Synced {
         event: &Event,
     ) -> Result<Answer, TableError> {
         Ok(apply_in(tx, role, user, event).await?.answer)
-    }
-
-    async fn list_synced_after(
-        &self,
-        tx: &mut Transaction,
-        user: &User,
-        after: &Cursor,
-        limit: usize,
-    ) -> Result<Vec<TableRow>, TableError> {
-        let communities = list_synced_after(tx, user, after, limit).await?;
-        Ok(communities
-            .iter()
-            .map(table_row)
-            .collect::<Result<_, _>>()?)
-    }
-
-    async fn parents(
-        &self,
-        _tx: &mut Transaction,
-        _row: &TableRow,
-    ) -> Result<Vec<TableRow>, TableError> {
-        Ok(Vec::new())
     }
 
     async fn apply_server_row(
@@ -572,6 +559,31 @@ impl SyncedTable for Synced {
             version: community.version,
             fields: community.fields(UPDATE_FIELDS)?,
         }))
+    }
+}
+
+#[async_trait]
+impl SyncedTableServer for Synced {
+    async fn list_synced_after(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        range: &VersionRange,
+        limit: usize,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let communities = list_synced_after(tx, user, range, limit).await?;
+        Ok(communities
+            .iter()
+            .map(table_row)
+            .collect::<Result<_, _>>()?)
+    }
+
+    async fn parents(
+        &self,
+        _tx: &mut Transaction,
+        _row: &TableRow,
+    ) -> Result<Vec<TableRow>, TableError> {
+        Ok(Vec::new())
     }
 }
 

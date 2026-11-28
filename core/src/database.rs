@@ -24,6 +24,15 @@ pub enum Database {
     Sqlite(SqlitePool),
     #[cfg(feature = "postgres")]
     Postgres(sqlx::PgPool),
+    /// None: a web server whose remote backend owns the database, see
+    /// `services::backend`. Every transaction is refused, so what the
+    /// backend does not answer fails rather than reads another database.
+    None,
+}
+
+/// Why a transaction on `Database::None` is refused.
+fn no_database() -> sqlx::Error {
+    sqlx::Error::Configuration("this server's database belongs to its remote backend".into())
 }
 
 /// One transaction: what every core function runs in, so a row and the
@@ -65,6 +74,20 @@ impl Database {
             }
             #[cfg(feature = "postgres")]
             Database::Postgres(pool) => Transaction::Postgres(pool.begin().await?),
+            Database::None => return Err(no_database()),
+        })
+    }
+
+    /// Opens a read transaction with a single snapshot, including on PostgreSQL.
+    pub(crate) async fn begin_snapshot(&self) -> Result<Transaction, sqlx::Error> {
+        Ok(match self {
+            Database::Sqlite(pool) => Transaction::Sqlite(pool.begin().await?),
+            #[cfg(feature = "postgres")]
+            Database::Postgres(pool) => Transaction::Postgres(
+                pool.begin_with("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
+                    .await?,
+            ),
+            Database::None => return Err(no_database()),
         })
     }
 
@@ -75,6 +98,7 @@ impl Database {
             Database::Sqlite(pool) => pool.close().await,
             #[cfg(feature = "postgres")]
             Database::Postgres(pool) => pool.close().await,
+            Database::None => {}
         }
     }
 
@@ -185,6 +209,16 @@ where
     test(sqlite).await;
 
     #[cfg(feature = "postgres")]
+    with_test_postgres(test).await;
+}
+
+/// Runs against a fresh PostgreSQL schema when a test database is configured.
+#[cfg(all(test, feature = "postgres"))]
+pub(crate) async fn with_test_postgres<Test, Run>(test: Test)
+where
+    Test: FnOnce(Database) -> Run,
+    Run: Future<Output = ()>,
+{
     if let Ok(url) = std::env::var("TEST_POSTGRES_URL") {
         let schema = format!("test_{}", uuid::Uuid::now_v7().simple());
         let options = sqlx::postgres::PgConnectOptions::from_str(&url)

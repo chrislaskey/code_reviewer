@@ -11,6 +11,17 @@ use crate::deployment::{Deployment, Role};
 
 /// One account by its id, unless deleted.
 pub async fn get(deployment: &Deployment, id: Uuid) -> Result<AccountUser, AccountUserError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = serde_json::json!({ "user_id": id });
+        return match backend.call("accounts/users/get", &request).await {
+            Ok(account) => Ok(account),
+            Err(error) if error.code() == Some("not_found") => {
+                Err(AccountUserError::NotFound { id })
+            }
+            Err(error) => Err(error.into()),
+        };
+    }
     let mut tx = deployment.begin().await?;
     let account = accounts_users::get(&mut tx, id).await?;
     tx.commit().await?;

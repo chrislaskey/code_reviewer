@@ -35,10 +35,13 @@ pub async fn get(
     State(TrialUsersMax(max)): State<TrialUsersMax>,
     State(settings): State<Arc<SettingsDocument>>,
 ) -> Result<Json<TrialAvailable>, ApiError> {
+    if max == 0 || sign_up_enabled(&settings).is_err() {
+        return Ok(Json(TrialAvailable { available: false }));
+    }
     let count = trial_users::count(&deployment)
         .await
         .map_err(AccountError::from)?;
-    let available = sign_up_enabled(&settings).is_ok() && max > 0 && count < max;
+    let available = count < max;
     Ok(Json(TrialAvailable { available }))
 }
 

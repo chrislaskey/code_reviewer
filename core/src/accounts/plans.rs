@@ -46,6 +46,10 @@ pub async fn current(deployment: &Deployment, user: &User) -> Result<Option<Plan
     if deployment.role != Role::Server {
         return Err(PlanError::ServerOnly);
     }
+    // A remote backend sells nothing yet: commerce is not in the sample
+    if deployment.has_remote_backend() {
+        return Ok(None);
+    }
     let mut tx = deployment.begin().await?;
     let subscriptions = subscriptions::list_in(&mut tx, user.id).await?;
     let mut plan = None;
@@ -85,6 +89,9 @@ pub async fn payment_failed(
 ) -> Result<Option<Uuid>, PlanError> {
     if deployment.role != Role::Server {
         return Err(PlanError::ServerOnly);
+    }
+    if deployment.has_remote_backend() {
+        return Ok(None);
     }
     let mut tx = deployment.begin().await?;
     let subscriptions = subscriptions::list_in(&mut tx, user.id).await?;

@@ -7,9 +7,11 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::data::app_sync_state::Cursor;
+use crate::data::app_sync_changes;
 use crate::database::Transaction;
+use crate::deployment::Role;
 use crate::helpers::field_errors::FieldErrors;
+use crate::sync::VersionRange;
 
 pub const TABLE: &str = "app_communities";
 /// The longest name, in characters.
@@ -24,7 +26,8 @@ pub struct Community {
     pub inserted_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub version: i64,
-    pub last_synced_at: Option<DateTime<Utc>>,
+    #[serde(with = "crate::sync::version::optional")]
+    pub global_sync_version: Option<i64>,
     pub deleted_at: Option<DateTime<Utc>>,
     pub deleted_by_id: Option<Uuid>,
 }
@@ -97,20 +100,35 @@ pub async fn get(
     Ok(row)
 }
 
-/// Persists a row accepted by the resource workflow.
+/// Inserts a new row. On the server this publishes it: the row gets the
+/// next global sync version, recorded in `app_sync_changes` in this
+/// transaction. On a device the row keeps the version it has.
 pub(crate) async fn create(
     tx: &mut Transaction,
-    community: &AcceptedCommunity,
-) -> Result<(), sqlx::Error> {
-    query!(tx, insert(community.row()))
+    role: Role,
+    community: AcceptedCommunity,
+) -> Result<Community, sqlx::Error> {
+    let mut community = community.into_row();
+    community.global_sync_version =
+        app_sync_changes::stamp(tx, role, TABLE, community.id, community.global_sync_version)
+            .await?;
+    query!(tx, insert(&community))?;
+    Ok(community)
 }
 
-/// Persists a row accepted by the resource workflow.
+/// Writes the row over its stored one, a soft delete included, and
+/// publishes it on the server as `create` does.
 pub(crate) async fn update(
     tx: &mut Transaction,
-    community: &AcceptedCommunity,
-) -> Result<(), sqlx::Error> {
-    query!(tx, update(community.row()))
+    role: Role,
+    community: AcceptedCommunity,
+) -> Result<Community, sqlx::Error> {
+    let mut community = community.into_row();
+    community.global_sync_version =
+        app_sync_changes::stamp(tx, role, TABLE, community.id, community.global_sync_version)
+            .await?;
+    query!(tx, update(&community))?;
+    Ok(community)
 }
 
 /// Explicit replication access for internal resource workflows.
@@ -134,10 +152,10 @@ pub mod replication {
     pub async fn list_synced_after(
         tx: &mut Transaction,
         user_id: Uuid,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<Community>, sqlx::Error> {
-        query!(tx, list_synced_after(user_id, after, limit))
+        query!(tx, list_synced_after(user_id, range, limit))
     }
 
     /// Persists a row accepted by the resource workflow.

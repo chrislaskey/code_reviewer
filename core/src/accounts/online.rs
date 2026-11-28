@@ -316,7 +316,7 @@ mod tests {
     async fn online_plan_kept_is_none_until_asked() {
         crate::database::with_each_database(|database| async move {
             let deployment = Deployment::new(database, crate::deployment::Role::Device);
-            device_settings::upgrade(&deployment)
+            crate::device_settings::upgrade(&deployment)
                 .await
                 .expect("settings");
             assert_eq!(plan_kept(&deployment).await.expect("read"), None);

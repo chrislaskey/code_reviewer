@@ -48,7 +48,6 @@ use axum_extra::extract::cookie::Cookie;
 use serde::Deserialize;
 
 use app_core::accounts::{self, CodeMatched, CodeSent, Session};
-use app_core::app::users;
 use app_core::data::accounts_tokens::Context;
 use app_core::data::app_users::User;
 use app_core::deployment::Deployment;
@@ -182,9 +181,7 @@ async fn trial_user_of(deployment: &Deployment, jar: &CookieJar) -> Result<Optio
     let Some(user) = signed_in_user_of(deployment, jar).await? else {
         return Ok(None);
     };
-    let is_trial = app_core::accounts::trial_users::is_trial(deployment, &user)
-        .await
-        .map_err(users::UserError::from)?;
+    let is_trial = app_core::accounts::trial_users::is_trial(deployment, &user).await?;
     Ok(is_trial.then_some(user))
 }
 

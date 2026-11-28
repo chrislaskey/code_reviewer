@@ -23,14 +23,14 @@ use crate::app::{communities, users};
 use crate::data::app_communities::Community;
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
 use crate::data::app_sync_backfills;
-use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::json;
 use crate::sync::TableRow;
+use crate::sync::VersionRange;
 use crate::sync::events::{self, Answer, AnswerStatus};
-use crate::sync::synced_table::{LocalCreate, SyncedTable, TableError};
+use crate::sync::synced_table::{LocalCreate, SyncedTable, SyncedTableServer, TableError};
 use crate::sync::tables;
 
 const CREATE_FIELDS: &[&str] = &["user_id", "community_id", "role"];
@@ -40,8 +40,6 @@ const UPDATE_FIELDS: &[&str] = &["deleted_at"];
 pub enum MembershipError {
     #[error("not a member of community {community_id}")]
     NotFound { community_id: Uuid },
-    #[error("community {id} not found")]
-    UnknownCommunity { id: Uuid },
     #[error("{0}")]
     Invalid(String),
     #[error("the change was refused: {0}")]
@@ -51,6 +49,11 @@ pub enum MembershipError {
     /// A synced table's own module failed.
     #[error(transparent)]
     Table(#[from] TableError),
+    /// The remote backend failed, or answered what this error has no
+    /// variant for.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -80,6 +83,20 @@ pub async fn create(
     user: &User,
     community_id: Uuid,
 ) -> Result<Membership, MembershipError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = serde_json::json!({ "actor_id": user.id, "community_id": community_id });
+        return match backend.call("memberships/create", &request).await {
+            Ok(membership) => Ok(membership),
+            Err(error) if error.code() == Some("not_found") => {
+                Err(MembershipError::Rejected("unknown_community".to_string()))
+            }
+            Err(error) if error.code() == Some("trial_writes_full") => {
+                Err(crate::sync::events::RecordError::TrialWritesFull.into())
+            }
+            Err(error) => Err(error.into()),
+        };
+    }
     let mut tx = deployment.begin().await?;
     let membership = create_in(&mut tx, deployment.role, user, community_id).await?;
     tx.commit().await?;
@@ -92,6 +109,23 @@ pub async fn delete(
     user: &User,
     community_id: Uuid,
 ) -> Result<(), MembershipError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = serde_json::json!({ "actor_id": user.id, "community_id": community_id });
+        return match backend
+            .call::<_, serde_json::Value>("memberships/delete", &request)
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(error) if error.code() == Some("not_found") => {
+                Err(MembershipError::NotFound { community_id })
+            }
+            Err(error) if error.code() == Some("trial_writes_full") => {
+                Err(crate::sync::events::RecordError::TrialWritesFull.into())
+            }
+            Err(error) => Err(error.into()),
+        };
+    }
     let mut tx = deployment.begin().await?;
     delete_in(&mut tx, deployment.role, user, community_id).await?;
     tx.commit().await?;
@@ -208,10 +242,10 @@ pub(crate) async fn delete_row(tx: &mut Transaction, id: Uuid) -> Result<(), Mem
 pub(crate) async fn list_synced_after(
     tx: &mut Transaction,
     user: &User,
-    after: &Cursor,
+    range: &VersionRange,
     limit: usize,
 ) -> Result<Vec<Membership>, MembershipError> {
-    Ok(app_users_communities::replication::list_synced_after(tx, user.id, after, limit).await?)
+    Ok(app_users_communities::replication::list_synced_after(tx, user.id, range, limit).await?)
 }
 
 struct Applied {
@@ -251,6 +285,9 @@ async fn apply_in(
             membership,
         });
     }
+    // A retry is answered above without waiting for the feed. Two at once
+    // both reach here, and the second fails on the event's id.
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
 
     let allowed = match event.kind {
         EventKind::Create => CREATE_FIELDS,
@@ -293,9 +330,9 @@ async fn apply_in(
                         return rejected(event, "exists", Some(existing));
                     }
                     let now = now();
-                    let (version, last_synced_at) = match role {
-                        Role::Server => (1, Some(now)),
-                        Role::Device => (0, None),
+                    let version = match role {
+                        Role::Server => 1,
+                        Role::Device => 0,
                     };
                     let membership = Membership {
                         id: event.row_id,
@@ -305,12 +342,11 @@ async fn apply_in(
                         inserted_at: event.row_inserted_at(now),
                         updated_at: now,
                         version,
-                        last_synced_at,
+                        global_sync_version: None,
                         deleted_at: None,
                         deleted_by_id: None,
                     };
-                    app_users_communities::create(&mut *tx, &membership).await?;
-                    membership
+                    app_users_communities::create(&mut *tx, role, membership).await?
                 }
             }
         }
@@ -443,9 +479,8 @@ async fn write_changed(
     membership.updated_at = now;
     if role == Role::Server {
         membership.version += 1;
-        membership.last_synced_at = Some(now);
     }
-    app_users_communities::update(&mut *tx, membership).await?;
+    *membership = app_users_communities::update(&mut *tx, role, membership.clone()).await?;
     Ok(())
 }
 
@@ -473,8 +508,19 @@ pub struct Synced;
 
 #[async_trait]
 impl SyncedTable for Synced {
+    fn foreign_keys(&self) -> &'static [(&'static str, &'static str)] {
+        &[
+            ("user_id", "app_users"),
+            ("community_id", "app_communities"),
+        ]
+    }
+
     fn table(&self) -> &'static str {
         TABLE
+    }
+
+    fn server(&self) -> Option<&dyn SyncedTableServer> {
+        Some(self)
     }
 
     fn owner_column(&self) -> Option<&'static str> {
@@ -491,36 +537,6 @@ impl SyncedTable for Synced {
         Ok(apply_in(tx, role, user, event).await?.answer)
     }
 
-    async fn list_synced_after(
-        &self,
-        tx: &mut Transaction,
-        user: &User,
-        after: &Cursor,
-        limit: usize,
-    ) -> Result<Vec<TableRow>, TableError> {
-        let memberships = list_synced_after(tx, user, after, limit).await?;
-        Ok(memberships
-            .iter()
-            .map(table_row)
-            .collect::<Result<_, _>>()?)
-    }
-
-    async fn parents(
-        &self,
-        tx: &mut Transaction,
-        row: &TableRow,
-    ) -> Result<Vec<TableRow>, TableError> {
-        let membership: Membership = serde_json::from_value(row.row.clone())?;
-        let mut parents = Vec::new();
-        if let Some(user) = users::get_in(tx, membership.user_id).await? {
-            parents.push(users::table_row(&user)?);
-        }
-        if let Some(community) = communities::get_in(tx, membership.community_id).await? {
-            parents.push(communities::table_row(&community)?);
-        }
-        Ok(parents)
-    }
-
     /// A live membership of the device's user that the device did not
     /// have, or had left, records the community to backfill.
     async fn apply_server_row(
@@ -532,9 +548,11 @@ impl SyncedTable for Synced {
         let incoming: Membership = serde_json::from_value(row.row.clone())?;
         let joined = incoming.user_id == user.id
             && incoming.deleted_at.is_none()
-            && get_in(tx, incoming.id)
-                .await?
-                .is_none_or(|had| had.deleted_at.is_some() || had.last_synced_at.is_none());
+            && get_in(tx, incoming.id).await?.is_none_or(|had| {
+                had.deleted_at.is_some()
+                    || had.global_sync_version.is_none()
+                    || incoming.version > had.version
+            });
         let written = apply_server_row(tx, &row.row).await?;
         if written && joined {
             app_sync_backfills::create(&mut *tx, incoming.community_id).await?;
@@ -567,6 +585,39 @@ impl SyncedTable for Synced {
                 })),
             })
             .collect())
+    }
+}
+
+#[async_trait]
+impl SyncedTableServer for Synced {
+    async fn list_synced_after(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        range: &VersionRange,
+        limit: usize,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let memberships = list_synced_after(tx, user, range, limit).await?;
+        Ok(memberships
+            .iter()
+            .map(table_row)
+            .collect::<Result<_, _>>()?)
+    }
+
+    async fn parents(
+        &self,
+        tx: &mut Transaction,
+        row: &TableRow,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let membership: Membership = serde_json::from_value(row.row.clone())?;
+        let mut parents = Vec::new();
+        if let Some(user) = users::get_in(tx, membership.user_id).await? {
+            parents.push(users::table_row(&user)?);
+        }
+        if let Some(community) = communities::get_in(tx, membership.community_id).await? {
+            parents.push(communities::table_row(&community)?);
+        }
+        Ok(parents)
     }
 }
 

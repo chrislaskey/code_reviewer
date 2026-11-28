@@ -50,6 +50,11 @@ pub struct Deployment {
     /// The App Store, on a server that sells in the iPhone app.
     #[cfg(feature = "app-store")]
     pub app_store: Option<crate::services::app_store::AppStore>,
+    /// The remote backend that owns the database, on a web server that
+    /// has one: the public functions it serves call it instead, see
+    /// `docs/design/backend-seam.md`. The database is then `None`.
+    #[cfg(feature = "remote-backend")]
+    pub remote_backend: Option<crate::services::backend::RemoteBackend>,
 }
 
 impl Deployment {
@@ -66,7 +71,30 @@ impl Deployment {
             stripe: None,
             #[cfg(feature = "app-store")]
             app_store: None,
+            #[cfg(feature = "remote-backend")]
+            remote_backend: None,
         }
+    }
+
+    /// A web server whose remote backend owns the database: it opens
+    /// none.
+    #[cfg(feature = "remote-backend")]
+    pub fn new_with_remote_backend(
+        remote_backend: crate::services::backend::RemoteBackend,
+    ) -> Deployment {
+        Deployment {
+            remote_backend: Some(remote_backend),
+            ..Deployment::new(Database::None, Role::Server)
+        }
+    }
+
+    /// Whether a remote backend owns the database, so only what it
+    /// serves is answered.
+    pub fn has_remote_backend(&self) -> bool {
+        #[cfg(feature = "remote-backend")]
+        return self.remote_backend.is_some();
+        #[cfg(not(feature = "remote-backend"))]
+        false
     }
 
     pub fn with_file_store(self, file_store: FileStore) -> Deployment {

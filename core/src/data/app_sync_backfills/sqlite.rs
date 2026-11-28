@@ -16,12 +16,18 @@ pub async fn insert_if_missing(
     Ok(())
 }
 
-pub async fn list(connection: &mut SqliteConnection) -> Result<Vec<Uuid>, sqlx::Error> {
-    let rows: Vec<(Hyphenated,)> =
-        sqlx::query_as("SELECT community_id FROM app_sync_backfills ORDER BY community_id")
-            .fetch_all(connection)
-            .await?;
-    Ok(rows.into_iter().map(|(id,)| id.into_uuid()).collect())
+pub async fn list(
+    connection: &mut SqliteConnection,
+) -> Result<Vec<(Uuid, Option<String>)>, sqlx::Error> {
+    let rows: Vec<(Hyphenated, Option<String>)> = sqlx::query_as(
+        "SELECT community_id, continuation FROM app_sync_backfills ORDER BY community_id",
+    )
+    .fetch_all(connection)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, continuation)| (id.into_uuid(), continuation))
+        .collect())
 }
 
 pub async fn delete(
@@ -30,6 +36,19 @@ pub async fn delete(
 ) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM app_sync_backfills WHERE community_id = $1")
         .bind(community_id.hyphenated())
+        .execute(connection)
+        .await?;
+    Ok(())
+}
+
+pub async fn update_continuation(
+    connection: &mut SqliteConnection,
+    community_id: Uuid,
+    continuation: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE app_sync_backfills SET continuation = $2 WHERE community_id = $1")
+        .bind(community_id.hyphenated())
+        .bind(continuation)
         .execute(connection)
         .await?;
     Ok(())

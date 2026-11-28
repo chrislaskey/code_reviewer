@@ -9,14 +9,14 @@ use uuid::Uuid;
 
 use crate::data::app_communities::Community;
 use crate::data::app_events::{Event, Fields};
-use crate::data::app_sync_state::{self, Cursor};
+use crate::data::app_sync_state;
 use crate::data::app_users::User;
 use crate::data::app_users_communities::Membership;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role};
-use crate::sync::TableRow;
 use crate::sync::bytes::SyncedBytes;
 use crate::sync::events::Answer;
+use crate::sync::{TableRow, VersionRange};
 
 /// The error of a table's own module, as the machinery passes it on.
 pub type TableError = Box<dyn std::error::Error + Send + Sync>;
@@ -51,6 +51,17 @@ pub trait SyncedTable: Send + Sync {
     /// move gives to the account; none when the row has no maker.
     fn owner_column(&self) -> Option<&'static str>;
 
+    /// Foreign keys from this table to other synced rows, as (column, table).
+    /// Resync and purge keep parents until their dependent rows can go.
+    fn foreign_keys(&self) -> &'static [(&'static str, &'static str)] {
+        &[]
+    }
+
+    /// The table's part in the Rust server's sync, or none for a table
+    /// the app's remote backend serves instead, see
+    /// `docs/design/backend-seam.md`.
+    fn server(&self) -> Option<&dyn SyncedTableServer>;
+
     /// Applies an event of the user's in the caller's transaction and
     /// answers it, recording it on the server or queueing it on a device.
     async fn apply_in(
@@ -74,23 +85,6 @@ pub trait SyncedTable: Send + Sync {
         tx.commit().await?;
         Ok(answer)
     }
-
-    /// A page of the rows the server wrote after the cursor that the
-    /// user sees, deleted or not.
-    async fn list_synced_after(
-        &self,
-        tx: &mut Transaction,
-        user: &User,
-        after: &Cursor,
-        limit: usize,
-    ) -> Result<Vec<TableRow>, TableError>;
-
-    /// The rows this one points at, which a pull sends before it.
-    async fn parents(
-        &self,
-        tx: &mut Transaction,
-        row: &TableRow,
-    ) -> Result<Vec<TableRow>, TableError>;
 
     /// Writes the server's row over the device's, unless an event of the
     /// device's for it is still pending; true when it was written.
@@ -126,18 +120,6 @@ pub trait SyncedTable: Send + Sync {
         _id: Uuid,
     ) -> Result<Option<CurrentFields>, TableError> {
         Ok(None)
-    }
-
-    /// The live rows in a community after the cursor, for a device that
-    /// just joined it; none for a table not in communities.
-    async fn list_live_in_community_after(
-        &self,
-        _tx: &mut Transaction,
-        _community_id: Uuid,
-        _after: &Cursor,
-        _limit: usize,
-    ) -> Result<Vec<TableRow>, TableError> {
-        Ok(Vec::new())
     }
 
     /// Moves the device's rows from one community to another, through the
@@ -209,13 +191,14 @@ pub trait SyncedTable: Send + Sync {
     }
 
     /// Drops the device's rows for a resync from nothing, but those an
-    /// event still pending is about, which the next push answers.
+    /// event still pending is about, which the next push answers, and
+    /// those whose create was refused, kept for the person.
     async fn delete_for_resync(
         &self,
         tx: &mut Transaction,
         _user: &User,
     ) -> Result<(), TableError> {
-        Ok(app_sync_state::maintenance::delete_not_pending(tx, self.table()).await?)
+        Ok(app_sync_state::maintenance::delete_not_pending_or_refused(tx, self.table()).await?)
     }
 
     /// What the rows carry beside their fields, a file's bytes say, see
@@ -228,5 +211,40 @@ pub trait SyncedTable: Send + Sync {
     /// question asked before a move.
     fn counted_before_a_move(&self) -> bool {
         false
+    }
+}
+
+/// A synced table's part in the Rust server's sync: the pages a pull and a
+/// backfill answer, and the parents sent before a row. A table whose
+/// server is a remote backend needs none of it.
+#[async_trait]
+pub trait SyncedTableServer: Send + Sync {
+    /// A page of the rows the server wrote after the cursor that the
+    /// user sees, deleted or not.
+    async fn list_synced_after(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        range: &VersionRange,
+        limit: usize,
+    ) -> Result<Vec<TableRow>, TableError>;
+
+    /// The rows this one points at, which a pull sends before it.
+    async fn parents(
+        &self,
+        tx: &mut Transaction,
+        row: &TableRow,
+    ) -> Result<Vec<TableRow>, TableError>;
+
+    /// The live rows in a community after the cursor, for a device that
+    /// just joined it; none for a table not in communities.
+    async fn list_live_in_community_after(
+        &self,
+        _tx: &mut Transaction,
+        _community_id: Uuid,
+        _range: &VersionRange,
+        _limit: usize,
+    ) -> Result<Vec<TableRow>, TableError> {
+        Ok(Vec::new())
     }
 }

@@ -7,12 +7,12 @@
 //! answered, with the conflicts the person has not resolved; its records
 //! are `data::app_events`.
 //!
-//! An event in the queue is tried by every sync, but not for ever: each
-//! time the server or the bucket says no to it and it stays pending
-//! counts, `count_attempt`, and at `MAX_ATTEMPTS` it is refused, kept
-//! as a conflict with the reason until the person tries it again or
-//! lets it go. Not reaching the server counts nothing, and neither does
-//! a server or a bucket that is failing, so an outage of any length
+//! A rejection is final: the event is refused at once, kept as a
+//! conflict with the reason until the person resolves it. A file waiting
+//! for its bytes is the exception: each time the server or the bucket
+//! says no to it counts, `count_attempt`, and at `MAX_ATTEMPTS` it is
+//! refused. Not reaching the server counts nothing, and neither does a
+//! server or a bucket that is failing, so an outage of any length
 //! refuses nothing.
 
 use crate::data::app_events::{
@@ -103,7 +103,7 @@ impl StoredEvent {
 }
 
 /// Merges an event's `changes` into a row's `current` values at
-/// `version`, field by field. At the server's version every change
+/// `version`, field by field. At the server's version each changed value
 /// applies. Behind it, a field the row already holds the device's value
 /// for is skipped; a field still at the device's `base` value applies,
 /// since nobody else changed it; any other field was changed by someone
@@ -116,7 +116,12 @@ pub fn merge(
     changes: &Fields,
 ) -> (Fields, Conflicts) {
     if base_version == version {
-        return (changes.clone(), Conflicts::new());
+        let applied = changes
+            .iter()
+            .filter(|(field, value)| current.get(*field) != Some(*value))
+            .map(|(field, value)| (field.clone(), value.clone()))
+            .collect();
+        return (applied, Conflicts::new());
     }
     let mut applied = Fields::new();
     let mut conflicts = Conflicts::new();

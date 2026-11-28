@@ -7,7 +7,7 @@ use uuid::Uuid;
 use uuid::fmt::Hyphenated;
 
 use super::Note;
-use crate::data::app_sync_state::Cursor;
+use crate::sync::VersionRange;
 
 #[derive(FromRow)]
 struct NoteRow {
@@ -18,7 +18,7 @@ struct NoteRow {
     inserted_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
     version: i64,
-    last_synced_at: Option<DateTime<Utc>>,
+    global_sync_version: Option<i64>,
     deleted_at: Option<DateTime<Utc>>,
     deleted_by_id: Option<Hyphenated>,
 }
@@ -33,7 +33,7 @@ impl From<NoteRow> for Note {
             inserted_at: row.inserted_at,
             updated_at: row.updated_at,
             version: row.version,
-            last_synced_at: row.last_synced_at,
+            global_sync_version: row.global_sync_version,
             deleted_at: row.deleted_at,
             deleted_by_id: row.deleted_by_id.map(Hyphenated::into_uuid),
         }
@@ -43,7 +43,7 @@ impl From<NoteRow> for Note {
 macro_rules! select {
     ($($rest:expr),+ $(,)?) => {
         concat!(
-            "SELECT id, user_id, community_id, body, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id FROM app_test_notes ",
+            "SELECT id, user_id, community_id, body, inserted_at, updated_at, version, global_sync_version, deleted_at, deleted_by_id FROM app_test_notes ",
             $($rest),+
         )
     };
@@ -133,16 +133,16 @@ pub async fn list_of_user_in_community_deleted_at(
 pub async fn list_live_in_community_after(
     connection: &mut SqliteConnection,
     community_id: Uuid,
-    after: &Cursor,
+    range: &VersionRange,
     limit: usize,
 ) -> Result<Vec<Note>, sqlx::Error> {
     let rows: Vec<NoteRow> = sqlx::query_as(select!(
-        "WHERE deleted_at IS NULL AND community_id = $1 AND last_synced_at IS NOT NULL
-           AND (last_synced_at, id) > ($2, $3) ORDER BY last_synced_at, id LIMIT $4"
+        "WHERE deleted_at IS NULL AND community_id = $1
+           AND global_sync_version > $2 AND global_sync_version <= $3 ORDER BY global_sync_version LIMIT $4"
     ))
     .bind(community_id.hyphenated())
-    .bind(after.last_synced_at)
-    .bind(after.id.hyphenated())
+    .bind(range.after)
+    .bind(range.through)
     .bind(i64::try_from(limit).unwrap_or(i64::MAX))
     .fetch_all(connection)
     .await?;
@@ -152,17 +152,17 @@ pub async fn list_live_in_community_after(
 pub async fn list_synced_after(
     connection: &mut SqliteConnection,
     user_id: Uuid,
-    after: &Cursor,
+    range: &VersionRange,
     limit: usize,
 ) -> Result<Vec<Note>, sqlx::Error> {
     let rows: Vec<NoteRow> = sqlx::query_as(select!(
-        "WHERE last_synced_at IS NOT NULL AND (last_synced_at, id) > ($2, $3) AND ",
+        "WHERE global_sync_version > $2 AND global_sync_version <= $3 AND ",
         visible_to!(),
-        " ORDER BY last_synced_at, id LIMIT $4"
+        " ORDER BY global_sync_version LIMIT $4"
     ))
     .bind(user_id.hyphenated())
-    .bind(after.last_synced_at)
-    .bind(after.id.hyphenated())
+    .bind(range.after)
+    .bind(range.through)
     .bind(i64::try_from(limit).unwrap_or(i64::MAX))
     .fetch_all(connection)
     .await?;
@@ -200,12 +200,12 @@ pub async fn update(connection: &mut SqliteConnection, note: &Note) -> Result<()
 
 pub async fn upsert(connection: &mut SqliteConnection, note: &Note) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO app_test_notes (id, user_id, community_id, body, inserted_at, updated_at, version, last_synced_at, deleted_at, deleted_by_id)
+        "INSERT INTO app_test_notes (id, user_id, community_id, body, inserted_at, updated_at, version, global_sync_version, deleted_at, deleted_by_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          ON CONFLICT (id) DO UPDATE SET
            user_id = excluded.user_id, community_id = excluded.community_id, body = excluded.body,
            inserted_at = excluded.inserted_at, updated_at = excluded.updated_at, version = excluded.version,
-           last_synced_at = excluded.last_synced_at, deleted_at = excluded.deleted_at,
+           global_sync_version = excluded.global_sync_version, deleted_at = excluded.deleted_at,
            deleted_by_id = excluded.deleted_by_id",
     )
     .bind(note.id.hyphenated())
@@ -215,7 +215,7 @@ pub async fn upsert(connection: &mut SqliteConnection, note: &Note) -> Result<()
     .bind(note.inserted_at)
     .bind(note.updated_at)
     .bind(note.version)
-    .bind(note.last_synced_at)
+    .bind(note.global_sync_version)
     .bind(note.deleted_at)
     .bind(note.deleted_by_id.map(Uuid::hyphenated))
     .execute(connection)

@@ -10,9 +10,11 @@ use serde_json::Value;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::data::app_sync_state::Cursor;
+use crate::data::app_sync_changes;
 use crate::database::Transaction;
+use crate::deployment::Role;
 use crate::helpers::{locales, themes};
+use crate::sync::VersionRange;
 
 pub const TABLE: &str = "accounts_preferences";
 
@@ -38,7 +40,8 @@ pub struct Preference {
     pub inserted_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub version: i64,
-    pub last_synced_at: Option<DateTime<Utc>>,
+    #[serde(with = "crate::sync::version::optional")]
+    pub global_sync_version: Option<i64>,
     pub deleted_at: Option<DateTime<Utc>>,
     pub deleted_by_id: Option<Uuid>,
 }
@@ -126,20 +129,45 @@ pub async fn get_by_user_and_key(
     query!(tx, get_by_user_and_key(user_id, key))
 }
 
-/// Persists a row accepted by the resource workflow.
+/// Inserts a new row. On the server this publishes it: the row gets the
+/// next global sync version, recorded in `app_sync_changes` in this
+/// transaction. On a device the row keeps the version it has.
 pub(crate) async fn create(
     tx: &mut Transaction,
-    preference: &AcceptedPreference,
-) -> Result<(), sqlx::Error> {
-    query!(tx, insert(preference.row()))
+    role: Role,
+    preference: AcceptedPreference,
+) -> Result<Preference, sqlx::Error> {
+    let mut preference = preference.into_row();
+    preference.global_sync_version = app_sync_changes::stamp(
+        tx,
+        role,
+        TABLE,
+        preference.id,
+        preference.global_sync_version,
+    )
+    .await?;
+    query!(tx, insert(&preference))?;
+    Ok(preference)
 }
 
-/// Persists a row accepted by the resource workflow.
+/// Writes the row over its stored one, a soft delete included, and
+/// publishes it on the server as `create` does.
 pub(crate) async fn update(
     tx: &mut Transaction,
-    preference: &AcceptedPreference,
-) -> Result<(), sqlx::Error> {
-    query!(tx, update(preference.row()))
+    role: Role,
+    preference: AcceptedPreference,
+) -> Result<Preference, sqlx::Error> {
+    let mut preference = preference.into_row();
+    preference.global_sync_version = app_sync_changes::stamp(
+        tx,
+        role,
+        TABLE,
+        preference.id,
+        preference.global_sync_version,
+    )
+    .await?;
+    query!(tx, update(&preference))?;
+    Ok(preference)
 }
 
 /// Explicit replication access for internal resource workflows.
@@ -156,10 +184,10 @@ pub mod replication {
     pub async fn list_synced_after(
         tx: &mut Transaction,
         user_id: Uuid,
-        after: &Cursor,
+        range: &VersionRange,
         limit: usize,
     ) -> Result<Vec<Preference>, sqlx::Error> {
-        query!(tx, list_synced_after(user_id, after, limit))
+        query!(tx, list_synced_after(user_id, range, limit))
     }
 
     /// Persists the server's row as it is.

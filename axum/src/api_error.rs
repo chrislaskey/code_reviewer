@@ -32,6 +32,7 @@ use app_core::data::accounts_users::AccountUserError;
 use app_core::helpers::field_errors::FieldErrors;
 use app_core::ops::staff::StaffError;
 use app_core::services::app_store::AppStoreError;
+use app_core::services::backend::BackendError;
 use app_core::services::stripe::StripeError;
 use app_core::sync::SyncError;
 use app_core::sync::bytes::BytesError;
@@ -61,6 +62,28 @@ impl ApiError {
         ApiError {
             code: Some("account_deleted"),
             ..ApiError::new(StatusCode::GONE, "This account was deleted")
+        }
+    }
+
+    /// The remote backend's error: its status and message when it
+    /// answered one, else 502, see `app_core::services::backend`.
+    pub fn from_backend(error: &BackendError) -> ApiError {
+        match error {
+            BackendError::Answered {
+                status,
+                message,
+                fields,
+                ..
+            } => ApiError {
+                status: StatusCode::from_u16(*status).unwrap_or(StatusCode::BAD_GATEWAY),
+                message: message.clone(),
+                field_errors: fields.clone(),
+                code: None,
+            },
+            BackendError::Unreachable(_) | BackendError::Malformed(_) => {
+                tracing::warn!("backend: {error}");
+                ApiError::new(StatusCode::BAD_GATEWAY, error.to_string())
+            }
         }
     }
 
@@ -130,6 +153,7 @@ impl From<CommunityError> for ApiError {
             }
             CommunityError::Membership(error) => return ApiError::from_membership(error),
             CommunityError::Record(error) => return ApiError::from_record(error),
+            CommunityError::Backend(error) => return ApiError::from_backend(error),
             CommunityError::Table(_) | CommunityError::Database(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
@@ -141,13 +165,12 @@ impl From<CommunityError> for ApiError {
 impl ApiError {
     fn from_membership(error: &MembershipError) -> ApiError {
         let status = match error {
-            MembershipError::NotFound { .. } | MembershipError::UnknownCommunity { .. } => {
-                StatusCode::NOT_FOUND
-            }
+            MembershipError::NotFound { .. } => StatusCode::NOT_FOUND,
             MembershipError::Invalid(_) | MembershipError::Rejected(_) => {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
             MembershipError::Record(error) => return ApiError::from_record(error),
+            MembershipError::Backend(error) => return ApiError::from_backend(error),
             MembershipError::Table(_) | MembershipError::Database(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
@@ -188,6 +211,7 @@ impl From<UserError> for ApiError {
             }
             UserError::AccountUser(error) => return error.into(),
             UserError::Record(error) => return ApiError::from_record(&error),
+            UserError::Backend(error) => return ApiError::from_backend(&error),
             UserError::ServerOnly | UserError::DeviceSettings(_) | UserError::Database(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
@@ -203,6 +227,7 @@ impl From<PreferenceError> for ApiError {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
             PreferenceError::Record(error) => return ApiError::from_record(&error),
+            PreferenceError::Backend(error) => return ApiError::from_backend(&error),
             PreferenceError::Json(_) | PreferenceError::Database(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
@@ -218,6 +243,7 @@ impl From<AccountUserError> for ApiError {
             AccountUserError::InvalidEmail | AccountUserError::EmailTaken => {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
+            AccountUserError::Backend(error) => return ApiError::from_backend(&error),
             AccountUserError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         ApiError::new(status, error.to_string())
@@ -255,6 +281,7 @@ impl From<BytesError> for ApiError {
             BytesError::NoFileStore => StatusCode::SERVICE_UNAVAILABLE,
             BytesError::Storage(_) => StatusCode::BAD_GATEWAY,
             BytesError::User(error) => return error.into(),
+            BytesError::Backend(error) => return ApiError::from_backend(&error),
             BytesError::Io(_) | BytesError::Table(_) | BytesError::Database(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
@@ -270,6 +297,7 @@ impl From<AccountError> for ApiError {
             AccountError::AccountUser(error) => return error.into(),
             AccountError::Community(error) => return error.into(),
             AccountError::Sync(error) => return error.into(),
+            AccountError::Backend(error) => return ApiError::from_backend(&error),
             AccountError::SignInExpired
             | AccountError::CodeDoesNotMatch
             | AccountError::EmailOrPasswordDoesNotMatch
@@ -303,6 +331,7 @@ impl From<DeletionError> for ApiError {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
             DeletionError::Mail(_) => StatusCode::SERVICE_UNAVAILABLE,
+            DeletionError::Backend(error) => return ApiError::from_backend(&error),
             DeletionError::NoAccount { .. } => StatusCode::NOT_FOUND,
             DeletionError::ServerOnly
             | DeletionError::Refused(_)
@@ -363,14 +392,17 @@ impl From<SyncError> for ApiError {
             SyncError::User(error) => error.into(),
             SyncError::Unauthorized => ApiError::new(StatusCode::UNAUTHORIZED, error.to_string()),
             SyncError::AccountDeleted => ApiError::account_deleted(),
+            SyncError::Backend(error) => ApiError::from_backend(&error),
             SyncError::NotAMember { .. } => ApiError::new(StatusCode::FORBIDDEN, error.to_string()),
             SyncError::ProtocolVersion(_) => {
                 ApiError::new(StatusCode::UPGRADE_REQUIRED, error.to_string())
             }
-            SyncError::Transport(_) | SyncError::Refused(_) | SyncError::Malformed(_) => {
-                ApiError::new(StatusCode::BAD_REQUEST, error.to_string())
-            }
+            SyncError::InvalidContinuation
+            | SyncError::Transport(_)
+            | SyncError::Refused(_)
+            | SyncError::Malformed(_) => ApiError::new(StatusCode::BAD_REQUEST, error.to_string()),
             SyncError::Database(_)
+            | SyncError::NotServed(_)
             | SyncError::Table(_)
             | SyncError::DeviceSettings(_)
             | SyncError::Purge(_) => {

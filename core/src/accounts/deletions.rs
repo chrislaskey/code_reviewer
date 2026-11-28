@@ -75,6 +75,11 @@ pub enum DeletionError {
     Community(#[from] CommunityError),
     #[error("Could not send the email; try again")]
     Mail(#[from] MailError),
+    /// The remote backend failed, or answered what this error has no
+    /// variant for.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -103,7 +108,12 @@ pub async fn create(
     if deployment.role != Role::Server {
         return Err(DeletionError::ServerOnly);
     }
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::create(deployment, backend, mailer, user, code, requested).await;
+    }
     let mut tx = deployment.begin().await?;
+    crate::data::app_sync_versions::lock(&mut tx).await?;
     let account = live_account_in(&mut tx, user.id).await?;
     // Their language, read before their preferences go with the account
     let locale = preferences::mail_locale_in(&mut tx, Some(user.id), requested).await?;
@@ -140,6 +150,7 @@ pub async fn create_from_command_line(
         email: email.to_string(),
     };
     let mut tx = deployment.begin().await?;
+    crate::data::app_sync_versions::lock(&mut tx).await?;
     let account = accounts_users::get_by_email(&mut tx, email)
         .await?
         .ok_or_else(no_account)?;
@@ -270,6 +281,98 @@ async fn live_account_in(tx: &mut Transaction, id: Uuid) -> Result<AccountUser, 
     accounts_users::get(tx, id)
         .await?
         .ok_or_else(|| AccountUserError::NotFound { id }.into())
+}
+
+/// The delete answered by the remote backend, see
+/// `docs/design/backend-protocol.md`: it deletes the rows and answers the
+/// mail, which Rust sends, as the Rust server does after its
+/// transaction; a failure to send is logged. Rust deletes the pictures.
+/// A remote backend keeps no Stripe plans yet, so none is ended.
+#[cfg(feature = "remote-backend")]
+pub(super) mod from_backend {
+    use serde::Deserialize;
+    use serde_json::json;
+
+    use super::*;
+    use crate::services::backend::{BackendError, RemoteBackend};
+    use crate::services::mailer::Mail;
+
+    /// The mail a step answers for Rust to send.
+    #[derive(Deserialize)]
+    struct MailToSend {
+        kind: String,
+        to: String,
+        locale: String,
+        code: Option<String>,
+    }
+
+    #[derive(Deserialize)]
+    struct Answered {
+        mail: Option<MailToSend>,
+    }
+
+    pub(in crate::accounts::deletions) async fn code_create(
+        backend: &RemoteBackend,
+        mailer: &Mailer,
+        user: &User,
+        requested: &str,
+    ) -> Result<(), DeletionError> {
+        let request = json!({ "user_id": user.id, "locale": requested });
+        let answered: Answered = backend
+            .call("accounts/deletions/code/create", &request)
+            .await
+            .map_err(|error| deletion_error(error, user))?;
+        if let Some(mail) = answered.mail {
+            mailer.send(mail_of(mail)?).await?;
+        }
+        Ok(())
+    }
+
+    pub(super) async fn create(
+        deployment: &Deployment,
+        backend: &RemoteBackend,
+        mailer: &Mailer,
+        user: &User,
+        code: Option<&str>,
+        requested: &str,
+    ) -> Result<(), DeletionError> {
+        let request = json!({ "user_id": user.id, "code": code, "locale": requested });
+        let answered: Answered = backend
+            .call("accounts/deletions/create", &request)
+            .await
+            .map_err(|error| deletion_error(error, user))?;
+        let Some(mail) = answered.mail else {
+            return Ok(());
+        };
+        #[cfg(feature = "object-storage")]
+        bucket_empty(deployment, user.id).await;
+        #[cfg(not(feature = "object-storage"))]
+        let _ = deployment;
+        if let Err(error) = mailer.send(mail_of(mail)?).await {
+            tracing::warn!("could not mail {} that it was deleted: {error}", user.id);
+        }
+        Ok(())
+    }
+
+    /// The mail in the language the backend chose, if core has it.
+    fn mail_of(mail: MailToSend) -> Result<Mail, DeletionError> {
+        let locale = preferences::supported_locale(&mail.locale);
+        match (mail.kind.as_str(), mail.code) {
+            ("delete_code", Some(code)) => Ok(mails::delete_code(locale, &mail.to, &code)),
+            ("account_deleted", _) => Ok(mails::account_deleted(locale, &mail.to)),
+            (kind, _) => Err(BackendError::Malformed(format!("a mail of kind {kind}")).into()),
+        }
+    }
+
+    /// The delete's error for each code the protocol gives it.
+    fn deletion_error(error: BackendError, user: &User) -> DeletionError {
+        match error.code() {
+            Some("wrong_code") => DeletionError::CodeDoesNotMatch,
+            Some("trial_has_no_code") => DeletionError::TrialHasNoCode,
+            Some("not_found") => AccountUserError::NotFound { id: user.id }.into(),
+            _ => error.into(),
+        }
+    }
 }
 
 /// What is left at Stripe once the rows are deleted: the live

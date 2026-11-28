@@ -21,6 +21,10 @@ pub async fn create(
     if deployment.role != Role::Server {
         return Err(DeletionError::ServerOnly);
     }
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return super::from_backend::code_create(backend, mailer, user, requested).await;
+    }
     let mut tx = deployment.begin().await?;
     let account = super::live_account_in(&mut tx, user.id).await?;
     if account.trial_expires_at.is_some() {

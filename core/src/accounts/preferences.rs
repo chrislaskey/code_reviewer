@@ -17,14 +17,14 @@ use crate::data::accounts_preferences::{
     self, AcceptedPreference, LOCALE, Preference, PreferenceInvalid, TABLE, THEME,
 };
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
-use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::helpers::locales;
 use crate::sync::TableRow;
+use crate::sync::VersionRange;
 use crate::sync::events::{self, Answer};
-use crate::sync::synced_table::{LocalCreate, SyncedTable, TableError};
+use crate::sync::synced_table::{LocalCreate, SyncedTable, SyncedTableServer, TableError};
 
 /// The fields a create sets.
 const CREATE_FIELDS: &[&str] = &["user_id", "key", "value"];
@@ -33,7 +33,7 @@ const UPDATE_FIELDS: &[&str] = &["value"];
 
 /// A person's preferences as the pages read them, each its default
 /// when they made no choice.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, serde::Deserialize)]
 pub struct Preferences {
     /// The language chosen, or none to follow the device's.
     pub locale: Option<String>,
@@ -49,6 +49,11 @@ pub enum PreferenceError {
     Rejected(String),
     #[error(transparent)]
     Record(#[from] crate::sync::events::RecordError),
+    /// The remote backend failed, or answered what this error has no
+    /// variant for.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("{0}")]
     Json(#[from] serde_json::Error),
     #[error("database error: {0}")]
@@ -58,6 +63,11 @@ pub enum PreferenceError {
 /// The user's preferences. A row whose value no longer applies, a
 /// language since dropped say, reads as its default.
 pub async fn get(deployment: &Deployment, user: &User) -> Result<Preferences, PreferenceError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = json!({ "user_id": user.id });
+        return Ok(backend.call("accounts/preferences/get", &request).await?);
+    }
     let mut tx = deployment.begin().await?;
     let preferences = get_in(&mut tx, user.id).await?;
     tx.commit().await?;
@@ -95,12 +105,16 @@ pub(crate) async fn mail_locale_in(
             .and_then(|row| row.value.as_str().map(str::to_string)),
         None => None,
     };
-    let locale = chosen.as_deref().unwrap_or(requested);
-    Ok(crate::app::locales::SUPPORTED
+    Ok(supported_locale(chosen.as_deref().unwrap_or(requested)))
+}
+
+/// The locale, if the app has it, else the default.
+pub(crate) fn supported_locale(locale: &str) -> &'static str {
+    crate::app::locales::SUPPORTED
         .iter()
         .copied()
         .find(|supported| *supported == locale)
-        .unwrap_or(locales::DEFAULT))
+        .unwrap_or(locales::DEFAULT)
 }
 
 /// Sets one of the user's preferences, with the time from this
@@ -113,6 +127,20 @@ pub async fn update(
     value: Value,
 ) -> Result<Preferences, PreferenceError> {
     accounts_preferences::checked_value(key, &value)?;
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = json!({ "user_id": user.id, "key": key, "value": value });
+        return match backend.call("accounts/preferences/update", &request).await {
+            Ok(preferences) => Ok(preferences),
+            Err(error) if error.code() == Some("invalid") => {
+                Err(PreferenceError::Rejected(error.to_string()))
+            }
+            Err(error) if error.code() == Some("trial_writes_full") => {
+                Err(crate::sync::events::RecordError::TrialWritesFull.into())
+            }
+            Err(error) => Err(error.into()),
+        };
+    }
     let mut tx = deployment.begin().await?;
     let event = match accounts_preferences::get_by_user_and_key(&mut tx, user.id, key).await? {
         Some(row) if row.value == value => {
@@ -164,6 +192,9 @@ pub(crate) async fn apply_in(
         let server = row.as_ref().map(table_row).transpose()?;
         return Ok(recorded.answer(server));
     }
+    // A retry is answered above without waiting for the feed. Two at once
+    // both reach here, and the second fails on the event's id.
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     let allowed = match event.kind {
         EventKind::Create => CREATE_FIELDS,
         EventKind::Update => UPDATE_FIELDS,
@@ -207,6 +238,9 @@ pub(crate) async fn apply_in(
             row
         }
     };
+    if row.value == value {
+        return finish(tx, role, user, event, &row).await;
+    }
     let now = now();
     let mut updated = Preference {
         value,
@@ -215,14 +249,13 @@ pub(crate) async fn apply_in(
     };
     if role == Role::Server {
         updated.version += 1;
-        updated.last_synced_at = Some(now);
     }
     let updated = match AcceptedPreference::new(updated) {
         Ok(updated) => updated,
         Err(invalid) => return rejected(event, format!("invalid: {invalid}"), Some(&row)),
     };
-    accounts_preferences::update(tx, &updated).await?;
-    finish(tx, role, user, event, updated.row()).await
+    let updated = accounts_preferences::update(tx, role, updated).await?;
+    finish(tx, role, user, event, &updated).await
 }
 
 async fn create(
@@ -234,9 +267,9 @@ async fn create(
     value: Value,
 ) -> Result<Answer, PreferenceError> {
     let now = now();
-    let (version, last_synced_at) = match role {
-        Role::Server => (1, Some(now)),
-        Role::Device => (0, None),
+    let version = match role {
+        Role::Server => 1,
+        Role::Device => 0,
     };
     let preference = Preference {
         id: event.row_id,
@@ -246,7 +279,7 @@ async fn create(
         inserted_at: event.row_inserted_at(now),
         updated_at: now,
         version,
-        last_synced_at,
+        global_sync_version: None,
         deleted_at: None,
         deleted_by_id: None,
     };
@@ -254,8 +287,8 @@ async fn create(
         Ok(preference) => preference,
         Err(invalid) => return rejected(event, format!("invalid: {invalid}"), None),
     };
-    accounts_preferences::create(tx, &preference).await?;
-    finish(tx, role, user, event, preference.row()).await
+    let preference = accounts_preferences::create(tx, role, preference).await?;
+    finish(tx, role, user, event, &preference).await
 }
 
 /// Answers an applied event and does the role's part.
@@ -335,6 +368,10 @@ impl SyncedTable for Synced {
         TABLE
     }
 
+    fn server(&self) -> Option<&dyn SyncedTableServer> {
+        Some(self)
+    }
+
     fn owner_column(&self) -> Option<&'static str> {
         Some("user_id")
     }
@@ -347,27 +384,6 @@ impl SyncedTable for Synced {
         event: &Event,
     ) -> Result<Answer, TableError> {
         Ok(apply_in(tx, role, user, event).await?)
-    }
-
-    async fn list_synced_after(
-        &self,
-        tx: &mut Transaction,
-        user: &User,
-        after: &Cursor,
-        limit: usize,
-    ) -> Result<Vec<TableRow>, TableError> {
-        let rows =
-            accounts_preferences::replication::list_synced_after(tx, user.id, after, limit).await?;
-        Ok(rows.iter().map(table_row).collect::<Result<_, _>>()?)
-    }
-
-    /// A preference points at its user, whose own row a device always has.
-    async fn parents(
-        &self,
-        _tx: &mut Transaction,
-        _row: &TableRow,
-    ) -> Result<Vec<TableRow>, TableError> {
-        Ok(Vec::new())
     }
 
     async fn apply_server_row(
@@ -407,6 +423,30 @@ impl SyncedTable for Synced {
     async fn label(&self, tx: &mut Transaction, id: Uuid) -> Result<Option<String>, TableError> {
         let row = accounts_preferences::replication::get(tx, id).await?;
         Ok(row.map(|row| row.key))
+    }
+}
+
+#[async_trait]
+impl SyncedTableServer for Synced {
+    async fn list_synced_after(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        range: &VersionRange,
+        limit: usize,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let rows =
+            accounts_preferences::replication::list_synced_after(tx, user.id, range, limit).await?;
+        Ok(rows.iter().map(table_row).collect::<Result<_, _>>()?)
+    }
+
+    /// A preference points at its user, whose own row a device always has.
+    async fn parents(
+        &self,
+        _tx: &mut Transaction,
+        _row: &TableRow,
+    ) -> Result<Vec<TableRow>, TableError> {
+        Ok(Vec::new())
     }
 }
 
@@ -460,7 +500,7 @@ mod tests {
             let rows = rows_of(&server, alice.id).await;
             assert_eq!(rows.len(), 1, "one row, written over");
             assert_eq!(rows[0].version, 2);
-            assert!(rows[0].last_synced_at.is_some());
+            assert!(rows[0].global_sync_version.is_some());
         })
         .await;
     }

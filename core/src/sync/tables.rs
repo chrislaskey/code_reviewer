@@ -41,9 +41,42 @@ pub fn position(table: &str) -> usize {
         .unwrap_or(list().len())
 }
 
+/// Restricts physical deletion to rows without surviving synced dependents.
+pub(crate) fn without_dependents(table: &str) -> Result<String, sqlx::Error> {
+    use crate::database::identifier;
+    use std::fmt::Write;
+
+    let table = identifier(table)?;
+    let mut predicate = String::new();
+    for child in list() {
+        let name = identifier(child.table())?;
+        for &(column, parent) in child.foreign_keys() {
+            if parent == table {
+                let column = identifier(column)?;
+                write!(
+                    predicate,
+                    " AND NOT EXISTS (SELECT 1 FROM {name} WHERE {name}.{column} = {table}.id)"
+                )
+                .map_err(|error| sqlx::Error::Protocol(error.to_string()))?;
+            }
+        }
+    }
+    Ok(predicate)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tables_list_only_tables_this_server_serves() {
+        let unserved: Vec<_> = list()
+            .iter()
+            .filter(|synced| synced.server().is_none())
+            .map(|synced| synced.table())
+            .collect();
+        assert!(unserved.is_empty(), "no server part: {unserved:?}");
+    }
     use crate::database::Database;
 
     /// A table the app adds that carries the sync columns but is left out
@@ -61,7 +94,7 @@ mod tests {
         let mut with_sync_columns: Vec<String> = sqlx::query_scalar(
             "SELECT tables.name FROM sqlite_master AS tables
                JOIN pragma_table_info(tables.name) AS columns
-             WHERE tables.type = 'table' AND columns.name = 'last_synced_at'",
+             WHERE tables.type = 'table' AND columns.name = 'global_sync_version' AND tables.name NOT IN ('app_sync_changes', 'app_sync_state', 'app_sync_versions')",
         )
         .fetch_all(&pool)
         .await
@@ -73,5 +106,29 @@ mod tests {
             .collect();
         listed.sort();
         assert_eq!(listed, with_sync_columns);
+
+        for child in list() {
+            let mut declared = child.foreign_keys().to_vec();
+            declared.sort_unstable();
+            let keys: Vec<(String, String)> = sqlx::query_as(
+                r#"SELECT "from", "table" FROM pragma_foreign_key_list($1)
+                 WHERE "to" = 'id' ORDER BY "from", "table""#,
+            )
+            .bind(child.table())
+            .fetch_all(&pool)
+            .await
+            .expect("foreign keys");
+            let registered: Vec<_> = keys
+                .iter()
+                .filter(|(_, parent)| get(parent).is_some())
+                .map(|(column, parent)| (column.as_str(), parent.as_str()))
+                .collect();
+            assert_eq!(
+                declared,
+                registered,
+                "{}'s synced foreign keys",
+                child.table()
+            );
+        }
     }
 }

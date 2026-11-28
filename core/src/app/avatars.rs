@@ -169,9 +169,18 @@ pub async fn update(
         storage.delete(&request.key).await?;
         return Err(AvatarError::NotTheImageType);
     }
+    let avatar_url = storage.public_url(&request.key)?;
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = serde_json::json!({ "actor_id": user.id, "avatar_url": avatar_url });
+        let updated: User = backend
+            .call("users/avatar_update", &request)
+            .await
+            .map_err(UserError::from)?;
+        return Ok(updated);
+    }
     let mut tx = deployment.begin().await?;
-    let user =
-        users::update_avatar_url_in(&mut tx, user.id, &storage.public_url(&request.key)?).await?;
+    let user = users::update_avatar_url_in(&mut tx, user.id, &avatar_url).await?;
     tx.commit().await?;
     Ok(user)
 }
@@ -217,13 +226,11 @@ pub async fn delete_unreferenced(
         return Err(AvatarError::ServerOnly);
     }
     let storage = bucket(deployment)?;
-    let mut tx = deployment.begin().await?;
-    let referenced: std::collections::HashSet<String> = users::list_avatar_urls_in(&mut tx)
+    let referenced: std::collections::HashSet<String> = avatar_urls_list(deployment)
         .await?
         .iter()
         .filter_map(|url| key_of_url(url))
         .collect();
-    tx.commit().await?;
 
     let cutoff = now - chrono::Duration::days(UNREFERENCED_DAYS);
     let mut report = DeleteUnreferencedReport::default();
@@ -236,6 +243,28 @@ pub async fn delete_unreferenced(
         report.deleted += 1;
     }
     Ok(report)
+}
+
+/// Every user's picture, deleted users' too, from the remote backend
+/// beside one.
+#[cfg(feature = "object-storage")]
+async fn avatar_urls_list(deployment: &Deployment) -> Result<Vec<String>, AvatarError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        #[derive(serde::Deserialize)]
+        struct AvatarUrls {
+            avatar_urls: Vec<String>,
+        }
+        let answer: AvatarUrls = backend
+            .call("users/avatar_urls_list", &serde_json::json!({}))
+            .await
+            .map_err(UserError::from)?;
+        return Ok(answer.avatar_urls);
+    }
+    let mut tx = deployment.begin().await?;
+    let avatar_urls = users::list_avatar_urls_in(&mut tx).await?;
+    tx.commit().await?;
+    Ok(avatar_urls)
 }
 
 /// `update` asked of the server by the user signed in on this device,

@@ -477,6 +477,20 @@ impl Http {
         if status == reqwest::StatusCode::UPGRADE_REQUIRED {
             return Err(protocol_version_error(response).await);
         }
+        if status == reqwest::StatusCode::FORBIDDEN && path == "/api/sync/backfill" {
+            // This endpoint returns 403 when the caller is no longer a member.
+            let community_id = serde_json::to_value(request)
+                .ok()
+                .and_then(|request| {
+                    request["community_id"]
+                        .as_str()
+                        .and_then(|id| uuid::Uuid::parse_str(id).ok())
+                })
+                .ok_or_else(|| {
+                    SyncError::Malformed("a backfill without a community id".to_string())
+                })?;
+            return Err(SyncError::NotAMember { community_id });
+        }
         if !status.is_success() {
             let answer: Option<ErrorAnswer> = response.json().await.ok();
             return Err(match answer {

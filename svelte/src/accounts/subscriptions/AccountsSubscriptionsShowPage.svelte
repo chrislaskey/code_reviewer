@@ -49,7 +49,7 @@
     if (!inBrowser) return;
     inBrowser = false;
     load();
-    currentUserReload();
+    currentUserReload().catch((problem) => (error = errorMessageOf(problem)));
   }
 
   load();

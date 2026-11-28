@@ -3,7 +3,8 @@
 // of the application once, `currentUserLoad()`, and kept until a sign-out
 // or a sign-in says otherwise. Null when nobody is signed in, which is what
 // sends a visitor to the sign-in page (router.js); an error only when the
-// application could not tell, which the page shows.
+// application could not tell, which the page shows. A failed refresh
+// keeps the last known user until a successful request says otherwise.
 //
 // Their `preferences.locale` is the language the pages follow, see
 // translations.js, and `preferences.theme` the theme, see layouts/themes.js.
@@ -56,7 +57,6 @@ export function currentUserLoad() {
     },
     (problem) => {
       current = null;
-      currentUser.value = null;
       throw problem;
     },
   );

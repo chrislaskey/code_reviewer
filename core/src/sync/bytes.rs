@@ -247,6 +247,11 @@ pub enum BytesError {
     Table(#[from] TableError),
     #[error(transparent)]
     User(#[from] UserError),
+    /// The remote backend failed, or answered what this error has no
+    /// variant for.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -299,6 +304,17 @@ pub async fn download_url(
 ) -> Result<String, BytesError> {
     let bytes = of_table(table)?;
     let storage = bucket(deployment)?;
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let readable = readable_from_backend(backend, user, table, id).await?;
+        return Ok(storage
+            .download_url(
+                &readable.storage_key,
+                DOWNLOAD_URL_LIFETIME,
+                content_disposition,
+            )
+            .await?);
+    }
     let mut tx = deployment.begin().await?;
     let readable = bytes
         .readable(&mut tx, user, id)
@@ -324,6 +340,14 @@ pub async fn row_content(
     id: Uuid,
 ) -> Result<Option<RowContent>, BytesError> {
     let bytes = of_table(table)?;
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let readable = readable_from_backend(backend, user, table, id).await?;
+        return Ok(readable.content.map(|content| RowContent {
+            content_type: readable.content_type,
+            content,
+        }));
+    }
     let mut tx = deployment.begin().await?;
     bytes
         .readable(&mut tx, user, id)
@@ -332,6 +356,40 @@ pub async fn row_content(
     let content = bytes.content(&mut tx, user, id).await?;
     tx.commit().await?;
     Ok(content)
+}
+
+/// What Rust needs of a row the user sees to read its bytes, from the
+/// remote backend: its name, its content type, its key in the bucket,
+/// and the content the row keeps itself, if any, see
+/// `docs/design/backend-protocol.md`.
+#[cfg(feature = "remote-backend")]
+#[derive(Debug, Deserialize)]
+pub struct ReadableFromBackend {
+    pub name: String,
+    pub content_type: String,
+    pub storage_key: String,
+    pub content: Option<String>,
+}
+
+/// `<resource>/readable` of the table's resource, its name without
+/// `app_`: `files/readable` for `app_files`.
+#[cfg(feature = "remote-backend")]
+pub async fn readable_from_backend(
+    backend: &crate::services::backend::RemoteBackend,
+    user: &User,
+    table: &str,
+    id: Uuid,
+) -> Result<ReadableFromBackend, BytesError> {
+    let resource = table.strip_prefix("app_").unwrap_or(table);
+    let request = serde_json::json!({ "actor_id": user.id, "id": id });
+    match backend
+        .call(&format!("{resource}/readable"), &request)
+        .await
+    {
+        Ok(readable) => Ok(readable),
+        Err(error) if error.code() == Some("not_found") => Err(BytesError::NotFound { id }),
+        Err(error) => Err(error.into()),
+    }
 }
 
 /// The bytes of a row the user sees, read from the bucket: what the
@@ -344,6 +402,11 @@ pub(crate) async fn get_from_bucket(
     id: Uuid,
 ) -> Result<Vec<u8>, BytesError> {
     let bytes = of_table(table)?;
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let readable = readable_from_backend(backend, user, table, id).await?;
+        return Ok(bucket(deployment)?.get(&readable.storage_key).await?);
+    }
     let mut tx = deployment.begin().await?;
     let readable = bytes
         .readable(&mut tx, user, id)
@@ -495,10 +558,10 @@ pub async fn ask_about_waiting<T: Transport>(
     Ok(waiting)
 }
 
-/// The rows whose events are held back from the push: those waiting
-/// whose bytes the server does not have, and those it refused, whose
-/// later events, a rename say, it would answer by a row it never had,
-/// and the rows of other tables that wait with them.
+/// The rows whose events are held back from the push while their bytes
+/// wait: those whose bytes the server does not have, and the rows of
+/// other tables that wait with them. A refused row's are held back too,
+/// see `conflicts::hold_back_refused`.
 pub async fn held_back(
     deployment: &Deployment,
     waiting: &[Waiting],
@@ -509,14 +572,6 @@ pub async fn held_back(
         .map(|row| row.id)
         .collect();
     let mut tx = deployment.begin().await?;
-    let refused = app_events::conflicts(&mut tx)
-        .await?
-        .into_iter()
-        .filter(|stored| {
-            stored.event.kind == EventKind::Create && of_table(&stored.event.table).is_ok()
-        })
-        .map(|stored| stored.event.row_id);
-    held_back.extend(refused);
     let mut with_them = Vec::new();
     for (_, bytes) in tables() {
         with_them.extend(bytes.rows_waiting_with(&mut tx, &held_back).await?);
@@ -637,15 +692,8 @@ pub async fn delete_unreferenced(
     let storage = bucket(deployment)?;
     let cutoff = now - chrono::Duration::days(UNREFERENCED_DAYS);
     let mut report = DeleteUnreferencedReport::default();
-    for (_, bytes) in tables() {
-        let mut tx = deployment.begin().await?;
-        let referenced: BTreeSet<String> = bytes
-            .list_rows(&mut tx)
-            .await?
-            .into_iter()
-            .map(|row| storage_key(bytes, row.created_by_id, row.id))
-            .collect();
-        tx.commit().await?;
+    for (table, bytes) in tables() {
+        let referenced = referenced_keys(deployment, table.table(), bytes).await?;
         for stored in storage.list(bytes.key_prefix()).await? {
             if referenced.contains(&stored.key) || stored.last_modified > cutoff {
                 report.kept += 1;
@@ -656,6 +704,37 @@ pub async fn delete_unreferenced(
         }
     }
     Ok(report)
+}
+
+/// The bucket keys of the table's rows, deleted or not, which the sweep
+/// keeps: from the remote backend's `<resource>/storage_keys_list`, when
+/// it owns the rows.
+#[cfg(feature = "object-storage")]
+async fn referenced_keys(
+    deployment: &Deployment,
+    #[cfg_attr(not(feature = "remote-backend"), expect(unused_variables))] table: &str,
+    bytes: &dyn SyncedBytes,
+) -> Result<BTreeSet<String>, BytesError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        #[derive(Deserialize)]
+        struct Keys {
+            keys: BTreeSet<String>,
+        }
+        let resource = table.strip_prefix("app_").unwrap_or(table);
+        let operation = format!("{resource}/storage_keys_list");
+        let keys: Keys = backend.call(&operation, &serde_json::json!({})).await?;
+        return Ok(keys.keys);
+    }
+    let mut tx = deployment.begin().await?;
+    let referenced = bytes
+        .list_rows(&mut tx)
+        .await?
+        .into_iter()
+        .map(|row| storage_key(bytes, row.created_by_id, row.id))
+        .collect();
+    tx.commit().await?;
+    Ok(referenced)
 }
 
 /// Removes from the account's folder the bytes no live row points at:

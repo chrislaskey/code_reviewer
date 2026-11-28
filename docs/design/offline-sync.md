@@ -2,7 +2,8 @@
 
 How the desktop and mobile apps keep a SQLite file of their own, write to
 it with the network off, and converge with the web server, the system of
-record. The design is the one `phoenix/docs/design/offline-sync.md`,
+record. The design is the one `phoenix/docs/design/offline-sync.md`
+(in the history: `phoenix/` was removed after `f100d21`),
 `offline-sync-client.md` and `multi-tenancy.md` settled, with the
 reasons, kept here only as the decisions; what changes is how much code
 it takes, since `core/` runs on the server and on every device.
@@ -19,10 +20,11 @@ it takes, since `core/` runs on the server and on every device.
 - **Soft deletes.** A delete is an update of `deleted_at`, so it syncs
   like any edit, and records who in `deleted_by_id`. Every list and get
   leaves deleted rows out. A purge removes them after 90 days.
-- **The pull cursor is the server's write time**, `last_synced_at`, set
-  by the server inside the write, pulled with an overlap of a minute and
-  ordered by `(last_synced_at, id)`. A row the overlap sends again is a
-  harmless upsert.
+- **Pull follows committed global sync versions.** The server commits each
+  row's `global_sync_version` with the row and its `app_sync_changes`
+  entry. The device stores the version it has pulled through for that
+  feed. Row versions still decide conflicts. See
+  [the Rust implementation](global-sync-version-build.md).
 - **A row from the server never replaces a row with a queued change.**
   The push decides that row first.
 - **A conflict is kept until the person resolves it.** Nothing is retried
@@ -115,9 +117,15 @@ There is no default user on any deployment.
 | Column | Set by | Meaning |
 | --- | --- | --- |
 | `version` | the server only | 1 for a new row, incremented by the server on every write; 0 on a device's row not yet pushed |
-| `last_synced_at` | the server only | the time the server last wrote the row, the pull cursor; null on a device's row not yet pushed |
+| `global_sync_version` | the server only | the durable version of the row's last replicated change, null before a device create is accepted |
 | `deleted_at` | whoever deleted | the soft delete, the time on that device's clock |
 | `deleted_by_id` | the deployment applying the delete | the user who deleted, never sent by a device |
+
+There is no column for the time the server last wrote a row. The
+change log keeps it, `app_sync_changes.written_at` by the row's
+`global_sync_version`, for the retention window; the purge needs no
+more, since a tombstone at or below the floor was last written before
+the horizon.
 
 `updated_at` is the time of the last edit on the clock of whoever made
 it, shown to people and deciding nothing. The server writes its own time
@@ -217,15 +225,35 @@ it is the log: every event answered is recorded with its answer, in the
 same transaction as the row, so a retried event gets the same answer and
 nothing applies twice. On a device it is the queue: an event is `pending`
 until the server answers it, deleted when applied, and kept as a
-`conflict` until the person resolves it. A rejected event the server sent
-no row for stays pending with the reason in `last_error`, unless the
-reason is that the row is unknown to the server, see "Purge and resync".
+`conflict` until the person resolves it. A rejection is final: the
+event is never sent again on its own, and the person sees it, on the
+conflicts page, with the reason:
 
-**A pending event is not tried for ever.** Each time the server
-rejects it and it stays pending counts in `attempts`, and at 30,
-`events::MAX_ATTEMPTS`, the event is refused: kept as a conflict with
-the reason and nothing on the server's side, for the conflicts page.
-Only the server's no to that event counts. No network, a timeout,
+- **An update rejected with the server's row.** The server's row wins,
+  and nothing waits: the person's change is kept as a refused conflict,
+  to reapply or let go.
+- **An update rejected without a row.** Refused at once. When the row
+  is unknown to the server, the device's copy goes too, see "Purge and
+  resync".
+- **A create rejected with the server's row**, which already has a row
+  under that id. The server's row wins; there is nothing to tell.
+- **A create rejected without a row.** Refused, with its row kept on the
+  device. The row is not in the system of record, so what depends on
+  it waits, below.
+
+**A refused create is never dropped.** The person decides, on the
+conflicts page: Try again or Let it go, see "What the person must still
+be able to see" in `docs/design/backend-protocol.md`. Until then, the
+row's later events, and the creates of rows pointing at it by a foreign
+key of `SyncedTable::foreign_keys` (a post's rows in communities, a
+file's), wait with it: held back from each push, as a file's events are
+while its bytes wait. A resync keeps the row. Letting it go removes the
+row, its events and the rows waiting with it.
+
+**A file waiting for its bytes is not tried for ever.** It is the one
+rejection that is not final: the server only lacks the bytes yet. Each
+time counts in `attempts`, and at 30, `events::MAX_ATTEMPTS`, the
+create is refused. Only the server's no to that event counts. No network, a timeout,
 working offline, and a server or a bucket that is failing count
 nothing, so an outage of any length refuses nothing.
 
@@ -297,8 +325,9 @@ takes them away. So, as in Phoenix:
   became visible through a new community row, however old, arrives with
   it. A row taken out of a community brings nothing along: its post may
   be one the user never saw, from before they joined, and a device
-  without the post skips the row. `Page.cursor` is the last row's place
-  in the cursor order, not counting what was brought along.
+  without the post skips the row. `Page.cursor` is the version of the
+  page's last row, not counting what was brought along. A parent
+  brought along for another row does not advance it.
 - **Joining is the device asking for everything in that community.** When
   a device applies a live membership of its own user that it did not
   have, or had left, it records the community in `app_sync_backfills` and,
@@ -328,26 +357,36 @@ POST /api/sync/push
   -> {"events": [{"id", "status", "version", "conflicts", "reason", "server": {"table", "row"} | null}, ...]}
 
 POST /api/sync/pull
-  {"cursor": {"last_synced_at", "id"} | null, "after": {"last_synced_at", "id"} | null, "limit": 200}
+  {"cursor": {"feed_id", "global_sync_version"} | null, "after": {...} | null, "limit": 200}
   -> {"rows": [{"table", "row"}, ...], "next": {...} | null, "cursor": {...} | null,
-      "purge_horizon": "..." | null, "resync": false}
+      "resync": false}
 
 POST /api/sync/backfill
-  {"community_id": "...", "after": {"last_synced_at", "id"} | null, "limit": 200}
+  {"community_id": "...", "after": {...} | null, "limit": 200}
   -> the same page, of the community's live post rows; 403 for a community the user is not in
 ```
 
-A push applies the events in the order given, each in its own
-transaction, and answers every one. A pull answers rows with
-`(last_synced_at, id)` after the cursor, the overlap taken off the
-cursor's time; `after` continues a paged pull exactly, with no overlap.
-`next` is the place of the last row when the page was full; `cursor` is
-what to store once the page is applied, and on the last page it is the
-server's time, which the device now has everything up to, so a quiet
-stretch never makes a device look stale. Deleted rows are sent like any
-other. Every answer of the sync routes carries the server's
-settings version in the `x-settings-version` header, and every request
-the device's protocol version, see `multi-server.md`.
+A push applies the events in the order given, each in its own transaction.
+A pull reads up to an upper bound, the feed's head when the first page
+is read. `after` carries the previous page's `next` value and keeps that
+bound. A page holds the rows the user sees, in version order: from each
+table its first rows in the range, merged and cut at the limit. Other
+users' changes take no room on a page. An intermediate page's cursor is
+the version of its last row. The final page's cursor is the bound, even
+when the last versions were someone else's.
+
+A fresh device bootstraps from the current rows it may see. It saves its
+cursor on the final page only. Until then it keeps the `next` of its last
+page in `app_sync_state`, so a first pull cut short goes on from there on
+the next sync. Backfill has its own continuation, kept on its row of
+`app_sync_backfills` the same way, and leaves the main cursor alone. A
+continuation the server no longer answers, from another feed or below
+its floor, gets `resync`.
+
+Cursor versions and row global sync versions are decimal strings on the wire.
+Requests carry the sync protocol version in `x-protocol-version`. Responses
+carry the settings version in `x-settings-version`. See [server
+selection](multi-server.md).
 
 ## One sync on a device, `sync::run`
 
@@ -364,13 +403,17 @@ As the user signed in, with the device's token:
    applied before the next is sent, so a push cut short has kept what
    was answered. Apply the answers:
    `applied` deletes the event; `conflict` keeps it with the conflicts;
-   a rejected `create` deletes the event and the row it made, and the
-   server's row, if any, takes its place, except a file's, which is
-   never dropped; another `rejected` with a server
-   row deletes the event, the server wins; a `rejected` without one for a
+   a `rejected` update with a server row is refused for the person and
+   the server's row wins; a rejected `create` with one deletes the
+   event, the server already has the row; a rejected `create` without
+   one is refused and kept for the person,
+   with its row, and the later events in the request of that row and of
+   rows pointing at it stay pending, waiting with it; a file's create
+   the server only lacks the bytes of counts a try instead; a rejected
+   update without one for a
    row the server does not know deletes the device's copy and keeps the
    change as a conflict with nothing on the other side; any other
-   `rejected` without one keeps the event pending with the reason. Then,
+   rejected update without one is refused at once. Then,
    for each row the push answered, once no event for it is still pending,
    apply the server's row from its last answer, parents first, which
    brings the merged values and the new version; a server row under
@@ -471,28 +514,43 @@ person's value and the value now on the device, which is the server's as
 of the last sync. **Reapply** queues a new update from the row's current
 version with the person's values and syncs; it applies unless someone
 changed the field yet again. **Let it go** deletes the event. A conflict
-on a post that is gone can only be let go. A file the server refused is
-there too, by its name with the reason: **Try again** queues its create
-as it was, **Let it go** removes the file from the device.
+on a post that is gone can only be let go. A create the server refused
+is there too, by what it is about with the reason, a post, a file or a
+post's row in a community: **Try again** queues its create as it was,
+**Let it go** removes the row from the device, with the rows waiting
+with it, and a file's bytes.
 
 ## Purge and resync
 
-Soft-deleted rows would otherwise accumulate forever. `purge::run`, on
-the server, a daily job, see `docs/design/jobs.md`, hard-deletes every row
-whose delete and whose last write are both older than the horizon, 90
-days before now, so every device that pulled within the window has seen
-it go; children first, so a deleted post's community rows, deleted at
-the same moment, go with it, and a purged parent takes any row still
-under it through the foreign keys; then the events of rows that are
-gone. Each run records its horizon in `app_purges`, server only.
+Scheduled purge removes a committed prefix of change entries older than
+the retention window. It records the last discarded global sync version as
+the minimum valid cursor and removes eligible tombstones with no surviving
+synced children. The purge's wall time still determines which entries and
+tombstones are old enough to remove. Only moving the floor holds the feed
+lock. The tombstones at or below it go after, a table at a time, without
+it, so no writer waits on them: a device that could still need one has a
+cursor below the floor, and resyncs.
 
-A device away longer than that may have missed a deletion whose
-tombstone is gone, so the pull answers a cursor older than the latest
-horizon with an empty page marked `resync`. The device then drops every
-synced row, its cursor and its backfills to do, writes its own user's
-row again, and pulls from nothing; the memberships that arrive record
-their communities to backfill, as on a first sync, and the device ends
-up matching the server. Its own pending events are pushed before the
+**A hard delete of a synced row is allowed only when no device can hold
+it.** A device learns of a delete from the row: its tombstone, pulled
+like any change. A row deleted outright leaves nothing to pull, so a
+device that holds it keeps it. The purge is safe, since it removes only
+tombstones at or below the floor, which every device has pulled or
+resyncs past. The other hard deletes are safe for now, each because no
+device holds the row: an account's preferences when the account is
+deleted, as its devices lose their token; a trial's rows, as trials are
+on the web alone; an unconfirmed sign-up's user, which was never
+pulled. A new hard delete of a synced row must say which of these holds,
+or soft-delete the row instead. When one can't, the general fix is a
+removal entry in the change log, "row X of table T is gone", which a
+pull would answer; it isn't built, see the review's §2 A in
+`docs/suggestions/global-sync-version-review.md`.
+
+A cursor below that minimum or from another feed gets an empty page marked
+`resync`. The device drops its cursor and backfills, removes replicated rows
+it can replace, and bootstraps current authorized rows. It retains pending
+changes, their rows and required parents, the current user and unsent files.
+Its memberships queue the community backfills again. Its own pending events are pushed before the
 pull, as always, so a resync normally finds none; those a failed push
 left behind are kept, with the rows they are about, since a pending
 event carries its own change: the next push answers it and the server's
@@ -523,5 +581,4 @@ flow, magic links, confirmation, password change and reset, see
 `docs/suggestions/accounts.md`; deleting an account; a community's own
 page and its members; roles beyond `member`; the "something changed"
 nudge; a stale-form check on the web, which needs the page to send the
-version it loaded; `server_seq` in place of the time cursor if the
-overlap proves awkward on PostgreSQL. See `docs/suggestions/`.
+version it loaded. See `docs/suggestions/`.

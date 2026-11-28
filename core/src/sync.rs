@@ -20,18 +20,24 @@
 pub mod bytes;
 pub mod conflicts;
 pub mod events;
+#[cfg(feature = "remote-backend")]
+mod from_backend;
 pub mod pending_changes;
 pub mod purge;
 pub mod synced_table;
 pub mod tables;
 #[cfg(any(test, feature = "test-tables"))]
 pub mod test_notes;
+pub mod version;
+#[cfg(test)]
+mod version_tests;
 
-use crate::data::app_sync_backfills;
 use crate::data::app_sync_state;
+use crate::data::{app_sync_backfills, app_sync_versions};
 use std::collections::{BTreeMap, BTreeSet};
 
-use chrono::{DateTime, Duration, Utc};
+#[cfg(test)]
+use chrono::Duration;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
@@ -44,18 +50,18 @@ use crate::data::app_sync_state::Cursor;
 use crate::data::app_users::User;
 use crate::data::device_settings::{self, DeviceSettingsError, WORK_OFFLINE};
 use crate::database::Transaction;
-use crate::deployment::{Deployment, now};
+use crate::deployment::{Deployment, Role, now};
 use crate::services::web_server::Transport;
 use bytes::BytesError;
 use events::{Answer, AnswerStatus};
 use purge::PurgeError;
-use synced_table::{SyncedTable, TableError};
+use synced_table::{SyncedTable, SyncedTableServer, TableError};
 
 /// The version of the sync's protocol, which a server describes itself
 /// with, see `servers`: a device syncs with a server of its own version
 /// alone. Raised by a change a device of the version before could not
 /// sync through.
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 2;
 
 /// The header a device sends `PROTOCOL_VERSION` in with every request,
 /// which the server's sync routes require to be its own.
@@ -83,24 +89,32 @@ pub fn protocol_version_mismatch(server: u32, app: u32) -> String {
     format!("This server syncs with version {server}, and this app with version {app}; {older}")
 }
 
-/// How far back from its cursor's time a pull starts, so a row written
-/// in a transaction that committed after a later one is not missed.
-pub const OVERLAP_SECONDS: i64 = 60;
 pub const DEFAULT_LIMIT: usize = 200;
 pub const MAX_LIMIT: usize = 500;
 
-impl Cursor {
-    /// The row's place in the pull order, from its wire form.
-    pub fn of_row(row: &TableRow) -> Option<Cursor> {
-        let last_synced_at = row.row.get("last_synced_at")?.as_str()?;
-        let id = row.row.get("id")?.as_str()?;
-        Some(Cursor {
-            last_synced_at: DateTime::parse_from_rfc3339(last_synced_at)
-                .ok()?
-                .with_timezone(&Utc),
-            id: Uuid::parse_str(id).ok()?,
-        })
-    }
+/// An exclusive lower bound and an inclusive upper bound on sync versions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VersionRange {
+    #[serde(with = "version")]
+    pub after: i64,
+    #[serde(with = "version")]
+    pub through: i64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum Scan {
+    Incremental,
+    Bootstrap,
+    Community(Uuid),
+}
+
+/// Continues a bounded pull or backfill without changing the original upper bound.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Continuation {
+    feed_id: Uuid,
+    scan: Scan,
+    range: VersionRange,
 }
 
 /// A row as it travels on the wire: its table, and the row as JSON.
@@ -111,6 +125,16 @@ pub struct TableRow {
 }
 
 impl TableRow {
+    fn global_sync_version(&self) -> Result<i64, SyncError> {
+        let stamp = self.row.get("global_sync_version").and_then(Value::as_str);
+        stamp
+            .and_then(|value| value.parse::<i64>().ok())
+            .filter(|value| *value > 0)
+            .ok_or_else(|| {
+                SyncError::Malformed(format!("invalid global sync version for {}", self.table))
+            })
+    }
+
     fn id(&self) -> Option<Uuid> {
         Uuid::parse_str(self.row.get("id")?.as_str()?).ok()
     }
@@ -128,12 +152,12 @@ pub struct PushResponse {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct PullRequest {
-    /// The device's stored cursor, pulled from with the overlap.
+    /// The device's committed progress, absent when bootstrapping.
     #[serde(default)]
     pub cursor: Option<Cursor>,
     /// The `next` of the page before, continued exactly.
     #[serde(default)]
-    pub after: Option<Cursor>,
+    pub after: Option<Continuation>,
     #[serde(default)]
     pub limit: Option<usize>,
 }
@@ -144,7 +168,7 @@ pub struct BackfillRequest {
     pub community_id: Uuid,
     /// The `next` of the page before.
     #[serde(default)]
-    pub after: Option<Cursor>,
+    pub after: Option<Continuation>,
     #[serde(default)]
     pub limit: Option<usize>,
 }
@@ -154,21 +178,13 @@ pub struct BackfillRequest {
 pub struct Page {
     /// In cursor order, each row after the rows it points at.
     pub rows: Vec<TableRow>,
-    /// Where the next page starts, when this one was full.
+    /// The continuation of this bounded scan.
     #[serde(default)]
-    pub next: Option<Cursor>,
-    /// The place to store once the page is applied: the last row's in
-    /// cursor order, not counting the rows brought along for it, or on
-    /// the last page the server's time, which the device has everything
-    /// up to.
+    pub next: Option<Continuation>,
+    /// Store with the applied rows. Bootstrap sets this only on its last page.
     #[serde(default)]
     pub cursor: Option<Cursor>,
-    /// The oldest deletion the server still has, after its last purge.
-    #[serde(default)]
-    pub purge_horizon: Option<DateTime<Utc>>,
-    /// The device's cursor is older than the horizon, so it may have
-    /// missed a deletion: drop everything and pull from nothing. The
-    /// page is empty.
+    /// The feed or retained range no longer supports this cursor.
     #[serde(default)]
     pub resync: bool,
 }
@@ -212,8 +228,20 @@ pub enum SyncError {
     /// person: a sign-up with a taken email, say.
     #[error("{0}")]
     Refused(String),
+    /// A request supplied contradictory or out-of-order pagination bounds.
+    #[error("invalid sync continuation")]
+    InvalidContinuation,
+    /// The remote backend failed, or answered what this error has no
+    /// variant for.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("the server answered with something unexpected: {0}")]
     Malformed(String),
+    /// A table with no part in this server's sync, which a remote
+    /// backend serves instead.
+    #[error("this server does not serve the table {0}")]
+    NotServed(String),
 }
 
 /// Answers a push from the user: applies the events in the order given,
@@ -223,10 +251,24 @@ pub async fn push(
     user: &User,
     request: PushRequest,
 ) -> Result<PushResponse, SyncError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::push(deployment, backend, user, request).await;
+    }
     let mut answers = Vec::with_capacity(request.events.len());
     for event in &request.events {
         let answer = match tables::get(&event.table) {
-            Some(synced) => synced.apply_event(deployment, user, event).await?,
+            Some(synced) => {
+                let mut retries_left = 2;
+                loop {
+                    match synced.apply_event(deployment, user, event).await {
+                        Err(error) if retries_left > 0 && database_rolled_back(error.as_ref()) => {
+                            retries_left -= 1;
+                        }
+                        result => break result?,
+                    }
+                }
+            }
             None => Answer::rejected(event.id, "unknown_table", None),
         };
         answers.push(answer);
@@ -234,70 +276,108 @@ pub async fn push(
     Ok(PushResponse { events: answers })
 }
 
-/// Answers a pull from the user: the rows they see that the server wrote
-/// after the cursor, every table merged by its place in the order and
-/// cut at the limit, deleted or not, each after the rows it points at.
-/// A cursor older than the purge horizon is answered with `resync`
-/// instead, since a deletion it never saw may be gone.
+/// PostgreSQL reports these errors after aborting the transaction.
+fn database_rolled_back(mut error: &(dyn std::error::Error + 'static)) -> bool {
+    loop {
+        if let Some(sqlx::Error::Database(database)) = error.downcast_ref::<sqlx::Error>() {
+            return matches!(database.code().as_deref(), Some("40001" | "40P01"));
+        }
+        let Some(source) = error.source() else {
+            return false;
+        };
+        error = source;
+    }
+}
+
+/// Gives the server's feed a new id, after its database is restored from
+/// a backup: the restored head may be below what devices saw, and the
+/// versions given out again would name other changes. Every device's
+/// cursor is then of another feed, so its next pull resyncs. Answers the
+/// new id. A remote backend renews its own.
+pub async fn feed_id_renew(deployment: &Deployment) -> Result<Uuid, SyncError> {
+    if deployment.role != Role::Server {
+        return Err(SyncError::NotServed("a device has no feed".to_string()));
+    }
+    let feed_id = Uuid::now_v7();
+    let mut tx = deployment.begin().await?;
+    app_sync_versions::lock(&mut tx).await?;
+    app_sync_versions::update_feed_id(&mut tx, feed_id).await?;
+    tx.commit().await?;
+    Ok(feed_id)
+}
+
+/// Pulls a page of a consistent snapshot of the server's committed feed.
 pub async fn pull(
     deployment: &Deployment,
     user: &User,
     request: PullRequest,
 ) -> Result<Page, SyncError> {
-    let purge_horizon = purge::horizon(deployment).await?;
-    if let (Some(horizon), Some(cursor)) = (purge_horizon, request.cursor)
-        && cursor.last_synced_at < horizon
-    {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::pull(backend, user, request).await;
+    }
+    let mut tx = deployment.database.begin_snapshot().await?;
+    let feed = app_sync_versions::get(&mut tx).await?;
+    let continuation = if let Some(after) = request.after {
+        if request.cursor.is_some() || matches!(after.scan, Scan::Community(_)) {
+            return Err(SyncError::InvalidContinuation);
+        }
+        after
+    } else {
+        let (feed_id, scan, after) = match request.cursor {
+            Some(cursor) if cursor.global_sync_version > feed.head => {
+                return Ok(Page {
+                    resync: true,
+                    ..Page::default()
+                });
+            }
+            Some(cursor) => (
+                cursor.feed_id,
+                Scan::Incremental,
+                cursor.global_sync_version,
+            ),
+            None => (feed.id, Scan::Bootstrap, 0),
+        };
+        Continuation {
+            feed_id,
+            scan,
+            range: VersionRange {
+                after,
+                through: feed.head,
+            },
+        }
+    };
+    if !continuation.covered_by(&feed)? {
         return Ok(Page {
-            purge_horizon,
             resync: true,
             ..Page::default()
         });
     }
     let limit = request.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
-    let after = match (request.after, request.cursor) {
-        (Some(after), _) => after,
-        (None, Some(cursor)) => Cursor {
-            last_synced_at: cursor.last_synced_at - Duration::seconds(OVERLAP_SECONDS),
-            id: Uuid::nil(),
-        },
-        (None, None) => Cursor::start(),
-    };
-
-    let mut tx = deployment.begin().await?;
-    let mut rows: Vec<TableRow> = Vec::new();
-    for synced in tables::list() {
-        rows.extend(
-            synced
-                .list_synced_after(&mut tx, user, &after, limit)
-                .await?,
-        );
-    }
-    let mut page = page_of(&mut tx, rows, limit).await?;
-    tx.commit().await?;
-    page.purge_horizon = purge_horizon;
-    if page.next.is_none() {
-        // The device now has everything up to this moment, whatever the
-        // last row's time, so a quiet stretch never makes it look stale
+    let mut page = scan_page(&mut tx, user, continuation, limit).await?;
+    if continuation.scan == Scan::Incremental || page.next.is_none() {
         page.cursor = Some(Cursor {
-            last_synced_at: now(),
-            id: Uuid::nil(),
+            feed_id: feed.id,
+            global_sync_version: page
+                .next
+                .map_or(continuation.range.through, |next| next.range.after),
         });
     }
+    tx.commit().await?;
     Ok(page)
 }
 
-/// Answers a backfill from the user: every post and file in the
-/// community, as their live rows there after the cursor, each with the
-/// rows it points at. The user must be in the community.
+/// Lists live rows in a community the caller can currently access.
 pub async fn backfill(
     deployment: &Deployment,
     user: &User,
     request: BackfillRequest,
 ) -> Result<Page, SyncError> {
-    let limit = request.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
-    let after = request.after.unwrap_or_else(Cursor::start);
-    let mut tx = deployment.begin().await?;
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::backfill(backend, user, request).await;
+    }
+    let mut tx = deployment.database.begin_snapshot().await?;
     if memberships::get_live_in(&mut tx, user.id, request.community_id)
         .await?
         .is_none()
@@ -306,56 +386,102 @@ pub async fn backfill(
             community_id: request.community_id,
         });
     }
-    let mut rows: Vec<TableRow> = Vec::new();
-    for synced in tables::list() {
-        rows.extend(
-            synced
-                .list_live_in_community_after(&mut tx, request.community_id, &after, limit)
-                .await?,
-        );
+    let feed = app_sync_versions::get(&mut tx).await?;
+    let scan = Scan::Community(request.community_id);
+    let continuation = request.after.unwrap_or(Continuation {
+        feed_id: feed.id,
+        scan,
+        range: VersionRange {
+            after: 0,
+            through: feed.head,
+        },
+    });
+    if continuation.scan != scan {
+        return Err(SyncError::InvalidContinuation);
     }
-    let page = page_of(&mut tx, rows, limit).await?;
+    if !continuation.covered_by(&feed)? {
+        return Ok(Page {
+            resync: true,
+            ..Page::default()
+        });
+    }
+    let limit = request.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+    let page = scan_page(&mut tx, user, continuation, limit).await?;
     tx.commit().await?;
     Ok(page)
 }
 
-/// A row's place in the pull order.
-fn place_of(row: &TableRow) -> Result<Cursor, SyncError> {
-    let id = row
-        .id()
-        .ok_or_else(|| SyncError::Malformed(format!("a row of {} without an id", row.table)))?;
-    let last_synced_at =
-        Cursor::of_row(row).map_or(DateTime::<Utc>::UNIX_EPOCH, |cursor| cursor.last_synced_at);
-    Ok(Cursor { last_synced_at, id })
+impl Continuation {
+    fn covered_by(&self, feed: &app_sync_versions::Feed) -> Result<bool, SyncError> {
+        let VersionRange { after, through } = self.range;
+        if after < 0 || through < 0 || after > through {
+            return Err(SyncError::InvalidContinuation);
+        }
+        if self.feed_id != feed.id || through > feed.head {
+            return Ok(false);
+        }
+        let required = if self.scan == Scan::Incremental {
+            after
+        } else {
+            through
+        };
+        Ok(required >= feed.floor)
+    }
 }
 
-/// The first `limit` rows in cursor order, each after the rows it points
-/// at, with where the next page starts when there are more.
-async fn page_of(
+/// Reads the next page of the scan: from each table, the first rows the
+/// user sees with a global sync version in the range, merged in version
+/// order and cut at `limit`. A row's version is unique across tables, so
+/// the page holds every visible row up to its last one.
+async fn scan_page(
     tx: &mut Transaction,
-    rows: Vec<TableRow>,
+    user: &User,
+    continuation: Continuation,
     limit: usize,
 ) -> Result<Page, SyncError> {
-    let mut placed = rows
-        .into_iter()
-        .map(|row| Ok((place_of(&row)?, row)))
-        .collect::<Result<Vec<_>, SyncError>>()?;
-    placed.sort_by_key(|(place, _)| *place);
-    let more = placed.len() > limit;
-    placed.truncate(limit);
-    let cursor = placed.last().map(|(place, _)| *place);
-    let mut out = Vec::with_capacity(placed.len());
+    let range = continuation.range;
+    let mut rows = Vec::new();
+    for synced in tables::list() {
+        let served = server_of(*synced)?;
+        let rows_of_table = match continuation.scan {
+            Scan::Community(id) => {
+                served
+                    .list_live_in_community_after(tx, id, &range, limit + 1)
+                    .await?
+            }
+            Scan::Incremental | Scan::Bootstrap => {
+                served
+                    .list_synced_after(tx, user, &range, limit + 1)
+                    .await?
+            }
+        };
+        for row in rows_of_table {
+            rows.push((row.global_sync_version()?, row));
+        }
+    }
+    rows.sort_by_key(|(version, _)| *version);
+    let mut next = None;
+    if rows.len() > limit {
+        next = Some(continuation.continued_after(rows[limit - 1].0));
+        rows.truncate(limit);
+    }
+    let mut out = Vec::with_capacity(rows.len());
     let mut sent = BTreeSet::new();
-    for (_, row) in placed {
+    for (_, row) in rows {
         send_with_parents(tx, &mut out, &mut sent, row).await?;
     }
     Ok(Page {
         rows: out,
-        next: if more { cursor } else { None },
-        cursor,
-        purge_horizon: None,
-        resync: false,
+        next,
+        ..Page::default()
     })
+}
+
+impl Continuation {
+    fn continued_after(mut self, version: i64) -> Self {
+        self.range.after = version;
+        self
+    }
 }
 
 /// Puts the row on the wire after the rows it points at, and theirs in
@@ -370,17 +496,30 @@ async fn send_with_parents(
     sent: &mut BTreeSet<(String, Uuid)>,
     row: TableRow,
 ) -> Result<(), SyncError> {
-    let key = (row.table.clone(), place_of(&row)?.id);
+    let id = row
+        .id()
+        .ok_or_else(|| SyncError::Malformed(format!("a row of {} without an id", row.table)))?;
+    let key = (row.table.clone(), id);
     if sent.contains(&key) {
         return Ok(());
     }
     let synced = synced_table_of(&row.table)?;
-    for parent in synced.parents(tx, &row).await? {
+    for parent in server_of(synced)?.parents(tx, &row).await? {
         Box::pin(send_with_parents(tx, out, sent, parent)).await?;
     }
     sent.insert(key);
     out.push(row);
     Ok(())
+}
+
+/// The table's part in this server's sync: every table has one on a
+/// Rust server.
+fn server_of(
+    synced: &'static dyn SyncedTable,
+) -> Result<&'static dyn SyncedTableServer, SyncError> {
+    synced
+        .server()
+        .ok_or_else(|| SyncError::NotServed(synced.table().to_string()))
 }
 
 /// The synced table of the name a row or an event gives.
@@ -498,7 +637,7 @@ pub async fn run<T: Transport>(
     let token = Some(token.as_str());
     let mut waiting = bytes::ask_about_waiting(deployment, transport, token).await?;
     report.files_left = waiting.len().saturating_sub(bytes::PER_SYNC);
-    let held_back = bytes::held_back(deployment, &waiting).await?;
+    let held_back = rows_held_back(deployment, &waiting).await?;
     if let Err(error) =
         push_pending(deployment, transport, token, &user, &held_back, &mut report).await
     {
@@ -509,7 +648,7 @@ pub async fn run<T: Transport>(
     prune(deployment, &user, &mut report).await?;
     report.uploaded = bytes::upload_waiting(deployment, transport, token, &mut waiting).await?;
     if report.uploaded > 0 {
-        let held_back = bytes::held_back(deployment, &waiting).await?;
+        let held_back = rows_held_back(deployment, &waiting).await?;
         if let Err(error) =
             push_pending(deployment, transport, token, &user, &held_back, &mut report).await
         {
@@ -586,6 +725,20 @@ async fn push_pending<T: Transport>(
     }
 }
 
+/// The rows whose events are held back from the push: those waiting for
+/// their bytes to reach the server, and those waiting for the person,
+/// with the rows that wait with them.
+async fn rows_held_back(
+    deployment: &Deployment,
+    waiting: &[bytes::Waiting],
+) -> Result<BTreeSet<Uuid>, SyncError> {
+    let mut held_back = bytes::held_back(deployment, waiting).await?;
+    let mut tx = deployment.begin().await?;
+    conflicts::hold_back_refused(&mut tx, &mut held_back).await?;
+    tx.commit().await?;
+    Ok(held_back)
+}
+
 /// How many of the events, from the first, one push request holds:
 /// those whose JSON is within `PUSH_BATCH_BYTES`, and one at least.
 fn count_within_push_batch_bytes(batch: &[StoredEvent]) -> Result<usize, SyncError> {
@@ -620,6 +773,9 @@ async fn push_batch<T: Transport>(
     // The server's row of each answered row, by the row's place in the
     // write order, applied once every answer is in
     let mut answered: BTreeMap<(usize, Uuid), TableRow> = BTreeMap::new();
+    // The rows whose create was refused in this request: the later events
+    // of each, and the creates of rows pointing at it, wait with it
+    let mut refused: BTreeSet<Uuid> = BTreeSet::new();
     for answer in response.events {
         let Some(stored) = pending.iter().find(|stored| stored.event.id == answer.id) else {
             continue;
@@ -638,30 +794,37 @@ async fn push_batch<T: Transport>(
             AnswerStatus::Rejected => {
                 report.rejected += 1;
                 let reason = answer.reason.unwrap_or_else(|| "rejected".to_string());
+                // Kept pending, and held back from now on
+                if refused.contains(&event.row_id)
+                    || conflicts::creates_row_pointing_at(event, &refused)
+                {
+                    refused.insert(event.row_id);
+                    continue;
+                }
                 match (event.kind, server.is_some()) {
-                    // The server's row wins
-                    (_, true) => app_events::delete(&mut tx, event.id).await?,
-                    // A row's bytes may be their only copy, so it is never
-                    // dropped: it waits while the server only lacks the
-                    // bytes, and is kept for the person otherwise
-                    (EventKind::Create, false) if bytes::of_table(&event.table).is_ok() => {
-                        let refused = if reason == bytes::NOT_UPLOADED {
+                    // The server already has the row: its row wins
+                    (EventKind::Create, true) => app_events::delete(&mut tx, event.id).await?,
+                    // The server's row wins, and the person sees why their
+                    // change did not, to reapply or let go
+                    (EventKind::Update, true) => {
+                        app_events::refuse(&mut tx, event.id, &reason).await?;
+                        report.conflicts += 1;
+                    }
+                    // Never dropped: the row stays, a file's bytes may be
+                    // their only copy, and the person tries again or lets
+                    // it go. A file waits while the server only lacks its
+                    // bytes
+                    (EventKind::Create, false) => {
+                        let is_refused = if reason == bytes::NOT_UPLOADED {
                             app_events::count_attempt(&mut tx, event.id, &reason).await?
                         } else {
                             app_events::refuse(&mut tx, event.id, &reason).await?;
                             true
                         };
-                        if refused {
+                        if is_refused {
+                            refused.insert(event.row_id);
                             report.conflicts += 1;
                         }
-                        continue;
-                    }
-                    // The server will never have this row: drop it
-                    (EventKind::Create, false) => {
-                        app_events::delete(&mut tx, event.id).await?;
-                        app_events::delete_pending_of_row(&mut tx, &event.table, event.row_id)
-                            .await?;
-                        delete_row(&mut tx, &event.table, event.row_id).await?;
                         continue;
                     }
                     // The row is gone from the server, purged or never
@@ -687,12 +850,10 @@ async fn push_batch<T: Transport>(
                         report.conflicts += 1;
                         continue;
                     }
-                    // Kept pending with the reason, and tried again by the
-                    // next sync, up to the limit
+                    // Refused once, not tried again: a rejection is final
                     (EventKind::Update, false) => {
-                        if app_events::count_attempt(&mut tx, event.id, &reason).await? {
-                            report.conflicts += 1;
-                        }
+                        app_events::refuse(&mut tx, event.id, &reason).await?;
+                        report.conflicts += 1;
                         continue;
                     }
                 }
@@ -723,9 +884,17 @@ async fn pull_pages<T: Transport>(
     user: &User,
     report: &mut Report,
 ) -> Result<(), SyncError> {
+    let mut tx = deployment.begin().await?;
+    let cursor = app_sync_state::get(&mut tx).await?;
+    // A first pull cut short goes on from its last page
+    let after = match cursor {
+        Some(_) => None,
+        None => app_sync_state::get_continuation(&mut tx).await?,
+    };
+    tx.commit().await?;
     let mut request = PullRequest {
-        cursor: status(deployment).await?.cursor,
-        after: None,
+        cursor,
+        after,
         limit: Some(DEFAULT_LIMIT),
     };
     loop {
@@ -745,8 +914,10 @@ async fn pull_pages<T: Transport>(
             apply_row(&mut tx, user, row).await?;
         }
         report.pulled += page.rows.len();
-        if let Some(cursor) = page.cursor {
-            app_sync_state::upsert(&mut tx, &cursor).await?;
+        match (page.cursor, page.next) {
+            (Some(cursor), _) => app_sync_state::upsert(&mut tx, &cursor).await?,
+            (None, Some(next)) => app_sync_state::upsert_continuation(&mut tx, &next).await?,
+            (None, None) => {}
         }
         tx.commit().await?;
         match page.next {
@@ -772,6 +943,7 @@ async fn reset(deployment: &Deployment, user: &User) -> Result<(), SyncError> {
     let mut tx = deployment.begin().await?;
     for synced in tables::list().iter().rev() {
         synced.delete_for_resync(&mut tx, user).await?;
+        app_sync_state::maintenance::clear_versions(&mut tx, synced.table()).await?;
     }
     app_sync_state::maintenance::delete_cursor_and_backfills(&mut tx).await?;
     tx.commit().await?;
@@ -789,12 +961,14 @@ async fn backfill_pending<T: Transport>(
     report: &mut Report,
 ) -> Result<(), SyncError> {
     let mut tx = deployment.begin().await?;
-    let communities = app_sync_backfills::list(&mut tx).await?;
+    let backfills = app_sync_backfills::list(&mut tx).await?;
     tx.commit().await?;
-    for community_id in communities {
-        let mut after = None;
+    for backfill in backfills {
+        let community_id = backfill.community_id;
+        // A backfill cut short goes on from its last page
+        let mut after = backfill.continuation;
         loop {
-            let page = transport
+            let result = transport
                 .backfill(
                     token,
                     BackfillRequest {
@@ -803,14 +977,38 @@ async fn backfill_pending<T: Transport>(
                         limit: Some(DEFAULT_LIMIT),
                     },
                 )
-                .await?;
+                .await;
+            let page = match result {
+                Ok(page) => page,
+                Err(SyncError::NotAMember { .. }) => {
+                    let mut tx = deployment.begin().await?;
+                    app_sync_backfills::delete(&mut tx, community_id).await?;
+                    tx.commit().await?;
+                    // Apply any membership revocation that committed after the pull.
+                    pull_pages(deployment, transport, token, user, report).await?;
+                    break;
+                }
+                Err(error) => return Err(error),
+            };
+            if page.resync {
+                // Keep this community queued and start it again after the
+                // next pull.
+                let mut tx = deployment.begin().await?;
+                app_sync_backfills::delete(&mut tx, community_id).await?;
+                app_sync_backfills::create(&mut tx, community_id).await?;
+                tx.commit().await?;
+                break;
+            }
             let mut tx = deployment.begin().await?;
             for row in &page.rows {
                 apply_row(&mut tx, user, row).await?;
             }
             report.backfilled += page.rows.len();
-            if page.next.is_none() {
-                app_sync_backfills::delete(&mut tx, community_id).await?;
+            match &page.next {
+                Some(next) => {
+                    app_sync_backfills::update_continuation(&mut tx, community_id, next).await?
+                }
+                None => app_sync_backfills::delete(&mut tx, community_id).await?,
             }
             tx.commit().await?;
             match page.next {
@@ -844,6 +1042,16 @@ async fn prune(deployment: &Deployment, user: &User, report: &mut Report) -> Res
 /// had left, records the community to backfill.
 async fn apply_row(tx: &mut Transaction, user: &User, row: &TableRow) -> Result<bool, SyncError> {
     let synced = synced_table_of(&row.table)?;
+    let id = row
+        .id()
+        .ok_or_else(|| SyncError::Malformed(format!("a row of {} without an id", row.table)))?;
+    let version = row.global_sync_version()?;
+    if app_sync_state::row_version(tx, &row.table, id)
+        .await?
+        .is_some_and(|stored| stored > version)
+    {
+        return Ok(false);
+    }
     Ok(synced.apply_server_row(tx, user, row).await?)
 }
 
@@ -906,7 +1114,27 @@ pub(crate) mod tests {
     }
 
     async fn sync(device: &Deployment, server: &Deployment) -> Report {
-        run(device, &InProcess { server }).await.expect("a sync")
+        let report = run(device, &InProcess { server }).await.expect("a sync");
+        assert_every_row_published(server).await;
+        report
+    }
+
+    /// Fails for a server row written without publishing its change, so
+    /// a write path that skips `app_sync_changes::record` fails its tests.
+    pub(crate) async fn assert_every_row_published(server: &Deployment) {
+        let mut tx = server.begin().await.expect("a transaction");
+        for synced in tables::list() {
+            let unpublished =
+                crate::data::app_sync_changes::list_unpublished(&mut tx, synced.table())
+                    .await
+                    .expect("the unpublished rows");
+            assert!(
+                unpublished.is_empty(),
+                "rows of {} written without a published change: {unpublished:?}",
+                synced.table()
+            );
+        }
+        tx.commit().await.expect("committed");
     }
 
     async fn bodies(deployment: &Deployment, user: &User) -> Vec<String> {
@@ -937,7 +1165,7 @@ pub(crate) mod tests {
                 inserted_at: now,
                 updated_at: now,
                 version: 1,
-                last_synced_at: Some(now),
+                global_sync_version: Some(1),
                 deleted_at: None,
                 deleted_by_id: None,
             };
@@ -949,7 +1177,7 @@ pub(crate) mod tests {
                 inserted_at: now,
                 updated_at: now,
                 version: 1,
-                last_synced_at: Some(now),
+                global_sync_version: Some(2),
                 deleted_at: None,
                 deleted_by_id: None,
             };
@@ -958,8 +1186,8 @@ pub(crate) mod tests {
                 memberships::table_row(&membership).expect("row"),
             ];
             let cursor = Cursor {
-                last_synced_at: now,
-                id: membership.id,
+                feed_id: Uuid::now_v7(),
+                global_sync_version: 2,
             };
             for commit in [false, true] {
                 let mut tx = device.begin().await.expect("transaction");
@@ -999,7 +1227,12 @@ pub(crate) mod tests {
                         .is_some(),
                     commit
                 );
-                let backfills = app_sync_backfills::list(&mut tx).await.expect("backfills");
+                let backfills: Vec<Uuid> = app_sync_backfills::list(&mut tx)
+                    .await
+                    .expect("backfills")
+                    .into_iter()
+                    .map(|backfill| backfill.community_id)
+                    .collect();
                 assert_eq!(
                     backfills,
                     if commit {
@@ -1045,7 +1278,7 @@ pub(crate) mod tests {
                 .await
                 .expect("the note on a");
             assert_eq!(on_a.version, 1);
-            assert!(on_a.last_synced_at.is_some());
+            assert!(on_a.global_sync_version.is_some());
             assert_eq!(bodies(&server, &alice).await, vec!["from a"]);
 
             let report = sync(&b, &server).await;
@@ -1642,7 +1875,7 @@ pub(crate) mod tests {
             };
             let report = run(&b, &transport).await.expect("a sync");
             assert!(report.push_error.is_some());
-            assert_eq!(report.pulled, 2, "a's edit, and alice's row in the overlap");
+            assert_eq!(report.pulled, 2, "a's edit, and alice's row as its parent");
             assert_eq!(
                 test_notes::get(&b, &alice, note.id)
                     .await
@@ -1844,7 +2077,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn sync_pull_pages_in_cursor_order_and_resends_the_overlap() {
+    async fn sync_pull_pages_in_version_order_and_resumes_after_the_last_version() {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let alice = users::create(&server, "alice@example.com", "Alice")
@@ -1875,8 +2108,8 @@ pub(crate) mod tests {
             assert_eq!(page.rows[0].row["id"], json!(alice.id));
             assert_eq!(page.rows[1].row["id"], json!(first.id));
             let next = page.next.expect("another page");
-            assert_eq!(next.id, first.id);
-            assert_eq!(page.cursor, Some(next));
+            assert_eq!(Some(next.range.after), first.global_sync_version);
+            assert!(page.cursor.is_none(), "baseline is saved on the last page");
 
             let page = pull(
                 &server,
@@ -1895,29 +2128,19 @@ pub(crate) mod tests {
             assert_eq!(page.rows[2].row["id"], json!(third.id));
             assert!(page.next.is_none());
             let cursor = page.cursor.expect("a cursor");
-            assert_eq!(
-                cursor.id,
-                Uuid::nil(),
-                "the server's time, on the last page"
-            );
-            assert!(cursor.last_synced_at >= third.last_synced_at.expect("synced"));
-
+            assert_eq!(Some(cursor.global_sync_version), third.global_sync_version);
             let page = pull(
                 &server,
                 &alice,
                 PullRequest {
                     cursor: Some(cursor),
-                    after: None,
-                    limit: None,
+                    ..PullRequest::default()
                 },
             )
             .await
-            .expect("a page");
-            assert_eq!(
-                page.rows.len(),
-                4,
-                "the overlap sends the last minute again"
-            );
+            .expect("another pull");
+            assert!(page.rows.is_empty());
+            assert_eq!(page.cursor, Some(cursor));
         })
         .await;
     }
@@ -2071,8 +2294,27 @@ pub(crate) mod tests {
         .await;
     }
 
+    /// Queues the first pending event again with a field the server
+    /// refuses.
+    async fn break_queued_event(device: &Deployment, user: &User) {
+        let mut tx = device.begin().await.expect("a transaction");
+        let stored = app_events::pending(&mut tx)
+            .await
+            .expect("the events")
+            .remove(0);
+        app_events::delete(&mut tx, stored.event.id)
+            .await
+            .expect("deleted");
+        let mut broken = stored.event.clone();
+        broken.changes.insert("version".to_string(), json!(5));
+        crate::sync::events::queue(&mut tx, user.id, &broken)
+            .await
+            .expect("queued");
+        tx.commit().await.expect("committed");
+    }
+
     #[tokio::test]
-    async fn sync_a_rejected_create_drops_the_devices_row() {
+    async fn sync_a_rejected_create_is_kept_for_the_person_with_its_later_edits() {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
@@ -2080,42 +2322,143 @@ pub(crate) mod tests {
             let note = test_notes::create(&a, &alice, "fine", None)
                 .await
                 .expect("a note");
-            {
-                // Rewrite the queued create to one the server refuses
-                let mut tx = a.begin().await.expect("a transaction");
-                let stored = app_events::pending(&mut tx)
-                    .await
-                    .expect("the events")
-                    .remove(0);
-                app_events::delete(&mut tx, stored.event.id)
-                    .await
-                    .expect("deleted");
-                let mut broken = stored.event.clone();
-                broken.changes = fields(json!({ "body": "x", "version": 5 }));
-                crate::sync::events::queue(&mut tx, alice.id, &broken)
-                    .await
-                    .expect("queued");
-                tx.commit().await.expect("committed");
-            }
+            break_queued_event(&a, &alice).await;
 
             let report = sync(&a, &server).await;
             assert_eq!(report.rejected, 1);
+            assert_eq!(report.conflicts, 1);
             assert_eq!(report.pending, 0);
-            assert!(bodies(&a, &alice).await.is_empty());
+            assert_eq!(bodies(&a, &alice).await, vec!["fine"], "the row stays");
             assert!(bodies(&server, &alice).await.is_empty());
-            let error = test_notes::get(&a, &alice, note.id)
+            let refused = conflicts::list(&a).await.expect("the conflicts");
+            assert_eq!(refused.len(), 1);
+            assert_eq!(refused[0].row_id, note.id);
+            assert_eq!(refused[0].resolve, conflicts::Resolve::TryAgain);
+            assert!(refused[0].reason.is_some(), "with why");
+
+            test_notes::update(&a, &alice, note.id, "edited")
                 .await
-                .expect_err("dropped");
-            assert!(matches!(error, NoteError::NotFound { .. }));
+                .expect("edited while refused");
+            let report = sync(&a, &server).await;
+            assert_eq!(report.rejected, 0, "the edit waits with its create");
+            assert_eq!(report.pending, 1);
+            assert!(bodies(&server, &alice).await.is_empty());
+
+            conflicts::delete(&a, refused[0].id).await.expect("let go");
+            assert!(bodies(&a, &alice).await.is_empty());
+            assert!(conflicts::list(&a).await.expect("the conflicts").is_empty());
+            assert_eq!(sync(&a, &server).await.pending, 0, "the edit went with it");
         })
         .await;
     }
 
-    fn fields(value: Value) -> app_events::Fields {
-        match value {
-            Value::Object(fields) => fields,
-            _ => panic!("fields are an object"),
-        }
+    #[tokio::test]
+    async fn sync_a_rejected_update_takes_the_servers_row_and_tells_the_person() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let (alice, token) = user_with_token(&server, "alice@example.com").await;
+            let note = test_notes::create(&server, &alice, "roses", None)
+                .await
+                .expect("a note");
+            let a = device_of(&alice, &token).await;
+            sync(&a, &server).await;
+            test_notes::update(&a, &alice, note.id, "tulips")
+                .await
+                .expect("edited");
+            break_queued_event(&a, &alice).await;
+
+            let report = sync(&a, &server).await;
+            assert_eq!(report.rejected, 1);
+            assert_eq!(report.conflicts, 1, "the person is told");
+            assert_eq!(report.pending, 0, "not tried again");
+            assert_eq!(bodies(&a, &alice).await, vec!["roses"], "the server's row");
+            let refused = conflicts::list(&a).await.expect("the conflicts");
+            assert_eq!(refused.len(), 1);
+            assert!(refused[0].reason.is_some(), "with why");
+            assert_eq!(refused[0].resolve, conflicts::Resolve::Reapply);
+
+            test_notes::update(&a, &alice, note.id, "daisies")
+                .await
+                .expect("edited again");
+            assert_eq!(sync(&a, &server).await.pushed, 1, "nothing waits on it");
+            assert_eq!(bodies(&server, &alice).await, vec!["daisies"]);
+            conflicts::delete(&a, refused[0].id).await.expect("let go");
+            assert!(conflicts::list(&a).await.expect("the conflicts").is_empty());
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn sync_a_rejected_create_tried_again_is_sent_again() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let (alice, token) = user_with_token(&server, "alice@example.com").await;
+            let a = device_of(&alice, &token).await;
+            test_notes::create(&a, &alice, "fine", None)
+                .await
+                .expect("a note");
+            break_queued_event(&a, &alice).await;
+            sync(&a, &server).await;
+            assert_eq!(sync(&a, &server).await.rejected, 0, "not sent on its own");
+
+            let refused = conflicts::list(&a).await.expect("the conflicts");
+            conflicts::try_again(&a, refused[0].id)
+                .await
+                .expect("tried again");
+            let report = sync(&a, &server).await;
+            assert_eq!(report.rejected, 1, "sent again");
+            assert_eq!(report.conflicts, 1, "and refused again");
+            assert_eq!(bodies(&a, &alice).await, vec!["fine"]);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn sync_a_renewed_feed_id_resyncs_every_device_and_keeps_its_rows() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let (alice, token) = user_with_token(&server, "alice@example.com").await;
+            test_notes::create(&server, &alice, "roses", None)
+                .await
+                .expect("a note");
+            let a = device_of(&alice, &token).await;
+            sync(&a, &server).await;
+            let before = sync(&a, &server).await;
+            assert!(!before.resynced);
+
+            let renewed = feed_id_renew(&server).await.expect("renewed");
+            let mut tx = server.begin().await.expect("a transaction");
+            assert_eq!(
+                app_sync_versions::get(&mut tx).await.expect("the feed").id,
+                renewed
+            );
+            tx.commit().await.expect("committed");
+            let after = sync(&a, &server).await;
+            assert!(after.resynced);
+            assert_eq!(bodies(&a, &alice).await, vec!["roses"]);
+            assert!(!sync(&a, &server).await.resynced, "once");
+            assert!(feed_id_renew(&a).await.is_err(), "a device has no feed");
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn sync_a_rejected_create_keeps_its_row_through_a_resync() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let (alice, token) = user_with_token(&server, "alice@example.com").await;
+            let a = device_of(&alice, &token).await;
+            test_notes::create(&a, &alice, "fine", None)
+                .await
+                .expect("a note");
+            break_queued_event(&a, &alice).await;
+            sync(&a, &server).await;
+
+            reset(&a, &alice).await.expect("a resync");
+            assert_eq!(bodies(&a, &alice).await, vec!["fine"]);
+            assert_eq!(conflicts::list(&a).await.expect("the conflicts").len(), 1);
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -2478,60 +2821,20 @@ pub(crate) mod tests {
                 1,
                 "sent once"
             );
-            assert_eq!(page.cursor.expect("a cursor").id, Uuid::nil());
+            assert!(page.cursor.expect("a cursor").global_sync_version > 0);
         })
         .await;
     }
 
-    /// Runs an update of one row's times, for rows that must look old.
-    async fn backdate(deployment: &Deployment, statement: &'static str, id: Uuid) {
-        let at = now() - Duration::days(100);
-        let mut tx = deployment.begin().await.expect("a transaction");
-        match &mut tx {
-            Transaction::Sqlite(tx) => {
-                sqlx::query(statement)
-                    .bind(at)
-                    .bind(id.hyphenated())
-                    .execute(&mut **tx)
-                    .await
-                    .expect("backdated");
-            }
-            #[cfg(feature = "postgres")]
-            Transaction::Postgres(tx) => {
-                sqlx::query(statement)
-                    .bind(at)
-                    .bind(id)
-                    .execute(&mut **tx)
-                    .await
-                    .expect("backdated");
-            }
-        }
-        tx.commit().await.expect("committed");
-    }
-
-    /// Deletes the note on the server as if long ago, and purges it.
+    /// Deletes the note and runs the purge after its retention window.
     async fn delete_long_ago_and_purge(server: &Deployment, alice: &User, note_id: Uuid) {
         test_notes::delete(server, alice, note_id)
             .await
             .expect("deleted");
-        backdate(
-            server,
-            "UPDATE app_test_notes SET deleted_at = $1, last_synced_at = $1 WHERE id = $2",
-            note_id,
-        )
-        .await;
-        let report = purge::run(server, now()).await.expect("purged");
+        let report = purge::run(server, now() + Duration::days(100))
+            .await
+            .expect("purged");
         assert_eq!(report.removed[test_notes::TABLE], 1);
-    }
-
-    /// Makes the device's last pull look older than the purge window.
-    async fn backdate_cursor(device: &Deployment) {
-        backdate(
-            device,
-            "UPDATE app_sync_state SET cursor_last_synced_at = $1 WHERE cursor_id != $2",
-            Uuid::max(),
-        )
-        .await;
     }
 
     #[tokio::test]
@@ -2553,7 +2856,6 @@ pub(crate) mod tests {
             assert_eq!(bodies(&a, &alice).await, vec!["gone", "kept"]);
 
             delete_long_ago_and_purge(&server, &alice, gone.id).await;
-            backdate_cursor(&a).await;
             let report = sync(&a, &server).await;
             assert!(report.resynced, "{report:?}");
             assert!(
@@ -2592,7 +2894,10 @@ pub(crate) mod tests {
         with_each_database(|database| async move {
             let server = Deployment::new(database, Role::Server);
             let (alice, token) = user_with_token(&server, "alice@example.com").await;
-            let note = test_notes::create(&server, &alice, "start", None)
+            let community = communities::create(&server, &alice, "Gardening")
+                .await
+                .expect("the note's parent");
+            let note = test_notes::create(&server, &alice, "start", Some(community.id))
                 .await
                 .expect("a note");
             let old = test_notes::create(&server, &alice, "old", None)
@@ -2604,7 +2909,6 @@ pub(crate) mod tests {
                 .await
                 .expect("edited");
             delete_long_ago_and_purge(&server, &alice, old.id).await;
-            backdate_cursor(&a).await;
 
             let transport = PushLost {
                 server: InProcess { server: &server },
@@ -2795,5 +3099,211 @@ pub(crate) mod tests {
             protocol_version_refusal(Some("one")).is_some(),
             "not a number"
         );
+    }
+
+    /// The server in this process, until `pages` pull or backfill pages
+    /// have been answered: then the network is gone. It keeps the
+    /// requests it was sent.
+    struct CutShort<'a> {
+        server: InProcess<'a>,
+        pages: usize,
+        pulls: std::sync::Mutex<Vec<PullRequest>>,
+        backfills: std::sync::Mutex<Vec<BackfillRequest>>,
+    }
+
+    impl<'a> CutShort<'a> {
+        fn after(server: &'a Deployment, pages: usize) -> CutShort<'a> {
+            CutShort {
+                server: InProcess { server },
+                pages,
+                pulls: std::sync::Mutex::new(Vec::new()),
+                backfills: std::sync::Mutex::new(Vec::new()),
+            }
+        }
+
+        fn answered(&self) -> usize {
+            self.pulls.lock().expect("the pulls").len()
+                + self.backfills.lock().expect("the backfills").len()
+        }
+    }
+
+    impl Transport for CutShort<'_> {
+        async fn push(
+            &self,
+            token: Option<&str>,
+            request: PushRequest,
+        ) -> Result<PushResponse, SyncError> {
+            self.server.push(token, request).await
+        }
+
+        async fn pull(&self, token: Option<&str>, request: PullRequest) -> Result<Page, SyncError> {
+            if self.answered() >= self.pages {
+                return Err(SyncError::Transport("cut short".to_string()));
+            }
+            self.pulls.lock().expect("the pulls").push(request.clone());
+            self.server.pull(token, request).await
+        }
+
+        async fn backfill(
+            &self,
+            token: Option<&str>,
+            request: BackfillRequest,
+        ) -> Result<Page, SyncError> {
+            if self.answered() >= self.pages {
+                return Err(SyncError::Transport("cut short".to_string()));
+            }
+            self.backfills
+                .lock()
+                .expect("the backfills")
+                .push(request.clone());
+            self.server.backfill(token, request).await
+        }
+
+        async fn sign_in_with_device_code(
+            &self,
+            code: &str,
+            verifier: &str,
+        ) -> Result<Session, SyncError> {
+            self.server.sign_in_with_device_code(code, verifier).await
+        }
+
+        async fn sign_out(&self, token: &str) -> Result<(), SyncError> {
+            self.server.sign_out(token).await
+        }
+
+        async fn bytes_uploads_create(
+            &self,
+            token: Option<&str>,
+            table: &str,
+            request: UploadNew,
+        ) -> Result<Upload, SyncError> {
+            self.server
+                .bytes_uploads_create(token, table, request)
+                .await
+        }
+
+        async fn bytes_upload(
+            &self,
+            token: Option<&str>,
+            table: &str,
+            upload: &Upload,
+            path: &Path,
+        ) -> Result<(), SyncError> {
+            self.server.bytes_upload(token, table, upload, path).await
+        }
+
+        async fn bytes_download(
+            &self,
+            token: Option<&str>,
+            table: &str,
+            id: Uuid,
+            path: &Path,
+        ) -> Result<(), SyncError> {
+            self.server.bytes_download(token, table, id, path).await
+        }
+    }
+
+    #[tokio::test]
+    async fn sync_a_first_pull_cut_short_goes_on_from_its_last_page() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let (alice, token) = user_with_token(&server, "alice@example.com").await;
+            for index in 0..DEFAULT_LIMIT + 10 {
+                test_notes::create(&server, &alice, &format!("note {index}"), None)
+                    .await
+                    .expect("a note");
+            }
+            let device = device_of(&alice, &token).await;
+
+            let cut_short = CutShort::after(&server, 1);
+            assert!(run(&device, &cut_short).await.is_err());
+            assert_eq!(bodies(&device, &alice).await.len(), DEFAULT_LIMIT - 1);
+            let mut tx = device.begin().await.expect("a transaction");
+            assert!(
+                app_sync_state::get(&mut tx)
+                    .await
+                    .expect("cursor")
+                    .is_none()
+            );
+            let kept = app_sync_state::get_continuation(&mut tx)
+                .await
+                .expect("continuation");
+            tx.commit().await.expect("committed");
+            assert!(kept.is_some());
+
+            let carried_on = CutShort::after(&server, usize::MAX);
+            run(&device, &carried_on).await.expect("a sync");
+            let pulls = carried_on.pulls.lock().expect("the pulls").clone();
+            assert_eq!(pulls[0].after, kept, "it went on from the page kept");
+            assert_eq!(bodies(&device, &alice).await.len(), DEFAULT_LIMIT + 10);
+            let mut tx = device.begin().await.expect("a transaction");
+            assert!(
+                app_sync_state::get(&mut tx)
+                    .await
+                    .expect("cursor")
+                    .is_some()
+            );
+            assert!(
+                app_sync_state::get_continuation(&mut tx)
+                    .await
+                    .expect("continuation")
+                    .is_none()
+            );
+            tx.commit().await.expect("committed");
+            assert_every_row_published(&server).await;
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn sync_a_backfill_cut_short_goes_on_from_its_last_page() {
+        with_each_database(|database| async move {
+            let server = Deployment::new(database, Role::Server);
+            let (alice, _) = user_with_token(&server, "alice@example.com").await;
+            let (bob, bob_token) = user_with_token(&server, "bob@example.com").await;
+            let gardening = communities::create(&server, &alice, "Gardening")
+                .await
+                .expect("a community");
+            for index in 0..DEFAULT_LIMIT + 10 {
+                test_notes::create(
+                    &server,
+                    &alice,
+                    &format!("note {index}"),
+                    Some(gardening.id),
+                )
+                .await
+                .expect("a note");
+            }
+            let device = device_of(&bob, &bob_token).await;
+            sync(&device, &server).await;
+            memberships::create(&server, &bob, gardening.id)
+                .await
+                .expect("joined");
+
+            // The pull, then one page of the backfill
+            let cut_short = CutShort::after(&server, 2);
+            assert!(run(&device, &cut_short).await.is_err());
+            assert!(!bodies(&device, &bob).await.is_empty());
+            let mut tx = device.begin().await.expect("a transaction");
+            let backfills = app_sync_backfills::list(&mut tx).await.expect("backfills");
+            tx.commit().await.expect("committed");
+            assert_eq!(backfills.len(), 1);
+            assert!(backfills[0].continuation.is_some());
+
+            let carried_on = CutShort::after(&server, usize::MAX);
+            run(&device, &carried_on).await.expect("a sync");
+            let requests = carried_on.backfills.lock().expect("the backfills").clone();
+            assert_eq!(requests[0].after, backfills[0].continuation);
+            assert_eq!(bodies(&device, &bob).await.len(), DEFAULT_LIMIT + 10);
+            let mut tx = device.begin().await.expect("a transaction");
+            assert!(
+                app_sync_backfills::list(&mut tx)
+                    .await
+                    .expect("backfills")
+                    .is_empty()
+            );
+            tx.commit().await.expect("committed");
+        })
+        .await;
     }
 }

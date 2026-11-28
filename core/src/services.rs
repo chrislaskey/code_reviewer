@@ -8,6 +8,8 @@ pub mod agents;
 pub mod app_store;
 #[cfg(feature = "host")]
 pub mod apple_push;
+#[cfg(feature = "remote-backend")]
+pub mod backend;
 #[cfg(feature = "host")]
 pub mod git;
 #[cfg(feature = "host")]

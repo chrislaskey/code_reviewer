@@ -27,6 +27,7 @@ framework = [
     "core/src/lib.rs",
     "core/src/database.rs",
     "core/src/deployment.rs",
+    "core/src/device_settings.rs",
     "core/src/servers.rs",
     "core/src/servers/**",
     "core/src/jobs.rs",
@@ -43,6 +44,7 @@ framework = [
     "core/src/helpers/themes.rs",
     "core/src/helpers/translations.rs",
     "core/src/services/app_store.rs",
+    "core/src/services/backend.rs",
     "core/src/services/mailer.rs",
     "core/src/services/mailer/**",
     "core/src/services/storage.rs",
@@ -69,7 +71,9 @@ framework = [
     "core/src/data/app_communities/**",
     "core/src/data/app_users_communities/**",
     "core/src/data/app_events/**",
+    "core/src/data/app_sync_changes/**",
     "core/src/data/app_sync_state/**",
+    "core/src/data/app_sync_versions/**",
     "core/src/data/app_sync_backfills/**",
     "core/src/data/app_purges/**",
     "core/src/data/app_jobs/**",
@@ -205,6 +209,10 @@ examples = [
     "core/migrations/*/*_app_posts_create.sql",
     "core/migrations/*/*_app_files_create.sql",
     "core/migrations/*/*_app_files_content_add.sql",
+
+    # The sample remote backend, see docs/design/backend-seam.md: an app on
+    # the Rust backend deletes it, an app on Elixir builds from it
+    "core_elixir/**",
 
     "axum/src/app/posts.rs",
     "axum/src/app/files.rs",

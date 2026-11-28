@@ -69,6 +69,11 @@ pub enum TrialUserError {
     AccountUser(#[from] AccountUserError),
     #[error(transparent)]
     Community(#[from] CommunityError),
+    /// The remote backend failed, or has no trials: a backend without
+    /// them answers `not_implemented`.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -81,6 +86,8 @@ impl From<TrialUserError> for AccountError {
             TrialUserError::User(error) => error.into(),
             TrialUserError::AccountUser(error) => error.into(),
             TrialUserError::Community(error) => error.into(),
+            #[cfg(feature = "remote-backend")]
+            TrialUserError::Backend(error) => error.into(),
             TrialUserError::Database(error) => error.into(),
         }
     }
@@ -99,7 +106,20 @@ pub async fn create(deployment: &Deployment, max: i64) -> Result<Session, TrialU
     if deployment.role != Role::Server {
         return Err(TrialUserError::ServerOnly);
     }
+    if max <= 0 {
+        return Err(TrialUserError::Full);
+    }
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = serde_json::json!({ "max": max });
+        return match backend.call("trial_users/create", &request).await {
+            Ok(session) => Ok(session),
+            Err(error) if error.code() == Some("full") => Err(TrialUserError::Full),
+            Err(error) => Err(error.into()),
+        };
+    }
     let mut tx = deployment.begin().await?;
+    crate::data::app_sync_versions::lock(&mut tx).await?;
     if trial_users::count(&mut tx).await? >= max {
         return Err(TrialUserError::Full);
     }
@@ -121,14 +141,30 @@ pub async fn create(deployment: &Deployment, max: i64) -> Result<Session, TrialU
 
 /// How many trial users there are, for the cap.
 pub async fn count(deployment: &Deployment) -> Result<i64, TrialUserError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        #[derive(serde::Deserialize)]
+        struct Count {
+            count: i64,
+        }
+        let answer: Count = backend
+            .call("trial_users/count", &serde_json::json!({}))
+            .await?;
+        return Ok(answer.count);
+    }
     let mut tx = deployment.begin().await?;
     let count = trial_users::count(&mut tx).await?;
     tx.commit().await?;
     Ok(count)
 }
 
-/// Whether the user is a trial user. On a device, never.
-pub async fn is_trial(deployment: &Deployment, user: &User) -> Result<bool, sqlx::Error> {
+/// Whether the user is a trial user. On a device, never. Beside a
+/// remote backend, by the account it keeps.
+pub async fn is_trial(deployment: &Deployment, user: &User) -> Result<bool, UserError> {
+    if deployment.has_remote_backend() {
+        let account = crate::accounts::users::get(deployment, user.id).await?;
+        return Ok(account.trial_expires_at.is_some());
+    }
     let mut tx = deployment.begin().await?;
     let account = accounts_users::lifecycle::get(&mut tx, user.id).await?;
     tx.commit().await?;
@@ -160,6 +196,7 @@ pub async fn delete_expired(
     }
     let ended_before = now - Duration::hours(KEPT_AFTER_HOURS);
     let mut tx = deployment.begin().await?;
+    crate::data::app_sync_versions::lock(&mut tx).await?;
     let users = trial_users::maintenance::delete_expired_before(&mut tx, ended_before).await?;
     tx.commit().await?;
     Ok(TrialUsersDeleted { users })
@@ -178,7 +215,7 @@ pub(crate) async fn show_communities_in(
     tx: &mut Transaction,
     user_id: Uuid,
 ) -> Result<(), sqlx::Error> {
-    trial_users::maintenance::touch_communities_of(tx, user_id, now()).await
+    trial_users::maintenance::touch_communities_of(tx, user_id).await
 }
 
 #[cfg(test)]

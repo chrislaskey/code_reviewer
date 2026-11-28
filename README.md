@@ -25,6 +25,7 @@ core/      app_core, the application: one module per resource, with
 axum/      app_web, the web server: app_core over HTTP under /api, and svelte/dist
 tauri/     app_tauri, the desktop and mobile app: app_core behind Tauri commands
 svelte/    the pages, one Svelte app the web server serves and the Tauri app bundles
+core_elixir/ the sample remote backend, Elixir with Commanded, see docs/design/backend-seam.md
 bin/dev    starts a deployment in dev mode
 bin/lint   runs the checks a change passes before it is committed
 bin/reset  deletes the local SQLite files and drops the dev PostgreSQL database
@@ -280,7 +281,8 @@ communities its owner chose, zero or more
 checkboxes set. A user sees their own posts and the posts in their
 communities; leaving a community takes the member's own posts there
 along, and rejoining brings them back. The decisions are
-`phoenix/docs/design/multi-tenancy.md`, the port is in
+`phoenix/docs/design/multi-tenancy.md` (in the history, before
+`phoenix/` was removed after `f100d21`), the port is in
 `docs/design/offline-sync.md` under "Communities and what a user sees",
 and what was left out is `docs/suggestions/communities.md`.
 
@@ -335,7 +337,12 @@ Where each deployment's file is:
   `postgres://user@host/database`, which must exist (`createdb`). So
   `DATABASE_URL=postgres://postgres@localhost/starter_pack bin/dev` runs
   the web on PostgreSQL while the apps keep their SQLite files, the
-  mix the sync will face.
+  mix the sync will face. With `BACKEND=remote`, `BACKEND_URL` and
+  `BACKEND_SERVICE_TOKEN`, the web server opens no database: a remote
+  backend such as `core_elixir/` owns it, see
+  `docs/design/backend-seam.md`. Only what that backend serves is
+  answered yet. `BACKEND=elixir bin/dev` runs the web that way, over
+  `core_elixir/`.
 * The Tauri app: a folder per account under `accounts/`, holding its
   database, `app.db`, and the bytes of its files, `files/`, listed in
   `device.db`, in `DATA_DIR` when set, else the app data directory Tauri
@@ -416,6 +423,11 @@ the only way a value reaches a phone build, else `http://localhost:4000`.
 `bin/dev` sets it, and the sign-in page's URL beside it, with the
 `--config` override for the web server it starts. The web has nothing to sync and shows no sync
 status.
+
+Pull follows the server's committed `global_sync_version`. The device
+saves its feed ID and the last applied version in the active account's
+database. A cursor below the retained history triggers a fresh bootstrap
+that keeps pending work. See [offline sync](docs/design/offline-sync.md).
 
 The device holds exactly what its user sees. The pull brings each row
 after the rows it points at, so the foreign keys hold; joining a
@@ -741,7 +753,11 @@ fly deploy --ha=false
 ```
 
 It runs one machine with the SQLite database on the `data` volume;
-`--ha=false` keeps it at one. `fly ssh console -C "app_web ops staff
+`--ha=false` keeps it at one. After restoring the database from a
+backup, a volume snapshot say, run `fly ssh console -C "app_web sync feed
+renew"` before people sync again: the feed gets a new id and every
+device resyncs, since the restored database may give out again versions
+a device already saw. `fly ssh console -C "app_web ops staff
 create <email>"` makes an account staff. Settings that aren't secret are
 in `fly.toml`'s `[env]`; secrets are set with `fly secrets set --stage`,
 which waits for the next deploy. A secret goes in before the setting that

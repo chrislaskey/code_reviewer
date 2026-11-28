@@ -63,6 +63,10 @@ pub enum AccountUserError {
     InvalidEmail,
     #[error("that email already has an account")]
     EmailTaken,
+    /// The remote backend that keeps the accounts failed.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }

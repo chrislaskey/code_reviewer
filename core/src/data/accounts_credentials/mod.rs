@@ -64,8 +64,9 @@ pub async fn is_set(tx: &mut Transaction, user_id: Uuid) -> Result<bool, Credent
     Ok(query!(tx, get_password_hash(user_id))?.is_some())
 }
 
-/// The hash of the password, once checked for length.
-async fn checked_hash(password: &str) -> Result<String, CredentialError> {
+/// The hash of the password, once checked for length: what `set`
+/// keeps, and what Rust sends a remote backend to keep.
+pub(crate) async fn checked_hash(password: &str) -> Result<String, CredentialError> {
     let password = checked_password(password)?;
     off_the_runtime(move || {
         Argon2::default()
@@ -87,6 +88,15 @@ pub async fn verify(
         Some(user_id) => query!(tx, get_password_hash(user_id))?,
         None => None,
     };
+    verify_hash(password_hash, password).await
+}
+
+/// Whether the password matches the hash; false for no hash, after the
+/// same work: for a hash a remote backend answered, as for one here.
+pub(crate) async fn verify_hash(
+    password_hash: Option<String>,
+    password: &str,
+) -> Result<bool, CredentialError> {
     let nobody = password_hash.is_none();
     let password_hash = password_hash.unwrap_or_else(|| NOBODYS_HASH.to_string());
     let password = password.to_string();

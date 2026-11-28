@@ -12,10 +12,10 @@ CREATE TABLE accounts_preferences (
   inserted_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
   version bigint NOT NULL DEFAULT 0,
-  last_synced_at timestamptz,
+  global_sync_version BIGINT CHECK (global_sync_version > 0),
   deleted_at timestamptz,
   deleted_by_id uuid
 );
 
 CREATE UNIQUE INDEX accounts_preferences_user_id_key ON accounts_preferences (user_id, key);
-CREATE INDEX accounts_preferences_last_synced_at ON accounts_preferences (last_synced_at, id);
+CREATE INDEX accounts_preferences_global_sync_version ON accounts_preferences (global_sync_version);

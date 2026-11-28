@@ -1,12 +1,12 @@
 # Kept out of the Docker build context: build output, dependencies the
-# image installs itself, local databases, and the Phoenix reference.
+# image installs itself, and local databases.
 .git
 .claude
 .worktrees
 target
 axum/data
-phoenix
 svelte/node_modules
+core_elixir
 svelte/dist
 svelte/dist-ops
 tauri/gen

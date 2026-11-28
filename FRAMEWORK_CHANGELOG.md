@@ -18,6 +18,386 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-27: pictures on a remote backend
+
+Commits: this one. `docs/design/backend-seam.md`, step 4.
+
+- **What changed**.
+  - Beside a remote backend, `avatars::update` sends the picture's URL
+    to it, `users/avatar_update`, once Rust checked the file, and
+    `avatars::delete_unreferenced` asks it for every picture,
+    `users/avatar_urls_list`. The `avatars_delete_unreferenced` job
+    runs beside a remote backend.
+  - `core_elixir/` serves both, and the conformance suite has one more
+    test.
+- **What an app does**.
+  - **Required**, for an app with its own remote backend: serve the two
+    operations, or pictures fail beside it.
+
+## 2026-11-27: deleting an account on a remote backend
+
+Commits: this one. `docs/design/backend-seam.md`, step 4.
+
+- **What changed**.
+  - Beside a remote backend, `accounts::deletions::code::create` and
+    `accounts::deletions::create` call it,
+    `accounts/deletions/code/create` and `accounts/deletions/create`.
+    Rust sends the mail it answers and deletes the pictures. No Stripe
+    plan is ended there. `DeletionError` has a `Backend` variant, under
+    the `remote-backend` feature.
+  - `core_elixir/` serves them, and the conformance suite has three
+    more tests.
+- **What an app does**.
+  - **Required**, for an app that matches `DeletionError` exhaustively
+    with the `remote-backend` feature on: handle `Backend`.
+  - **Required**, for an app with its own remote backend: serve the
+    two operations, deleting the app's own rows of the user by each
+    table's rule, or deleting an account fails beside it.
+
+## 2026-11-27: passwords on a remote backend
+
+Commits: this one. `docs/design/backend-seam.md`, step 4.
+
+- **What changed**.
+  - Beside a remote backend, `accounts::password::get` and `update`,
+    `sign_in_with_password` and `sign_in_with_password_for_device` call
+    it. Rust still hashes and checks every password; the backend keeps
+    the hash: `accounts/password/get`, `update` and `get_hash`, then
+    `accounts/sign_in_with_password` or its `_for_device`.
+  - `data::accounts_credentials` has `checked_hash` and `verify_hash`,
+    crate-private, for the remote path.
+  - `core_elixir/` serves them, and the conformance suite has two more
+    tests.
+- **What an app does**.
+  - **Required**, for an app with its own remote backend: serve the
+    five operations, or passwords fail beside it.
+
+## 2026-11-27: renaming on a remote backend
+
+Commits: this one. `docs/design/backend-seam.md`, step 4.
+
+- **What changed**.
+  - Beside a remote backend, `users::update` calls it, `users/update`,
+    where it failed until now: `PUT /api/users/current` renames.
+  - `core_elixir/` serves it, and takes `app_users` updates in its push.
+  - The conformance suite has three more tests, for renaming.
+- **What an app does**.
+  - **Required**, for an app with its own remote backend: serve
+    `users/update`, or renaming fails beside it.
+
+## 2026-11-27: preferences on a remote backend
+
+Commits: this one. `docs/design/backend-seam.md`, step 4.
+
+- **What changed**.
+  - Beside a remote backend, `accounts::preferences::get` and `update`
+    call it, `accounts/preferences/get` and `update`, where `get`
+    answered the defaults until now. `PreferenceError` has a `Backend`
+    variant, under the `remote-backend` feature.
+  - `core_elixir/` serves preferences, and syncs `accounts_preferences`
+    in its push and pull. A code's mail is in the account's language.
+    It reads the languages and themes from `core/src/app/locales.rs`
+    and `core/src/helpers/themes.rs` when it compiles.
+  - The conformance suite has three more tests, for preferences.
+- **What an app does**.
+  - **Required**, for an app that matches `PreferenceError`
+    exhaustively with the `remote-backend` feature on: handle `Backend`.
+  - **Required**, for an app with its own remote backend: serve
+    `accounts/preferences/get` and `update`, or the current user's page
+    fails beside it.
+
+## 2026-11-27: trials on a remote backend
+
+Commits: this one. `docs/design/backend-seam.md`, step 3.
+
+- **What changed**.
+  - `core_elixir/` has trials: `trial_users/count` and `create`,
+    `accounts/sign_in_from_trial`, the write limit, and an hourly Oban
+    job that removes expired trials. It records the events of the
+    community and membership writes it makes for a person, as Rust
+    does, so a trial's limit counts the same writes.
+  - `accounts::sign_in_from_trial` calls the remote backend beside
+    one. Its `not_a_trial` is `AccountError::NotATrial`.
+  - `memberships::create` and `delete` map the backend's
+    `trial_writes_full` to `RecordError::TrialWritesFull`, as Rust
+    refuses it.
+  - `MembershipError::UnknownCommunity` is removed. Only the remote
+    path answered it. A refused join is now `Rejected("unknown_community")`
+    on every backend, as the Rust server answers it.
+  - The conformance suite has three more tests, for trials. Against a
+    remote backend it runs with `--test-threads=1`, since its tests
+    share the backend's data.
+- **What an app does**.
+  - **Required**, for an app that matches `MembershipError::UnknownCommunity`:
+    match `MembershipError::Rejected` with `"unknown_community"` instead.
+  - **Optional**, for an app's own dispatch of a write to a remote
+    backend: map `trial_writes_full` to `RecordError::TrialWritesFull`.
+
+## 2026-11-27: last_synced_at is removed from every synced table
+
+Commits: this one.
+
+- **What changed**. Synced rows have no `last_synced_at`. It was the
+  server's time of a row's last write, left from the old timestamp
+  cursor, and only the purge still read it, which the floor already
+  covers. The change log keeps a write's time, by its
+  `global_sync_version`, for the retention window. The baseline
+  migrations, the structs, the SQL and the wire shape of a row all
+  lose it, in Rust and in `core_elixir/`.
+- **What an app does**.
+  - **Required**, for each of the app's own synced tables: remove
+    `last_synced_at` from its create migration, its struct and row
+    struct, its SQL and binds, and its write paths, where a server
+    write set it and `(version, last_synced_at)` became `version`.
+  - **Required**: `bin/reset` the server's database and the devices',
+    since the baseline migrations changed.
+
+## 2026-11-27: is_trial asks the remote backend
+
+Commits: this one.
+
+- **What changed**. `accounts::trial_users::is_trial` answers by the
+  account the remote backend keeps, beside one, where it answered "no"
+  until now. Its error is `UserError`, not `sqlx::Error`.
+- **What an app does**.
+  - **Required**, for an app's own call of `is_trial`: convert the
+    `UserError` it answers.
+
+## 2026-11-27: the purge no longer holds the feed lock while it deletes
+
+Commits: this one.
+
+- **What changed**. `sync::purge::run` holds the feed lock only to
+  remove the old change log, move the floor and record the run. The
+  tombstones go after, a table at a time, without it, so writers don't
+  wait on them. `docs/design/offline-sync.md` gains the rule for hard
+  deletes: a synced row is deleted outright only when no device can
+  hold it.
+- **What an app does**.
+  - **Required**, for an app's own hard delete of a synced row: check it
+    against the rule, or soft-delete the row instead.
+
+## 2026-11-27: app_web sync feed renew, after a restore
+
+Commits: this one.
+
+- **What changed**. `app_web sync feed renew`, and
+  `app_core::sync::feed_id_renew`, give the server's sync feed a new id.
+  Run it after restoring the database from a backup, before people sync
+  again: every device resyncs at its next pull. Without it a device can
+  miss changes, since the restored database may give out again versions
+  it already saw.
+- **What an app does**.
+  - **Optional**. Add the command to the app's restore steps, as the
+    README's Fly.io section does.
+
+## 2026-11-27: device sign-in, resent codes and terms through a remote backend
+
+Commits: this one. Step 3 of `docs/design/backend-seam.md`.
+
+- **What changed**.
+  - Beside a remote backend, the desktop and phone apps sign in,
+    a code can be resent, and the last step records the terms
+    accepted: `accounts::sign_in_confirm_for_device`,
+    `sign_in_with_device_code`, `resend_code_to` and `resend_code` call
+    it, and `sign_in_confirm` sends `TERMS_VERSION`.
+  - `trial_users::count` and `create` call the remote backend, which
+    the sample answers `not_implemented`, so a guest visit fails plainly
+    there until a backend has trials. `trial_users::create` with a cap
+    of 0 is refused before it opens a transaction, on every backend, and
+    `GET /api/accounts/trial` counts nothing at a cap of 0.
+  - The conformance suite has three more tests, ten in all.
+  - `core_elixir/` has `mix core.feed_id_renew`, for after a restore.
+- **What an app does**. Nothing.
+
+## 2026-11-27: a conformance suite for remote backends, and Elixir in bin/lint
+
+Commits: this one. Step 2 of `docs/design/backend-seam.md`.
+
+- **What changed**.
+  - `core/src/app/files/conformance_tests.rs`, with the files example:
+    seven tests of sync, files and
+    memberships, run on the Rust backend with the other tests, and
+    against a remote backend with `CONFORMANCE_BACKEND_URL` and
+    `--ignored`. `core_elixir/` passes them all.
+  - `bin/lint` checks `core_elixir/`'s format and compile while it is
+    there, the `elixir` target.
+  - `core_elixir/` reads its dev port from `BACKEND_PORT`, not `PORT`,
+    which is the web server's.
+- **What an app does**.
+  - **Optional**, for an app that deleted `core_elixir/`: nothing;
+    `bin/lint` skips it.
+  - **Optional**, for an app with its own remote backend: run the suite
+    against it, and add a test for each resource it serves.
+
+## 2026-11-27: the web server can call a remote backend
+
+Commits: `52bb028`, `25cf524`, which dispatches sign-in and the
+current user, `869193b`, which dispatches sync, `991d995`, which
+dispatches communities, memberships and files, `5be5419`, which runs
+the bucket sweep beside a remote backend, and the commit after it, which
+gives `bin/dev` `BACKEND=elixir`. The first parts of step 1 of
+`docs/design/backend-seam.md`.
+
+- **What changed**.
+  - `BACKEND=remote`, with `BACKEND_URL` and `BACKEND_SERVICE_TOKEN`,
+    makes the web server call a remote backend, such as
+    `core_elixir/`, which owns the database. The server then opens no
+    database. `BACKEND` unset, or `rust`, is the server as before.
+  - Core's `remote-backend` feature has the client,
+    `services::backend::RemoteBackend`. `Deployment` has
+    `remote_backend`, and `Database` has `None`.
+  - The token check, sign-in's three steps, sign-out, the current
+    user's account, sync's push, pull and backfill, the communities
+    list, joining and leaving, and files call it. Reading a row's
+    bytes asks `<resource>/readable`, named from the table without
+    `app_`.
+  - `RecurringJob` has `runs_beside_a_remote_backend`, false unless a
+    job says so. Beside a remote backend only those run, the bucket
+    sweep of files among them, due by when the process last ran them.
+  - `BACKEND=elixir bin/dev` runs the web over `core_elixir/`, on the
+    web port + 3000, see `bin/dev --help`. In remote mode, staff, plans, preferences
+    and trials answer nothing, since the sample doesn't serve them.
+    Every other entry fails in remote mode, until its area is
+    dispatched.
+- **What an app does**.
+  - **Required**, for an app whose code matches on `Database`: add an
+    arm for `Database::None`.
+  - **Required**, for an app's code that matches on `UserError`,
+    `AccountError`, `AccountUserError`, `SyncError`, `BytesError`,
+    `CommunityError`, `MembershipError` or `FileError`: handle their
+    `Backend` variant.
+  - **Optional**, for an app's own job on what Rust keeps, such as a
+    bucket, when the app will use a remote backend: answer true from
+    `runs_beside_a_remote_backend`.
+  - **Optional**. Nothing else changes for an app on the Rust backend.
+
+## 2026-11-27: every rejection is shown to the person, and a refused create is kept
+
+Commits: this one.
+
+- **What changed**.
+  - A create the server refuses, with no row of its own to send, is kept
+    on the device as a conflict with the reason, for every synced table.
+    Before, only a table with bytes kept it. Any other table deleted the
+    row and its events without a word.
+  - The row stays. Its later events, and the creates of rows pointing at
+    it by a foreign key of `SyncedTable::foreign_keys`, wait with it,
+    held back from each push.
+  - A resync keeps it. The conflicts page offers Try again and Let go;
+    letting it go removes the row and the rows waiting with it.
+  - An update the server rejects is refused at once, not tried 30
+    times. When the server sends its row, the row wins and the person's
+    change is kept as a refused conflict, to reapply or let go; before,
+    it gave way without a word. Only a file waiting for its bytes still
+    counts tries.
+  - `app_sync_state::maintenance::delete_not_pending` is now
+    `delete_not_pending_or_refused`.
+- **What an app does**.
+  - **Required**, for an app's own synced table that points at another
+    synced row: list that column in `foreign_keys`, so its creates wait
+    with a refused parent. Most already do, for resync and purge.
+  - **Required**, for an app's own table that overrides
+    `delete_for_resync`: keep the rows whose create was refused, an
+    `app_events` row with `status = 'conflict' AND type = 'create'`, as
+    `app_files`'s does. A table on the default needs nothing.
+  - **Optional**. Mark a refused row in the app's own pages, as the files
+    pages do. The conflicts page already lists it.
+
+## 2026-11-27: a sample Elixir backend replaces phoenix/
+
+Commits: `b11afb9` removed `phoenix/`, `969ef0d` added `core_elixir/`,
+`9a92088` moved its HTTP layer to Phoenix, and the commit after it
+named it `core` and gave it the Rust PostgreSQL migrations.
+
+- **What changed**. `phoenix/`, the earlier reference app, is gone.
+  `core_elixir/`, the Elixir app `core`, is a sample remote backend:
+  Elixir with Phoenix,
+  PostgreSQL, Ecto, Oban and Commanded, answering the operations of
+  `docs/design/backend-protocol.md`. Files are its synced resource.
+  Its schema is the Rust core's PostgreSQL migrations, which it runs
+  itself. Axum doesn't call it yet, see `docs/design/backend-seam.md`.
+  It is an example, so `framework.toml` never checks it.
+- **What an app does**.
+  - **Optional**. An app on the Rust backend deletes `core_elixir/`. An
+    app that will use an Elixir backend keeps it, and builds from it.
+  - **Optional**. Delete a `phoenix/` the merge left, if the app changed
+    files inside it.
+
+## 2026-11-27: global sync versions replace timestamp cursors
+
+Commits: `5861a22`, `53a21ec`, and the commit after it that splits
+`SyncedTable`.
+
+- **What changed**.
+  - The server gives each change to a synced row a `global_sync_version`.
+    The version commits in the write's own transaction, with an
+    `app_sync_changes` entry. A device pulls through the versions,
+    not the server's clock. Sync protocol 2 replaces protocol 1, and
+    the baseline schemas changed.
+  - A data context's `create` and `update` for a synced table take the
+    `Role`, stamp the row, and return it. On the server they publish
+    the change; on a device they keep the row's version.
+  - A pull pages by the rows the user sees. Other users' changes cost
+    no round trips.
+  - An interrupted first pull, or community backfill, continues from
+    its last page on the next sync.
+  - A retried event is answered before its transaction waits for the
+    feed lock. A sign-in that writes no synced row takes no feed lock.
+  - The core sync tests fail on any server row written without
+    publishing its change, `assert_every_row_published`.
+  - `SyncedTable` keeps what a device and the server both use. The
+    Rust server's pull reads, `list_synced_after`, `parents` and
+    `list_live_in_community_after`, move to a new `SyncedTableServer`
+    trait. A table answers `server()` with it, or with none for a table
+    a remote backend serves.
+  - `device_settings::upgrade` moved from `data::device_settings` to
+    `core/src/device_settings.rs`. It opens its own transaction there.
+- **What an app does**.
+  - **Required**. For each synced table of the app's own:
+    - In its create migration, add `global_sync_version INTEGER CHECK
+      (global_sync_version > 0)` (`BIGINT` on PostgreSQL) and an index
+      on it. Drop the `(last_synced_at, id)` index.
+    - Add the field to its struct, with
+      `#[serde(with = "crate::sync::version::optional")]`, and to its
+      SQL.
+    - Give its data context's `create` and `update` the `Role`. Stamp
+      the row with `app_sync_changes::stamp` before writing it, and
+      return it, as `data/app_files` does. Make the write paths call
+      them, and stamp nothing by hand. Direct SQL that changes synced
+      rows on the server records one change per row, as
+      `trial_users::maintenance` does.
+    - In its `apply_in`, answer a retried event first. Then call
+      `app_sync_versions::lock_for_role` before reading the row it
+      decides on.
+    - Make `list_synced_after` and `list_live_in_community_after` take a
+      `&VersionRange`. Select `global_sync_version > after AND
+      global_sync_version <= through`, ordered by it. Declare
+      `foreign_keys()` on its `SyncedTable`.
+    - Move `list_synced_after`, `parents` and
+      `list_live_in_community_after` from its `impl SyncedTable` to an
+      `impl SyncedTableServer` for the same struct. Add
+      `fn server(&self) -> Option<&dyn SyncedTableServer> { Some(self) }`
+      to its `impl SyncedTable`, as `app/files.rs` does.
+  - **Required** where the app calls it: call
+    `app_core::device_settings::upgrade` in place of
+    `app_core::data::device_settings::upgrade`.
+  - **Required**. Remove any divergence for these files that the
+    framework's version now covers.
+  - **Required**. Stop the development server and desktop app. Run
+    `bin/reset` for the development checkout and database, then
+    restart. This deletes local account databases, pending changes
+    and device files. It also recreates the configured development
+    PostgreSQL database when it can be reached. Use `bin/reset --dry-run`
+    to see its targets first. Clear the data on test phones, simulators
+    and other machines separately. Then install builds that match the
+    server.
+  - **Verify**. Run the app's sync tests through the core `sync` test
+    helper, which checks that every row is published. Sign in on two
+    clean devices. Make an offline edit and see it on the other device
+    after reconnecting. Check that an online edit, a deletion and a
+    change in community access also reach the devices.
+
 ## 2026-11-26: restore the iPhone app layout after login
 
 - **What changed**: after a successful return from the iPhone's sign-in

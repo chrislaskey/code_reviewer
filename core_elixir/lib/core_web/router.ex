@@ -1,0 +1,77 @@
+defmodule CoreWeb.Router do
+  use CoreWeb, :router
+
+  alias CoreWeb.{
+    AccountsController,
+    PreferencesController,
+    CommunitiesController,
+    DeletionsController,
+    FilesCommunitiesController,
+    FilesController,
+    MembershipsController,
+    NotImplementedController,
+    PasswordController,
+    SyncController,
+    TrialUsersController,
+    UsersController
+  }
+
+  pipeline :backend do
+    plug :accepts, ["json"]
+    plug CoreWeb.Plugs.ServiceToken
+  end
+
+  scope "/backend" do
+    pipe_through :backend
+
+    post "/users/get_by_token", UsersController, :get_by_token
+    post "/users/update", UsersController, :update
+    post "/users/avatar_update", UsersController, :avatar_update
+    post "/users/avatar_urls_list", UsersController, :avatar_urls_list
+
+    post "/accounts/users/get", AccountsController, :users_get
+    post "/accounts/sign_in", AccountsController, :sign_in
+    post "/accounts/sign_in_with_code", AccountsController, :sign_in_with_code
+    post "/accounts/resend_code_to", AccountsController, :resend_code_to
+    post "/accounts/resend_code", AccountsController, :resend_code
+    post "/accounts/sign_in_confirm", AccountsController, :sign_in_confirm
+    post "/accounts/sign_in_confirm_for_device", AccountsController, :sign_in_confirm_for_device
+    post "/accounts/sign_in_with_device_code", AccountsController, :sign_in_with_device_code
+    post "/accounts/sign_in_from_trial", AccountsController, :sign_in_from_trial
+    post "/accounts/sign_out", AccountsController, :sign_out
+    post "/accounts/sign_in_with_password", AccountsController, :sign_in_with_password
+    post "/accounts/sign_in_with_password_for_device", AccountsController, :sign_in_with_password_for_device
+    post "/accounts/password/get", PasswordController, :get
+    post "/accounts/password/update", PasswordController, :update
+    post "/accounts/password/get_hash", PasswordController, :get_hash
+    post "/accounts/deletions/code/create", DeletionsController, :code_create
+    post "/accounts/deletions/create", DeletionsController, :create
+    post "/accounts/preferences/get", PreferencesController, :get
+    post "/accounts/preferences/update", PreferencesController, :update
+
+    post "/trial_users/count", TrialUsersController, :count
+    post "/trial_users/create", TrialUsersController, :create
+
+    post "/sync/push", SyncController, :push
+    post "/sync/pull", SyncController, :pull
+    post "/sync/backfill", SyncController, :backfill
+
+    post "/communities/list", CommunitiesController, :list
+    post "/memberships/create", MembershipsController, :create
+    post "/memberships/delete", MembershipsController, :delete
+
+    post "/files/list", FilesController, :list
+    post "/files/get", FilesController, :get
+    post "/files/create", FilesController, :create
+    post "/files/update", FilesController, :update
+    post "/files/delete", FilesController, :delete
+    post "/files/readable", FilesController, :readable
+    post "/files/storage_keys_list", FilesController, :storage_keys_list
+    post "/files/duplicates_list", FilesController, :duplicates_list
+
+    post "/files_communities/create", FilesCommunitiesController, :create
+    post "/files_communities/delete", FilesCommunitiesController, :delete
+
+    post "/:resource/:action", NotImplementedController, :show
+  end
+end

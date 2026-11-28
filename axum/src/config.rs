@@ -2,10 +2,11 @@
 //! listens, where the built pages are, whether it is behind a proxy, how
 //! many trial users it holds, its address as people reach it, its name
 //! for the apps, what it offers them and the other servers it lists;
-//! and, one module each, its database, mailer, buckets, Stripe and App
-//! Store.
+//! and, one module each, its backend, database, mailer, buckets, Stripe
+//! and App Store.
 
 pub mod app_store;
+pub mod backend;
 pub mod database;
 pub mod mailer;
 pub mod storage;

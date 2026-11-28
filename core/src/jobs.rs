@@ -9,6 +9,8 @@
 //! at once only one runs it. A job that fails is recorded with its error
 //! and tried again once it is due; every job may be run again safely.
 
+use std::collections::BTreeMap;
+
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use serde_json::Value;
@@ -39,6 +41,13 @@ pub trait RecurringJob: Send + Sync + std::fmt::Debug {
     /// its bucket.
     fn is_set_up(&self, _deployment: &Deployment) -> bool {
         true
+    }
+
+    /// Whether it runs on a web server whose remote backend owns the
+    /// database, see `docs/design/backend-seam.md`: only a job on what
+    /// Rust keeps, such as the bucket. The backend runs its own others.
+    fn runs_beside_a_remote_backend(&self) -> bool {
+        false
     }
 
     /// Runs it once, answering what it did.
@@ -127,6 +136,12 @@ impl RecurringJob for AvatarsDeleteUnreferenced {
         deployment.avatar_bucket.is_some()
     }
 
+    /// Rust keeps the bucket, so it sweeps it, by the pictures the
+    /// backend's users still have.
+    fn runs_beside_a_remote_backend(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "object-storage"))]
     fn is_set_up(&self, _deployment: &Deployment) -> bool {
         false
@@ -183,6 +198,12 @@ impl RecurringJob for FilesDeleteUnreferenced {
     #[cfg(not(feature = "object-storage"))]
     fn is_set_up(&self, _deployment: &Deployment) -> bool {
         false
+    }
+
+    /// Rust keeps the bucket, so it sweeps it, by the keys the backend
+    /// still references.
+    fn runs_beside_a_remote_backend(&self) -> bool {
+        true
     }
 
     #[cfg(feature = "object-storage")]
@@ -398,6 +419,36 @@ pub async fn run_due(deployment: &Deployment, now: DateTime<Utc>) -> Result<Vec<
     Ok(runs)
 }
 
+/// `run_due` on a web server whose remote backend owns the database,
+/// which has no `app_jobs` to record the runs in: the jobs that run
+/// beside it, due by `last_runs`, the start of each one's last run in
+/// this process, which this updates. A restart runs each again at once.
+pub async fn run_due_beside_a_remote_backend(
+    deployment: &Deployment,
+    now: DateTime<Utc>,
+    last_runs: &mut BTreeMap<&'static str, DateTime<Utc>>,
+) -> Vec<JobRun> {
+    let mut runs = Vec::new();
+    for job in list() {
+        if job.role() != deployment.role
+            || !job.runs_beside_a_remote_backend()
+            || !job.is_set_up(deployment)
+        {
+            continue;
+        }
+        let due = last_runs
+            .get(job.name())
+            .is_none_or(|last| *last <= now - job.interval());
+        if !due {
+            continue;
+        }
+        last_runs.insert(job.name(), now);
+        let result = job.perform(deployment, now).await;
+        runs.push(JobRun { job, result });
+    }
+    runs
+}
+
 /// Runs the job at `now`, due or not, and records the run.
 pub async fn run(
     deployment: &Deployment,
@@ -458,6 +509,35 @@ mod tests {
 
     fn jobs_of(runs: &[JobRun]) -> Vec<&'static str> {
         runs.iter().map(|run| run.job.name()).collect()
+    }
+
+    #[test]
+    fn jobs_beside_a_remote_backend_are_only_the_bucket_sweeps() {
+        let beside: Vec<&str> = list()
+            .into_iter()
+            .filter(|job| job.runs_beside_a_remote_backend())
+            .map(|job| job.name())
+            .collect();
+        assert_eq!(
+            beside,
+            vec!["avatars_delete_unreferenced", "files_delete_unreferenced"]
+        );
+    }
+
+    #[tokio::test]
+    async fn jobs_beside_a_remote_backend_need_what_they_work_on() {
+        with_each_database(|database| async move {
+            let mut last_runs = BTreeMap::new();
+            let runs = run_due_beside_a_remote_backend(
+                &server(database),
+                crate::deployment::now(),
+                &mut last_runs,
+            )
+            .await;
+            assert!(runs.is_empty(), "no bucket, no sweep");
+            assert!(last_runs.is_empty());
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -681,6 +761,7 @@ mod tests {
                 Database::Postgres(pool) => {
                     sqlx::query(statement).execute(pool).await.expect("dropped");
                 }
+                Database::None => unreachable!("a test opens a database"),
             }
         }
     }

@@ -19,13 +19,15 @@ use uuid::Uuid;
 use crate::data::accounts_tokens;
 use crate::data::accounts_users::{self, AccountUserError};
 use crate::data::app_events::{self, Conflicts, Event, EventKind, Fields};
-use crate::data::app_sync_state::Cursor;
 use crate::data::device_settings::{self, DeviceSettingsError, SIGNED_IN};
 use crate::database::Transaction;
 use crate::deployment::{Deployment, Role, now};
 use crate::sync::TableRow;
+use crate::sync::VersionRange;
 use crate::sync::events::{self, Answer, AnswerStatus};
-use crate::sync::synced_table::{CurrentFields, LocalCreate, SyncedTable, TableError};
+use crate::sync::synced_table::{
+    CurrentFields, LocalCreate, SyncedTable, SyncedTableServer, TableError,
+};
 
 /// What a person changes of their own row; the rest is the server's.
 pub(crate) const UPDATE_FIELDS: &[&str] = &["name"];
@@ -83,6 +85,11 @@ pub enum UserError {
     DeviceSettings(#[from] DeviceSettingsError),
     #[error(transparent)]
     Record(#[from] crate::sync::events::RecordError),
+    /// The remote backend failed, or answered what this error has no
+    /// variant for.
+    #[cfg(feature = "remote-backend")]
+    #[error(transparent)]
+    Backend(#[from] crate::services::backend::BackendError),
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 }
@@ -111,6 +118,7 @@ pub async fn create(deployment: &Deployment, email: &str, name: &str) -> Result<
         return Err(UserError::ServerOnly);
     }
     let mut tx = deployment.begin().await?;
+    crate::data::app_sync_versions::lock(&mut tx).await?;
     let id = Uuid::now_v7();
     accounts_users::create(&mut tx, id, email, true).await?;
     let user = create_in(&mut tx, id, name).await?;
@@ -132,14 +140,13 @@ pub(crate) async fn create_in(
         inserted_at: now,
         updated_at: now,
         version: 1,
-        last_synced_at: Some(now),
+        global_sync_version: None,
         deleted_at: None,
         deleted_by_id: None,
         avatar_url: None,
     };
     let user = AcceptedUser::new(user)?;
-    app_users::create(&mut *tx, &user).await?;
-    let user = user.into_row();
+    let user = app_users::create(&mut *tx, Role::Server, user).await?;
     Ok(user)
 }
 
@@ -149,6 +156,23 @@ pub(crate) async fn create_in(
 /// `docs/design/offline-sync.md`.
 pub async fn update(deployment: &Deployment, user: &User, name: &str) -> Result<User, UserError> {
     let name = app_users::checked_name(name)?;
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = json!({ "actor_id": user.id, "name": name });
+        return match backend.call("users/update", &request).await {
+            Ok(user) => Ok(user),
+            Err(error) if error.code() == Some("not_found") => {
+                Err(UserError::NotFound { id: user.id })
+            }
+            Err(error) if error.code() == Some("invalid") => {
+                Err(UserError::Rejected(error.to_string()))
+            }
+            Err(error) if error.code() == Some("trial_writes_full") => {
+                Err(crate::sync::events::RecordError::TrialWritesFull.into())
+            }
+            Err(error) => Err(error.into()),
+        };
+    }
     let mut tx = deployment.begin().await?;
     let current = get_live(&mut tx, user.id).await?;
     if current.name == name {
@@ -219,6 +243,9 @@ pub(crate) async fn apply_in(
             user: row,
         });
     }
+    // A retry is answered above without waiting for the feed. Two at once
+    // both reach here, and the second fails on the event's id.
+    crate::data::app_sync_versions::lock_for_role(tx, role).await?;
     let Some(row) = get_in(tx, event.row_id).await? else {
         return rejected(event, "unknown_user", None);
     };
@@ -256,11 +283,9 @@ pub(crate) async fn apply_in(
     };
     if role == Role::Server {
         updated.version += 1;
-        updated.last_synced_at = Some(now);
     }
     let updated = AcceptedUser::new(updated)?;
-    app_users::update(&mut *tx, &updated).await?;
-    let updated = updated.into_row();
+    let updated = app_users::update(&mut *tx, role, updated).await?;
     finish(tx, role, user, event, conflicts, updated).await
 }
 
@@ -303,18 +328,21 @@ pub(crate) async fn update_name_in(
     id: Uuid,
     name: &str,
 ) -> Result<User, UserError> {
+    crate::data::app_sync_versions::lock(tx).await?;
     let user = get_live(tx, id).await?;
+    if user.name == name {
+        return Ok(user);
+    }
     let now = now();
     let updated = User {
         name: name.to_string(),
         updated_at: now,
         version: user.version + 1,
-        last_synced_at: Some(now),
+        global_sync_version: None,
         ..user
     };
     let updated = AcceptedUser::new(updated)?;
-    app_users::update(&mut *tx, &updated).await?;
-    let updated = updated.into_row();
+    let updated = app_users::update(&mut *tx, Role::Server, updated).await?;
     Ok(updated)
 }
 
@@ -327,7 +355,11 @@ pub(crate) async fn update_avatar_url_in(
     id: Uuid,
     avatar_url: &str,
 ) -> Result<User, UserError> {
+    crate::data::app_sync_versions::lock(tx).await?;
     let user = get_live(tx, id).await?;
+    if user.avatar_url.as_deref() == Some(avatar_url) {
+        return Ok(user);
+    }
     let now = now();
     let event = Event::update(
         TABLE,
@@ -341,12 +373,11 @@ pub(crate) async fn update_avatar_url_in(
         avatar_url: Some(avatar_url.to_string()),
         updated_at: now,
         version: user.version + 1,
-        last_synced_at: Some(now),
+        global_sync_version: None,
         ..user
     };
     let updated = AcceptedUser::new(updated)?;
-    app_users::update(&mut *tx, &updated).await?;
-    let updated = updated.into_row();
+    let updated = app_users::update(&mut *tx, Role::Server, updated).await?;
     let answer = Answer::applied(
         event.id,
         updated.version,
@@ -364,6 +395,7 @@ pub const DELETED_NAME: &str = "Deleted user";
 /// soft-deleted, named `DELETED_NAME` and without a picture, so every
 /// device that pulled it sees them go, see `accounts::deletions`.
 pub(crate) async fn delete_in(tx: &mut Transaction, id: Uuid) -> Result<User, UserError> {
+    crate::data::app_sync_versions::lock(tx).await?;
     let user = get_live(tx, id).await?;
     let now = now();
     let event = Event::update(
@@ -387,14 +419,13 @@ pub(crate) async fn delete_in(tx: &mut Transaction, id: Uuid) -> Result<User, Us
         avatar_url: None,
         updated_at: now,
         version: user.version + 1,
-        last_synced_at: Some(now),
+        global_sync_version: None,
         deleted_at: Some(now),
         deleted_by_id: Some(id),
         ..user
     };
     let deleted = AcceptedUser::new(deleted)?;
-    app_users::delete(&mut *tx, &deleted).await?;
-    let deleted = deleted.into_row();
+    let deleted = app_users::delete(&mut *tx, Role::Server, deleted).await?;
     let answer = Answer::applied(
         event.id,
         deleted.version,
@@ -425,6 +456,10 @@ pub(crate) async fn delete_of_unconfirmed_accounts_before(
 /// server does not know, or one that has expired, stands for nobody,
 /// and one of a deleted account is `AccountDeleted`.
 pub async fn get_by_token(deployment: &Deployment, token: &str) -> Result<User, UserError> {
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return get_by_token_from_backend(backend, token).await;
+    }
     let (api_made_after, session_made_after) = accounts_tokens::made_after_to_be_valid(now());
     let mut tx = deployment.begin().await?;
     let user = app_users::authentication::get_by_token_hash(
@@ -439,6 +474,29 @@ pub async fn get_by_token(deployment: &Deployment, token: &str) -> Result<User, 
         Some(user) if user.deleted_at.is_some() => Err(UserError::AccountDeleted),
         Some(user) => Ok(user),
         None => Err(UserError::UnknownToken),
+    }
+}
+
+/// `get_by_token`, answered by the remote backend.
+#[cfg(feature = "remote-backend")]
+async fn get_by_token_from_backend(
+    backend: &crate::services::backend::RemoteBackend,
+    token: &str,
+) -> Result<User, UserError> {
+    #[derive(Deserialize)]
+    struct Found {
+        user: User,
+    }
+    let found = backend
+        .call::<_, Found>("users/get_by_token", &json!({ "token": token }))
+        .await;
+    match found {
+        Ok(found) => Ok(found.user),
+        Err(error) => match error.code() {
+            Some("unknown_token") => Err(UserError::UnknownToken),
+            Some("account_deleted") => Err(UserError::AccountDeleted),
+            _ => Err(error.into()),
+        },
     }
 }
 
@@ -547,6 +605,10 @@ impl SyncedTable for Synced {
         TABLE
     }
 
+    fn server(&self) -> Option<&dyn SyncedTableServer> {
+        Some(self)
+    }
+
     fn owner_column(&self) -> Option<&'static str> {
         None
     }
@@ -559,25 +621,6 @@ impl SyncedTable for Synced {
         event: &Event,
     ) -> Result<Answer, TableError> {
         Ok(apply_in(tx, role, user, event).await?.answer)
-    }
-
-    async fn list_synced_after(
-        &self,
-        tx: &mut Transaction,
-        user: &User,
-        after: &Cursor,
-        limit: usize,
-    ) -> Result<Vec<TableRow>, TableError> {
-        let users = app_users::replication::list_synced_after(tx, user.id, after, limit).await?;
-        Ok(users.iter().map(table_row).collect::<Result<_, _>>()?)
-    }
-
-    async fn parents(
-        &self,
-        _tx: &mut Transaction,
-        _row: &TableRow,
-    ) -> Result<Vec<TableRow>, TableError> {
-        Ok(Vec::new())
     }
 
     async fn apply_server_row(
@@ -631,6 +674,28 @@ impl SyncedTable for Synced {
     }
 }
 
+#[async_trait]
+impl SyncedTableServer for Synced {
+    async fn list_synced_after(
+        &self,
+        tx: &mut Transaction,
+        user: &User,
+        range: &VersionRange,
+        limit: usize,
+    ) -> Result<Vec<TableRow>, TableError> {
+        let users = app_users::replication::list_synced_after(tx, user.id, range, limit).await?;
+        Ok(users.iter().map(table_row).collect::<Result<_, _>>()?)
+    }
+
+    async fn parents(
+        &self,
+        _tx: &mut Transaction,
+        _row: &TableRow,
+    ) -> Result<Vec<TableRow>, TableError> {
+        Ok(Vec::new())
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -646,7 +711,7 @@ pub(crate) mod tests {
             .await
             .expect("an in-memory SQLite database");
         let deployment = Deployment::new(database, Role::Device);
-        device_settings::upgrade(&deployment)
+        crate::device_settings::upgrade(&deployment)
             .await
             .expect("the settings set up");
         deployment
@@ -679,7 +744,7 @@ pub(crate) mod tests {
             inserted_at: now,
             updated_at: now,
             version: 1,
-            last_synced_at: Some(now),
+            global_sync_version: None,
             deleted_at: None,
             deleted_by_id: None,
             avatar_url: None,
@@ -754,7 +819,7 @@ pub(crate) mod tests {
                 .expect("a user");
             assert_eq!(user.name, "Alice", "trimmed");
             assert_eq!(user.version, 1);
-            assert_eq!(user.last_synced_at, Some(user.updated_at));
+            assert!(user.global_sync_version.is_some(), "published");
             assert_eq!(get(&deployment, user.id).await.expect("the user"), user);
 
             let account = crate::accounts::users::get(&deployment, user.id)

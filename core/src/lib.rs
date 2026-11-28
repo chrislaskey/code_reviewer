@@ -11,7 +11,8 @@
 //!   functions the server and the app both call, `posts::list`, which take
 //!   the `Deployment`, own the transaction and check the acting user.
 //! - `database`, `deployment`: the connection, its migrations, and the
-//!   role a deployment plays; `servers`: what a server says it is, for
+//!   role a deployment plays; `device_settings`: a device's settings
+//!   brought up to date; `servers`: what a server says it is, for
 //!   a device signing in to another server, see
 //!   `docs/design/multi-server.md`.
 //! - `jobs`, `server_tasks`: what the server runs by itself, recurring
@@ -26,6 +27,7 @@ pub mod app;
 pub mod data;
 pub mod database;
 pub mod deployment;
+pub mod device_settings;
 pub mod helpers;
 pub mod jobs;
 pub mod ops;
