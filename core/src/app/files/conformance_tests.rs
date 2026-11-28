@@ -851,3 +851,55 @@ async fn conformance_a_trial_is_deleted_without_a_code(server: Deployment) {
     assert!(mailer.sent().is_empty(), "nothing mailed");
     assert!(users::get_by_token(&server, &guest.token).await.is_err());
 }
+
+conformance!(conformance_a_picture_reaches_the_device_and_the_sweep_keeps_it);
+async fn conformance_a_picture_reaches_the_device_and_the_sweep_keeps_it(server: Deployment) {
+    use crate::app::avatars::{self, AvatarUpdate, AvatarUploadNew};
+    use crate::services::storage::Storage;
+
+    const PNG: &[u8] = b"\x89PNG\r\n\x1a\nthe rest of a picture";
+    let bucket = Storage::memory();
+    let server = server.with_avatar_bucket(bucket.clone());
+    let alice = signed_up(&server).await;
+    let upload = AvatarUploadNew {
+        content_type: "image/png".to_string(),
+        size: PNG.len() as u64,
+    };
+    let answer = avatars::uploads::create(&server, &alice.user, &upload)
+        .await
+        .expect("an upload");
+    bucket
+        .put(&answer.key, PNG.to_vec())
+        .await
+        .expect("uploaded");
+    let orphan = format!("avatars/{}/{}.png", alice.user.id, Uuid::now_v7());
+    bucket
+        .put(&orphan, PNG.to_vec())
+        .await
+        .expect("another, never confirmed");
+    let update = AvatarUpdate {
+        key: answer.key.clone(),
+    };
+    let user = avatars::update(&server, &alice.user, &update)
+        .await
+        .expect("the picture");
+    let avatar_url = user.avatar_url.expect("a picture");
+
+    let (a, _folder) = files::tests::device_with_folder(&alice.user, &alice.token).await;
+    sync(&a, &server).await;
+    let on_device = users::get(&a, alice.user.id).await.expect("the device's");
+    assert_eq!(on_device.avatar_url.as_deref(), Some(avatar_url.as_str()));
+
+    let later = crate::deployment::now() + chrono::Duration::days(avatars::UNREFERENCED_DAYS + 1);
+    avatars::delete_unreferenced(&server, later)
+        .await
+        .expect("swept");
+    assert!(
+        bucket.size(&answer.key).await.expect("asked").is_some(),
+        "kept"
+    );
+    assert!(
+        bucket.size(&orphan).await.expect("asked").is_none(),
+        "deleted"
+    );
+}

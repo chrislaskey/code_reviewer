@@ -93,7 +93,7 @@ device already saw.
 
 - More of the conformance suite, `core/src/app/files/conformance_tests.rs`,
   which this backend passes: a test for each area added below.
-- Pictures, posts, community writes and
+- Posts, community writes and
   commerce. They answer `501 not_implemented`.
 - Splitting a Rust migration that someday holds a function or a `DO`
   block: `Core.Migrations.Statements` splits at every `;`.

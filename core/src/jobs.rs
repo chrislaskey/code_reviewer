@@ -136,6 +136,12 @@ impl RecurringJob for AvatarsDeleteUnreferenced {
         deployment.avatar_bucket.is_some()
     }
 
+    /// Rust keeps the bucket, so it sweeps it, by the pictures the
+    /// backend's users still have.
+    fn runs_beside_a_remote_backend(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "object-storage"))]
     fn is_set_up(&self, _deployment: &Deployment) -> bool {
         false
@@ -506,13 +512,16 @@ mod tests {
     }
 
     #[test]
-    fn jobs_beside_a_remote_backend_are_only_the_bucket_sweep_of_files() {
+    fn jobs_beside_a_remote_backend_are_only_the_bucket_sweeps() {
         let beside: Vec<&str> = list()
             .into_iter()
             .filter(|job| job.runs_beside_a_remote_backend())
             .map(|job| job.name())
             .collect();
-        assert_eq!(beside, vec!["files_delete_unreferenced"]);
+        assert_eq!(
+            beside,
+            vec!["avatars_delete_unreferenced", "files_delete_unreferenced"]
+        );
     }
 
     #[tokio::test]

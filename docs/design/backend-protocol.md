@@ -109,6 +109,13 @@ SHA-256 hashes of tokens, as hex. It matches them exactly.
 - The name is trimmed, 1 to 80 characters. Rust checks it first.
 - A deleted or unknown user is `not_found`.
 
+**`users/avatar_update`** (sample). `{"actor_id", "avatar_url"} → User`:
+sets the user's picture, an event in their name. Rust signed the upload,
+checked the file in its bucket, and sends its public URL.
+**`users/avatar_urls_list`** (sample). `{} → {"avatar_urls": ["…"]}`:
+every user's picture, deleted users' too, for Rust's daily sweep of the
+bucket.
+
 **`accounts/users/get`** (sample). The account of a user, for the
 current user's page: its email and whether it is a trial.
 

@@ -368,11 +368,13 @@ next. How step 1 is built:
   in `sync::bytes`, then signs the URL or serves the row's content.
   Signing an upload needs nothing from the backend.
 - A job runs beside a remote backend only when it says so,
-  `RecurringJob::runs_beside_a_remote_backend`: only
-  `files_delete_unreferenced`, the bucket sweep. It keeps the keys
-  `<resource>/storage_keys_list` answers. There is no `app_jobs` to
-  record runs in, so Axum keeps when each last ran in memory, and a
-  restart runs it again at once. The sweep is safe to run twice. The
+  `RecurringJob::runs_beside_a_remote_backend`: only the bucket
+  sweeps. `files_delete_unreferenced` keeps the keys
+  `<resource>/storage_keys_list` answers, and
+  `avatars_delete_unreferenced` the pictures `users/avatar_urls_list`
+  answers. There is no `app_jobs` to record runs in, so Axum keeps when
+  each last ran in memory, and a restart runs it again at once. A sweep
+  is safe to run twice. The
   backend runs its own purge.
 - `BACKEND=elixir bin/dev` starts `core_elixir` on the web port + 3000,
   after `mix database.create`, against `BACKEND_DATABASE_URL`, then the
@@ -489,7 +491,15 @@ In order, each with conformance tests:
    The backend deletes the rows and answers the mail. Rust sends it and
    deletes the pictures from the bucket. Beside a remote backend no
    Stripe plan is ended, since the backend keeps no plans yet.
-5. Next: the picture, `avatar_url`.
+5. **The picture, built 2026-11-27**, with a conformance test. Rust
+   keeps the bucket: it signs the upload, checks the file, and sends
+   the backend the picture's URL, `users/avatar_update`. The daily
+   sweep of pictures runs beside a remote backend, by the URLs
+   `users/avatar_urls_list` answers.
+
+Left in remote mode: staff answers "not staff", and the plan and the
+failed payment answer none. Staff needs the ops commands on the
+backend, and plans need a design for purchasing beside one.
 
 ### Open questions and smaller fixes
 

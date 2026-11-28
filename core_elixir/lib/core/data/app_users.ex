@@ -29,6 +29,10 @@ defmodule Core.Data.AppUsers do
   def list_by_ids([]), do: []
   def list_by_ids(ids), do: Repo.all(from u in __MODULE__, where: u.id in ^ids)
 
+  @doc "Every row's picture, deleted rows' too."
+  def list_avatar_urls,
+    do: Repo.all(from u in __MODULE__, where: not is_nil(u.avatar_url), select: u.avatar_url)
+
   @doc "Whether a live user other than `except_id` has the name, in any case."
   def exists_by_name?(name, except_id) do
     Repo.exists?(

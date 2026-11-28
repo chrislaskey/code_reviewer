@@ -18,6 +18,22 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-27: pictures on a remote backend
+
+Commits: this one. `docs/design/backend-seam.md`, step 4.
+
+- **What changed**.
+  - Beside a remote backend, `avatars::update` sends the picture's URL
+    to it, `users/avatar_update`, once Rust checked the file, and
+    `avatars::delete_unreferenced` asks it for every picture,
+    `users/avatar_urls_list`. The `avatars_delete_unreferenced` job
+    runs beside a remote backend.
+  - `core_elixir/` serves both, and the conformance suite has one more
+    test.
+- **What an app does**.
+  - **Required**, for an app with its own remote backend: serve the two
+    operations, or pictures fail beside it.
+
 ## 2026-11-27: deleting an account on a remote backend
 
 Commits: this one. `docs/design/backend-seam.md`, step 4.

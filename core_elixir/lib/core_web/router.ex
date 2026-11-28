@@ -26,6 +26,8 @@ defmodule CoreWeb.Router do
 
     post "/users/get_by_token", UsersController, :get_by_token
     post "/users/update", UsersController, :update
+    post "/users/avatar_update", UsersController, :avatar_update
+    post "/users/avatar_urls_list", UsersController, :avatar_urls_list
 
     post "/accounts/users/get", AccountsController, :users_get
     post "/accounts/sign_in", AccountsController, :sign_in

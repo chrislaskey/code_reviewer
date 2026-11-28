@@ -1,6 +1,6 @@
 # The SHA-256 of each framework file as the template ships it, see
 # framework.toml. Written by `cargo run -p framework_check -- lock`.
-e224c807841116616c08af7a681f4108637ff77bec7d93f611fc4fb6d8b81eef  FRAMEWORK_CHANGELOG.md
+8fb15fcc3e245aeeba1608ddf3d902e837a69e27a83aff5f8b27a7b225aa6a54  FRAMEWORK_CHANGELOG.md
 8519249972fe5e4ca952db7e02f2f9874dc98b3168d8d2c5a9972e3fa57d1df6  axum/src/accounts.rs
 dfdf353a942c730f3c0cea40c9e89a737bcf5fbf06960b91baab16578564a327  axum/src/accounts/app_store_notifications.rs
 4440725170bdb3eeda5a1257a241671c748cb8069a42809f37f289bacef91187  axum/src/accounts/checkouts.rs
@@ -110,7 +110,7 @@ d2871c31fdef82d5d01aba55e0331298c6ec9d77f5c6ef831f9ee2968ab8e62b  core/src/accou
 4d012e6d91059df3a935ca5a75ba82ab9421bdd3361416a03e30320b94ead1b4  core/src/accounts/subscriptions/portal.rs
 2daa449554e648559c9f0f52c73dfe370b73e69d7a420f3970b831803ff37787  core/src/accounts/trial_users.rs
 c719a113f623ec3cff1937c6338fd8f445e02503acc460f251f95511cdcf4f94  core/src/accounts/users.rs
-cee866dd75649095e0f975e12c5e23af7e11c65a7743749f3ea373045306368c  core/src/app/avatars.rs
+9ba3302505e54874af3d9e0d5963f201da75277a802daee0fe2500d13bccf847  core/src/app/avatars.rs
 9c7e31329b32f86fc05b3031e88be6a53119b6aabc526851e691fa01d74f12ff  core/src/app/avatars/uploads.rs
 56b78e3bd00dd1875b17cab40ea7bf3713f9adf44df96d753c921ae9ff69cc18  core/src/app/communities.rs
 ee4156bccaa59f32b354f667633d4e23348caab5f0cafcdfbbb87a66208ce896  core/src/app/current_community.rs
@@ -205,7 +205,7 @@ d5b17695f28e217091f4342f58dfc7d0f8e3a508d0072339648dbe3f9b347d5f  core/src/helpe
 18281d1391d4bf5579f73d2a2633bfdd05d3d4e2c9b4d30be16db38f0e01dc33  core/src/helpers/sha256.rs
 07ab200d00be974871445b0de21c66a5e87302b9da4dbb2d372a0f76afca9ef4  core/src/helpers/themes.rs
 9882f97c23edf9138717f151f275a344e3241af39057e235d5c347b366cc466c  core/src/helpers/translations.rs
-3c38dc1774de6dd8e48aaa5410994d1fe6209d9cbcc7a19e899e760013f8b7db  core/src/jobs.rs
+c0e65bbf3dc605f63169e995bd8c3407c5d99da7729d8eb6a454b52307d53db0  core/src/jobs.rs
 ec6c897f324fdd56d0470f589b4353996a7cd45f71e94f627d5ba0dea33d96bc  core/src/lib.rs
 feef2c0e24147002cf86c6de72f823af905886b458b0ba552818044c3b3eab23  core/src/ops.rs
 feb40ca000f6519448fe76cec0774554f45c5b7b2f6348dfc46745eea22d3905  core/src/ops/staff.rs

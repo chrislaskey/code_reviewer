@@ -78,6 +78,37 @@ defmodule Core.App.Users do
     end
   end
 
+  @doc """
+  Sets the user's picture, as `users::update_avatar_url_in` does: an
+  event in their name the devices pull. Rust checked the upload in its
+  bucket, and gives its public URL. Answers the user.
+  """
+  def avatar_update(user_id, avatar_url) when is_binary(avatar_url) and avatar_url != "" do
+    Repo.transaction(fn ->
+      AppSyncVersions.lock()
+
+      case AppUsers.get(user_id) do
+        %AppUsers{deleted_at: nil} = user ->
+          event =
+            Events.update(AppUsers.table(), user.id, user.version, %{"avatar_url" => user.avatar_url}, %{
+              "avatar_url" => avatar_url
+            })
+
+          updated = AppUsers.update(%{SyncedRow.changed(user, Time.now()) | avatar_url: avatar_url})
+          Events.record(user_id, event, Answers.applied(event["id"], updated.version, %{}, nil))
+          AppUsers.to_wire(updated)
+
+        _ ->
+          Repo.rollback(:not_found)
+      end
+    end)
+  end
+
+  def avatar_update(_user_id, _avatar_url), do: {:error, {:invalid, %{"avatar_url" => ["is needed"]}}}
+
+  @doc "Every user's picture, deleted users' too, for Rust's sweep of the bucket: a deleted row keeps its file until the row goes."
+  def avatar_urls_list, do: {:ok, %{"avatar_urls" => AppUsers.list_avatar_urls()}}
+
   @doc "Applies a pushed event of the actor's to their own row and answers it. A retried event gets the answer it got."
   def apply_event(actor_id, event) do
     Repo.transaction(fn ->

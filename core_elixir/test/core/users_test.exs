@@ -42,4 +42,12 @@ defmodule Core.UsersTest do
     {:ok, %{"events" => [answer]}} = Core.Sync.push(alice["id"], [create], [])
     assert %{"status" => "rejected", "reason" => "server_only"} = answer
   end
+
+  test "a picture is set as an event, and listed for the sweep, a deleted user's too" do
+    alice = signed_up("alice@example.com")["user"]
+    url = "https://bucket.example.com/avatars/#{alice["id"]}/one.png"
+    assert {:ok, %{"avatar_url" => ^url, "version" => 2}} = Users.avatar_update(alice["id"], url)
+    assert Users.avatar_urls_list() == {:ok, %{"avatar_urls" => [url]}}
+    assert Users.avatar_update(Ids.new(), url) == {:error, :not_found}
+  end
 end
