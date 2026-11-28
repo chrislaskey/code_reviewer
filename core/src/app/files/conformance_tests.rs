@@ -1,8 +1,8 @@
 //! The conformance suite of the backend protocol, see
 //! `docs/design/backend-seam.md`: what a device sees of sync, files,
-//! memberships, trials and preferences, set up only by what the protocol
-//! serves. It is the files example's, so it goes with it; an app adds a
-//! test for each resource its backend serves. Each test runs on the Rust
+//! memberships, trials, preferences and passwords, set up only by what
+//! the protocol serves. It is the files example's, so it goes with it;
+//! an app adds a test for each resource its backend serves. Each test runs on the Rust
 //! backend with the other tests, and against a remote backend when asked,
 //! its device syncing through the server's own functions as the web
 //! server calls them:
@@ -25,6 +25,7 @@ use std::future::Future;
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::accounts::password::PasswordUpdate;
 use crate::accounts::{self, Session, preferences};
 use crate::app::files::{self, FileFilter};
 use crate::app::{communities, memberships, users};
@@ -33,7 +34,7 @@ use crate::data::app_events::Event;
 use crate::data::app_sync_state::Cursor;
 use crate::database::with_each_database;
 use crate::deployment::Deployment;
-use crate::services::mailer::{Mailer, mails};
+use crate::services::mailer::{Mail, Mailer, mails};
 use crate::services::web_server::InProcess;
 use crate::sync::{self, PullRequest, Report, conflicts};
 
@@ -667,4 +668,89 @@ async fn conformance_nobody_renames_someone_else(server: Deployment) {
         .await
         .expect("the server's");
     assert_eq!(on_server.name, alice.user.name);
+}
+
+const PASSWORD: &str = "correct horse battery";
+
+/// Gives the user a password, as they would signed in, and answers the
+/// mail that tells them.
+async fn password_set(server: &Deployment, session: &Session, password: &str) -> Mail {
+    let mailer = Mailer::memory();
+    let update = PasswordUpdate {
+        password: password.to_string(),
+    };
+    accounts::password::update(server, &mailer, &session.user, &update, "en")
+        .await
+        .expect("a password");
+    mailer.last_sent_to(&session.email).expect("mailed")
+}
+
+conformance!(conformance_a_password_signs_in_on_the_web_and_on_a_device);
+async fn conformance_a_password_signs_in_on_the_web_and_on_a_device(server: Deployment) {
+    let alice = signed_up(&server).await;
+    let status = accounts::password::get(&server, &alice.user)
+        .await
+        .expect("asked");
+    assert!(!status.is_set);
+    let mail = password_set(&server, &alice, PASSWORD).await;
+    assert_eq!(
+        mail.subject,
+        mails::password_changed("en", &alice.email).subject
+    );
+    let status = accounts::password::get(&server, &alice.user)
+        .await
+        .expect("asked");
+    assert!(status.is_set);
+
+    let session = accounts::sign_in_with_password(&server, &alice.email.to_uppercase(), PASSWORD)
+        .await
+        .expect("the password matched");
+    assert_eq!(session.user.id, alice.user.id);
+    let user = users::get_by_token(&server, &session.token)
+        .await
+        .expect("the token works");
+    assert_eq!(user.id, alice.user.id);
+
+    let verifier = "a verifier only the device knows";
+    let device_code = accounts::sign_in_with_password_for_device(
+        &server,
+        &alice.email,
+        PASSWORD,
+        &accounts::challenge_of(verifier),
+    )
+    .await
+    .expect("a device code");
+    let session = accounts::sign_in_with_device_code(&server, &device_code.code, verifier)
+        .await
+        .expect("the device's session");
+    assert_eq!(session.user.id, alice.user.id);
+}
+
+conformance!(conformance_a_password_sign_in_refuses_every_way_alike);
+async fn conformance_a_password_sign_in_refuses_every_way_alike(server: Deployment) {
+    let alice = signed_up(&server).await;
+    password_set(&server, &alice, PASSWORD).await;
+    password_set(&server, &alice, "another horse battery").await;
+    let bob = signed_up(&server).await;
+    let guest = trial(&server).await;
+    let nobody = format!("{}@example.com", Uuid::now_v7().simple());
+    for (email, attempt) in [
+        (alice.email.as_str(), PASSWORD),
+        (alice.email.as_str(), ""),
+        (bob.email.as_str(), PASSWORD),
+        (guest.email.as_str(), PASSWORD),
+        (nobody.as_str(), PASSWORD),
+    ] {
+        let refused = accounts::sign_in_with_password(&server, email, attempt).await;
+        assert!(
+            matches!(
+                refused,
+                Err(accounts::AccountError::EmailOrPasswordDoesNotMatch)
+            ),
+            "{email} with {attempt:?}: {refused:?}"
+        );
+    }
+    accounts::sign_in_with_password(&server, &alice.email, "another horse battery")
+        .await
+        .expect("the new one");
 }

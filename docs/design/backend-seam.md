@@ -479,7 +479,12 @@ In order, each with conformance tests:
    when it compiles, so the lists stay one.
 2. **Renaming, built 2026-11-27**, with three conformance tests:
    `users/update`, and `app_users` in the sample's push.
-3. Next: passwords, then deletions.
+3. **Passwords, built 2026-11-27**, with two conformance tests. Rust
+   hashes a password and checks one, with Argon2id, as it does on its
+   own database. The backend keeps the hash it is given, and answers
+   it for a sign-in. So a backend needs no Argon2 and no password
+   rules, and a refusal takes the same work every way.
+4. Next: deletions, with the picture.
 
 ### Open questions and smaller fixes
 

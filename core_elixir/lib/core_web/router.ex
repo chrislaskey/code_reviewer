@@ -9,6 +9,7 @@ defmodule CoreWeb.Router do
     FilesController,
     MembershipsController,
     NotImplementedController,
+    PasswordController,
     SyncController,
     TrialUsersController,
     UsersController
@@ -35,6 +36,11 @@ defmodule CoreWeb.Router do
     post "/accounts/sign_in_with_device_code", AccountsController, :sign_in_with_device_code
     post "/accounts/sign_in_from_trial", AccountsController, :sign_in_from_trial
     post "/accounts/sign_out", AccountsController, :sign_out
+    post "/accounts/sign_in_with_password", AccountsController, :sign_in_with_password
+    post "/accounts/sign_in_with_password_for_device", AccountsController, :sign_in_with_password_for_device
+    post "/accounts/password/get", PasswordController, :get
+    post "/accounts/password/update", PasswordController, :update
+    post "/accounts/password/get_hash", PasswordController, :get_hash
     post "/accounts/preferences/get", PreferencesController, :get
     post "/accounts/preferences/update", PreferencesController, :update
 

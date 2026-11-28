@@ -612,6 +612,10 @@ async fn with_password<Finished: FromFinish>(
         return Err(AccountError::ServerOnly);
     }
     let email = accounts_users::checked_email(email)?;
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return from_backend::with_password(backend, &email, password, finish).await;
+    }
     let mut tx = deployment.begin().await?;
     let account = accounts_users::get_by_email(&mut tx, &email)
         .await?
@@ -646,8 +650,9 @@ async fn finish_proven_in<Finished: FromFinish>(
     Ok(Finished::from_finish(user, account.email.clone(), secret))
 }
 
-/// What `finish_in` answered, as the caller's kind of finished sign-in.
-trait FromFinish {
+/// What `finish_in` answered, as the caller's kind of finished sign-in,
+/// which a remote backend answers too.
+trait FromFinish: serde::de::DeserializeOwned {
     fn from_finish(user: User, email: String, secret: String) -> Self;
 }
 
@@ -910,6 +915,70 @@ mod from_backend {
             .map_err(account_error)
     }
 
+    /// A sign-in with a password: the backend keeps the hash, and Rust
+    /// checks the password against it, as `with_password` does, so every
+    /// refusal is the same after the same work. Then the backend finishes
+    /// the sign-in.
+    pub(super) async fn with_password<Finished: FromFinish>(
+        backend: &RemoteBackend,
+        email: &str,
+        password: &str,
+        finish: Finish<'_>,
+    ) -> Result<Finished, AccountError> {
+        #[derive(Deserialize)]
+        struct Hash {
+            user_id: Option<Uuid>,
+            password_hash: Option<String>,
+        }
+        let hash: Hash = backend
+            .call("accounts/password/get_hash", &json!({ "email": email }))
+            .await
+            .map_err(account_error)?;
+        let matches = accounts_credentials::verify_hash(hash.password_hash, password).await?;
+        let user_id = match hash.user_id {
+            Some(user_id) if matches => user_id,
+            _ => return Err(AccountError::EmailOrPasswordDoesNotMatch),
+        };
+        let (action, request) = match finish {
+            Finish::Session => (
+                "accounts/sign_in_with_password",
+                json!({ "user_id": user_id, "terms_version": TERMS_VERSION }),
+            ),
+            Finish::Device { challenge } => (
+                "accounts/sign_in_with_password_for_device",
+                json!({ "user_id": user_id, "challenge": challenge, "terms_version": TERMS_VERSION }),
+            ),
+        };
+        backend.call(action, &request).await.map_err(account_error)
+    }
+
+    /// Rust hashes the password and the backend keeps the hash; Rust
+    /// mails the account that it changed.
+    pub(in crate::accounts) async fn password_update(
+        backend: &RemoteBackend,
+        mailer: &Mailer,
+        user: &User,
+        password: &str,
+        requested: &str,
+    ) -> Result<(), AccountError> {
+        #[derive(Deserialize)]
+        struct Updated {
+            mail: MailToSend,
+        }
+        let password_hash = accounts_credentials::checked_hash(password).await?;
+        let request = json!({
+            "user_id": user.id,
+            "password_hash": password_hash,
+            "locale": requested,
+        });
+        let updated: Updated = backend
+            .call("accounts/password/update", &request)
+            .await
+            .map_err(account_error)?;
+        mailer.send(mail_of(updated.mail)?).await?;
+        Ok(())
+    }
+
     pub(super) async fn sign_out(backend: &RemoteBackend, token: &str) -> Result<(), AccountError> {
         let _: serde_json::Value = backend
             .call("accounts/sign_out", &json!({ "token": token }))
@@ -924,12 +993,13 @@ mod from_backend {
         match (mail.kind.as_str(), mail.code) {
             ("sign_in_code", Some(code)) => Ok(mails::sign_in_code(locale, &mail.to, &code)),
             ("no_account", _) => Ok(mails::no_account(locale, &mail.to)),
+            ("password_changed", _) => Ok(mails::password_changed(locale, &mail.to)),
             (kind, _) => Err(BackendError::Malformed(format!("a mail of kind {kind}")).into()),
         }
     }
 
     /// The account's error for each code the protocol gives a sign-in.
-    fn account_error(error: BackendError) -> AccountError {
+    pub(in crate::accounts) fn account_error(error: BackendError) -> AccountError {
         match error.code() {
             Some("wrong_code") => AccountError::CodeDoesNotMatch,
             Some("sign_in_expired") => AccountError::SignInExpired,

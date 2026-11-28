@@ -44,6 +44,17 @@ defmodule CoreWeb.AccountsController do
          do: json(conn, session)
   end
 
+  def sign_in_with_password(conn, params) do
+    with {:ok, session} <- Accounts.sign_in_with_password(params["user_id"], params["terms_version"]),
+         do: json(conn, session)
+  end
+
+  def sign_in_with_password_for_device(conn, params) do
+    with {:ok, code} <-
+           Accounts.sign_in_with_password_for_device(params["user_id"], params["challenge"], params["terms_version"]),
+         do: json(conn, code)
+  end
+
   def sign_out(conn, params) do
     :ok = Accounts.sign_out(params["token"])
     json(conn, %{})

@@ -271,8 +271,47 @@ longer applies, a language since dropped say, reads as null.
 - A code's mail is in the language the account chose, else the one
   asked for.
 
-Specified, not in the sample: the password operations,
-`accounts/deletions/*`, and the commerce and ops operations of
+**`accounts/password/get`** (sample). `{"user_id"} → {"is_set": true}`:
+whether the user has a password.
+
+**`accounts/password/update`** (sample). Keeps a password's hash as
+the user's, their first or in place of the one they had.
+
+```json
+{"user_id": "…", "password_hash": "$argon2id$…", "locale": "en"}
+→ {"mail": {"kind": "password_changed", "to": "…", "locale": "en", "code": null}}
+```
+
+- Rust checks the password's length and hashes it. The backend keeps
+  the hash as it is, in `accounts_credentials`, and never sees the
+  password.
+- The mail tells the account's email, in the language it chose. Rust
+  sends it.
+
+**`accounts/password/get_hash`** (sample). The account a password signs
+in, and its hash, for Rust to check.
+
+```json
+{"email": "…"}
+→ {"user_id": "…" | null, "password_hash": "$argon2id$…" | null}
+```
+
+- Only a confirmed account, not a trial, has a `user_id` here. Its
+  `password_hash` is null when it has no password.
+- Rust checks the password against the hash, or against a hash nobody
+  has when there is none, so every refusal takes the same work. Then it
+  calls one of the two below.
+
+**`accounts/sign_in_with_password`** (sample).
+`{"user_id", "terms_version"} → {"user", "email", "token"}`: finishes a
+sign-in whose password Rust checked. It records the terms, as the last
+step of a code's sign-in does. **`accounts/sign_in_with_password_for_device`**
+(sample). `{"user_id", "challenge", "terms_version"} → {"code"}`: the
+same for a device, with a code it collects as after
+`sign_in_confirm_for_device`. An account that is no longer confirmed
+and full is `sign_in_expired`.
+
+Specified, not in the sample: `accounts/deletions/*`, and the commerce and ops operations of
 `backend-seam.md` §2.
 
 ### Sync

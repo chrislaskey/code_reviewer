@@ -18,6 +18,24 @@ Each entry: the date and a title, the commits, **What changed**, and
 in the commit that makes such a change, naming the earlier commits it
 completes.
 
+## 2026-11-27: passwords on a remote backend
+
+Commits: this one. `docs/design/backend-seam.md`, step 4.
+
+- **What changed**.
+  - Beside a remote backend, `accounts::password::get` and `update`,
+    `sign_in_with_password` and `sign_in_with_password_for_device` call
+    it. Rust still hashes and checks every password; the backend keeps
+    the hash: `accounts/password/get`, `update` and `get_hash`, then
+    `accounts/sign_in_with_password` or its `_for_device`.
+  - `data::accounts_credentials` has `checked_hash` and `verify_hash`,
+    crate-private, for the remote path.
+  - `core_elixir/` serves them, and the conformance suite has two more
+    tests.
+- **What an app does**.
+  - **Required**, for an app with its own remote backend: serve the
+    five operations, or passwords fail beside it.
+
 ## 2026-11-27: renaming on a remote backend
 
 Commits: this one. `docs/design/backend-seam.md`, step 4.

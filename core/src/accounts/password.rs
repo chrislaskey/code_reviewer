@@ -30,6 +30,14 @@ pub async fn get(deployment: &Deployment, user: &User) -> Result<PasswordStatus,
     if deployment.role != Role::Server {
         return Err(AccountError::ServerOnly);
     }
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        let request = serde_json::json!({ "user_id": user.id });
+        return backend
+            .call("accounts/password/get", &request)
+            .await
+            .map_err(crate::accounts::from_backend::account_error);
+    }
     let mut tx = deployment.begin().await?;
     let is_set = accounts_credentials::is_set(&mut tx, user.id).await?;
     tx.commit().await?;
@@ -48,6 +56,17 @@ pub async fn update(
 ) -> Result<(), AccountError> {
     if deployment.role != Role::Server {
         return Err(AccountError::ServerOnly);
+    }
+    #[cfg(feature = "remote-backend")]
+    if let Some(backend) = &deployment.remote_backend {
+        return crate::accounts::from_backend::password_update(
+            backend,
+            mailer,
+            user,
+            &update.password,
+            requested,
+        )
+        .await;
     }
     let mut tx = deployment.begin().await?;
     let account = accounts_users::get(&mut tx, user.id)

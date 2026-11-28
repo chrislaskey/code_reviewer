@@ -172,10 +172,7 @@ defmodule Core.Accounts do
   def sign_in_confirm(pending, terms_version) do
     with {:ok, row} <- confirm_row(pending) do
       Repo.transaction(fn ->
-        account = confirmed(row, terms_version)
-        token = Random.hex(32)
-        AccountsTokens.create(account.id, AccountsTokens.context_api(), token)
-        %{"user" => AppUsers.to_wire(AppUsers.get(account.id)), "email" => account.email, "token" => token}
+        row |> confirmed(terms_version) |> session_of()
       end)
     end
   end
@@ -188,10 +185,7 @@ defmodule Core.Accounts do
   def sign_in_confirm_for_device(pending, challenge, terms_version) when is_binary(challenge) do
     with {:ok, row} <- confirm_row(pending) do
       Repo.transaction(fn ->
-        account = confirmed(row, terms_version)
-        code = Random.hex(16)
-        AccountsTokens.create(account.id, AccountsTokens.context_device_code(), code <> challenge)
-        %{"code" => code}
+        row |> confirmed(terms_version) |> device_code_of(challenge)
       end)
     end
   end
@@ -212,15 +206,59 @@ defmodule Core.Accounts do
       row ->
         Repo.transaction(fn ->
           AccountsTokens.delete(row)
-          account = AccountsUsers.get(row.user_id)
-          token = Random.hex(32)
-          AccountsTokens.create(account.id, AccountsTokens.context_api(), token)
-          %{"user" => AppUsers.to_wire(AppUsers.get(account.id)), "email" => account.email, "token" => token}
+          row.user_id |> AccountsUsers.get() |> session_of()
         end)
     end
   end
 
   def sign_in_with_device_code(_code, _challenge), do: {:error, :unknown_device_code}
+
+  @doc """
+  Signs in the account whose password Rust checked, as
+  `accounts::sign_in_with_password` does: the hash came from
+  `Core.Accounts.Password.get_hash/1`. Records the terms, as every
+  sign-in does.
+  """
+  def sign_in_with_password(user_id, terms_version) do
+    with {:ok, account} <- password_account(user_id) do
+      Repo.transaction(fn -> account |> terms_accepted(terms_version) |> session_of() end)
+    end
+  end
+
+  @doc "The same, for the device whose challenge it is: a code it collects, and no token."
+  def sign_in_with_password_for_device(user_id, challenge, terms_version) when is_binary(challenge) do
+    with {:ok, account} <- password_account(user_id) do
+      Repo.transaction(fn -> account |> terms_accepted(terms_version) |> device_code_of(challenge) end)
+    end
+  end
+
+  def sign_in_with_password_for_device(_user_id, _challenge, _terms_version),
+    do: {:error, {:invalid, %{"challenge" => ["is needed"]}}}
+
+  # Only an account that signs in with a password: confirmed, no trial
+  defp password_account(user_id) do
+    case live_account(user_id) do
+      {:ok, %AccountsUsers{confirmed_at: %DateTime{}, trial_expires_at: nil} = account} -> {:ok, account}
+      _ -> {:error, :sign_in_expired}
+    end
+  end
+
+  defp session_of(account) do
+    token = Random.hex(32)
+    AccountsTokens.create(account.id, AccountsTokens.context_api(), token)
+    %{"user" => AppUsers.to_wire(AppUsers.get(account.id)), "email" => account.email, "token" => token}
+  end
+
+  defp device_code_of(account, challenge) do
+    code = Random.hex(16)
+    AccountsTokens.create(account.id, AccountsTokens.context_device_code(), code <> challenge)
+    %{"code" => code}
+  end
+
+  defp terms_accepted(account, terms_version) do
+    now = Time.now()
+    AccountsUsers.update(%{account | terms_version: terms_version, terms_accepted_at: now, updated_at: now})
+  end
 
   defp confirm_row(pending) do
     case AccountsTokens.get_valid(pending || "", AccountsTokens.context_sign_in_confirm()) do
@@ -248,7 +286,7 @@ defmodule Core.Accounts do
           %{account | confirmed_at: now}
       end
 
-    AccountsUsers.update(%{account | terms_version: terms_version, terms_accepted_at: now, updated_at: now})
+    terms_accepted(account, terms_version)
   end
 
   # A trial user's account as the person's own, once the code sent to
